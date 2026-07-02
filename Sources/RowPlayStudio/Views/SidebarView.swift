@@ -60,12 +60,14 @@ struct SidebarView: View {
     }
 
     private func toggleSort(_ field: WorkoutSortField) {
-        if library.query.sort == field {
-            library.query.dir = library.query.dir == .asc ? .desc : .asc
+        var newQuery = library.query
+        if newQuery.sort == field {
+            newQuery.dir = newQuery.dir == .asc ? .desc : .asc
         } else {
-            library.query.sort = field
-            library.query.dir = (field == .pace || field == .time) ? .asc : .desc
+            newQuery.sort = field
+            newQuery.dir = (field == .pace || field == .time) ? .asc : .desc
         }
+        library.query = newQuery
     }
 
     private func sortLabel(_ field: WorkoutSortField) -> String {

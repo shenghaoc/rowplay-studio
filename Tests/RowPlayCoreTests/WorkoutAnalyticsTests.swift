@@ -55,12 +55,13 @@ final class WorkoutAnalyticsTests: XCTestCase {
         let workouts = [
             makeWorkout(id: 1, distance: 2_000, time: 420),
             makeWorkout(id: 2, distance: 2_000, time: 430),
-            makeWorkout(id: 3, distance: 5_000, time: 1_100),
+            makeWorkout(id: 3, sport: .skierg, distance: 5_000, time: 1_100),
         ]
 
         let pbs = WorkoutAnalytics.dashboardPersonalBests(for: workouts, pbIds: [1, 3])
 
         XCTAssertEqual(pbs.map(\.id), [1, 3])
+        XCTAssertEqual(pbs.map(\.sport), [.rower, .skierg])
         XCTAssertEqual(pbs.map(\.distance), [2_000, 5_000])
     }
 

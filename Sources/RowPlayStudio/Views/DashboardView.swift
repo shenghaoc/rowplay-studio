@@ -82,9 +82,14 @@ struct DashboardView: View {
                 ], spacing: 10) {
                     ForEach(pbs) { pb in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(pbLabel(pb.distance))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                Image(systemName: sportIcon(pb.sport))
+                                    .foregroundStyle(.secondary)
+                                Text(pbLabel(pb.distance))
+                                Text(pb.sport.displayName)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
                             Text(RowPlayFormatting.time(pb.time, tenths: true))
                                 .font(.title3.monospacedDigit().weight(.semibold))
                             Text(RowPlayFormatting.pace(pb.time / (pb.distance / 500)))

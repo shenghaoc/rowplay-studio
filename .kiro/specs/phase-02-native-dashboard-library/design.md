@@ -43,7 +43,7 @@ A pure, testable module porting the web app's `workoutQuery.ts`:
 
 ### 5. DashboardView Enhancements (`Sources/RowPlayStudio/Views/DashboardView.swift`)
 
-- Add PB highlights section showing each standard-distance PB from `WorkoutAnalytics.dashboardPersonalBests`.
+- Add PB highlights section showing each standard-distance PB, including sport context, from `WorkoutAnalytics.dashboardPersonalBests`.
 - Add per-sport summary cards.
 - All data from `RowPlayCore` analytics, no view-local computation.
 

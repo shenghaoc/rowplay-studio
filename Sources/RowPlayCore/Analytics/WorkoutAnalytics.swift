@@ -23,6 +23,7 @@ public struct DashboardSummary: Equatable, Sendable {
 
 public struct DashboardPersonalBest: Equatable, Identifiable, Sendable {
     public var id: Int
+    public var sport: Sport
     public var distance: Double
     public var time: TimeInterval
     public var date: Date
@@ -98,6 +99,7 @@ public enum WorkoutAnalytics {
 
                 return DashboardPersonalBest(
                     id: workout.id,
+                    sport: workout.sport,
                     distance: standardDistance,
                     time: workout.time,
                     date: workout.date

@@ -116,13 +116,10 @@ public enum WorkoutQuery {
         let filtered = workouts.filter { w in
             if let sport = query.sport, w.sport != sport { return false }
             if let wt = query.workoutType, w.workoutType != wt { return false }
-            if let from = query.dateFrom {
+            if query.dateFrom != nil || query.dateTo != nil {
                 let dayKey = RowPlayDateTime.dayKeyFromDate(w.date)
-                if dayKey < from { return false }
-            }
-            if let to = query.dateTo {
-                let dayKey = RowPlayDateTime.dayKeyFromDate(w.date)
-                if dayKey > to { return false }
+                if let from = query.dateFrom, dayKey < from { return false }
+                if let to = query.dateTo, dayKey > to { return false }
             }
             if let nominal = query.distanceM {
                 if abs(w.distance - nominal) > nominal * 0.02 { return false }
