@@ -2,8 +2,10 @@ import RowPlayCore
 import SwiftUI
 
 struct ContentView: View {
+    private static let dashboardSelectionID = -1
+
     @ObservedObject var library: WorkoutLibrary
-    @SceneStorage("selectedWorkoutID") private var selectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+    @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
 
     var body: some View {
         NavigationSplitView {
@@ -13,16 +15,20 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if let detail = library.detail(id: selectedWorkoutID) {
+            if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
                 WorkoutDetailView(detail: detail, summary: library.summary)
             } else {
-                DashboardView(summary: library.summary, details: library.filteredDetails)
+                DashboardView(
+                    summary: library.filteredSummary,
+                    workouts: library.filteredWorkouts,
+                    pbIds: library.pbIds
+                )
             }
         }
-        .searchable(text: $library.searchText, placement: .sidebar)
+        .searchable(text: searchTextBinding, placement: .sidebar)
         .toolbar {
             ToolbarItemGroup {
-                Picker("Sport", selection: $library.selectedSport) {
+                Picker("Sport", selection: sportBinding) {
                     Text("All").tag(Sport?.none)
                     ForEach(Sport.allCases) { sport in
                         Text(sport.displayName).tag(Sport?.some(sport))
@@ -33,7 +39,7 @@ struct ContentView: View {
 
                 Button {
                     library.reloadDemoData()
-                    selectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+                    storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
                 } label: {
                     Label("Reload Demo Library", systemImage: "arrow.clockwise")
                 }
@@ -41,12 +47,31 @@ struct ContentView: View {
         }
     }
 
+    private var selectedWorkoutID: Int? {
+        storedSelectedWorkoutID == Self.dashboardSelectionID ? nil : storedSelectedWorkoutID
+    }
+
     private var selectionBinding: Binding<Int?> {
         Binding {
             selectedWorkoutID
         } set: { newValue in
-            selectedWorkoutID = newValue ?? DemoWorkoutLibrary.defaultWorkoutID
+            storedSelectedWorkoutID = newValue ?? Self.dashboardSelectionID
+        }
+    }
+
+    private var sportBinding: Binding<Sport?> {
+        Binding {
+            library.query.sport
+        } set: { newValue in
+            library.query.sport = newValue
+        }
+    }
+
+    private var searchTextBinding: Binding<String> {
+        Binding {
+            library.query.searchText ?? ""
+        } set: { newValue in
+            library.query.searchText = newValue.isEmpty ? nil : newValue
         }
     }
 }
-

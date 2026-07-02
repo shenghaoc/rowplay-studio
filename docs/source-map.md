@@ -9,11 +9,12 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/paceInput.ts` | `Sources/RowPlayCore/Support/PaceInput.swift` | Phase 1 ports pace string parsing and formatting. |
 | `src/lib/datetime.ts` | `Sources/RowPlayCore/Support/RowPlayDateTime.swift` | Phase 1 ports logbook timestamp parsing, day-key arithmetic, and timezone-aware day resolution. |
 | `src/lib/privacy.ts` | `Sources/RowPlayCore/Support/PrivacyRedaction.swift` | Phase 1 ports the share-link privacy guard (`isPubliclyShareable`). |
-| `src/lib/analytics.ts` | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 0 ports summaries, distance bands, and linear trend only. |
+| `src/lib/analytics.ts` | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 0 ports summaries, distance bands, and linear trend; Phase 2 adds dashboard PB card and recent pace derivations. |
 | `src/lib/analytics.ts` (PBs) | `Sources/RowPlayCore/Analytics/PersonalBests.swift` | Phase 1 ports personal best detection at standard distances with ±2% tolerance. |
 | `src/lib/performancePredictor.ts` | `Sources/RowPlayCore/Analytics/PerformancePredictor.swift` | Phase 1 ports Paul's Law predictions and prediction table with beaten/behind/untried status. |
 | `src/lib/mockData.ts` | `Sources/RowPlayCore/Fixtures/DemoWorkoutLibrary.swift` | Phase 0 ports deterministic demo workouts to keep the native app explorable without Concept2 credentials. |
-| `src/routes/dashboard` and dashboard components | `Sources/RowPlayStudio/Views/DashboardView.swift` | Phase 0 creates a native dashboard shell; full parity is Phase 2. |
+| `src/routes/dashboard` and dashboard components | `Sources/RowPlayStudio/Views/DashboardView.swift` | Phase 0 creates a native dashboard shell; Phase 2 adds PB highlights, sport summaries, and query-driven filtering. |
+| `src/lib/workoutQuery.ts` | `Sources/RowPlayCore/Library/WorkoutQuery.swift` | Phase 2 ports filter, sort, search, distance/duration chip toggling, PB-only filtering, and average power. |
+| `src/components/WorkoutListFilters.svelte` | `Sources/RowPlayStudio/Views/SidebarView.swift` + toolbar | Phase 2 adds sort menu and sport segmented picker to native sidebar/toolbar. |
 | `src/routes/replay/[id]` and `src/lib/replay` | Future Phase 3 | Not yet ported beyond exposing stroke data and split tables. |
 | `src/lib/server/concept2.ts`, `session.ts`, `db.ts` | Future Phase 4 | Native sync should use URLSession, Keychain, and local SQLite rather than Cloudflare KV/D1. |
-

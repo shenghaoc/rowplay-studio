@@ -41,15 +41,19 @@ Exit criteria:
 
 Scope:
 
-- Replace the Phase 0 dashboard with a production-grade macOS library surface: filters, sort, search, sport chips, personal bests, calendar/heatmap, PMC, goals, and workout list ergonomics.
-- Add local persistence for demo/imported workouts.
-- Support file import from rowplay JSON/CSV exports before Concept2 sync is native.
+- Port `workoutQuery.ts` pure query/filter/sort engine into `RowPlayCore/Library/WorkoutQuery.swift`.
+- Wire `WorkoutQuery` into `WorkoutLibrary` store so filtering/sorting is not view-local math.
+- Add sidebar sort menu, sport segmented picker, PB badge on workout rows.
+- Enhance dashboard with personal bests grid, per-sport summary cards, challenge distance metric.
+- Add `WorkoutQueryTests` covering filter, sort, chip toggling, PB detection, and edge cases.
 
 Exit criteria:
 
 - The native dashboard is usable offline with imported or demo data.
 - Dashboard calculations come from `RowPlayCore`, not view-local math.
-- Keyboard navigation and VoiceOver labels are covered in review.
+- `swift test` and `swift build` pass.
+
+Status: implemented in draft PR #2 on `codex/phase-02-native-dashboard-library`; pending merge.
 
 ## Phase 3 - Replay Engine And Native Renderer
 
@@ -123,4 +127,3 @@ Exit criteria:
 - Phase 0: direct commit to `main` to create the native scaffold.
 - Phase 1 onward: one branch and pull request per phase.
 - Phase PRs should include the relevant `.kiro/specs/phase-XX-*` updates, local validation commands, and a truthful scope statement.
-

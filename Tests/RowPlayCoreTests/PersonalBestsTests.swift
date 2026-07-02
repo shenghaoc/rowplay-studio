@@ -124,4 +124,9 @@ final class PersonalBestsTests: XCTestCase {
 
         XCTAssertEqual(ids, [1])
     }
+
+    func testStandardDistanceMatchesWithinTolerance() {
+        XCTAssertEqual(PersonalBests.standardDistance(matching: 2_003), 2_000)
+        XCTAssertNil(PersonalBests.standardDistance(matching: 1_700))
+    }
 }

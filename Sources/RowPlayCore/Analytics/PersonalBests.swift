@@ -19,7 +19,7 @@ public struct PersonalBest: Equatable, Sendable {
 
 public enum PersonalBests {
     /// Standard Concept2 race distances for PB tracking.
-    public static let standardDistances: [Double] = [500, 1000, 2000, 5000, 6000, 10000, 21_097]
+    public static let standardDistances: [Double] = [500, 1000, 2000, 5000, 6000, 10000, 21_097, 42_195]
 
     /// Distance matching tolerance (±2%).
     private static let distanceTolerance = 0.02
@@ -41,6 +41,13 @@ public enum PersonalBests {
     /// When `sport` is non-nil, only workouts matching that sport are considered.
     public static func pbWorkoutIds(for workouts: [Workout], sport: Sport? = nil) -> Set<Int> {
         Set(bestWorkoutsPerStandardDistance(for: workouts, sport: sport).map { $0.workout.id })
+    }
+
+    /// Returns the canonical standard distance matched by a workout distance.
+    public static func standardDistance(matching distance: Double) -> Double? {
+        standardDistances.first { target in
+            abs(distance - target) <= target * distanceTolerance
+        }
     }
 
     private static func bestWorkoutsPerStandardDistance(
