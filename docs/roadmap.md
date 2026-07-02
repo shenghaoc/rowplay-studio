@@ -23,9 +23,11 @@ Exit criteria:
 
 ## Phase 1 - Core Parity Foundation
 
+Status: in progress on `codex/phase-01-core-parity-foundation`.
+
 Scope:
 
-- Port the pure TypeScript helpers that do not depend on Cloudflare or the DOM: datetime handling, workout query/filtering, personal bests, training zones, milestones, performance predictor, rep comparison, and privacy redaction rules.
+- Port the pure TypeScript helpers that do not depend on Cloudflare or the DOM: datetime handling, pace input parsing, personal bests, performance predictor, and privacy redaction.
 - Build fixture parity against the web app's golden demo workouts.
 - Introduce a `RowPlayCoreTests/Fixtures` strategy so native and web calculations can be compared without hand-inspecting charts.
 
