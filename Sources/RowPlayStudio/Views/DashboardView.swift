@@ -46,7 +46,7 @@ struct DashboardView: View {
                     Text("Recent Pace")
                         .font(.title3.weight(.semibold))
 
-                    Chart(recentRowerPieces) { workout in
+                    Chart(recentPaceWorkouts) { workout in
                         LineMark(
                             x: .value("Date", workout.date),
                             y: .value("Pace", workout.pace)
@@ -109,6 +109,12 @@ struct DashboardView: View {
     }
 
     private func pbLabel(_ distance: Double) -> String {
+        if abs(distance - 21_097) < 10 {
+            return "Half"
+        }
+        if abs(distance - 42_195) < 10 {
+            return "Marathon"
+        }
         if distance >= 1_000 {
             return "\(Int(distance / 1_000))k"
         }
@@ -153,7 +159,7 @@ struct DashboardView: View {
         }
     }
 
-    private var recentRowerPieces: [Workout] {
+    private var recentPaceWorkouts: [Workout] {
         // Use the active sport filter if set; otherwise default to the sport with the most workouts.
         let sport: Sport = {
             let sports = Set(workouts.map(\.sport))

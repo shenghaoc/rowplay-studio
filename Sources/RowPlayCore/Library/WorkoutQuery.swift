@@ -69,7 +69,7 @@ public struct WorkoutListQuery: Equatable, Sendable {
             || dateTo != nil
             || distanceM != nil
             || hasStroke != nil
-            || !(searchText ?? "").isEmpty
+            || !(searchText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
             || pbsOnly
             || durationMin != nil
             || durationMax != nil
@@ -112,15 +112,15 @@ public enum WorkoutQuery {
         } else {
             nil
         }
+        let dateFrom = dayStartDate(query.dateFrom)
+        let dateToExclusive = dayEndExclusiveDate(query.dateTo)
+        let searchText = query.searchText?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let filtered = workouts.filter { w in
             if let sport = query.sport, w.sport != sport { return false }
             if let wt = query.workoutType, w.workoutType != wt { return false }
-            if query.dateFrom != nil || query.dateTo != nil {
-                let dayKey = RowPlayDateTime.dayKeyFromDate(w.date)
-                if let from = query.dateFrom, dayKey < from { return false }
-                if let to = query.dateTo, dayKey > to { return false }
-            }
+            if let dateFrom, w.date < dateFrom { return false }
+            if let dateToExclusive, w.date >= dateToExclusive { return false }
             if let nominal = query.distanceM {
                 if abs(w.distance - nominal) > nominal * 0.02 { return false }
             }
@@ -128,9 +128,7 @@ public enum WorkoutQuery {
                 if hasStroke && !w.hasStrokeData { return false }
                 if !hasStroke && w.hasStrokeData { return false }
             }
-            if let rawText = query.searchText {
-                let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { return true }
+            if let text = searchText, !text.isEmpty {
                 let match = w.workoutType.localizedCaseInsensitiveContains(text)
                     || w.sport.displayName.localizedCaseInsensitiveContains(text)
                     || (w.comments?.localizedCaseInsensitiveContains(text) ?? false)
@@ -224,5 +222,23 @@ public enum WorkoutQuery {
     /// Clear all filters, preserving sort.
     public static func clearFilters(_ query: WorkoutListQuery) -> WorkoutListQuery {
         WorkoutListQuery(sort: query.sort, dir: query.dir)
+    }
+
+    private static func dayStartDate(_ dayKey: String?) -> Date? {
+        guard let key = dayKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !key.isEmpty else {
+            return nil
+        }
+        let millis = RowPlayDateTime.dayKeyEpochMillis(key)
+        guard millis.isFinite else { return nil }
+        return Date(timeIntervalSince1970: millis / 1_000)
+    }
+
+    private static func dayEndExclusiveDate(_ dayKey: String?) -> Date? {
+        guard let key = dayKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !key.isEmpty else {
+            return nil
+        }
+        return dayStartDate(RowPlayDateTime.dayKeyAddingDays(1, to: key))
     }
 }

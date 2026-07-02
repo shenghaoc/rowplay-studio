@@ -60,7 +60,7 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     func detail(id: Int) -> WorkoutDetail? {
-        detailByID[id] ?? details.first { $0.id == id }
+        detailByID[id]
     }
 
     func reloadDemoData() {

@@ -79,6 +79,18 @@ final class WorkoutQueryTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), [1])
     }
 
+    func testWhitespaceSearchDoesNotBypassRemainingFilters() {
+        let workouts = [
+            makeWorkout(id: 1, distance: 2_000, time: 400),
+            makeWorkout(id: 2, distance: 2_000, time: 600),
+        ]
+        let q = WorkoutListQuery(searchText: " \n\t ", pbsOnly: true, durationMin: 500)
+
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
     func testFilterByDistanceChip() {
         let workouts = [
             makeWorkout(id: 1, distance: 2_003), // within ±2%
@@ -350,6 +362,10 @@ final class WorkoutQueryTests: XCTestCase {
         q = WorkoutQuery.defaultQuery
         q.searchText = "test"
         XCTAssertTrue(q.isFiltered)
+
+        q = WorkoutQuery.defaultQuery
+        q.searchText = " \n\t "
+        XCTAssertFalse(q.isFiltered)
 
         q = WorkoutQuery.defaultQuery
         q.pbsOnly = true

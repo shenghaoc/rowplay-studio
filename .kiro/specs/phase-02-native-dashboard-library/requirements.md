@@ -7,7 +7,7 @@ The native app must port the web app's `workoutQuery.ts` pure query/filter/sort 
 - **R1.1** `WorkoutSortField` enum: `date`, `distance`, `time`, `pace`, `power`.
 - **R1.2** `SortDir` enum: `asc`, `desc`.
 - **R1.3** `WorkoutListQuery` struct captures all filter/sort state: sport, workoutType, dateFrom, dateTo, distanceM, hasStroke, searchText, pbsOnly, durationMin, durationMax, sort, dir.
-- **R1.4** `WorkoutQuery.filterAndSortWorkouts(_:query:pbIds:)` applies every filter field and returns sorted results.
+- **R1.4** `WorkoutQuery.filterAndSortWorkouts(_:query:pbIds:)` applies every filter field and returns sorted results; whitespace-only search text is ignored without bypassing subsequent filters.
 - **R1.5** Distance chip constants: 500, 2000, 5000, 10000, 42195 metres with ±2% tolerance matching.
 - **R1.6** Duration chip constants: 1200, 1800, 3600 seconds with ±10% tolerance matching.
 - **R1.7** `toggleDistanceChip` and `toggleDurationChip` toggle chips on/off (clearing the other chip type).
@@ -38,7 +38,7 @@ The native app must port the web app's `workoutQuery.ts` pure query/filter/sort 
 
 ## R5: Test Coverage
 
-- **R5.1** `WorkoutQueryTests` covers: filter by sport, filter by date range, filter by distance chip, filter by duration chip, filter by search text, filter by PBs-only, sort by each field ascending/descending, toggle chips on/off, empty result handling.
+- **R5.1** `WorkoutQueryTests` covers: filter by sport, filter by date range, filter by distance chip, filter by duration chip, filter by search text including whitespace-only text, filter by PBs-only, sort by each field ascending/descending, toggle chips on/off, empty result handling.
 - **R5.2** `swift test` passes.
 - **R5.3** `swift build` passes.
 

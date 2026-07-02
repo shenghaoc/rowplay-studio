@@ -21,6 +21,8 @@ A pure, testable module porting the web app's `workoutQuery.ts`:
   - `pbWorkoutIds(workouts:sport:)` — PB workout IDs at standard distances.
   - Dashboard support helpers in `WorkoutAnalytics` derive PB cards and recent pace workouts for SwiftUI rendering.
 - `DistanceChip` and `DurationChip` constants matching web's `DISTANCE_CHIPS` and `DURATION_CHIPS`.
+- Search text is trimmed once per query; empty/whitespace-only text is ignored while later filters still run.
+- Date string boundaries are resolved once per query to UTC `Date` bounds, then compared directly inside the per-workout filter loop.
 
 ### 2. WorkoutLibrary Store Updates (`Sources/RowPlayStudio/Stores/WorkoutLibrary.swift`)
 
