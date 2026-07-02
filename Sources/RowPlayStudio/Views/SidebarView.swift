@@ -45,6 +45,16 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("RowPlay")
+        .background(clearSelectionButton)
+    }
+
+    private var clearSelectionButton: some View {
+        Button("") {
+            selectedWorkoutID = nil
+        }
+        .keyboardShortcut(.escape, modifiers: [])
+        .opacity(0)
+        .accessibilityHidden(true)
     }
 
     private func toggleSort(_ field: WorkoutSortField) {
@@ -87,7 +97,7 @@ private struct WorkoutSidebarRow: View {
                     }
                 }
                 HStack(spacing: 4) {
-                    Text(workout.date, format: .dateTime.month(.abbreviated).day())
+                    Text(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day())
                         .font(.caption)
                     Text("·")
                         .font(.caption)
@@ -125,4 +135,3 @@ private struct WorkoutSidebarRow: View {
         }
     }
 }
-

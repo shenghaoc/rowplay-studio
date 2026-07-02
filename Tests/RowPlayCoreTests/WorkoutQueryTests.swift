@@ -13,6 +13,7 @@ final class WorkoutQueryTests: XCTestCase {
         date: Date = Date(timeIntervalSince1970: 1_700_000_000),
         workoutType: String = "JustRow",
         comments: String? = nil,
+        source: String? = nil,
         hasStrokeData: Bool = true,
         wattMinutes: Double? = nil
     ) -> Workout {
@@ -26,6 +27,7 @@ final class WorkoutQueryTests: XCTestCase {
             wattMinutes: wattMinutes,
             workoutType: workoutType,
             comments: comments,
+            source: source,
             hasStrokeData: hasStrokeData
         )
     }
@@ -53,6 +55,16 @@ final class WorkoutQueryTests: XCTestCase {
             makeWorkout(id: 2, workoutType: "JustRow"),
         ]
         let q = WorkoutListQuery(workoutType: "2000m test")
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [1])
+    }
+
+    func testFilterBySearchTextMatchesSourceCaseInsensitively() {
+        let workouts = [
+            makeWorkout(id: 1, source: "Concept2 Online Logbook"),
+            makeWorkout(id: 2, source: "Manual entry"),
+        ]
+        let q = WorkoutListQuery(searchText: "logbook")
         let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
         XCTAssertEqual(result.map(\.id), [1])
     }
@@ -109,6 +121,17 @@ final class WorkoutQueryTests: XCTestCase {
         let q = WorkoutListQuery(pbsOnly: true)
         let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
         XCTAssertEqual(result.map(\.id), [1])
+    }
+
+    func testFilterByPBsOnlyRespectsSportFilter() {
+        let workouts = [
+            makeWorkout(id: 1, sport: .rower, distance: 2_000, time: 400),
+            makeWorkout(id: 2, sport: .skierg, distance: 2_000, time: 430),
+            makeWorkout(id: 3, sport: .skierg, distance: 2_000, time: 460),
+        ]
+        let q = WorkoutListQuery(sport: .skierg, pbsOnly: true)
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [2])
     }
 
     // MARK: - Sort Tests

@@ -2,8 +2,10 @@ import RowPlayCore
 import SwiftUI
 
 struct ContentView: View {
+    private static let dashboardSelectionID = -1
+
     @ObservedObject var library: WorkoutLibrary
-    @SceneStorage("selectedWorkoutID") private var selectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+    @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
 
     var body: some View {
         NavigationSplitView {
@@ -13,7 +15,7 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if let detail = library.detail(id: selectedWorkoutID) {
+            if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
                 WorkoutDetailView(detail: detail, summary: library.summary)
             } else {
                 DashboardView(
@@ -37,7 +39,7 @@ struct ContentView: View {
 
                 Button {
                     library.reloadDemoData()
-                    selectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+                    storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
                 } label: {
                     Label("Reload Demo Library", systemImage: "arrow.clockwise")
                 }
@@ -45,11 +47,15 @@ struct ContentView: View {
         }
     }
 
+    private var selectedWorkoutID: Int? {
+        storedSelectedWorkoutID == Self.dashboardSelectionID ? nil : storedSelectedWorkoutID
+    }
+
     private var selectionBinding: Binding<Int?> {
         Binding {
             selectedWorkoutID
         } set: { newValue in
-            selectedWorkoutID = newValue ?? DemoWorkoutLibrary.defaultWorkoutID
+            storedSelectedWorkoutID = newValue ?? Self.dashboardSelectionID
         }
     }
 
@@ -69,4 +75,3 @@ struct ContentView: View {
         }
     }
 }
-

@@ -4,12 +4,22 @@ import RowPlayCore
 
 @MainActor
 final class WorkoutLibrary: ObservableObject {
-    @Published var details: [WorkoutDetail]
-    @Published var query: WorkoutListQuery
+    @Published var details: [WorkoutDetail] {
+        didSet {
+            refreshPBIds()
+        }
+    }
+    @Published var query: WorkoutListQuery {
+        didSet {
+            refreshPBIds()
+        }
+    }
+    @Published private(set) var pbIds: Set<Int> = []
 
     init(details: [WorkoutDetail], query: WorkoutListQuery = WorkoutQuery.defaultQuery) {
         self.details = details
         self.query = query
+        refreshPBIds()
     }
 
     static func demo() -> WorkoutLibrary {
@@ -22,16 +32,12 @@ final class WorkoutLibrary: ObservableObject {
 
     var filteredDetails: [WorkoutDetail] {
         let filteredWorkouts = WorkoutQuery.filterAndSortWorkouts(workouts, query: query, pbIds: pbIds)
-        let detailByID = Dictionary(uniqueKeysWithValues: details.map { ($0.id, $0) })
+        let detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return filteredWorkouts.compactMap { detailByID[$0.id] }
     }
 
     var summary: DashboardSummary {
         WorkoutAnalytics.dashboardSummary(for: workouts)
-    }
-
-    var pbIds: Set<Int> {
-        WorkoutQuery.pbWorkoutIds(workouts: workouts)
     }
 
     var availableWorkoutTypes: [String] {
@@ -46,5 +52,8 @@ final class WorkoutLibrary: ObservableObject {
         details = DemoWorkoutLibrary.details
         query = WorkoutQuery.defaultQuery
     }
-}
 
+    private func refreshPBIds() {
+        pbIds = WorkoutQuery.pbWorkoutIds(workouts: workouts, sport: query.sport)
+    }
+}

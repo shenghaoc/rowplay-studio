@@ -69,8 +69,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var personalBestsSection: some View {
-        let allWorkouts = details.map(\.workout)
-        let pbs = PersonalBests.distancePBs(for: allWorkouts)
+        let pbs = visiblePersonalBests
         if !pbs.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Personal Bests")
@@ -79,8 +78,7 @@ struct DashboardView: View {
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 180, maximum: 240))
                 ], spacing: 10) {
-                    ForEach(pbs.indices, id: \.self) { index in
-                        let pb = pbs[index]
+                    ForEach(pbs) { pb in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(pbLabel(pb.distance))
                                 .font(.caption)
@@ -90,6 +88,9 @@ struct DashboardView: View {
                             Text(RowPlayFormatting.pace(pb.time / (pb.distance / 500)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            Text(pb.date, format: .dateTime.year().month(.abbreviated).day())
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
@@ -97,6 +98,31 @@ struct DashboardView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var visiblePersonalBests: [DashboardPersonalBest] {
+        details
+            .compactMap { detail -> DashboardPersonalBest? in
+                let workout = detail.workout
+                guard pbIds.contains(workout.id),
+                      let standardDistance = standardPBDistance(for: workout.distance)
+                else {
+                    return nil
+                }
+                return DashboardPersonalBest(
+                    id: workout.id,
+                    distance: standardDistance,
+                    time: workout.time,
+                    date: workout.date
+                )
+            }
+            .sorted { $0.distance < $1.distance }
+    }
+
+    private func standardPBDistance(for distance: Double) -> Double? {
+        PersonalBests.standardDistances.first { target in
+            abs(distance - target) <= target * 0.02
         }
     }
 
@@ -116,7 +142,9 @@ struct DashboardView: View {
                 Text("By Sport")
                     .font(.title3.weight(.semibold))
 
-                HStack(spacing: 12) {
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 180, maximum: 240))
+                ], spacing: 12) {
                     ForEach(summary.bySport) { sport in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
@@ -159,3 +187,9 @@ struct DashboardView: View {
     }
 }
 
+private struct DashboardPersonalBest: Identifiable {
+    let id: Int
+    let distance: Double
+    let time: TimeInterval
+    let date: Date
+}

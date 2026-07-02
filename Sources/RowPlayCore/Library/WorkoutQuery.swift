@@ -99,8 +99,6 @@ public enum WorkoutChips {
 // MARK: - Query Engine
 
 public enum WorkoutQuery {
-    private static let standardPBDistances: [Double] = [500, 1_000, 2_000, 5_000, 6_000, 10_000, 21_097]
-
     // MARK: Filter + Sort
 
     /// Filter and sort workouts according to the query. Pure, testable.
@@ -134,13 +132,11 @@ public enum WorkoutQuery {
                 if !hasStroke && w.hasStrokeData { return false }
             }
             if let text = query.searchText, !text.isEmpty {
-                let haystack = [
-                    w.workoutType,
-                    w.sport.displayName,
-                    w.comments ?? "",
-                    w.source ?? "",
-                ].joined(separator: " ").lowercased()
-                if !haystack.contains(text.lowercased()) { return false }
+                let match = w.workoutType.localizedCaseInsensitiveContains(text)
+                    || w.sport.displayName.localizedCaseInsensitiveContains(text)
+                    || (w.comments?.localizedCaseInsensitiveContains(text) ?? false)
+                    || (w.source?.localizedCaseInsensitiveContains(text) ?? false)
+                if !match { return false }
             }
             if query.pbsOnly, let pbs, !pbs.contains(w.id) { return false }
             if let dMin = query.durationMin, w.time < dMin { return false }
@@ -210,17 +206,7 @@ public enum WorkoutQuery {
 
     /// Workout IDs that hold a PB at any standard distance, optionally filtered by sport.
     public static func pbWorkoutIds(workouts: [Workout], sport: Sport? = nil) -> Set<Int> {
-        var ids = Set<Int>()
-        for target in standardPBDistances {
-            let matches = workouts.filter { w in
-                abs(w.distance - target) <= target * 0.02
-                    && w.time > 0
-                    && (sport == nil || w.sport == sport)
-            }
-            guard let best = matches.min(by: { $0.time < $1.time }) else { continue }
-            ids.insert(best.id)
-        }
-        return ids
+        PersonalBests.pbWorkoutIds(for: workouts, sport: sport)
     }
 
     /// Create a default query (sort by date, descending).
