@@ -59,16 +59,17 @@ final class PersonalBestsTests: XCTestCase {
         XCTAssertEqual(pb2k?.time, 420)
     }
 
-    func testDistancePBsKeepsSeparateSportsWhenUnfiltered() {
+    func testDistancePBsPicksFastestAcrossSportsWhenUnfiltered() {
         let workouts = [
             makeWorkout(id: 1, sport: .rower, distance: 2000, time: 420),
             makeWorkout(id: 2, sport: .skierg, distance: 2000, time: 400),
         ]
         let pbs = PersonalBests.distancePBs(for: workouts)
 
-        XCTAssertEqual(pbs.filter { $0.distance == 2000 }.count, 2)
-        XCTAssertEqual(pbs.first { $0.distance == 2000 && $0.sport == .rower }?.time, 420)
-        XCTAssertEqual(pbs.first { $0.distance == 2000 && $0.sport == .skierg }?.time, 400)
+        let pb2k = pbs.filter { $0.distance == 2000 }
+        XCTAssertEqual(pb2k.count, 1)
+        XCTAssertEqual(pb2k.first?.time, 400)
+        XCTAssertEqual(pb2k.first?.sport, .skierg)
     }
 
     func testDistancePBsReturnsAllStandardDistances() {
@@ -104,14 +105,14 @@ final class PersonalBestsTests: XCTestCase {
         XCTAssertTrue(ids.isEmpty)
     }
 
-    func testPbWorkoutIdsKeepsSeparateSportsWhenUnfiltered() {
+    func testPbWorkoutIdsPicksFastestAcrossSportsWhenUnfiltered() {
         let workouts = [
             makeWorkout(id: 1, sport: .rower, distance: 2000, time: 420),
             makeWorkout(id: 2, sport: .skierg, distance: 2000, time: 400),
         ]
         let ids = PersonalBests.pbWorkoutIds(for: workouts)
 
-        XCTAssertEqual(ids, [1, 2])
+        XCTAssertEqual(ids, [2])
     }
 
     func testPbWorkoutIdsFiltersBySport() {

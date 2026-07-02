@@ -47,36 +47,15 @@ public enum PersonalBests {
         for workouts: [Workout],
         sport: Sport?
     ) -> [(distance: Double, workout: Workout)] {
+        let filtered = sport.map { s in workouts.filter { $0.sport == s } } ?? workouts
         var bests: [(distance: Double, workout: Workout)] = []
 
-        for sportWorkouts in workoutGroups(for: workouts, sport: sport) {
-            for target in standardDistances {
-                guard let best = bestWorkout(in: sportWorkouts, for: target) else { continue }
-                bests.append((distance: target, workout: best))
-            }
+        for target in standardDistances {
+            guard let best = bestWorkout(in: filtered, for: target) else { continue }
+            bests.append((distance: target, workout: best))
         }
 
         return bests
-    }
-
-    private static func workoutGroups(for workouts: [Workout], sport: Sport?) -> [[Workout]] {
-        if let sport {
-            return [workouts.filter { $0.sport == sport }]
-        }
-
-        var groups: [[Workout]] = []
-        var groupIndexBySport: [Sport: Int] = [:]
-
-        for workout in workouts {
-            if let index = groupIndexBySport[workout.sport] {
-                groups[index].append(workout)
-            } else {
-                groupIndexBySport[workout.sport] = groups.count
-                groups.append([workout])
-            }
-        }
-
-        return groups
     }
 
     private static func bestWorkout(in workouts: [Workout], for target: Double) -> Workout? {
