@@ -83,7 +83,7 @@ struct DashboardView: View {
                     ForEach(pbs) { pb in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
-                                Image(systemName: sportIcon(pb.sport))
+                                Image(systemName: pb.sport.iconName)
                                     .foregroundStyle(.secondary)
                                 Text(pbLabel(pb.distance))
                                 Text(pb.sport.displayName)
@@ -130,7 +130,7 @@ struct DashboardView: View {
                     ForEach(summary.bySport) { sport in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
-                                Image(systemName: sportIcon(sport.sport))
+                                Image(systemName: sport.sport.iconName)
                                     .foregroundStyle(.secondary)
                                 Text(sport.sport.displayName)
                                     .font(.headline)
@@ -153,15 +153,14 @@ struct DashboardView: View {
         }
     }
 
-    private func sportIcon(_ sport: Sport) -> String {
-        switch sport {
-        case .rower: "figure.rower"
-        case .skierg: "figure.skiing.crosscountry"
-        case .bike: "bicycle"
-        }
-    }
-
     private var recentRowerPieces: [Workout] {
-        WorkoutAnalytics.recentPaceWorkouts(for: workouts, sport: .rower, limit: 10)
+        // Use the active sport filter if set; otherwise default to the sport with the most workouts.
+        let sport: Sport = {
+            let sports = Set(workouts.map(\.sport))
+            if sports.count == 1, let only = sports.first { return only }
+            return Dictionary(grouping: workouts, by: \.sport)
+                .max(by: { $0.value.count < $1.value.count })?.key ?? .rower
+        }()
+        return WorkoutAnalytics.recentPaceWorkouts(for: workouts, sport: sport, limit: 10)
     }
 }

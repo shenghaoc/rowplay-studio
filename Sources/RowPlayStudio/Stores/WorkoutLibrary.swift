@@ -11,7 +11,10 @@ final class WorkoutLibrary: ObservableObject {
     }
     @Published var query: WorkoutListQuery {
         didSet {
-            refreshPBIds()
+            // PBs depend only on workouts and sport filter, not sort/dir/search/etc.
+            if query.sport != oldValue.sport {
+                refreshPBIds()
+            }
         }
     }
     @Published private(set) var pbIds: Set<Int> = []

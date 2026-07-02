@@ -67,7 +67,7 @@ public enum WorkoutAnalytics {
             let distance = sportWorkouts.reduce(0) { $0 + $1.distance }
             let time = sportWorkouts.reduce(0) { $0 + $1.time }
             let averagePace = distance > 0 ? time / (distance / 500) : 0
-            let bestPace = sportWorkouts.map(\.pace).min() ?? 0
+            let bestPace = sportWorkouts.map(\.pace).filter { $0 > 0 }.min() ?? 0
             let longest = sportWorkouts.map(\.distance).max() ?? 0
 
             return SportSummary(

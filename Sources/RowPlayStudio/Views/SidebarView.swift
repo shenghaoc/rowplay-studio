@@ -6,9 +6,10 @@ struct SidebarView: View {
     @Binding var selectedWorkoutID: Int?
 
     var body: some View {
-        List(selection: $selectedWorkoutID) {
+        let filteredDetails = library.filteredDetails
+        return List(selection: $selectedWorkoutID) {
             Section {
-                ForEach(library.filteredDetails) { detail in
+                ForEach(filteredDetails) { detail in
                     WorkoutSidebarRow(
                         workout: detail.workout,
                         isPB: library.pbIds.contains(detail.workout.id)
@@ -17,7 +18,7 @@ struct SidebarView: View {
                 }
             } header: {
                 HStack {
-                    Text("\(library.filteredDetails.count) workouts")
+                    Text("\(filteredDetails.count) workouts")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -123,19 +124,8 @@ private struct WorkoutSidebarRow: View {
                 .lineLimit(1)
             }
         } icon: {
-            Image(systemName: iconName)
+            Image(systemName: workout.sport.iconName)
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private var iconName: String {
-        switch workout.sport {
-        case .rower:
-            "figure.rower"
-        case .skierg:
-            "figure.skiing.crosscountry"
-        case .bike:
-            "bicycle"
         }
     }
 }

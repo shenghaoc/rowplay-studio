@@ -29,6 +29,17 @@ public enum Sport: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
+    public var iconName: String {
+        switch self {
+        case .rower:
+            "figure.rower"
+        case .skierg:
+            "figure.skiing.crosscountry"
+        case .bike:
+            "bicycle"
+        }
+    }
+
     public var cadenceUnit: String {
         switch self {
         case .bike:

@@ -19,7 +19,7 @@ public struct PersonalBest: Equatable, Sendable {
 
 public enum PersonalBests {
     /// Standard Concept2 race distances for PB tracking.
-    public static let standardDistances: [Double] = [500, 1000, 2000, 5000, 6000, 10000, 21_097]
+    public static let standardDistances: [Double] = [500, 1000, 2000, 5000, 6000, 10000, 21_097, 42_195]
 
     /// Distance matching tolerance (±2%).
     private static let distanceTolerance = 0.02

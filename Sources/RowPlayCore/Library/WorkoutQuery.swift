@@ -154,11 +154,19 @@ public enum WorkoutQuery {
             case .pace:
                 let pa = a.pace > 0 ? a.pace : (ascending ? .infinity : -1)
                 let pb = b.pace > 0 ? b.pace : (ascending ? .infinity : -1)
-                cmp = ascending ? pa < pb : pa > pb
+                if pa != pb {
+                    cmp = ascending ? pa < pb : pa > pb
+                } else {
+                    cmp = ascending ? a.date < b.date : a.date > b.date
+                }
             case .power:
                 let pa = avgPowerWatts(for: a) ?? (ascending ? .infinity : -1)
                 let pb = avgPowerWatts(for: b) ?? (ascending ? .infinity : -1)
-                cmp = ascending ? pa < pb : pa > pb
+                if pa != pb {
+                    cmp = ascending ? pa < pb : pa > pb
+                } else {
+                    cmp = ascending ? a.date < b.date : a.date > b.date
+                }
             }
             return cmp
         }
