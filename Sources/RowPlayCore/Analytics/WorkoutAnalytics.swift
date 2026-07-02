@@ -21,6 +21,13 @@ public struct DashboardSummary: Equatable, Sendable {
     public var bySport: [SportSummary]
 }
 
+public struct DashboardPersonalBest: Equatable, Identifiable, Sendable {
+    public var id: Int
+    public var distance: Double
+    public var time: TimeInterval
+    public var date: Date
+}
+
 public struct DistanceBand: Equatable, Sendable {
     public var key: String
     public var label: String
@@ -78,6 +85,47 @@ public enum WorkoutAnalytics {
             }
             return lhs.distance > rhs.distance
         }
+    }
+
+    public static func dashboardPersonalBests(for workouts: [Workout], pbIds: Set<Int>) -> [DashboardPersonalBest] {
+        workouts
+            .compactMap { workout -> DashboardPersonalBest? in
+                guard pbIds.contains(workout.id),
+                      let standardDistance = PersonalBests.standardDistance(matching: workout.distance)
+                else {
+                    return nil
+                }
+
+                return DashboardPersonalBest(
+                    id: workout.id,
+                    distance: standardDistance,
+                    time: workout.time,
+                    date: workout.date
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.distance == rhs.distance {
+                    return lhs.date > rhs.date
+                }
+                return lhs.distance < rhs.distance
+            }
+    }
+
+    public static func recentPaceWorkouts(
+        for workouts: [Workout],
+        sport: Sport,
+        limit: Int
+    ) -> [Workout] {
+        guard limit > 0 else {
+            return []
+        }
+
+        return Array(
+            workouts
+                .filter { $0.sport == sport }
+                .sorted { $0.date < $1.date }
+                .suffix(limit)
+        )
     }
 
     public static func distanceBand(for metres: Double) -> DistanceBand {
@@ -160,4 +208,3 @@ public enum WorkoutAnalytics {
         )
     }
 }
-

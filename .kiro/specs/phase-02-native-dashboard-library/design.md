@@ -18,14 +18,16 @@ A pure, testable module porting the web app's `workoutQuery.ts`:
   - `toggleDistanceChip(_:metres:)` — toggle distance chip.
   - `toggleDurationChip(_:seconds:)` — toggle duration chip.
   - `avgPowerWatts(for:)` — compute average watts.
-  - `pbWorkoutIds(workouts:)` — PB workout IDs at standard distances.
+  - `pbWorkoutIds(workouts:sport:)` — PB workout IDs at standard distances.
+  - Dashboard support helpers in `WorkoutAnalytics` derive PB cards and recent pace workouts for SwiftUI rendering.
 - `DistanceChip` and `DurationChip` constants matching web's `DISTANCE_CHIPS` and `DURATION_CHIPS`.
 
 ### 2. WorkoutLibrary Store Updates (`Sources/RowPlayStudio/Stores/WorkoutLibrary.swift`)
 
 - Add `@Published var query: WorkoutListQuery` with default sort=date, dir=desc.
 - Replace `filteredDetails` computed property with `WorkoutQuery.filterAndSortWorkouts` call.
-- Add computed `pbIds: Set<Int>` and `availableWorkoutTypes: [String]`.
+- Add cached `pbIds: Set<Int>` scoped to the active sport filter plus `availableWorkoutTypes: [String]`.
+- Expose filtered workouts and filtered details from the store so views do not redo query work locally.
 - Remove the old `selectedSport` and `searchText` properties (consolidated into `query`).
 
 ### 3. SidebarView Enhancements (`Sources/RowPlayStudio/Views/SidebarView.swift`)
@@ -41,7 +43,7 @@ A pure, testable module porting the web app's `workoutQuery.ts`:
 
 ### 5. DashboardView Enhancements (`Sources/RowPlayStudio/Views/DashboardView.swift`)
 
-- Add PB highlights section showing each standard-distance PB.
+- Add PB highlights section showing each standard-distance PB from `WorkoutAnalytics.dashboardPersonalBests`.
 - Add per-sport summary cards.
 - All data from `RowPlayCore` analytics, no view-local computation.
 

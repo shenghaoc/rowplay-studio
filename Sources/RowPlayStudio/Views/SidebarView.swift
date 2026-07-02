@@ -40,6 +40,8 @@ struct SidebarView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .frame(width: 24)
+                    .accessibilityLabel("Sort workouts")
+                    .help("Sort workouts")
                 }
             }
         }

@@ -18,7 +18,7 @@ The native app must port the web app's `workoutQuery.ts` pure query/filter/sort 
 
 - **R2.1** `WorkoutLibrary` gains a `@Published var query: WorkoutListQuery` property with sensible defaults (sort by date descending).
 - **R2.2** `filteredDetails` uses `WorkoutQuery.filterAndSortWorkouts` instead of view-local filtering.
-- **R2.3** `WorkoutLibrary` exposes computed `pbIds: Set<Int>` from the current workouts.
+- **R2.3** `WorkoutLibrary` exposes cached `pbIds: Set<Int>` from the current workouts and active sport filter.
 - **R2.4** `WorkoutLibrary` exposes `availableWorkoutTypes: [String]` derived from the loaded workouts.
 
 ## R3: Enhanced Sidebar
@@ -34,7 +34,7 @@ The native app must port the web app's `workoutQuery.ts` pure query/filter/sort 
 - **R4.1** Dashboard shows summary metrics: sessions, total distance, challenge distance, total time, average pace.
 - **R4.2** Dashboard shows per-sport summary cards with distance, sessions, best pace.
 - **R4.3** Dashboard shows personal bests section listing each standard-distance PB with time and date.
-- **R4.4** Dashboard uses `RowPlayCore` analytics exclusively — no view-local math.
+- **R4.4** Dashboard metric and collection derivations use `RowPlayCore` analytics/query helpers exclusively; SwiftUI views only render the provided values.
 
 ## R5: Test Coverage
 

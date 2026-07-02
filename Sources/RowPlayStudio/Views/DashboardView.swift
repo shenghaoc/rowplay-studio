@@ -4,7 +4,7 @@ import SwiftUI
 
 struct DashboardView: View {
     var summary: DashboardSummary
-    var details: [WorkoutDetail]
+    var workouts: [Workout]
     var pbIds: Set<Int>
 
     var body: some View {
@@ -13,7 +13,9 @@ struct DashboardView: View {
                 Text("Dashboard")
                     .font(.largeTitle.weight(.semibold))
 
-                HStack(spacing: 12) {
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 140, maximum: 220))
+                ], spacing: 12) {
                     MetricTile(title: "Sessions", value: "\(summary.sessions)", systemImage: "calendar")
                     MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
                     MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance), systemImage: "flag.checkered")
@@ -44,16 +46,16 @@ struct DashboardView: View {
                     Text("Recent Pace")
                         .font(.title3.weight(.semibold))
 
-                    Chart(recentRowerPieces) { detail in
+                    Chart(recentRowerPieces) { workout in
                         LineMark(
-                            x: .value("Date", detail.workout.date),
-                            y: .value("Pace", detail.workout.pace)
+                            x: .value("Date", workout.date),
+                            y: .value("Pace", workout.pace)
                         )
                         .interpolationMethod(.catmullRom)
 
                         PointMark(
-                            x: .value("Date", detail.workout.date),
-                            y: .value("Pace", detail.workout.pace)
+                            x: .value("Date", workout.date),
+                            y: .value("Pace", workout.pace)
                         )
                     }
                     .chartYAxisLabel("sec/500m")
@@ -69,7 +71,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var personalBestsSection: some View {
-        let pbs = visiblePersonalBests
+        let pbs = WorkoutAnalytics.dashboardPersonalBests(for: workouts, pbIds: pbIds)
         if !pbs.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Personal Bests")
@@ -98,31 +100,6 @@ struct DashboardView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var visiblePersonalBests: [DashboardPersonalBest] {
-        details
-            .compactMap { detail -> DashboardPersonalBest? in
-                let workout = detail.workout
-                guard pbIds.contains(workout.id),
-                      let standardDistance = standardPBDistance(for: workout.distance)
-                else {
-                    return nil
-                }
-                return DashboardPersonalBest(
-                    id: workout.id,
-                    distance: standardDistance,
-                    time: workout.time,
-                    date: workout.date
-                )
-            }
-            .sorted { $0.distance < $1.distance }
-    }
-
-    private func standardPBDistance(for distance: Double) -> Double? {
-        PersonalBests.standardDistances.first { target in
-            abs(distance - target) <= target * 0.02
         }
     }
 
@@ -179,17 +156,7 @@ struct DashboardView: View {
         }
     }
 
-    private var recentRowerPieces: [WorkoutDetail] {
-        details
-            .filter { $0.workout.sport == .rower }
-            .sorted { $0.workout.date < $1.workout.date }
-            .suffix(10)
+    private var recentRowerPieces: [Workout] {
+        WorkoutAnalytics.recentPaceWorkouts(for: workouts, sport: .rower, limit: 10)
     }
-}
-
-private struct DashboardPersonalBest: Identifiable {
-    let id: Int
-    let distance: Double
-    let time: TimeInterval
-    let date: Date
 }

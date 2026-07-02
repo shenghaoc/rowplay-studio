@@ -53,7 +53,7 @@ Exit criteria:
 - Dashboard calculations come from `RowPlayCore`, not view-local math.
 - `swift test` and `swift build` pass.
 
-Status: in progress on `codex/phase-02-native-dashboard-library`.
+Status: implemented in draft PR #2 on `codex/phase-02-native-dashboard-library`; pending merge.
 
 ## Phase 3 - Replay Engine And Native Renderer
 
@@ -127,4 +127,3 @@ Exit criteria:
 - Phase 0: direct commit to `main` to create the native scaffold.
 - Phase 1 onward: one branch and pull request per phase.
 - Phase PRs should include the relevant `.kiro/specs/phase-XX-*` updates, local validation commands, and a truthful scope statement.
-

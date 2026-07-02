@@ -101,6 +101,18 @@ final class WorkoutQueryTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), [1])
     }
 
+    func testFilterByDateRange() {
+        let workouts = [
+            makeWorkout(id: 1, date: makeDate(1)),
+            makeWorkout(id: 2, date: makeDate(2)),
+            makeWorkout(id: 3, date: makeDate(3)),
+            makeWorkout(id: 4, date: makeDate(4)),
+        ]
+        let q = WorkoutListQuery(dateFrom: "1970-01-03", dateTo: "1970-01-04")
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id).sorted(), [2, 3])
+    }
+
     func testFilterByHasStroke() {
         let workouts = [
             makeWorkout(id: 1, hasStrokeData: true),
@@ -166,12 +178,32 @@ final class WorkoutQueryTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), [2, 1])
     }
 
+    func testSortByDistanceDescending() {
+        let workouts = [
+            makeWorkout(id: 1, distance: 2_000),
+            makeWorkout(id: 2, distance: 5_000),
+        ]
+        let q = WorkoutListQuery(sort: .distance, dir: .desc)
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [2, 1])
+    }
+
     func testSortByTime() {
         let workouts = [
             makeWorkout(id: 1, time: 600),
             makeWorkout(id: 2, time: 400),
         ]
         let q = WorkoutListQuery(sort: .time, dir: .asc)
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [2, 1])
+    }
+
+    func testSortByTimeDescending() {
+        let workouts = [
+            makeWorkout(id: 1, time: 400),
+            makeWorkout(id: 2, time: 600),
+        ]
+        let q = WorkoutListQuery(sort: .time, dir: .desc)
         let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
         XCTAssertEqual(result.map(\.id), [2, 1])
     }
@@ -186,12 +218,32 @@ final class WorkoutQueryTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), [2, 1])
     }
 
+    func testSortByPaceDescending() {
+        let workouts = [
+            makeWorkout(id: 1, pace: 110),
+            makeWorkout(id: 2, pace: 130),
+        ]
+        let q = WorkoutListQuery(sort: .pace, dir: .desc)
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [2, 1])
+    }
+
     func testSortByPower() {
         let workouts = [
             makeWorkout(id: 1, time: 400, wattMinutes: 100), // watts = 100*60/400 = 15
             makeWorkout(id: 2, time: 400, wattMinutes: 200), // watts = 200*60/400 = 30
         ]
         let q = WorkoutListQuery(sort: .power, dir: .desc)
+        let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
+        XCTAssertEqual(result.map(\.id), [2, 1])
+    }
+
+    func testSortByPowerAscending() {
+        let workouts = [
+            makeWorkout(id: 1, time: 400, wattMinutes: 200), // watts = 30
+            makeWorkout(id: 2, time: 400, wattMinutes: 100), // watts = 15
+        ]
+        let q = WorkoutListQuery(sort: .power, dir: .asc)
         let result = WorkoutQuery.filterAndSortWorkouts(workouts, query: q)
         XCTAssertEqual(result.map(\.id), [2, 1])
     }

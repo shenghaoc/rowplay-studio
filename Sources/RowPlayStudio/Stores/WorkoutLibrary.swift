@@ -30,8 +30,11 @@ final class WorkoutLibrary: ObservableObject {
         details.map(\.workout)
     }
 
+    var filteredWorkouts: [Workout] {
+        WorkoutQuery.filterAndSortWorkouts(workouts, query: query, pbIds: pbIds)
+    }
+
     var filteredDetails: [WorkoutDetail] {
-        let filteredWorkouts = WorkoutQuery.filterAndSortWorkouts(workouts, query: query, pbIds: pbIds)
         let detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return filteredWorkouts.compactMap { detailByID[$0.id] }
     }
