@@ -26,6 +26,7 @@ public struct DashboardPersonalBest: Equatable, Identifiable, Sendable {
     public var sport: Sport
     public var distance: Double
     public var time: TimeInterval
+    public var pace: TimeInterval
     public var date: Date
 }
 
@@ -102,6 +103,7 @@ public enum WorkoutAnalytics {
                     sport: workout.sport,
                     distance: standardDistance,
                     time: workout.time,
+                    pace: workout.pace,
                     date: workout.date
                 )
             }

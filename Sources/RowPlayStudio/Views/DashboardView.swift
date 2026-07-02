@@ -92,7 +92,7 @@ struct DashboardView: View {
                             .font(.caption)
                             Text(RowPlayFormatting.time(pb.time, tenths: true))
                                 .font(.title3.monospacedDigit().weight(.semibold))
-                            Text(RowPlayFormatting.pace(pb.time / (pb.distance / 500)))
+                            Text(RowPlayFormatting.pace(pb.pace))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text(pb.date, format: .dateTime.year().month(.abbreviated).day())

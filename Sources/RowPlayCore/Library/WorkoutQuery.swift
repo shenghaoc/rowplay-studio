@@ -128,7 +128,9 @@ public enum WorkoutQuery {
                 if hasStroke && !w.hasStrokeData { return false }
                 if !hasStroke && w.hasStrokeData { return false }
             }
-            if let text = query.searchText, !text.isEmpty {
+            if let rawText = query.searchText {
+                let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return true }
                 let match = w.workoutType.localizedCaseInsensitiveContains(text)
                     || w.sport.displayName.localizedCaseInsensitiveContains(text)
                     || (w.comments?.localizedCaseInsensitiveContains(text) ?? false)
