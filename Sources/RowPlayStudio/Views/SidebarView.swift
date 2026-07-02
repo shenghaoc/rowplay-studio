@@ -7,30 +7,106 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selectedWorkoutID) {
-            Section("Workouts") {
+            Section {
                 ForEach(library.filteredDetails) { detail in
-                    WorkoutSidebarRow(workout: detail.workout)
-                        .tag(detail.id)
+                    WorkoutSidebarRow(
+                        workout: detail.workout,
+                        isPB: library.pbIds.contains(detail.workout.id)
+                    )
+                    .tag(detail.id)
+                }
+            } header: {
+                HStack {
+                    Text("\(library.filteredDetails.count) workouts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Menu {
+                        ForEach(WorkoutSortField.allCases, id: \.self) { field in
+                            Button {
+                                toggleSort(field)
+                            } label: {
+                                HStack {
+                                    Text(sortLabel(field))
+                                    if library.query.sort == field {
+                                        Image(systemName: library.query.dir == .asc ? "arrow.up" : "arrow.down")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.caption)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 24)
                 }
             }
         }
         .listStyle(.sidebar)
         .navigationTitle("RowPlay")
     }
+
+    private func toggleSort(_ field: WorkoutSortField) {
+        if library.query.sort == field {
+            library.query.dir = library.query.dir == .asc ? .desc : .asc
+        } else {
+            library.query.sort = field
+            library.query.dir = (field == .pace || field == .time) ? .asc : .desc
+        }
+    }
+
+    private func sortLabel(_ field: WorkoutSortField) -> String {
+        switch field {
+        case .date: "Date"
+        case .distance: "Distance"
+        case .time: "Time"
+        case .pace: "Pace"
+        case .power: "Power"
+        }
+    }
 }
 
 private struct WorkoutSidebarRow: View {
     var workout: Workout
+    var isPB: Bool
 
     var body: some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
-                Text(workout.workoutType)
-                    .lineLimit(1)
-                Text("\(workout.sport.displayName) - \(RowPlayFormatting.distance(workout.distance)) - \(RowPlayFormatting.time(workout.time))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(workout.workoutType)
+                        .lineLimit(1)
+                    if isPB {
+                        Text("PB")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
+                    }
+                }
+                HStack(spacing: 4) {
+                    Text(workout.date, format: .dateTime.month(.abbreviated).day())
+                        .font(.caption)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text(RowPlayFormatting.distance(workout.distance))
+                        .font(.caption)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text(RowPlayFormatting.time(workout.time))
+                        .font(.caption)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text(RowPlayFormatting.pace(workout.pace))
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
         } icon: {
             Image(systemName: iconName)

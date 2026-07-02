@@ -5,6 +5,7 @@ import SwiftUI
 struct DashboardView: View {
     var summary: DashboardSummary
     var details: [WorkoutDetail]
+    var pbIds: Set<Int>
 
     var body: some View {
         ScrollView {
@@ -15,9 +16,14 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     MetricTile(title: "Sessions", value: "\(summary.sessions)", systemImage: "calendar")
                     MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                    MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance), systemImage: "flag.checkered")
                     MetricTile(title: "Time", value: RowPlayFormatting.time(summary.totalTime), systemImage: "clock")
                     MetricTile(title: "Avg Pace", value: RowPlayFormatting.pace(summary.averagePace), systemImage: "speedometer")
                 }
+
+                personalBestsSection
+
+                sportSummarySection
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Distance by Sport")
@@ -56,6 +62,92 @@ struct DashboardView: View {
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Personal Bests
+
+    @ViewBuilder
+    private var personalBestsSection: some View {
+        let allWorkouts = details.map(\.workout)
+        let pbs = PersonalBests.distancePBs(for: allWorkouts)
+        if !pbs.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Personal Bests")
+                    .font(.title3.weight(.semibold))
+
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 180, maximum: 240))
+                ], spacing: 10) {
+                    ForEach(pbs.indices, id: \.self) { index in
+                        let pb = pbs[index]
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(pbLabel(pb.distance))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(RowPlayFormatting.time(pb.time, tenths: true))
+                                .font(.title3.monospacedDigit().weight(.semibold))
+                            Text(RowPlayFormatting.pace(pb.time / (pb.distance / 500)))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+            }
+        }
+    }
+
+    private func pbLabel(_ distance: Double) -> String {
+        if distance >= 1_000 {
+            return "\(Int(distance / 1_000))k"
+        }
+        return "\(Int(distance))m"
+    }
+
+    // MARK: - Sport Summary
+
+    @ViewBuilder
+    private var sportSummarySection: some View {
+        if !summary.bySport.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("By Sport")
+                    .font(.title3.weight(.semibold))
+
+                HStack(spacing: 12) {
+                    ForEach(summary.bySport) { sport in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Image(systemName: sportIcon(sport.sport))
+                                    .foregroundStyle(.secondary)
+                                Text(sport.sport.displayName)
+                                    .font(.headline)
+                            }
+                            Text("\(sport.sessions) sessions")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(RowPlayFormatting.distance(sport.distance))
+                                .font(.subheadline.monospacedDigit())
+                            Text("Best: \(RowPlayFormatting.pace(sport.bestPace))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+    }
+
+    private func sportIcon(_ sport: Sport) -> String {
+        switch sport {
+        case .rower: "figure.rower"
+        case .skierg: "figure.skiing.crosscountry"
+        case .bike: "bicycle"
         }
     }
 

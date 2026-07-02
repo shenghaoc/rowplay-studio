@@ -16,13 +16,17 @@ struct ContentView: View {
             if let detail = library.detail(id: selectedWorkoutID) {
                 WorkoutDetailView(detail: detail, summary: library.summary)
             } else {
-                DashboardView(summary: library.summary, details: library.filteredDetails)
+                DashboardView(
+                    summary: library.summary,
+                    details: library.filteredDetails,
+                    pbIds: library.pbIds
+                )
             }
         }
-        .searchable(text: $library.searchText, placement: .sidebar)
+        .searchable(text: searchTextBinding, placement: .sidebar)
         .toolbar {
             ToolbarItemGroup {
-                Picker("Sport", selection: $library.selectedSport) {
+                Picker("Sport", selection: sportBinding) {
                     Text("All").tag(Sport?.none)
                     ForEach(Sport.allCases) { sport in
                         Text(sport.displayName).tag(Sport?.some(sport))
@@ -46,6 +50,22 @@ struct ContentView: View {
             selectedWorkoutID
         } set: { newValue in
             selectedWorkoutID = newValue ?? DemoWorkoutLibrary.defaultWorkoutID
+        }
+    }
+
+    private var sportBinding: Binding<Sport?> {
+        Binding {
+            library.query.sport
+        } set: { newValue in
+            library.query.sport = newValue
+        }
+    }
+
+    private var searchTextBinding: Binding<String> {
+        Binding {
+            library.query.searchText ?? ""
+        } set: { newValue in
+            library.query.searchText = newValue.isEmpty ? nil : newValue
         }
     }
 }

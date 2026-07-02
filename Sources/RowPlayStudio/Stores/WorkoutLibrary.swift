@@ -5,13 +5,11 @@ import RowPlayCore
 @MainActor
 final class WorkoutLibrary: ObservableObject {
     @Published var details: [WorkoutDetail]
-    @Published var selectedSport: Sport?
-    @Published var searchText: String
+    @Published var query: WorkoutListQuery
 
-    init(details: [WorkoutDetail], selectedSport: Sport? = nil, searchText: String = "") {
+    init(details: [WorkoutDetail], query: WorkoutListQuery = WorkoutQuery.defaultQuery) {
         self.details = details
-        self.selectedSport = selectedSport
-        self.searchText = searchText
+        self.query = query
     }
 
     static func demo() -> WorkoutLibrary {
@@ -23,27 +21,21 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     var filteredDetails: [WorkoutDetail] {
-        details.filter { detail in
-            let workout = detail.workout
-            let sportMatches = selectedSport == nil || selectedSport == workout.sport
-            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !query.isEmpty else {
-                return sportMatches
-            }
-
-            let haystack = [
-                workout.workoutType,
-                workout.sport.displayName,
-                workout.comments ?? "",
-                workout.source ?? ""
-            ].joined(separator: " ").lowercased()
-
-            return sportMatches && haystack.contains(query.lowercased())
-        }
+        let filteredWorkouts = WorkoutQuery.filterAndSortWorkouts(workouts, query: query, pbIds: pbIds)
+        let detailByID = Dictionary(uniqueKeysWithValues: details.map { ($0.id, $0) })
+        return filteredWorkouts.compactMap { detailByID[$0.id] }
     }
 
     var summary: DashboardSummary {
         WorkoutAnalytics.dashboardSummary(for: workouts)
+    }
+
+    var pbIds: Set<Int> {
+        WorkoutQuery.pbWorkoutIds(workouts: workouts)
+    }
+
+    var availableWorkoutTypes: [String] {
+        Array(Set(workouts.map(\.workoutType))).sorted()
     }
 
     func detail(id: Int) -> WorkoutDetail? {
@@ -52,8 +44,7 @@ final class WorkoutLibrary: ObservableObject {
 
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
-        selectedSport = nil
-        searchText = ""
+        query = WorkoutQuery.defaultQuery
     }
 }
 
