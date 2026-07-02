@@ -119,10 +119,12 @@ public enum DemoWorkoutLibrary {
 
             let lateSurge = fraction > 0.9 ? 4.0 : 0
             let cadence = spec.baseCadence + lateSurge + (random.next() - 0.5) * 2
-            let heartRate: Int? = if spec.omitHeartRate {
-                nil
-            } else {
-                Int(min(192, Double(spec.baseHeartRate) * (0.8 + fraction * 0.22) + (random.next() - 0.5) * 3).rounded())
+            var heartRate: Int?
+            if !spec.omitHeartRate {
+                let baseHeartRate = Double(spec.baseHeartRate)
+                let progression = baseHeartRate * (0.8 + fraction * 0.22)
+                let jitter = (random.next() - 0.5) * 3
+                heartRate = Int(min(192, progression + jitter).rounded())
             }
 
             strokes.append(
@@ -213,4 +215,3 @@ private struct SeededRandom {
         return Double(state) / Double(UInt32.max)
     }
 }
-
