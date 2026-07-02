@@ -19,7 +19,7 @@ struct ContentView: View {
                 WorkoutDetailView(detail: detail, summary: library.summary)
             } else {
                 DashboardView(
-                    summary: library.summary,
+                    summary: library.filteredSummary,
                     workouts: library.filteredWorkouts,
                     pbIds: library.pbIds
                 )
