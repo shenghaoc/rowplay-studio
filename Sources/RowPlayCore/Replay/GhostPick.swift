@@ -39,7 +39,7 @@ public enum GhostPick {
             workoutType: current.workoutType
         )
         let pool = candidates.filter { c in
-            c.id != current.id && ComparabilityGuard.areComparable(
+            c.id != current.id && c.hasStrokeData && ComparabilityGuard.areComparable(
                 currentCtx,
                 ComparableContext(
                     sport: c.sport,

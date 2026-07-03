@@ -30,7 +30,10 @@ public final class ReplayState {
     /// The stroke data being replayed.
     private let strokes: [Stroke]
 
-    /// Total workout duration in seconds (from last stroke timestamp).
+    /// Time offset of the first stroke (origin).
+    private let originT: TimeInterval
+
+    /// Total workout duration in seconds (relative to first stroke).
     public let duration: TimeInterval
 
     /// Current playback time in seconds.
@@ -50,9 +53,12 @@ public final class ReplayState {
 
     public init(strokes: [Stroke], onFrame: ((ReplayFrame, Bool) -> Void)? = nil) {
         self.strokes = strokes
-        self.duration = strokes.last?.t ?? 0
+        self.originT = strokes.first?.t ?? 0
+        let lastT = strokes.last?.t ?? 0
+        self.duration = lastT - self.originT
         self.onFrame = onFrame
-        self.currentFrame = ReplaySample.sampleAt(strokes: strokes, t: 0)
+        self.time = 0
+        self.currentFrame = ReplaySample.sampleAt(strokes: strokes, t: self.originT)
     }
 
     // MARK: - Playback Controls
@@ -112,7 +118,7 @@ public final class ReplayState {
     // MARK: - Private
 
     private func emit() {
-        currentFrame = ReplaySample.sampleAt(strokes: strokes, t: time)
+        currentFrame = ReplaySample.sampleAt(strokes: strokes, t: time + originT)
         onFrame?(currentFrame, playing)
     }
 }

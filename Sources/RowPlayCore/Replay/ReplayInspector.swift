@@ -3,14 +3,12 @@ import Foundation
 /// Replay inspector helpers for examining stroke data.
 public enum ReplayInspector {
     /// Metres per stroke at this instant; nil when pace or cadence is invalid.
-    public static func distancePerStroke(sport: Sport, pace: TimeInterval, cadence: Double) -> Double? {
+    public static func distancePerStroke(pace: TimeInterval, cadence: Double) -> Double? {
         guard pace > 0, cadence > 0 else { return nil }
-        // pace is per 500m (row/ski) or per 1000m (bike) in seconds.
-        // speed = distance / time. For row/ski: speed = 500 / pace (m/s).
-        // For bike: speed = 1000 / pace (m/s).
-        // distance per stroke = speed * (60 / cadence)
-        let distanceBasis: Double = sport == .bike ? 1000.0 : 500.0
-        let dps = (distanceBasis * 60.0) / (pace * cadence)
+        // pace is always per 500m (normalized across all sports in RowPlayCore).
+        // speed = 500 / pace (m/s).
+        // distance per stroke = speed * (60 / cadence) = 30000 / (pace * cadence).
+        let dps = 30_000 / (pace * cadence)
         return dps > 0 ? dps : nil
     }
 
