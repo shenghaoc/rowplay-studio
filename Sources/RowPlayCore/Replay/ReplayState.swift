@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Available playback speed presets.
@@ -24,7 +25,7 @@ public enum ReplaySpeed: Double, CaseIterable, Sendable {
 /// This is the native equivalent of the web's `ReplayEngine` but uses a tick-based
 /// model instead of `requestAnimationFrame`, since SwiftUI's `TimelineView` or a
 /// `CADisplayLink` drives the ticks externally.
-public final class ReplayState: @unchecked Sendable {
+public final class ReplayState: ObservableObject, @unchecked Sendable {
     /// The stroke data being replayed.
     private let strokes: [Stroke]
 
@@ -32,16 +33,16 @@ public final class ReplayState: @unchecked Sendable {
     public let duration: TimeInterval
 
     /// Current playback time in seconds.
-    public private(set) var time: TimeInterval = 0
+    @Published public private(set) var time: TimeInterval = 0
 
     /// Whether playback is currently active.
-    public private(set) var playing = false
+    @Published public private(set) var playing = false
 
     /// Current playback speed multiplier.
-    public private(set) var speed: ReplaySpeed = .one
+    @Published public private(set) var speed: ReplaySpeed = .one
 
     /// The interpolated frame at the current time.
-    public private(set) var currentFrame: ReplayFrame
+    @Published public private(set) var currentFrame: ReplayFrame
 
     /// Callback invoked on each frame update with the new frame and playing state.
     private let onFrame: ((ReplayFrame, Bool) -> Void)?

@@ -5,13 +5,13 @@ import SwiftUI
 struct ReplayView: View {
     let detail: WorkoutDetail
     @Environment(\.colorScheme) private var colorScheme
-    @State private var state: ReplayState
+    @StateObject private var state: ReplayState
     @State private var frameVersion = 0
     @State private var playbackTimer: Timer?
 
     init(detail: WorkoutDetail) {
         self.detail = detail
-        _state = State(initialValue: ReplayState(strokes: detail.strokes))
+        _state = StateObject(wrappedValue: ReplayState(strokes: detail.strokes))
     }
 
     var body: some View {
@@ -48,6 +48,7 @@ struct ReplayView: View {
 
         let maxT = strokes.last?.t ?? 1
         let maxD = strokes.last?.d ?? 1
+        guard maxT > 0, maxD > 0 else { return }
 
         var path = Path()
         for (i, stroke) in strokes.enumerated() {
@@ -66,6 +67,7 @@ struct ReplayView: View {
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
         let maxT = detail.strokes.last?.t ?? 1
         let maxD = detail.strokes.last?.d ?? 1
+        guard maxT > 0, maxD > 0 else { return }
         let frame = state.currentFrame
 
         let x = CGFloat(frame.t / maxT) * size.width
@@ -107,7 +109,8 @@ struct ReplayView: View {
     }
 
     private var cadenceText: String {
-        String(Int(state.currentFrame.cadence.rounded()))
+        guard state.currentFrame.cadence.isFinite else { return "-" }
+        return String(Int(state.currentFrame.cadence.rounded()))
     }
 
     private var machineColor: Color {

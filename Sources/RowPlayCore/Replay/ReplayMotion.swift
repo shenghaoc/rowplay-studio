@@ -44,10 +44,11 @@ public enum ReplayMotion {
         let tau = Double.pi * 2
         let cycles = floor(phase / tau)
         let u = phase / tau - cycles // 0...1 within the cycle
-        let w: Double = if u < driveFrac {
-            (u / driveFrac) * 0.5
+        let clampedDriveFrac = max(0.01, min(0.99, driveFrac))
+        let w: Double = if u < clampedDriveFrac {
+            (u / clampedDriveFrac) * 0.5
         } else {
-            0.5 + ((u - driveFrac) / (1 - driveFrac)) * 0.5
+            0.5 + ((u - clampedDriveFrac) / (1 - clampedDriveFrac)) * 0.5
         }
         return (cycles + w) * tau
     }
