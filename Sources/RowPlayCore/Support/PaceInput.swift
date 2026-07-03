@@ -15,6 +15,10 @@ public enum PaceInput {
     /// Returns `nil` for invalid or non-positive input.
     public static func parsePaceInput(_ raw: String) -> TimeInterval? {
         let s = raw.trimmingCharacters(in: .whitespaces)
+
+        // Security: Prevent DoS by limiting length before regex
+        guard s.count <= 20 else { return nil }
+
         let range = NSRange(s.startIndex..<s.endIndex, in: s)
 
         if let match = clockRegex.firstMatch(in: s, range: range) {

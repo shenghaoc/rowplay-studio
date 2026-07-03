@@ -151,6 +151,10 @@ public enum RowPlayDateTime {
 
     private static func parseLogbookParts(_ text: String) -> LogbookParts? {
         let value = text.trimmingCharacters(in: .whitespaces)
+
+        // Security: Prevent DoS by limiting length before regex
+        guard value.count <= 30 else { return nil }
+
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = logbookRegex.firstMatch(in: value, range: range) else {
             return nil
@@ -176,6 +180,10 @@ public enum RowPlayDateTime {
 
     private static func parseDayKey(_ key: String) -> Date? {
         let value = key.trimmingCharacters(in: .whitespaces)
+
+        // Security: Prevent DoS by limiting length before regex
+        guard value.count <= 20 else { return nil }
+
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = dayKeyRegex.firstMatch(in: value, range: range) else { return nil }
 
