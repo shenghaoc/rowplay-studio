@@ -57,7 +57,7 @@ struct WorkoutDetailView: View {
             MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance), systemImage: "ruler")
             MetricTile(title: "Time", value: RowPlayFormatting.time(detail.workout.time, tenths: true), systemImage: "timer")
             MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer")
-            MetricTile(title: detail.workout.sport.cadenceUnit, value: cadenceText, systemImage: "metronome")
+            MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome")
             MetricTile(title: "Watts", value: wattsText, systemImage: "bolt")
         }
     }
