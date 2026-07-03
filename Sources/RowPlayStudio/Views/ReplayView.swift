@@ -6,7 +6,6 @@ struct ReplayView: View {
     let detail: WorkoutDetail
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var state: ReplayState
-    @State private var frameVersion = 0
     @State private var playbackTimer: Timer?
     @State private var lastTickDate: Date?
 
@@ -124,10 +123,7 @@ struct ReplayView: View {
     private var playbackControls: some View {
         HStack(spacing: 16) {
             // Play/Pause
-            Button(action: {
-                state.toggle()
-                markFrameChanged()
-            }) {
+            Button(action: { state.toggle() }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
@@ -137,10 +133,7 @@ struct ReplayView: View {
             Slider(
                 value: Binding(
                     get: { state.time },
-                    set: {
-                        state.seek(to: $0)
-                        markFrameChanged()
-                    }
+                    set: { state.seek(to: $0) }
                 ),
                 in: 0...max(state.duration, 1)
             )
@@ -148,10 +141,7 @@ struct ReplayView: View {
             // Speed picker
             Picker("Speed", selection: Binding(
                 get: { state.speed },
-                set: {
-                    state.setSpeed($0)
-                    markFrameChanged()
-                }
+                set: { state.setSpeed($0) }
             )) {
                 ForEach(ReplaySpeed.allCases, id: \.self) { speed in
                     Text(speed.label).tag(speed)
@@ -177,9 +167,7 @@ struct ReplayView: View {
             } ?? 0
             lastTickDate = now
 
-            if state.tick(deltaTime: delta) {
-                markFrameChanged()
-            }
+            state.tick(deltaTime: delta)
         }
         timer.tolerance = 1.0 / 120.0
         RunLoop.main.add(timer, forMode: .common)
@@ -190,11 +178,6 @@ struct ReplayView: View {
         playbackTimer?.invalidate()
         playbackTimer = nil
         lastTickDate = nil
-        markFrameChanged()
-    }
-
-    private func markFrameChanged() {
-        frameVersion &+= 1
     }
 }
 
@@ -213,11 +196,6 @@ private struct TelemetryItem: View {
                 .foregroundStyle(.secondary)
         }
     }
-}
-
-// Placeholder for a proper display link integration.
-private struct DisplayLinkPublisher {
-    // Future: wrap CVDisplayLink or CADisplayLink for precise timing.
 }
 
 private extension Color {
