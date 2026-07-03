@@ -5,13 +5,13 @@ import SwiftUI
 struct ReplayView: View {
     let detail: WorkoutDetail
     @Environment(\.colorScheme) private var colorScheme
-    @StateObject private var state: ReplayState
+    @State private var state: ReplayState
     @State private var playbackTimer: Timer?
     @State private var lastTickDate: Date?
 
     init(detail: WorkoutDetail) {
         self.detail = detail
-        _state = StateObject(wrappedValue: ReplayState(strokes: detail.strokes))
+        _state = State(initialValue: ReplayState(strokes: detail.strokes))
     }
 
     var body: some View {
@@ -160,7 +160,10 @@ struct ReplayView: View {
         lastTickDate = Date()
         let state = self.state
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak state] _ in
-            guard let state = state else { return }
+            guard let state = state, state.playing else {
+                lastTickDate = Date() // reset so resume doesn't jump
+                return
+            }
             let now = Date()
             let delta = lastTickDate.map {
                 ReplayMotion.clampDt(ms: now.timeIntervalSince($0) * 1_000)
