@@ -8,6 +8,7 @@ struct ReplayView: View {
     @StateObject private var state: ReplayState
     @State private var frameVersion = 0
     @State private var playbackTimer: Timer?
+    @State private var lastTickDate: Date?
 
     init(detail: WorkoutDetail) {
         self.detail = detail
@@ -166,8 +167,15 @@ struct ReplayView: View {
 
     private func startTimer() {
         guard playbackTimer == nil else { return }
+        lastTickDate = Date()
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { _ in
-            if state.tick(deltaTime: 1.0 / 60.0) {
+            let now = Date()
+            let delta = lastTickDate.map {
+                ReplayMotion.clampDt(ms: now.timeIntervalSince($0) * 1_000)
+            } ?? 0
+            lastTickDate = now
+
+            if state.tick(deltaTime: delta) {
                 markFrameChanged()
             }
         }
@@ -179,6 +187,7 @@ struct ReplayView: View {
     private func stopTimer() {
         playbackTimer?.invalidate()
         playbackTimer = nil
+        lastTickDate = nil
         markFrameChanged()
     }
 
