@@ -1,10 +1,13 @@
+import Foundation
 import RowPlayCore
 import SwiftUI
 
 struct ReplayView: View {
     let detail: WorkoutDetail
+    @Environment(\.colorScheme) private var colorScheme
     @State private var state: ReplayState
-    @State private var timerActive = false
+    @State private var frameVersion = 0
+    @State private var playbackTimer: Timer?
 
     init(detail: WorkoutDetail) {
         self.detail = detail
@@ -21,10 +24,12 @@ struct ReplayView: View {
             playbackControls
         }
         .navigationTitle("Replay")
-        .onAppear { timerActive = true }
-        .onDisappear { timerActive = false }
-        .onChange(of: timerActive) { _, active in
-            if active { startTimer() }
+        .onAppear {
+            startTimer()
+        }
+        .onDisappear {
+            state.pause()
+            stopTimer()
         }
     }
 
@@ -55,10 +60,7 @@ struct ReplayView: View {
             }
         }
 
-        context.stroke(path, with: .color(.blue.opacity(0.6)), lineWidth: 2)
-
-        // Draw ghost path if we had ghost data (placeholder for future).
-        // For now just draw the player path.
+        context.stroke(path, with: .color(machineColor.opacity(0.7)), lineWidth: 2)
     }
 
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
@@ -108,12 +110,20 @@ struct ReplayView: View {
         String(Int(state.currentFrame.cadence.rounded()))
     }
 
+    private var machineColor: Color {
+        let color = ReplaySportThemeLookup.machineColor(for: detail.workout.sport)
+        return Color(hex: colorScheme == .dark ? color.dark : color.light)
+    }
+
     // MARK: - Playback Controls
 
     private var playbackControls: some View {
         HStack(spacing: 16) {
             // Play/Pause
-            Button(action: { state.toggle() }) {
+            Button(action: {
+                state.toggle()
+                markFrameChanged()
+            }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
@@ -123,7 +133,10 @@ struct ReplayView: View {
             Slider(
                 value: Binding(
                     get: { state.time },
-                    set: { state.seek(to: $0) }
+                    set: {
+                        state.seek(to: $0)
+                        markFrameChanged()
+                    }
                 ),
                 in: 0...max(state.duration, 1)
             )
@@ -131,7 +144,10 @@ struct ReplayView: View {
             // Speed picker
             Picker("Speed", selection: Binding(
                 get: { state.speed },
-                set: { state.setSpeed($0) }
+                set: {
+                    state.setSpeed($0)
+                    markFrameChanged()
+                }
             )) {
                 ForEach(ReplaySpeed.allCases, id: \.self) { speed in
                     Text(speed.label).tag(speed)
@@ -146,13 +162,25 @@ struct ReplayView: View {
     // MARK: - Timer
 
     private func startTimer() {
-        // Use a simple Timer-based approach for ticking the replay state.
-        // In a future iteration, this could use CADisplayLink for smoother animation.
-        // For now, use a 60fps Timer.
-        Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            guard timerActive else { return }
-            state.tick(deltaTime: 1.0 / 60.0)
+        guard playbackTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { _ in
+            if state.tick(deltaTime: 1.0 / 60.0) {
+                markFrameChanged()
+            }
         }
+        timer.tolerance = 1.0 / 120.0
+        RunLoop.main.add(timer, forMode: .common)
+        playbackTimer = timer
+    }
+
+    private func stopTimer() {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
+        markFrameChanged()
+    }
+
+    private func markFrameChanged() {
+        frameVersion &+= 1
     }
 }
 
@@ -176,4 +204,21 @@ private struct TelemetryItem: View {
 // Placeholder for a proper display link integration.
 private struct DisplayLinkPublisher {
     // Future: wrap CVDisplayLink or CADisplayLink for precise timing.
+}
+
+private extension Color {
+    init(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        var value: UInt64 = 0
+        guard cleaned.count == 6, Scanner(string: cleaned).scanHexInt64(&value) else {
+            self = .accentColor
+            return
+        }
+
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
+    }
 }

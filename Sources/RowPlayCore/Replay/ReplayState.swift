@@ -95,7 +95,7 @@ public final class ReplayState: @unchecked Sendable {
     /// if the frame changed.
     @discardableResult
     public func tick(deltaTime: TimeInterval) -> Bool {
-        guard playing else { return false }
+        guard playing, deltaTime.isFinite, deltaTime > 0 else { return false }
         time += deltaTime * speed.rawValue
         if time >= duration {
             time = duration

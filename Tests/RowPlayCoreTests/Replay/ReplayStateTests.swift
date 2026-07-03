@@ -48,6 +48,16 @@ final class ReplayStateTests: XCTestCase {
         XCTAssertEqual(state.time, initialTime)
     }
 
+    func testTickIgnoresInvalidDeltas() {
+        let state = ReplayState(strokes: demoStrokes)
+        state.play()
+        XCTAssertFalse(state.tick(deltaTime: -1.0))
+        XCTAssertFalse(state.tick(deltaTime: .nan))
+        XCTAssertFalse(state.tick(deltaTime: .infinity))
+        XCTAssertEqual(state.time, 0)
+        XCTAssertTrue(state.playing)
+    }
+
     func testTickRespectsSpeedMultiplier() {
         let state = ReplayState(strokes: demoStrokes)
         state.play()
