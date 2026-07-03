@@ -69,6 +69,8 @@ Exit criteria:
 - Sampling and ghost selection match web fixtures.
 - Rendering choices are validated with screenshots and performance measurements on macOS.
 
+Status: implemented in draft PR on `codex/phase-03-replay-engine-foundation`; pending merge.
+
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
 Scope:

@@ -36,6 +36,12 @@ public struct DistanceBand: Equatable, Sendable {
     public var nominalMetres: Double
 }
 
+public struct DurationBand: Equatable, Sendable {
+    public var key: String
+    public var label: String
+    public var nominalSeconds: Double
+}
+
 public struct TrendFit: Equatable, Sendable {
     public var slopePerDay: Double
     public var y0: Double
@@ -164,6 +170,36 @@ public enum WorkoutAnalytics {
         }
 
         return DistanceBand(key: "other", label: "Other", nominalMetres: metres)
+    }
+
+    public static func durationBand(for seconds: TimeInterval) -> DurationBand {
+        let standards: [(Double, String)] = [
+            (60, "1 min"),
+            (240, "4 min"),
+            (1_200, "20 min"),
+            (1_800, "30 min"),
+            (3_600, "60 min")
+        ]
+
+        for standard in standards where abs(seconds - standard.0) <= standard.0 * 0.1 {
+            return DurationBand(key: "\(Int(standard.0))", label: standard.1, nominalSeconds: standard.0)
+        }
+
+        let ranges: [(Double, Double, String)] = [
+            (0, 90, "<90s"),
+            (90, 360, "90s–6m"),
+            (360, 900, "6–15m"),
+            (900, 2_400, "15–40m"),
+            (2_400, 4_800, "40–80m"),
+            (4_800, .infinity, "80m+")
+        ]
+
+        for range in ranges where seconds >= range.0 && seconds < range.1 {
+            let upper = range.0 == 0 ? range.1 : min(range.1, range.0 * 2)
+            return DurationBand(key: "r\(Int(range.0))", label: range.2, nominalSeconds: (range.0 + upper) / 2)
+        }
+
+        return DurationBand(key: "other", label: "Other", nominalSeconds: seconds)
     }
 
     public static func linearTrend(points: [(x: Date, y: Double)]) -> TrendFit? {
