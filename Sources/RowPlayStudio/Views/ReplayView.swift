@@ -168,7 +168,9 @@ struct ReplayView: View {
     private func startTimer() {
         guard playbackTimer == nil else { return }
         lastTickDate = Date()
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { _ in
+        let state = self.state
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak state] _ in
+            guard let state = state else { return }
             let now = Date()
             let delta = lastTickDate.map {
                 ReplayMotion.clampDt(ms: now.timeIntervalSince($0) * 1_000)
