@@ -21,8 +21,8 @@ final class WorkoutLibrary: ObservableObject {
     private(set) var workouts: [Workout] = []
     private(set) var filteredWorkouts: [Workout] = []
     private(set) var filteredDetails: [WorkoutDetail] = []
-    private(set) var summary: DashboardSummary = DashboardSummary(sessions: 0, totalDistance: 0, challengeDistance: 0, totalTime: 0, averagePace: 0, bySport: [])
-    private(set) var filteredSummary: DashboardSummary = DashboardSummary(sessions: 0, totalDistance: 0, challengeDistance: 0, totalTime: 0, averagePace: 0, bySport: [])
+    private(set) var summary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
+    private(set) var filteredSummary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
