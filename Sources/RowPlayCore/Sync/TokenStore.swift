@@ -1,0 +1,147 @@
+import Foundation
+import Security
+
+/// Protocol for Concept2 BYOT (bring-your-own-token) credential storage.
+///
+/// Implementations must never write tokens to UserDefaults, plain files,
+/// logs, fixtures, or test assertions. The only acceptable storage backends
+/// are the system Keychain (production) and in-memory (tests/previews).
+public protocol TokenStore: Sendable {
+    /// Persist a Concept2 access token, replacing any existing value.
+    func saveToken(_ token: String) throws
+    /// Load the stored token, or nil if none exists.
+    func loadToken() throws -> String?
+    /// Delete the stored token (disconnect/logout).
+    func deleteToken() throws
+}
+
+/// Keychain-backed token store for production use.
+///
+/// Uses Security framework directly with `kSecClassGenericPassword` and
+/// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
+public final class KeychainTokenStore: TokenStore, @unchecked Sendable {
+    private let service: String
+    private let account: String
+
+    /// - Parameters:
+    ///   - service: Keychain service name. Defaults to the app's bundle identifier scoped token.
+    ///   - account: Keychain account name. Defaults to `"default"`.
+    public init(
+        service: String = "com.rowplay-studio.concept2-token",
+        account: String = "default"
+    ) {
+        self.service = service
+        self.account = account
+    }
+
+    public func saveToken(_ token: String) throws {
+        guard let data = token.data(using: .utf8) else {
+            throw TokenStoreError.encodingFailed
+        }
+        // Delete any existing item first to avoid errSecDuplicateItem.
+        try deleteToken()
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        ]
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw TokenStoreError.keychainError(status)
+        }
+    }
+
+    public func loadToken() throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data, let token = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            return token
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw TokenStoreError.keychainError(status)
+        }
+    }
+
+    public func deleteToken() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        // errSecItemNotFound is not an error — deleting a non-existent token is idempotent.
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw TokenStoreError.keychainError(status)
+        }
+    }
+}
+
+/// Errors specific to token store operations.
+public enum TokenStoreError: Error, Equatable {
+    /// The token string could not be encoded as UTF-8 data.
+    case encodingFailed
+    /// A Keychain framework error occurred. The OSStatus value is preserved for diagnostics.
+    case keychainError(OSStatus)
+
+    public static func == (lhs: TokenStoreError, rhs: TokenStoreError) -> Bool {
+        switch (lhs, rhs) {
+        case (.encodingFailed, .encodingFailed):
+            return true
+        case let (.keychainError(l), .keychainError(r)):
+            return l == r
+        default:
+            return false
+        }
+    }
+}
+
+/// In-memory token store for tests and previews.
+///
+/// Holds the token as a plain `String?` property. This is the only
+/// implementation where tokens are visible in memory — acceptable for
+/// test control flow, never used in production.
+public final class FakeTokenStore: TokenStore, @unchecked Sendable {
+    public private(set) var storedToken: String?
+    private let lock = NSLock()
+
+    public init(storedToken: String? = nil) {
+        self.storedToken = storedToken
+    }
+
+    public func saveToken(_ token: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        storedToken = token
+    }
+
+    public func loadToken() throws -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedToken
+    }
+
+    public func deleteToken() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        storedToken = nil
+    }
+}
