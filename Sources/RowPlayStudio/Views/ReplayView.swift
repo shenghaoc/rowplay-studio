@@ -54,14 +54,16 @@ struct ReplayView: View {
         let strokes = detail.strokes
         guard strokes.count > 1 else { return }
 
-        let maxT = strokes.last?.t ?? 1
+        let originT = strokes[0].t
+        let maxT = strokes.last?.t ?? originT
+        let duration = maxT - originT
         let maxD = strokes.last?.d ?? 1
-        guard maxT > 0, maxD > 0 else { return }
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
 
         var path = Path()
         for (i, stroke) in strokes.enumerated() {
-            let x = CGFloat(stroke.t / maxT) * size.width
-            let y = size.height - CGFloat(stroke.d / maxD) * size.height
+            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
+            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
             if i == 0 {
                 path.move(to: CGPoint(x: x, y: y))
             } else {
@@ -73,13 +75,13 @@ struct ReplayView: View {
     }
 
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
-        let maxT = detail.strokes.last?.t ?? 1
+        let duration = state.duration
         let maxD = detail.strokes.last?.d ?? 1
-        guard maxT > 0, maxD > 0 else { return }
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
         let frame = state.currentFrame
 
-        let x = CGFloat(frame.t / maxT) * size.width
-        let y = size.height - CGFloat(frame.d / maxD) * size.height
+        let x = unitFraction(frame.t, denominator: duration) * size.width
+        let y = size.height - unitFraction(frame.d, denominator: maxD) * size.height
 
         var playhead = Path()
         playhead.move(to: CGPoint(x: x, y: 0))
@@ -94,6 +96,11 @@ struct ReplayView: View {
             height: dotSize
         ))
         context.fill(dot, with: .color(.red))
+    }
+
+    private func unitFraction(_ numerator: Double, denominator: Double) -> CGFloat {
+        guard numerator.isFinite, denominator.isFinite, denominator > 0 else { return 0 }
+        return CGFloat(max(0, min(1, numerator / denominator)))
     }
 
     // MARK: - Telemetry

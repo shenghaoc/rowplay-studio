@@ -24,6 +24,16 @@ final class ReplaySampleTests: XCTestCase {
         XCTAssertEqual(f.watts, 0)
     }
 
+    func testSampleAtReturnsZeroFrameForNonFiniteTime() {
+        let f = ReplaySample.sampleAt(strokes: ladderStrokes, t: .nan)
+        XCTAssertEqual(f.t, 0)
+        XCTAssertEqual(f.d, 0)
+        XCTAssertEqual(f.pace, 0)
+        XCTAssertEqual(f.progress, 0)
+        XCTAssertEqual(f.cadence, 0)
+        XCTAssertEqual(f.watts, 0)
+    }
+
     func testSampleAtClampsBeforeFirstSample() {
         let strokes = ladderStrokes
         let f = ReplaySample.sampleAt(strokes: strokes, t: -1)

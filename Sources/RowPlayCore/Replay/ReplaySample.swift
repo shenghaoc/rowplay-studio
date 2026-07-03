@@ -38,7 +38,7 @@ public enum ReplaySample {
     public static func sampleAt(strokes: [Stroke], t: TimeInterval) -> ReplayFrame {
         let n = strokes.count
         if n == 0 || !t.isFinite {
-            return ReplayFrame(t: t, d: 0, pace: 0, cadence: 0, watts: 0, progress: 0)
+            return ReplayFrame(t: t.isFinite ? t : 0, d: 0, pace: 0, cadence: 0, watts: 0, progress: 0)
         }
         let total = strokes[n - 1].t > 0 ? strokes[n - 1].t : 1
         let progress = max(0, min(1, t / total))

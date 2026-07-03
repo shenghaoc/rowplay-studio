@@ -41,10 +41,11 @@ public enum ReplayMotion {
     /// output, so `cos(warped)` swings +1 (catch) → −1 (finish) fast and eases back
     /// through the long recovery.
     public static func warpStrokePhase(_ phase: Double, driveFrac: Double = 0.4) -> Double {
+        guard phase.isFinite else { return 0 }
         let tau = Double.pi * 2
         let cycles = floor(phase / tau)
         let u = phase / tau - cycles // 0...1 within the cycle
-        let clampedDriveFrac = max(0.01, min(0.99, driveFrac))
+        let clampedDriveFrac = driveFrac.isFinite ? max(0.01, min(0.99, driveFrac)) : 0.4
         let w: Double = if u < clampedDriveFrac {
             (u / clampedDriveFrac) * 0.5
         } else {

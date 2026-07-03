@@ -79,6 +79,16 @@ final class ReplayMotionTests: XCTestCase {
         XCTAssertTrue(driveRate > recoveryRate)
     }
 
+    func testWarpStrokePhaseHandlesInvalidDriveFractions() {
+        XCTAssertTrue(ReplayMotion.warpStrokePhase(0.5 * tau, driveFrac: 0).isFinite)
+        XCTAssertTrue(ReplayMotion.warpStrokePhase(0.5 * tau, driveFrac: 1).isFinite)
+        XCTAssertEqual(
+            ReplayMotion.warpStrokePhase(0.4 * tau, driveFrac: .nan),
+            Double.pi,
+            accuracy: 0.00000000001
+        )
+    }
+
     // MARK: - strokeSurge
 
     func testStrokeSurgeChecksAtCatchPeaksAtFinish() {
