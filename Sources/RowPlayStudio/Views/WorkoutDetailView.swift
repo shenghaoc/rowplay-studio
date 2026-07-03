@@ -5,12 +5,14 @@ import SwiftUI
 struct WorkoutDetailView: View {
     var detail: WorkoutDetail
     var summary: DashboardSummary
+    @State private var showingReplay = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 metricStrip
+                replayButton
                 strokeChart
                 splitTable
             }
@@ -18,6 +20,9 @@ struct WorkoutDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
+        .navigationDestination(isPresented: $showingReplay) {
+            ReplayView(detail: detail)
+        }
     }
 
     private var header: some View {
@@ -59,6 +64,19 @@ struct WorkoutDetailView: View {
             MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer")
             MetricTile(title: detail.workout.sport.cadenceUnit, value: cadenceText, systemImage: "metronome")
             MetricTile(title: "Watts", value: wattsText, systemImage: "bolt")
+        }
+    }
+
+    @ViewBuilder
+    private var replayButton: some View {
+        if detail.workout.hasStrokeData {
+            Button(action: { showingReplay = true }) {
+                Label("Replay Workout", systemImage: "play.rectangle.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
     }
 

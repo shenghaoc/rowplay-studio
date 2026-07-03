@@ -1,0 +1,24 @@
+# Phase 03 Replay Engine And Native Renderer Foundation Tasks
+
+- [x] Add `DurationBand` and `durationBand(for:)` to `WorkoutAnalytics.swift`.
+- [x] Create `ReplaySample.swift` with `ReplayFrame`, `sampleAt`, `sampleIndexAt`.
+- [x] Create `ReplayMotion.swift` with animation timing helpers.
+- [x] Create `ComparabilityGuard.swift` with axis classification and comparability check.
+- [x] Create `GhostPick.swift` with ghost candidate selection.
+- [x] Create `ReplaySportTheme.swift` with sport labels and colors.
+- [x] Create `ReplayInspector.swift` with distancePerStroke and splitIndexAt.
+- [x] Create `ReplayState.swift` with playback state machine.
+- [x] Create `ReplayView.swift` with SwiftUI Canvas replay surface.
+- [x] Update `WorkoutDetailView.swift` to add replay navigation.
+- [x] Create `ReplaySampleTests.swift` covering sampling, bounds, interpolation, ghost coherence.
+- [x] Create `ReplayMotionTests.swift` covering all motion helpers.
+- [x] Create `ComparabilityGuardTests.swift` covering axis and band matching.
+- [x] Create `GhostPickTests.swift` covering ghost selection logic.
+- [x] Create `ReplayInspectorTests.swift` covering inspector helpers.
+- [x] Create `ReplayStateTests.swift` covering playback state machine.
+- [x] Create `.kiro/specs/phase-03-replay-engine-foundation` spec documents.
+- [x] Update `docs/source-map.md` with Phase 3 mappings.
+- [x] Update `docs/roadmap.md` Phase 3 status.
+- [x] Run `swift test` — all tests pass.
+- [x] Run `swift build` — clean build.
+- [x] Run `git diff --check` — no whitespace errors.
