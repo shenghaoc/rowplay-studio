@@ -58,7 +58,11 @@ public final class ReplayState {
         self.duration = lastT - self.originT
         self.onFrame = onFrame
         self.time = 0
-        self.currentFrame = ReplaySample.sampleAt(strokes: strokes, t: self.originT)
+        self.currentFrame = Self.relativeFrame(
+            from: ReplaySample.sampleAt(strokes: strokes, t: self.originT),
+            playbackTime: 0,
+            duration: self.duration
+        )
     }
 
     // MARK: - Playback Controls
@@ -118,7 +122,22 @@ public final class ReplayState {
     // MARK: - Private
 
     private func emit() {
-        currentFrame = ReplaySample.sampleAt(strokes: strokes, t: time + originT)
+        currentFrame = Self.relativeFrame(
+            from: ReplaySample.sampleAt(strokes: strokes, t: time + originT),
+            playbackTime: time,
+            duration: duration
+        )
         onFrame?(currentFrame, playing)
+    }
+
+    private static func relativeFrame(
+        from sampledFrame: ReplayFrame,
+        playbackTime: TimeInterval,
+        duration: TimeInterval
+    ) -> ReplayFrame {
+        var frame = sampledFrame
+        frame.t = playbackTime
+        frame.progress = duration > 0 ? max(0, min(1, playbackTime / duration)) : 0
+        return frame
     }
 }

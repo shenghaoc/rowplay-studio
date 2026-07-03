@@ -13,6 +13,26 @@ final class ReplayStateTests: XCTestCase {
         XCTAssertTrue(state.duration > 0)
     }
 
+    func testFrameTimeAndProgressAreRelativeWhenFirstStrokeStartsAfterZero() {
+        let strokes = [
+            Stroke(t: 5, d: 10, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 15, d: 60, pace: 110, cadence: 30, watts: 220)
+        ]
+        let state = ReplayState(strokes: strokes)
+
+        XCTAssertEqual(state.duration, 10)
+        XCTAssertEqual(state.currentFrame.t, 0)
+        XCTAssertEqual(state.currentFrame.progress, 0)
+
+        state.play()
+        state.tick(deltaTime: 2)
+
+        XCTAssertEqual(state.time, 2)
+        XCTAssertEqual(state.currentFrame.t, 2)
+        XCTAssertEqual(state.currentFrame.progress, 0.2, accuracy: 0.0001)
+        XCTAssertTrue(state.currentFrame.d > strokes[0].d)
+    }
+
     func testPlaySetsPlayingTrue() {
         let state = ReplayState(strokes: demoStrokes)
         state.play()
