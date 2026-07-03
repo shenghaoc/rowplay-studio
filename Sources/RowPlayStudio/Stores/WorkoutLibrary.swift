@@ -30,24 +30,14 @@ final class WorkoutLibrary: ObservableObject {
     init(details: [WorkoutDetail], query: WorkoutListQuery = WorkoutQuery.defaultQuery) {
         self.details = details
         self.query = query
-
-        let initialWorkouts = details.map(\.workout)
-        self.workouts = initialWorkouts
-        self.summary = WorkoutAnalytics.dashboardSummary(for: initialWorkouts)
-        self.detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        self.pbIds = WorkoutQuery.pbWorkoutIds(workouts: initialWorkouts, sport: query.sport)
-        self.filteredWorkouts = WorkoutQuery.filterAndSortWorkouts(initialWorkouts, query: query, pbIds: self.pbIds)
-        self.filteredDetails = self.filteredWorkouts.compactMap { self.detailByID[$0.id] }
-        self.filteredSummary = WorkoutAnalytics.dashboardSummary(for: self.filteredWorkouts)
+        updateAllDerivedData()
     }
 
     static func demo() -> WorkoutLibrary {
         WorkoutLibrary(details: DemoWorkoutLibrary.details)
     }
 
-    var availableWorkoutTypes: [String] {
-        Array(Set(workouts.map(\.workoutType))).sorted()
-    }
+    private(set) var availableWorkoutTypes: [String] = []
 
     func detail(id: Int) -> WorkoutDetail? {
         detailByID[id]
@@ -62,6 +52,7 @@ final class WorkoutLibrary: ObservableObject {
         detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         workouts = details.map(\.workout)
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
+        availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()
         updateQueryDerivedData(sportChanged: true)
     }
 
