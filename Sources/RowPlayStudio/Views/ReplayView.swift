@@ -6,7 +6,6 @@ struct ReplayView: View {
     let detail: WorkoutDetail
     @Environment(\.colorScheme) private var colorScheme
     @State private var state: ReplayState
-    @State private var playbackTimer: Timer?
     @State private var lastTickDate: Date?
 
     init(detail: WorkoutDetail) {
@@ -15,21 +14,30 @@ struct ReplayView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            replayCanvas
-                .frame(minHeight: 300)
-            Divider()
-            telemetryBar
-            Divider()
-            playbackControls
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing)) { timelineContext in
+            VStack(spacing: 0) {
+                replayCanvas
+                    .frame(minHeight: 300)
+                Divider()
+                telemetryBar
+                Divider()
+                playbackControls
+            }
+            .onChange(of: timelineContext.date) { oldDate, newDate in
+                guard state.playing else {
+                    lastTickDate = newDate
+                    return
+                }
+                let delta = lastTickDate.map {
+                    ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
+                } ?? 0
+                lastTickDate = newDate
+                state.tick(deltaTime: delta)
+            }
         }
         .navigationTitle("Replay")
-        .onAppear {
-            startTimer()
-        }
         .onDisappear {
             state.pause()
-            stopTimer()
         }
     }
 
@@ -73,13 +81,11 @@ struct ReplayView: View {
         let x = CGFloat(frame.t / maxT) * size.width
         let y = size.height - CGFloat(frame.d / maxD) * size.height
 
-        // Vertical playhead line
         var playhead = Path()
         playhead.move(to: CGPoint(x: x, y: 0))
         playhead.addLine(to: CGPoint(x: x, y: size.height))
         context.stroke(playhead, with: .color(.red), lineWidth: 1)
 
-        // Current position dot
         let dotSize: CGFloat = 8
         let dot = Path(ellipseIn: CGRect(
             x: x - dotSize / 2,
@@ -122,23 +128,23 @@ struct ReplayView: View {
 
     private var playbackControls: some View {
         HStack(spacing: 16) {
-            // Play/Pause
             Button(action: { state.toggle() }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
             .keyboardShortcut(.space, modifiers: [])
 
-            // Scrubber
             Slider(
                 value: Binding(
                     get: { state.time },
                     set: { state.seek(to: $0) }
                 ),
-                in: 0...max(state.duration, 1)
+                in: 0...max(state.duration, 1),
+                onEditingChanged: { isEditing in
+                    if isEditing { state.pause() }
+                }
             )
 
-            // Speed picker
             Picker("Speed", selection: Binding(
                 get: { state.speed },
                 set: { state.setSpeed($0) }
@@ -151,36 +157,6 @@ struct ReplayView: View {
             .frame(maxWidth: 200)
         }
         .padding()
-    }
-
-    // MARK: - Timer
-
-    private func startTimer() {
-        guard playbackTimer == nil else { return }
-        lastTickDate = Date()
-        let state = self.state
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak state] _ in
-            guard let state = state, state.playing else {
-                lastTickDate = Date() // reset so resume doesn't jump
-                return
-            }
-            let now = Date()
-            let delta = lastTickDate.map {
-                ReplayMotion.clampDt(ms: now.timeIntervalSince($0) * 1_000)
-            } ?? 0
-            lastTickDate = now
-
-            state.tick(deltaTime: delta)
-        }
-        timer.tolerance = 1.0 / 120.0
-        RunLoop.main.add(timer, forMode: .common)
-        playbackTimer = timer
-    }
-
-    private func stopTimer() {
-        playbackTimer?.invalidate()
-        playbackTimer = nil
-        lastTickDate = nil
     }
 }
 
@@ -204,8 +180,7 @@ private struct TelemetryItem: View {
 private extension Color {
     init(hex: String) {
         let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        var value: UInt64 = 0
-        guard cleaned.count == 6, Scanner(string: cleaned).scanHexInt64(&value) else {
+        guard cleaned.count == 6, let value = UInt64(cleaned, radix: 16) else {
             self = .accentColor
             return
         }
