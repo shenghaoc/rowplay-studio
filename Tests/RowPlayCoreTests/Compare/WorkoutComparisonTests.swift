@@ -82,8 +82,9 @@ final class WorkoutComparisonTests: XCTestCase {
     // MARK: - Side Stats
 
     func testSideStatsBasic() {
-        let strokes = (0..<100).map { i in
-            makeStroke(t: Double(i) * 2, d: Double(i) * 10, pace: 120 + Double(i % 5), watts: 200 + i % 10)
+        var strokes: [Stroke] = []
+        for i in 0..<100 {
+            strokes.append(makeStroke(t: Double(i) * 2, d: Double(i) * 10, pace: 120 + Double(i % 5), watts: 200 + i % 10))
         }
         let workout = makeWorkout(distance: 1000, time: 200, pace: 100)
         let detail = makeDetail(workout: workout, strokes: strokes)
@@ -147,8 +148,12 @@ final class WorkoutComparisonTests: XCTestCase {
     // MARK: - Distance Overlay
 
     func testBuildDistanceOverlay() {
-        let strokesA = (0..<20).map { i in makeStroke(t: Double(i) * 2, d: Double(i) * 50) }
-        let strokesB = (0..<20).map { i in makeStroke(t: Double(i) * 2.5, d: Double(i) * 40) }
+        var strokesA: [Stroke] = []
+        var strokesB: [Stroke] = []
+        for i in 0..<20 {
+            strokesA.append(makeStroke(t: Double(i) * 2, d: Double(i) * 50))
+            strokesB.append(makeStroke(t: Double(i) * 2.5, d: Double(i) * 40))
+        }
         let overlay = WorkoutComparison.buildDistanceOverlay(strokesA, strokesB)
         XCTAssertNotNil(overlay)
         XCTAssertEqual(overlay!.alignedMetres, 760, accuracy: 1) // min(950, 760)

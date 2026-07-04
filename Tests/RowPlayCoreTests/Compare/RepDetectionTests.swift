@@ -104,8 +104,9 @@ final class RepDetectionTests: XCTestCase {
             Split(index: 1, distance: 500, time: 120, pace: 120),
         ]
         // 60 strokes total: 30 per rep
-        let strokes = (0..<60).map { i in
-            makeStroke(t: Double(i) * 2, d: Double(i) * (1000.0 / 60.0))
+        var strokes: [Stroke] = []
+        for i in 0..<60 {
+            strokes.append(makeStroke(t: Double(i) * 2, d: Double(i) * (1000.0 / 60.0)))
         }
         let detail = makeDetail(splits: splits, strokes: strokes)
         let reps = RepDetection.detectReps(detail)
