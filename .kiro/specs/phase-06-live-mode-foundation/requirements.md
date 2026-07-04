@@ -9,6 +9,7 @@ The native app must model live-mode polling state as a pure, testable state mach
 - **R1.3** `LiveModeState` transitions are driven by explicit events: `start`, `stop`, `pollStarted`, `pollSucceeded`, `pollFailed`, `tickScheduled`, `intervalChanged`.
 - **R1.4** The state machine enforces that `pollStarted` is only valid when status is `idle` or `error`; successive `pollStarted` events while `polling` are ignored.
 - **R1.5** `LiveModeState.isStale(lastSampleAge:)` returns true when the most recent sample exceeds a staleness threshold derived from the current interval (2× the configured interval).
+- **R1.6** `LiveModeState` only accepts supported interval presets and falls back to 60 seconds for invalid initial values.
 
 ## R2: Polling Cadence and Backoff
 
@@ -24,7 +25,7 @@ The native app must compute polling intervals with visibility-aware throttling a
 The native app must define an injectable protocol for live workout data so mock and future real sources share the same interface.
 
 - **R3.1** `LiveSource` protocol defines `func poll(knownIDs: Set<Int>) async throws -> LivePollResult`.
-- **R3.2** `LivePollResult` struct contains `workouts: [Workout]`, `added: Int`, and `total: Int`.
+- **R3.2** `LivePollResult` struct contains `workouts: [Workout]` and `added: Int`; aggregate totals and PB celebrations are deferred until real sync wiring is added.
 - **R3.3** `MockLiveSource` generates deterministic demo workouts at varying intervals for QA and UI development.
 - **R3.4** `MockLiveSource` produces workouts with realistic sport distribution, distance ranges, and timing.
 - **R3.5** `MockLiveSource` is stateful: it tracks generated IDs and increments them to avoid collisions.

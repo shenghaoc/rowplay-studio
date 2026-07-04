@@ -31,7 +31,7 @@ public struct LiveModeState: Equatable, Sendable {
     ) {
         self.enabled = enabled
         self.status = status
-        self.intervalSec = intervalSec
+        self.intervalSec = liveIntervals.contains(intervalSec) ? intervalSec : 60
         self.consecutiveFailures = consecutiveFailures
         self.lastPollAt = lastPollAt
         self.nextPollAt = nextPollAt
@@ -93,6 +93,7 @@ public struct LiveModeState: Equatable, Sendable {
 
     /// Change the polling interval.
     public mutating func intervalChanged(_ newInterval: Int) {
+        guard liveIntervals.contains(newInterval) else { return }
         intervalSec = newInterval
     }
 }

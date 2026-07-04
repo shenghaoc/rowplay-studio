@@ -37,11 +37,11 @@ The `isStale(lastSampleAge:)` check compares the age against `2 × intervalSec`.
 
 - `effectiveInterval(baseInterval:isVisible:)` — visibility throttle (300s min when hidden)
 - `nextBackoffMs(consecutiveFailures:)` — exponential backoff: 30s → 60s → 120s → 300s cap
-- `LIVE_INTERVALS` — the preset array `[30, 60, 120, 300]`
+- `liveIntervals` — the preset array `[30, 60, 120, 300]`; `LiveModeState` ignores unsupported interval changes and normalizes invalid initial values to 60 seconds
 
 ## Live Source Boundary
 
-`LiveSource` is an `async throws` protocol so the mock can simulate delay and a future Concept2 client can make real network calls. The protocol returns `LivePollResult` which carries full `Workout` objects (not partial samples) so the library can ingest them directly.
+`LiveSource` is an `async throws` protocol so the mock can simulate delay and a future Concept2 client can make real network calls. The protocol returns `LivePollResult` which carries full `Workout` objects (not partial samples) so the library can ingest them directly. The native foundation result tracks added workouts only; aggregate totals and new-PB metadata are deferred to the real sync wiring.
 
 `MockLiveSource` generates workouts by:
 1. Picking a random sport from `Sport.allCases`
@@ -83,4 +83,4 @@ The library does not own the timer directly; the app or view layer drives pollin
 - Swift `camelCase` for all properties (established).
 - `LiveModeState` mirrors the web's `LiveMode` class shape but as a value type.
 - `LiveSource.poll(knownIDs:)` mirrors the web's `apiPoll`/`demoPoll` split as a single protocol method.
-- `LivePollResult` mirrors the web's `LivePollResult` interface.
+- `LivePollResult` mirrors the workout-delivery portion of the web's `LivePollResult` interface while deferring aggregate totals and PB celebration metadata.

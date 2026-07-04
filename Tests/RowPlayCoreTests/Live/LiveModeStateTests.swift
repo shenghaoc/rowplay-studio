@@ -117,6 +117,25 @@ final class LiveModeStateTests: XCTestCase {
         XCTAssertEqual(state.intervalSec, 120)
     }
 
+    func testIntervalChangedIgnoresInvalidIntervals() {
+        var state = LiveModeState()
+        state.intervalChanged(0)
+        XCTAssertEqual(state.intervalSec, 60)
+        state.intervalChanged(-30)
+        XCTAssertEqual(state.intervalSec, 60)
+        state.intervalChanged(45)
+        XCTAssertEqual(state.intervalSec, 60)
+    }
+
+    func testInitialIntervalDefaultsWhenInvalid() {
+        let zero = LiveModeState(intervalSec: 0)
+        let negative = LiveModeState(intervalSec: -30)
+        let unsupported = LiveModeState(intervalSec: 45)
+        XCTAssertEqual(zero.intervalSec, 60)
+        XCTAssertEqual(negative.intervalSec, 60)
+        XCTAssertEqual(unsupported.intervalSec, 60)
+    }
+
     // MARK: - Tick Scheduled
 
     func testTickScheduled() {
