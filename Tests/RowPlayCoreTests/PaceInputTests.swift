@@ -27,6 +27,11 @@ final class PaceInputTests: XCTestCase {
         XCTAssertEqual(PaceInput.parsePaceInput("  2:00  "), 120)
     }
 
+    func testParseRejectsLongRawInputBeforeTrimming() {
+        let padded = String(repeating: " ", count: 1_000) + "2:00"
+        XCTAssertNil(PaceInput.parsePaceInput(padded))
+    }
+
     func testParseReturnsNilForInvalid() {
         XCTAssertNil(PaceInput.parsePaceInput(""))
         XCTAssertNil(PaceInput.parsePaceInput("abc"))

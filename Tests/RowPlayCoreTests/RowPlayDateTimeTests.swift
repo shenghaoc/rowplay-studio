@@ -29,6 +29,11 @@ final class RowPlayDateTimeTests: XCTestCase {
         XCTAssertNotNil(date)
     }
 
+    func testParseLogbookDateTimeRejectsLongRawInputBeforeTrimming() {
+        let padded = String(repeating: " ", count: 1_000) + "2026-05-27 06:12:00"
+        XCTAssertNil(RowPlayDateTime.parseLogbookDateTime(padded))
+    }
+
     // MARK: - logbookEpochMillis
 
     func testLogbookEpochMillisReturnsFiniteValue() {
@@ -136,6 +141,11 @@ final class RowPlayDateTimeTests: XCTestCase {
 
     func testDayKeyEpochMillisInvalidReturnsNaN() {
         XCTAssertTrue(RowPlayDateTime.dayKeyEpochMillis("bad").isNaN)
+    }
+
+    func testDayKeyEpochMillisRejectsLongRawInputBeforeTrimming() {
+        let padded = String(repeating: " ", count: 1_000) + "2026-05-27"
+        XCTAssertTrue(RowPlayDateTime.dayKeyEpochMillis(padded).isNaN)
     }
 
     // MARK: - workoutLocalDayKey
