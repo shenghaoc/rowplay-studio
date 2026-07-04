@@ -38,20 +38,31 @@ public protocol Concept2APIClient: Sendable {
 public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
     private let details: [WorkoutDetail]
     private let lock = NSLock()
+    private var _fetchWorkoutsCallCount: Int = 0
+    private var _fetchDetailRequestedIDs: [Int] = []
 
     /// Tracks the number of `fetchWorkouts` calls for test assertions.
-    public private(set) var fetchWorkoutsCallCount: Int = 0
+    public var fetchWorkoutsCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _fetchWorkoutsCallCount
+    }
+
     /// Tracks the IDs requested via `fetchWorkoutDetail` for test assertions.
-    public private(set) var fetchDetailRequestedIDs: [Int] = []
+    public var fetchDetailRequestedIDs: [Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _fetchDetailRequestedIDs
+    }
 
     public init(details: [WorkoutDetail] = DemoWorkoutLibrary.details) {
         self.details = details
     }
 
     public func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
-        lock.lock()
-        fetchWorkoutsCallCount += 1
-        lock.unlock()
+        lock.withLock {
+            _fetchWorkoutsCallCount += 1
+        }
 
         let sorted = details.sorted { $0.workout.date > $1.workout.date }
         let workouts = sorted.map(\.workout)
@@ -71,9 +82,9 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
     }
 
     public func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
-        lock.lock()
-        fetchDetailRequestedIDs.append(id)
-        lock.unlock()
+        lock.withLock {
+            _fetchDetailRequestedIDs.append(id)
+        }
 
         guard let detail = details.first(where: { $0.workout.id == id }) else {
             throw Concept2ClientError.workoutNotFound(id)

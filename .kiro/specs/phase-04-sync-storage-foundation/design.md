@@ -66,8 +66,8 @@ Redaction layer over `os.Logger`:
   - Bearer headers: `/Authorization:\s*Bearer\s+\S+/gi` → `[REDACTED]`
   - Token values: `/(?<="token"\s*:\s*")[^"]+(?=")/gi` → `[REDACTED]`
   - Large JSON blobs: `/\{(?:[^{}]|\{[^{}]*\}){100,}\}/g` → `[REDACTED]`
-- `PrivacySafeLogger` wraps `os.Logger` and applies `redact()` to all string arguments.
-- Error arguments get a new Error with redacted message, preserving stack.
+- `PrivacySafeLogger` wraps `os.Logger` and applies `redact()` to the main message and all string arguments.
+- Interpolated error strings are redacted before emission to avoid logging tokens or authorization headers.
 
 ### 5. Sync State Tracker (`RowPlayCore/Sync/SyncStateTracker.swift`)
 
@@ -83,7 +83,7 @@ public struct SyncState: Equatable, Sendable {
 }
 ```
 
-- `SyncStateTracker` is `@Observable` (macOS 14+).
+- `SyncStateTracker` is `@Observable` and `@MainActor` (macOS 14+).
 - Reads workout count from the cache protocol.
 - Transitions: idle → syncing → complete/error.
 

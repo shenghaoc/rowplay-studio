@@ -40,6 +40,7 @@ public struct SyncState: Equatable, Sendable {
 /// - error → syncing (on retry)
 @available(macOS 14.0, *)
 @Observable
+@MainActor
 public final class SyncStateTracker {
     public private(set) var state: SyncState
 

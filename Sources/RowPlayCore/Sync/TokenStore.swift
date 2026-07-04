@@ -19,7 +19,7 @@ public protocol TokenStore: Sendable {
 ///
 /// Uses Security framework directly with `kSecClassGenericPassword` and
 /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
-public final class KeychainTokenStore: TokenStore, @unchecked Sendable {
+public final class KeychainTokenStore: TokenStore {
     private let service: String
     private let account: String
 
@@ -120,7 +120,7 @@ public enum TokenStoreError: Error, Equatable {
 /// implementation where tokens are visible in memory — acceptable for
 /// test control flow, never used in production.
 public final class FakeTokenStore: TokenStore, @unchecked Sendable {
-    public private(set) var storedToken: String?
+    private var storedToken: String?
     private let lock = NSLock()
 
     public init(storedToken: String? = nil) {

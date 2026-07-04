@@ -112,6 +112,24 @@ final class PrivacySafeLoggerTests: XCTestCase {
 
     // MARK: - PrivacySafeLogger (smoke test — no crash)
 
+    func testLoggerMessageFormattingRedactsInterpolatedMessage() {
+        let result = formatPrivacySafeLogMessage(
+            "Sync failed: Authorization: Bearer abcdef1234567890abcdef1234567890",
+            args: []
+        )
+        XCTAssertFalse(result.contains("abcdef1234567890abcdef1234567890"))
+        XCTAssertTrue(result.contains("[REDACTED]"))
+    }
+
+    func testLoggerMessageFormattingRedactsArguments() {
+        let result = formatPrivacySafeLogMessage(
+            "Token value:",
+            args: ["abcdef1234567890abcdef1234567890"]
+        )
+        XCTAssertFalse(result.contains("abcdef1234567890abcdef1234567890"))
+        XCTAssertTrue(result.contains("[REDACTED]"))
+    }
+
     func testLoggerCreationDoesNotCrash() {
         let logger = PrivacySafeLogger(category: "test")
         logger.error("test message")

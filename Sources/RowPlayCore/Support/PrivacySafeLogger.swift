@@ -54,11 +54,18 @@ public func redact(_ value: Any) -> String {
     return result
 }
 
+func formatPrivacySafeLogMessage(_ message: String, args: [Any]) -> String {
+    let redactedMessage = redact(message)
+    let redactedArgs = args.map { redact($0) }
+    if redactedArgs.isEmpty {
+        return redactedMessage
+    }
+    return ([redactedMessage] + redactedArgs).joined(separator: " ")
+}
+
 /// Privacy-safe logger wrapping `os.Logger`.
 ///
-/// Redacts all string arguments before emitting to the system log.
-/// Error arguments get a new `Error` with a redacted message, preserving
-/// the original stack trace.
+/// Redacts the main message and all arguments before emitting to the system log.
 ///
 /// Mirrors the web app's `createLogger(console)` pattern.
 public struct PrivacySafeLogger {
@@ -75,23 +82,11 @@ public struct PrivacySafeLogger {
 
     /// Log an error message with redacted arguments.
     public func error(_ message: String, _ args: Any...) {
-        let redactedArgs = args.map { redact($0) }
-        if redactedArgs.isEmpty {
-            logger.error("\(message, privacy: .public)")
-        } else {
-            let formatted = ([message] + redactedArgs).joined(separator: " ")
-            logger.error("\(formatted, privacy: .public)")
-        }
+        logger.error("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
     }
 
     /// Log a warning message with redacted arguments.
     public func warn(_ message: String, _ args: Any...) {
-        let redactedArgs = args.map { redact($0) }
-        if redactedArgs.isEmpty {
-            logger.warning("\(message, privacy: .public)")
-        } else {
-            let formatted = ([message] + redactedArgs).joined(separator: " ")
-            logger.warning("\(formatted, privacy: .public)")
-        }
+        logger.warning("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
     }
 }

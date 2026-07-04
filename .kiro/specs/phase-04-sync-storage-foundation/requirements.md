@@ -38,8 +38,8 @@ The native app must redact sensitive data before logging.
 - **R4.1** `PrivacySafeLogger` wraps `os.Logger` and redacts strings before emitting.
 - **R4.2** `RedactionPattern` defines known sensitive patterns: hex tokens (32+ chars), Bearer headers, generic `token=...` patterns, and raw JSON blobs > 100 characters.
 - **R4.3** `redact(_:)` is a pure function that applies all patterns and returns a sanitized string.
-- **R4.4** `PrivacySafeLogger.error(_:)` and `.warn(_:)` apply redaction to all string arguments.
-- **R4.5** Error messages are redacted: the logger creates a new Error with a redacted message, preserving the original stack trace.
+- **R4.4** `PrivacySafeLogger.error(_:)` and `.warn(_:)` apply redaction to the main message and all string arguments.
+- **R4.5** Error messages are redacted before they are emitted to the system log, including errors interpolated into the main message string.
 - **R4.6** The redaction function is idempotent — calling it on already-redacted text is safe.
 
 ## R5: Sync State Model
@@ -47,7 +47,7 @@ The native app must redact sensitive data before logging.
 The native app must track sync progress without importing Cloudflare D1 assumptions.
 
 - **R5.1** `SyncState` struct records `lastSyncDate`, `totalWorkouts`, `inProgress`, `lastError`, and `lastErrorDate`.
-- **R5.2** `SyncStateTracker` is an `ObservableObject` that publishes sync state changes.
+- **R5.2** `SyncStateTracker` is an `@Observable`, `@MainActor` class (macOS 14+) that publishes sync state changes on the main actor.
 - **R5.3** The tracker is backed by the workout cache (count-based) and a simple in-memory error log.
 - **R5.4** The tracker does not depend on any specific storage backend; it reads from the cache protocol.
 

@@ -2,6 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 @available(macOS 14.0, *)
+@MainActor
 final class SyncStateTrackerTests: XCTestCase {
     private var cache: InMemoryWorkoutCache!
     private var tracker: SyncStateTracker!
