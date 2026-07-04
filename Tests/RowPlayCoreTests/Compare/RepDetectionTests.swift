@@ -7,17 +7,22 @@ final class RepDetectionTests: XCTestCase {
         Stroke(t: t, d: d, pace: pace, cadence: spm, heartRate: hr, watts: 200)
     }
 
-    private func makeDetail(splits: [Split], strokes: [Stroke] = []) -> WorkoutDetail {
+    private func makeDetail(
+        sport: Sport = .rower,
+        splits: [Split],
+        strokes: [Stroke] = [],
+        isInterval: Bool = true
+    ) -> WorkoutDetail {
         let workout = Workout(
             id: 1,
             date: Date(timeIntervalSince1970: 1_000_000),
-            sport: .rower,
+            sport: sport,
             distance: 2000,
             time: 480,
             pace: 120,
             workoutType: "fixed_distance",
             hasStrokeData: true,
-            isInterval: true
+            isInterval: isInterval
         )
         return WorkoutDetail(workout: workout, strokes: strokes, splits: splits)
     }
@@ -51,6 +56,15 @@ final class RepDetectionTests: XCTestCase {
             Split(index: 0, distance: 500, time: 120, pace: 120),
         ]
         let detail = makeDetail(splits: splits)
+        XCTAssertNil(RepDetection.detectReps(detail))
+    }
+
+    func testDetectRepsRequiresIntervalWorkout() {
+        let splits = [
+            Split(index: 0, distance: 500, time: 120, pace: 120),
+            Split(index: 1, distance: 500, time: 125, pace: 125),
+        ]
+        let detail = makeDetail(splits: splits, isInterval: false)
         XCTAssertNil(RepDetection.detectReps(detail))
     }
 
@@ -113,5 +127,18 @@ final class RepDetectionTests: XCTestCase {
         XCTAssertEqual(reps!.count, 2)
         // First rep should have strokes with times relative to t=0
         XCTAssertEqual(reps![0].times.first ?? -1, 0, accuracy: 0.01)
+    }
+
+    func testDetectRepsUsesSportAwareSplitFallbackWatts() {
+        let splits = [
+            Split(index: 0, distance: 500, time: 30, pace: 100),
+            Split(index: 1, distance: 500, time: 30, pace: 100),
+        ]
+        let detail = makeDetail(sport: .bike, splits: splits)
+
+        let reps = RepDetection.detectReps(detail)
+
+        XCTAssertNotNil(reps)
+        XCTAssertEqual(reps![0].power.first ?? 0, 43.75, accuracy: 0.01)
     }
 }

@@ -128,11 +128,14 @@ public enum WorkoutComparison {
             return CompareVerdict(winner: .tie)
         }
 
-        let bandA = WorkoutAnalytics.distanceBand(for: a.workout.distance)
-        let bandB = WorkoutAnalytics.distanceBand(for: b.workout.distance)
-        let likeForLike = bandA.key == bandB.key
+        let axisA = ComparabilityGuard.classifyAxis(workoutType: a.workout.workoutType)
+        let axisB = ComparabilityGuard.classifyAxis(workoutType: b.workout.workoutType)
+        let likeForLikeDistance = axisA == .distance
+            && axisB == .distance
+            && WorkoutAnalytics.distanceBand(for: a.workout.distance).key
+                == WorkoutAnalytics.distanceBand(for: b.workout.distance).key
 
-        if likeForLike, a.workout.time > 0, b.workout.time > 0 {
+        if likeForLikeDistance, a.workout.time > 0, b.workout.time > 0 {
             let timeDeltaSec = b.workout.time - a.workout.time // positive = A faster
             var winner: CompareWinner = .tie
             if abs(timeDeltaSec) >= 0.5 { winner = timeDeltaSec > 0 ? .a : .b }
@@ -180,7 +183,7 @@ public enum WorkoutComparison {
         let avgDps = computeAvgDps(strokes: strokes)
 
         // Pace consistency (coefficient of variation)
-        let paceConsistency = computePaceConsistency(strokes: strokes)
+        let paceConsistency = computePaceConsistency(strokes: strokes, splits: detail.splits)
 
         return WorkoutSideStats(
             time: detail.workout.time,
@@ -395,8 +398,19 @@ public enum WorkoutComparison {
     }
 
     /// Pace coefficient of variation (%).
-    private static func computePaceConsistency(strokes: [Stroke]) -> Double {
+    private static func computePaceConsistency(strokes: [Stroke], splits: [Split]) -> Double {
         let paces = strokes.map { $0.pace }.filter { $0 > 0 }
+        if paces.count >= 2 {
+            return coefficientOfVariation(paces)
+        }
+        let splitPaces = splits
+            .filter { $0.isRest != true }
+            .map { $0.pace }
+            .filter { $0 > 0 }
+        return coefficientOfVariation(splitPaces)
+    }
+
+    private static func coefficientOfVariation(_ paces: [Double]) -> Double {
         guard paces.count >= 2 else { return 0 }
 
         let mean = paces.reduce(0, +) / Double(paces.count)

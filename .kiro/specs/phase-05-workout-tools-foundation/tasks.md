@@ -13,9 +13,10 @@
 - [x] Create `Tests/RowPlayCoreTests/Import/HrImportTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Annotations/AnnotationStoreTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Share/SharePackageTests.swift`.
+- [x] Add pre-merge hardening for logbook date export parity, time-axis comparison, interval-only rep detection, sport-aware rep fallback watts, split consistency fallback, annotation delete cleanup, and HR import preservation.
 - [x] Create `.kiro/specs/phase-05-workout-tools-foundation` spec documents.
 - [x] Update `docs/source-map.md` with Phase 5 mappings.
 - [x] Update `docs/roadmap.md` Phase 5 status.
-- [x] Run `swift test` — all tests pass (347 tests, 0 failures).
+- [x] Run `swift test` — all tests pass (355 tests, 0 failures).
 - [x] Run `swift build` — clean build.
 - [x] Run `git diff --check` — no whitespace errors.

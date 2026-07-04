@@ -15,14 +15,11 @@ public enum WorkoutExport {
 
     /// Full logbook export as CSV (one row per workout).
     public static func csv(_ workouts: [Workout]) -> String {
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withSpaceBetweenDateAndTime]
-
         var lines = [csvHeaders.joined(separator: ",")]
         for w in workouts {
             let row = [
                 csvCell(w.id),
-                csvCell(dateFormatter.string(from: w.date)),
+                csvCell(logbookDateString(from: w.date)),
                 csvCell(w.sport.rawValue),
                 csvCell(w.distance),
                 csvCell(w.time),
@@ -80,6 +77,15 @@ public enum WorkoutExport {
         "rowplay-workout-\(id).\(ext)"
     }
 
+    /// Concept2 logbook timestamp string (`YYYY-MM-DD HH:MM:SS`) interpreted in UTC.
+    static func logbookDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.string(from: date)
+    }
+
     // MARK: - CSV Cell Escaping (RFC 4180 + formula injection protection)
 
     /// Escape a CSV cell value. Handles nil, numbers, booleans, and strings.
@@ -111,7 +117,7 @@ private struct ExportPayload: Encodable {
 
 private struct ExportWorkout: Encodable {
     let id: Int
-    let date: Date
+    let date: String
     let sport: String
     let distance: Double
     let time: Double
@@ -130,7 +136,7 @@ private struct ExportWorkout: Encodable {
 
     init(from w: Workout) {
         self.id = w.id
-        self.date = w.date
+        self.date = WorkoutExport.logbookDateString(from: w.date)
         self.sport = w.sport.rawValue
         self.distance = w.distance
         self.time = w.time

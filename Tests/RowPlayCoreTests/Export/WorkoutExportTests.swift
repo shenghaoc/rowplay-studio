@@ -43,6 +43,14 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertTrue(row.contains("480"))
     }
 
+    func testCsvUsesLogbookDateFormat() {
+        let w = makeWorkout(date: Date(timeIntervalSince1970: 1_700_000_000))
+        let csv = WorkoutExport.csv([w])
+        let lines = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
+        XCTAssertTrue(lines[1].contains("2023-11-14 22:13:20"))
+        XCTAssertFalse(lines[1].contains("22:13:20Z"))
+    }
+
     func testCsvMultipleWorkouts() {
         let workouts = [
             makeWorkout(id: 1),
@@ -61,6 +69,12 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertTrue(json.contains("rowplay-logbook-export"))
         XCTAssertTrue(json.contains("\"version\" : 1"))
         XCTAssertTrue(json.contains("\"workoutCount\" : 1"))
+    }
+
+    func testJsonUsesLogbookDateFormatForWorkoutDate() {
+        let json = WorkoutExport.json([makeWorkout(date: Date(timeIntervalSince1970: 1_700_000_000))])
+        XCTAssertTrue(json.contains("\"date\" : \"2023-11-14 22:13:20\""))
+        XCTAssertFalse(json.contains("\"date\" : \"2023-11-14T22:13:20Z\""))
     }
 
     func testJsonEmpty() {

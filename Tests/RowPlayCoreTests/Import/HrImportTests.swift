@@ -183,4 +183,27 @@ final class HrImportTests: XCTestCase {
         XCTAssertEqual(result.workout.heartRateAvg, 101)
         XCTAssertEqual(result.splits[0].heartRate?.average, 101)
     }
+
+    func testApplyHrImportPreservesExistingAverageWhenNoMergedHrExists() {
+        let workout = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 1_000_000),
+            sport: .rower,
+            distance: 20,
+            time: 4,
+            pace: 100,
+            heartRateAvg: 150,
+            workoutType: "fixed_distance",
+            hasStrokeData: true
+        )
+        let detail = WorkoutDetail(
+            workout: workout,
+            strokes: [makeStroke(t: 0, d: 0), makeStroke(t: 4, d: 20)],
+            splits: [Split(index: 0, distance: 20, time: 4, pace: 100)]
+        )
+
+        let result = HrImport.applyHrImport(detail, samples: [], offsetSec: 0)
+
+        XCTAssertEqual(result.workout.heartRateAvg, 150)
+    }
 }

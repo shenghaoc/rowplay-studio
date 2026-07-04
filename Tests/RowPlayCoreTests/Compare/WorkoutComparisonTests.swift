@@ -79,6 +79,17 @@ final class WorkoutComparisonTests: XCTestCase {
         XCTAssertNil(verdict.timeDeltaSec)
     }
 
+    func testCompareVerdictTimeAxisComparesPaceNotElapsedTime() {
+        let a = makeDetail(workout: makeWorkout(distance: 5_000, time: 1_200, pace: 120, workoutType: "JustRow"))
+        let b = makeDetail(workout: makeWorkout(id: 2, distance: 5_200, time: 1_200, pace: 115.38, workoutType: "FixedTime"))
+
+        let verdict = WorkoutComparison.compareVerdict(a, b)
+
+        XCTAssertEqual(verdict.winner, .b)
+        XCTAssertNil(verdict.timeDeltaSec)
+        XCTAssertEqual(verdict.paceDelta ?? 0, 4.62, accuracy: 0.01)
+    }
+
     // MARK: - Side Stats
 
     func testSideStatsBasic() {
@@ -110,6 +121,13 @@ final class WorkoutComparisonTests: XCTestCase {
         let detail = makeDetail(workout: workout)
         let stats = WorkoutComparison.sideStats(detail)
         XCTAssertEqual(stats.avgWatts, 44)
+    }
+
+    func testSideStatsZeroPaceHasZeroWattsFallback() {
+        let workout = makeWorkout(distance: 0, time: 0, pace: 0)
+        let detail = makeDetail(workout: workout)
+        let stats = WorkoutComparison.sideStats(detail)
+        XCTAssertEqual(stats.avgWatts, 0)
     }
 
     func testSideStatsComputesDpsFromPaceAndCadence() {
@@ -145,6 +163,19 @@ final class WorkoutComparisonTests: XCTestCase {
         let detail = makeDetail(workout: makeWorkout(), strokes: strokes)
         let stats = WorkoutComparison.sideStats(detail)
         XCTAssertEqual(stats.best5sPower, 220)
+    }
+
+    func testSideStatsFallsBackToSplitPacesForConsistency() {
+        let splits = [
+            Split(index: 0, distance: 500, time: 120, pace: 118),
+            Split(index: 1, distance: 500, time: 120, pace: 122),
+            Split(index: 2, distance: 500, time: 120, pace: 126),
+        ]
+        let detail = makeDetail(workout: makeWorkout(), splits: splits)
+
+        let stats = WorkoutComparison.sideStats(detail)
+
+        XCTAssertGreaterThan(stats.paceConsistency, 0)
     }
 
     // MARK: - Interval Compare

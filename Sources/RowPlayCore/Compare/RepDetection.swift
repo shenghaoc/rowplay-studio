@@ -36,6 +36,7 @@ public enum RepDetection {
     /// Returns one RepSeries per work interval, or nil when the workout is not
     /// a recognisable multi-rep piece (< 2 work intervals or each < 30 s).
     public static func detectReps(_ detail: WorkoutDetail) -> [RepSeries]? {
+        guard detail.workout.isInterval else { return nil }
         let work = workSplits(detail.splits)
         guard work.count >= minReps else { return nil }
 
@@ -52,7 +53,7 @@ public enum RepDetection {
             if !bucket.isEmpty {
                 base = seriesFromStrokes(bucket)
             } else {
-                base = seriesFromSplit(split)
+                base = seriesFromSplit(split, sport: detail.workout.sport)
             }
             let avgPace = repAvgPaceFromArrays(base.pace, fallback: split.pace)
             series.append(RepSeries(
@@ -134,11 +135,13 @@ public enum RepDetection {
         return (times, pace, rate, power, hr)
     }
 
-    private static func seriesFromSplit(_ split: Split) -> (times: [Double], pace: [Double], rate: [Double], power: [Double], hr: [Double]) {
+    private static func seriesFromSplit(_ split: Split, sport: Sport) -> (times: [Double], pace: [Double], rate: [Double], power: [Double], hr: [Double]) {
         let steps = max(1, Int(split.time.rounded()))
         let spm = split.cadence ?? 0
         let hrVal = split.heartRate?.average.map { Double($0) } ?? 0
-        let watts = split.pace > 0 ? RowPlayFormatting.paceToWatts(split.pace) : 0
+        let watts = split.pace > 0
+            ? RowPlayFormatting.paceToWatts(for: sport, pacePer500m: split.pace)
+            : 0
 
         let times = (0..<steps).map { Double($0) }
         let pace = Array(repeating: split.pace, count: steps)

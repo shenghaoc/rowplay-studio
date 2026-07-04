@@ -122,7 +122,7 @@ public enum HrImport {
         }
 
         var updatedWorkout = detail.workout
-        updatedWorkout.heartRateAvg = hrStats.avg
+        updatedWorkout.heartRateAvg = hrStats.avg ?? detail.workout.heartRateAvg
 
         return WorkoutDetail(
             workout: updatedWorkout,
