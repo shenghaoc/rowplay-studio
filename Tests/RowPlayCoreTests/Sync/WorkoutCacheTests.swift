@@ -70,6 +70,19 @@ final class WorkoutCacheTests: XCTestCase {
         XCTAssertTrue(summaries.contains(where: { $0.id == detail.workout.id }))
     }
 
+    func testSaveWorkoutsUpdatesExistingDetailSummary() throws {
+        let detail = DemoWorkoutLibrary.details[0]
+        try cache.saveDetail(detail)
+        // Save an updated summary with a different date.
+        var updatedWorkout = detail.workout
+        updatedWorkout.date = Date(timeIntervalSince1970: 0)
+        try cache.saveWorkouts([updatedWorkout])
+        let loaded = try cache.loadWorkout(id: detail.workout.id)
+        XCTAssertNotNil(loaded)
+        XCTAssertEqual(loaded?.workout.date, updatedWorkout.date,
+            "saveWorkouts should update the embedded workout in cached details")
+    }
+
     // MARK: - deleteAll
 
     func testDeleteAllClearsWorkouts() throws {

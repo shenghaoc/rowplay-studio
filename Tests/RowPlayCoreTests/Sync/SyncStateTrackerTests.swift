@@ -1,6 +1,15 @@
 import XCTest
 @testable import RowPlayCore
 
+/// A WorkoutCache that throws on every operation, for testing error paths.
+private final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
+    func saveWorkouts(_ workouts: [Workout]) throws { throw NSError(domain: "test", code: 1) }
+    func saveDetail(_ detail: WorkoutDetail) throws { throw NSError(domain: "test", code: 1) }
+    func loadAllWorkouts() throws -> [Workout] { throw NSError(domain: "test", code: 1) }
+    func loadWorkout(id: Int) throws -> WorkoutDetail? { throw NSError(domain: "test", code: 1) }
+    func deleteAll() throws { throw NSError(domain: "test", code: 1) }
+}
+
 @available(macOS 14.0, *)
 @MainActor
 final class SyncStateTrackerTests: XCTestCase {
@@ -105,6 +114,25 @@ final class SyncStateTrackerTests: XCTestCase {
         try cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
         tracker.syncCompleted()
         XCTAssertEqual(tracker.state.totalWorkouts, DemoWorkoutLibrary.details.count)
+    }
+
+    // MARK: - Error handling
+
+    func testRefreshWorkoutCountHandlesCacheError() {
+        let throwingCache = ThrowingWorkoutCache()
+        let errorTracker = SyncStateTracker(cache: throwingCache)
+        // Should not crash; totalWorkouts stays at 0.
+        XCTAssertEqual(errorTracker.state.totalWorkouts, 0)
+    }
+
+    func testSyncFailedRefreshesWorkoutCount() throws {
+        try cache.saveWorkouts([DemoWorkoutLibrary.details[0].workout])
+        tracker.syncStarted()
+        try cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
+        let error = NSError(domain: "test", code: 1)
+        tracker.syncFailed(error: error)
+        XCTAssertEqual(tracker.state.totalWorkouts, DemoWorkoutLibrary.details.count,
+            "syncFailed should refresh workout count from cache")
     }
 
     // MARK: - Equatable

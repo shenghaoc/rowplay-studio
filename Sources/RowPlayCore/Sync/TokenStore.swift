@@ -45,13 +45,18 @@ public final class KeychainTokenStore: TokenStore {
             kSecAttrAccount as String: account,
         ]
 
-        // Try updating an existing item first; fall through to add if none exists.
+        // Try updating an existing item first; fall through to add only if not found.
         let updateAttributes: [String: Any] = [
             kSecValueData as String: data,
         ]
         let updateStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
-        if updateStatus == errSecSuccess {
+        switch updateStatus {
+        case errSecSuccess:
             return
+        case errSecItemNotFound:
+            break // fall through to add
+        default:
+            throw TokenStoreError.keychainError(updateStatus)
         }
 
         // No existing item — add a new one.
@@ -112,17 +117,6 @@ public enum TokenStoreError: Error, Equatable {
     case encodingFailed
     /// A Keychain framework error occurred. The OSStatus value is preserved for diagnostics.
     case keychainError(OSStatus)
-
-    public static func == (lhs: TokenStoreError, rhs: TokenStoreError) -> Bool {
-        switch (lhs, rhs) {
-        case (.encodingFailed, .encodingFailed):
-            return true
-        case let (.keychainError(l), .keychainError(r)):
-            return l == r
-        default:
-            return false
-        }
-    }
 }
 
 /// In-memory token store for tests and previews.

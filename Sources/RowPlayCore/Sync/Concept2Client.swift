@@ -43,20 +43,19 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
 
     /// Tracks the number of `fetchWorkouts` calls for test assertions.
     public var fetchWorkoutsCallCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return _fetchWorkoutsCallCount
+        lock.withLock { _fetchWorkoutsCallCount }
     }
 
     /// Tracks the IDs requested via `fetchWorkoutDetail` for test assertions.
     public var fetchDetailRequestedIDs: [Int] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _fetchDetailRequestedIDs
+        lock.withLock { _fetchDetailRequestedIDs }
     }
+
+    private let sorted: [WorkoutDetail]
 
     public init(details: [WorkoutDetail] = DemoWorkoutLibrary.details) {
         self.details = details
+        self.sorted = details.sorted { $0.workout.date > $1.workout.date }
     }
 
     public func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
@@ -65,10 +64,8 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
         }
 
         guard perPage > 0 else {
-            return Concept2Page(workouts: [], totalPages: 0)
+            return Concept2Page(workouts: [], totalPages: 1)
         }
-
-        let sorted = details.sorted { $0.workout.date > $1.workout.date }
         let workouts = sorted.map(\.workout)
         let totalPages = max(1, Int(ceil(Double(workouts.count) / Double(perPage))))
         let effectivePage = max(1, page)

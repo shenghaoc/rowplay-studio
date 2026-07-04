@@ -87,5 +87,7 @@ public final class SyncStateTracker {
         state.lastError = redact(error)
         state.lastErrorDate = Date()
         logger.error("Sync failed: \(error)")
+        // A partial sync may have cached workouts before the failure.
+        refreshWorkoutCount()
     }
 }
