@@ -99,6 +99,7 @@ private struct WorkoutSidebarRow: View {
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
+                            .accessibilityLabel("Personal Best")
                     }
                 }
                 HStack(spacing: 4) {
@@ -107,16 +108,19 @@ private struct WorkoutSidebarRow: View {
                     Text("·")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                     Text(RowPlayFormatting.distance(workout.distance))
                         .font(.caption)
                     Text("·")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                     Text(RowPlayFormatting.time(workout.time))
                         .font(.caption)
                     Text("·")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                     Text(RowPlayFormatting.pace(workout.pace))
                         .font(.caption)
                 }
