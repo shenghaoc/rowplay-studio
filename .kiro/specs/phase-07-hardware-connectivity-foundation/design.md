@@ -56,7 +56,7 @@ The `failed` case carries a `reason: String` for human-readable diagnostics.
 
 ```swift
 public protocol ErgConnection: Sendable {
-    var currentState: ErgConnectionState { get }
+    var currentState: ErgConnectionState { get async }
     func connect(to device: ErgDevice) async throws
     func disconnect() async
     func telemetryStream() -> AsyncStream<ErgTelemetrySample>
@@ -81,6 +81,12 @@ This protocol:
 - Telemetry is generated from a seeded PRNG (reusing `SeededGenerator` pattern from Phase 6)
 
 The mock does NOT use real timers. Tests call `emitSample()` directly for deterministic advancement.
+
+Review hardening added to the mock:
+- Connection attempts use an attempt token so a delayed `connect(to:)` cannot overwrite a later `disconnect()` or `simulateFailure(reason:)`.
+- Reset restores the initial seed supplied to the instance, keeping custom-seed sequences deterministic.
+- `telemetryStream()` finishes any previous stream before replacing it and clears the stored continuation when the active stream terminates.
+- Generated pace is clamped to a positive minimum before deriving distance, preventing infinite or negative distance increments for unusual mock inputs.
 
 ## Relationship to Phase 6 Live Sources
 

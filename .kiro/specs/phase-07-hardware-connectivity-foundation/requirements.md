@@ -42,6 +42,10 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R5.2** `MockErgConnection` emits deterministic telemetry samples.
 - **R5.3** `MockErgConnection` does not require network or Bluetooth.
 - **R5.4** `MockErgConnection` is usable in unit tests with manual tick advancement.
+- **R5.5** In-flight mock connection attempts must not overwrite a later disconnect or failure state.
+- **R5.6** Resetting a mock connection must preserve the instance's original deterministic seed.
+- **R5.7** Replacing or terminating telemetry streams must clean up stale continuations.
+- **R5.8** Mock telemetry pace must remain positive so distance never moves backward, even with unusual base pace inputs.
 
 ## R6: Module Boundaries
 
@@ -62,8 +66,12 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R7.8** Tests verify mock telemetry distance does not go backward.
 - **R7.9** Tests verify mock telemetry contains cadence and watts.
 - **R7.10** Tests verify failure state preserves a human-readable reason.
-- **R7.11** `swift test` passes.
-- **R7.12** `swift build` passes.
+- **R7.11** Tests verify in-flight connect cancellation/failure does not resurrect the connection.
+- **R7.12** Tests verify custom-seed reset restores the original deterministic sequence.
+- **R7.13** Tests verify replacing the telemetry stream finishes the previous stream.
+- **R7.14** Tests verify non-positive base pace is clamped to a positive value.
+- **R7.15** `swift test` passes.
+- **R7.16** `swift build` passes.
 
 ## R8: Non-Goals
 
