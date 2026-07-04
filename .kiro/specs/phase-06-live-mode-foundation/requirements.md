@@ -48,7 +48,7 @@ The native app must provide a SwiftUI panel that displays live-mode controls and
 - **R5.3** It displays polling status: last poll time, next poll countdown, or a "polling" indicator.
 - **R5.4** It shows a warning indicator after 3+ consecutive failures.
 - **R5.5** The panel displays an in-progress mock workout sample that can update without credentials.
-- **R5.6** The panel integrates with `WorkoutLibrary` to append new live workouts to the library.
+- **R5.6** The panel is backed by `WorkoutLibrary` live state and demo sample data.
 
 ## R6: Native UX and Module Boundaries
 
@@ -58,6 +58,7 @@ The native app must provide a SwiftUI panel that displays live-mode controls and
 - **R6.4** `WorkoutLibrary` owns the current demo live sample and advances it when the panel starts or refreshes mock polling.
 - **R6.5** The dashboard exposes the live panel in its layout.
 - **R6.6** Standard macOS controls: toggle, interval buttons, icon-only refresh button with help text, status text with monospaced digits.
+- **R6.7** `WorkoutLibrary.ingestLiveResult(_:)` appends new live workouts while deduplicating existing and duplicate incoming workout IDs.
 
 ## R7: Test Coverage
 
