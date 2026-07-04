@@ -12,6 +12,8 @@ public protocol AnnotationStore: Sendable {
     func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation
     /// Delete an annotation by id.
     func deleteAnnotation(workoutId: Int, id: Int) async throws
+    /// Delete all annotations (disconnect/logout).
+    func deleteAll() async throws
 }
 
 /// In-memory annotation store for tests, previews, and early integration.
@@ -70,6 +72,13 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
             var annotations = storage[workoutId] ?? []
             annotations.removeAll { $0.id == id }
             storage[workoutId] = annotations
+        }
+    }
+
+    public func deleteAll() async throws {
+        lock.withLock {
+            storage.removeAll()
+            nextId = 1
         }
     }
 }

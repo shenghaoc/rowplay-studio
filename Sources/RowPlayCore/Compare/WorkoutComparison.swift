@@ -275,7 +275,7 @@ public enum WorkoutComparison {
         guard detail.workout.isInterval else { return nil }
         let workSplits = detail.splits.filter { split in
             // A work split is non-rest with >= 30 seconds
-            split.time >= 30
+            split.isRest != true && split.time >= 30
         }
         guard workSplits.count >= 2 else { return nil }
         return workSplits.map { IntervalRep(pace: $0.pace, time: $0.time) }

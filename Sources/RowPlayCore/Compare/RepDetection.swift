@@ -45,7 +45,7 @@ public enum RepDetection {
 
         for split in detail.splits {
             // Skip rest or short splits
-            guard split.time >= minRepSeconds else { continue }
+            guard split.isRest != true, split.time >= minRepSeconds else { continue }
 
             let bucket = repIndex < buckets.count ? buckets[repIndex] : []
             let base: (times: [Double], pace: [Double], rate: [Double], power: [Double], hr: [Double])
@@ -83,7 +83,7 @@ public enum RepDetection {
     // MARK: - Private Helpers
 
     private static func workSplits(_ splits: [Split]) -> [Split] {
-        splits.filter { $0.time >= minRepSeconds }
+        splits.filter { $0.isRest != true && $0.time >= minRepSeconds }
     }
 
     /// Assign strokes to work rep buckets based on split time boundaries.
@@ -104,7 +104,7 @@ public enum RepDetection {
         var splitToWork: [Int] = []
         var workIdx = 0
         for split in splits {
-            if split.time >= minRepSeconds {
+            if split.isRest != true && split.time >= minRepSeconds {
                 splitToWork.append(workIdx)
                 workIdx += 1
             } else {

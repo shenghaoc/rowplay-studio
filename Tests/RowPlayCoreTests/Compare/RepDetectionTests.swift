@@ -55,16 +55,15 @@ final class RepDetectionTests: XCTestCase {
     }
 
     func testDetectRepsWithMixedSplits() {
-        // All splits >= 30s are treated as work reps (native Split has no isRest field)
         let splits = [
             Split(index: 0, distance: 500, time: 120, pace: 120),
-            Split(index: 1, distance: 100, time: 60, pace: 300),  // slow/rest-like, but >= 30s
+            Split(index: 1, distance: 100, time: 60, pace: 300, isRest: true),
             Split(index: 2, distance: 500, time: 125, pace: 125),
         ]
         let detail = makeDetail(splits: splits)
         let reps = RepDetection.detectReps(detail)
         XCTAssertNotNil(reps)
-        XCTAssertEqual(reps!.count, 3) // all three >= 30s
+        XCTAssertEqual(reps!.count, 2)
     }
 
     // MARK: - Rep Avg Pace

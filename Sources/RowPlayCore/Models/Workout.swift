@@ -46,6 +46,7 @@ public struct Split: Codable, Equatable, Identifiable, Sendable {
     public var pace: TimeInterval
     public var cadence: Double?
     public var heartRate: HeartRateDetail?
+    public var isRest: Bool?
 
     public var id: Int { index }
 
@@ -55,7 +56,8 @@ public struct Split: Codable, Equatable, Identifiable, Sendable {
         time: TimeInterval,
         pace: TimeInterval,
         cadence: Double? = nil,
-        heartRate: HeartRateDetail? = nil
+        heartRate: HeartRateDetail? = nil,
+        isRest: Bool? = nil
     ) {
         self.index = index
         self.distance = distance
@@ -63,6 +65,7 @@ public struct Split: Codable, Equatable, Identifiable, Sendable {
         self.pace = pace
         self.cadence = cadence
         self.heartRate = heartRate
+        self.isRest = isRest
     }
 }
 
@@ -140,4 +143,3 @@ public struct WorkoutDetail: Codable, Equatable, Identifiable, Sendable {
         self.splits = splits
     }
 }
-

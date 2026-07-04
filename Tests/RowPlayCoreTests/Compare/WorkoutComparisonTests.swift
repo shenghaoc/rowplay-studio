@@ -168,6 +168,30 @@ final class WorkoutComparisonTests: XCTestCase {
         XCTAssertEqual(rows![0].paceDelta, 2, accuracy: 0.01)
     }
 
+    func testCompareIntervalRepsSkipsRestSplits() {
+        let splitsA = [
+            Split(index: 0, distance: 500, time: 120, pace: 120),
+            Split(index: 1, distance: 100, time: 60, pace: 300, isRest: true),
+            Split(index: 2, distance: 500, time: 125, pace: 125),
+        ]
+        let splitsB = [
+            Split(index: 0, distance: 500, time: 118, pace: 118),
+            Split(index: 1, distance: 100, time: 60, pace: 300, isRest: true),
+            Split(index: 2, distance: 500, time: 122, pace: 122),
+        ]
+        let workoutA = makeWorkout(distance: 1100, time: 305, pace: 122.5, isInterval: true)
+        let workoutB = makeWorkout(id: 2, distance: 1100, time: 300, pace: 120, isInterval: true)
+        let a = makeDetail(workout: workoutA, splits: splitsA)
+        let b = makeDetail(workout: workoutB, splits: splitsB)
+
+        let rows = WorkoutComparison.compareIntervalReps(a, b)
+
+        XCTAssertNotNil(rows)
+        XCTAssertEqual(rows!.count, 2)
+        XCTAssertEqual(rows![1].index, 2)
+        XCTAssertEqual(rows![1].paceDelta, 3, accuracy: 0.01)
+    }
+
     func testCompareIntervalRepsNotInterval() {
         let workoutA = makeWorkout(isInterval: false)
         let workoutB = makeWorkout(id: 2, isInterval: false)
