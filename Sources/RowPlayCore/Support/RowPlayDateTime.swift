@@ -16,6 +16,11 @@ public enum RowPlayDateTime {
     }
 
     private static let utc = TimeZone(secondsFromGMT: 0)!
+    private static let maxRawLogbookUTF16Length = 64
+    private static let maxTrimmedLogbookUTF16Length = 30
+    private static let maxRawDayKeyUTF16Length = 64
+    private static let maxTrimmedDayKeyUTF16Length = 20
+
     private static let logbookRegex = try! NSRegularExpression(
         pattern: #"^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$"#
     )
@@ -150,12 +155,12 @@ public enum RowPlayDateTime {
     // MARK: - Private
 
     private static func parseLogbookParts(_ text: String) -> LogbookParts? {
+        guard text.utf16.count <= maxRawLogbookUTF16Length else { return nil }
+
         let value = text.trimmingCharacters(in: .whitespaces)
 
-        // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count to match NSRegularExpression's UTF-16 basis
-        // Max valid logbook "YYYY-MM-DD HH:MM:SS" is 19 chars; 30 gives headroom
-        guard value.utf16.count <= 30 else { return nil }
+        // Bound regex input; utf16.count matches NSRegularExpression's UTF-16 basis.
+        guard value.utf16.count <= maxTrimmedLogbookUTF16Length else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = logbookRegex.firstMatch(in: value, range: range) else {
@@ -181,12 +186,12 @@ public enum RowPlayDateTime {
     }
 
     private static func parseDayKey(_ key: String) -> Date? {
+        guard key.utf16.count <= maxRawDayKeyUTF16Length else { return nil }
+
         let value = key.trimmingCharacters(in: .whitespaces)
 
-        // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count to match NSRegularExpression's UTF-16 basis
-        // Max valid day key "YYYY-MM-DD" is 10 chars; 20 gives headroom
-        guard value.utf16.count <= 20 else { return nil }
+        // Bound regex input; utf16.count matches NSRegularExpression's UTF-16 basis.
+        guard value.utf16.count <= maxTrimmedDayKeyUTF16Length else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = dayKeyRegex.firstMatch(in: value, range: range) else { return nil }

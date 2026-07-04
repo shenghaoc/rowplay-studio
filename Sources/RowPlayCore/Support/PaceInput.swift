@@ -4,6 +4,9 @@ import Foundation
 ///
 /// Ported from the web app's `src/lib/paceInput.ts`.
 public enum PaceInput {
+    private static let maxRawInputUTF16Length = 64
+    private static let maxTrimmedInputUTF16Length = 20
+
     private static let clockRegex = try! NSRegularExpression(
         pattern: #"^(\d+):([0-5]?\d(?:\.\d+)?)$"#
     )
@@ -14,12 +17,12 @@ public enum PaceInput {
     /// Parse a `M:SS` or bare numeric string to positive seconds.
     /// Returns `nil` for invalid or non-positive input.
     public static func parsePaceInput(_ raw: String) -> TimeInterval? {
+        guard raw.utf16.count <= maxRawInputUTF16Length else { return nil }
+
         let s = raw.trimmingCharacters(in: .whitespaces)
 
-        // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count to match NSRegularExpression's UTF-16 basis
-        // Max valid pace ~18 chars (e.g. "999999:59.99"); 20 gives headroom
-        guard s.utf16.count <= 20 else { return nil }
+        // Bound regex input; utf16.count matches NSRegularExpression's UTF-16 basis.
+        guard s.utf16.count <= maxTrimmedInputUTF16Length else { return nil }
 
         let range = NSRange(s.startIndex..<s.endIndex, in: s)
 
