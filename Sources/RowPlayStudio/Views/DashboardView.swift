@@ -105,6 +105,9 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(pbLabel(pb.distance)) \(pb.sport.displayName) Personal Best")
+                        .accessibilityValue("\(RowPlayFormatting.time(pb.time, tenths: true)), \(RowPlayFormatting.pace(pb.pace))")
                     }
                 }
             }
@@ -156,6 +159,9 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(sport.sport.displayName) Summary")
+                        .accessibilityValue("\(sport.sessions) sessions, \(RowPlayFormatting.distance(sport.distance)), Best Pace: \(RowPlayFormatting.pace(sport.bestPace))")
                     }
                 }
             }
