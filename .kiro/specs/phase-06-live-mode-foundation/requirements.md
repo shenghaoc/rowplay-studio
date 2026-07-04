@@ -47,15 +47,17 @@ The native app must provide a SwiftUI panel that displays live-mode controls and
 - **R5.2** When enabled, it shows interval selector chips (30s, 1m, 2m, 5m).
 - **R5.3** It displays polling status: last poll time, next poll countdown, or a "polling" indicator.
 - **R5.4** It shows a warning indicator after 3+ consecutive failures.
-- **R5.5** The panel integrates with `WorkoutLibrary` to append new live workouts to the library.
+- **R5.5** The panel displays an in-progress mock workout sample that can update without credentials.
+- **R5.6** The panel integrates with `WorkoutLibrary` to append new live workouts to the library.
 
 ## R6: Native UX and Module Boundaries
 
 - **R6.1** All live-mode domain logic lives in `RowPlayCore/Live/`.
 - **R6.2** The live-mode panel lives in `RowPlayStudio/Views/LiveModePanelView.swift`.
 - **R6.3** `WorkoutLibrary` gains a `liveState` property and a method to ingest live poll results.
-- **R6.4** The dashboard exposes the live panel in its layout.
-- **R6.5** Standard macOS controls: toggle, segmented picker for interval, status text with monospaced digits.
+- **R6.4** `WorkoutLibrary` owns the current demo live sample and advances it when the panel starts or refreshes mock polling.
+- **R6.5** The dashboard exposes the live panel in its layout.
+- **R6.6** Standard macOS controls: toggle, interval buttons, icon-only refresh button with help text, status text with monospaced digits.
 
 ## R7: Test Coverage
 

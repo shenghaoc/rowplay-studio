@@ -55,6 +55,7 @@ public struct LiveModeState: Equatable, Sendable {
         enabled = true
         status = .idle
         consecutiveFailures = 0
+        nextPollAt = nil
     }
 
     /// Disable live mode and transition to stopped.

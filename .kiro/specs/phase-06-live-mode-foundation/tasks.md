@@ -5,8 +5,8 @@
 - [x] Create `Sources/RowPlayCore/Live/LiveSource.swift` with LiveSource protocol and LivePollResult model.
 - [x] Create `Sources/RowPlayCore/Live/MockLiveSource.swift` with deterministic demo workout generation.
 - [x] Create `Sources/RowPlayCore/Live/DemoLiveSampleGenerator.swift` with sequential in-progress sample generation.
-- [x] Create `Sources/RowPlayStudio/Views/LiveModePanelView.swift` with toggle, interval chips, status display, and warning indicator.
-- [x] Update `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` with liveState property and ingestLiveResult method.
+- [x] Create `Sources/RowPlayStudio/Views/LiveModePanelView.swift` with toggle, interval chips, updating mock sample display, status display, and warning indicator.
+- [x] Update `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` with liveState property, demo sample advancement, and ingestLiveResult method.
 - [x] Update `Sources/RowPlayStudio/Views/DashboardView.swift` to embed the live mode panel.
 - [x] Create `Tests/RowPlayCoreTests/Live/LiveModeStateTests.swift` covering state transitions, stale detection, invalid intervals, stopped completions, and edge cases.
 - [x] Create `Tests/RowPlayCoreTests/Live/LivePollingCadenceTests.swift` covering effective interval, backoff steps, and backoff reset.

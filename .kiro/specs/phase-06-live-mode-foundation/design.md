@@ -62,7 +62,9 @@ The generator is seeded for deterministic test output.
 `LiveModePanelView` observes `WorkoutLibrary.liveState` and renders:
 
 - A toggle bound to `liveState.enabled`
-- A `Picker` with `SegmentedPickerStyle` for interval selection
+- Interval buttons for the supported poll intervals
+- The current demo `LiveWorkoutSample` with distance, elapsed time, pace, cadence, and heart-rate metrics
+- A manual refresh button for advancing the mock sample without waiting for the next scheduled interval
 - Status text showing last/next poll times using `Text(date:style:)`
 - A warning badge when `consecutiveFailures >= 3`
 - A progress indicator when status is `polling`
@@ -73,10 +75,12 @@ The panel is embedded in `DashboardView` below the existing metric tiles.
 
 `WorkoutLibrary` gains:
 - `@Published var liveState: LiveModeState`
+- `@Published private(set) var liveSample: LiveWorkoutSample?` for the in-progress mock workout surfaced by the panel
+- `func advanceDemoLiveSample(at:)` and `func advanceDemoLiveSampleIfDue(at:)` for schedule-aware mock updates
 - `func ingestLiveResult(_ result: LivePollResult)` — appends new workouts, deduplicates by ID
 - A `LiveSource` property (defaulting to `MockLiveSource`) for the poll cycle
 
-The library does not own the timer directly; the app or view layer drives polling via `DispatchQueue` or `TimelineView` to keep the store testable.
+The library does not own the timer directly; the view layer uses a lightweight timer to ask the store to advance the demo sample when `nextPollAt` is due. This keeps the store testable while making the dashboard panel visibly useful without Concept2 credentials.
 
 ## Naming Conventions
 

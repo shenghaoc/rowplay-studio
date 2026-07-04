@@ -17,9 +17,11 @@ final class WorkoutLibrary: ObservableObject {
     }
     @Published private(set) var pbIds: Set<Int> = []
     @Published var liveState: LiveModeState = LiveModeState()
+    @Published private(set) var liveSample: LiveWorkoutSample?
     let annotationStore: any AnnotationStore
 
     private(set) var liveSource: any LiveSource = MockLiveSource()
+    private let demoLiveSampleGenerator = DemoLiveSampleGenerator()
 
     // Caches to prevent expensive O(N) and O(N log N) recomputations on every render
     private(set) var workouts: [Workout] = []
@@ -103,20 +105,45 @@ final class WorkoutLibrary: ObservableObject {
 
     // MARK: - Live Mode
 
-    func startLiveMode() {
+    func startLiveMode(at date: Date = Date()) {
         liveState.start()
+        advanceDemoLiveSample(at: date)
     }
 
     func stopLiveMode() {
         liveState.stop()
+        liveSample = nil
+        demoLiveSampleGenerator.reset()
     }
 
     func setLiveInterval(_ sec: Int) {
+        let previousInterval = liveState.intervalSec
         liveState.intervalChanged(sec)
+        guard liveState.enabled, liveState.intervalSec != previousInterval else { return }
+        liveState.tickScheduled(at: Date().addingTimeInterval(TimeInterval(liveState.intervalSec)))
     }
 
     func setLiveSource(_ source: any LiveSource) {
         liveSource = source
+    }
+
+    func advanceDemoLiveSample(at date: Date = Date()) {
+        guard liveState.enabled else { return }
+        liveState.pollStarted()
+        liveSample = demoLiveSampleGenerator.nextSample(at: date)
+        liveState.pollSucceeded(at: date)
+        liveState.tickScheduled(at: date.addingTimeInterval(TimeInterval(liveState.intervalSec)))
+    }
+
+    func advanceDemoLiveSampleIfDue(at date: Date = Date()) {
+        guard liveState.enabled else { return }
+        guard let nextPollAt = liveState.nextPollAt else {
+            advanceDemoLiveSample(at: date)
+            return
+        }
+        if nextPollAt <= date {
+            advanceDemoLiveSample(at: date)
+        }
     }
 
     func ingestLiveResult(_ result: LivePollResult) {

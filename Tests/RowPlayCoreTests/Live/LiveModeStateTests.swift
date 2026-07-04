@@ -31,6 +31,13 @@ final class LiveModeStateTests: XCTestCase {
         XCTAssertEqual(state.consecutiveFailures, 0)
     }
 
+    func testStartClearsStaleNextPoll() {
+        let staleNextPoll = Date().addingTimeInterval(-60)
+        var state = LiveModeState(nextPollAt: staleNextPoll)
+        state.start()
+        XCTAssertNil(state.nextPollAt)
+    }
+
     func testStopTransitionsToStopped() {
         var state = LiveModeState()
         state.start()
@@ -148,6 +155,15 @@ final class LiveModeStateTests: XCTestCase {
 
     func testTickScheduledIgnoredWhenDisabled() {
         var state = LiveModeState()
+        let future = Date().addingTimeInterval(60)
+        state.tickScheduled(at: future)
+        XCTAssertNil(state.nextPollAt)
+    }
+
+    func testTickScheduledIgnoredAfterStop() {
+        var state = LiveModeState()
+        state.start()
+        state.stop()
         let future = Date().addingTimeInterval(60)
         state.tickScheduled(at: future)
         XCTAssertNil(state.nextPollAt)
