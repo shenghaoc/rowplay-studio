@@ -225,6 +225,7 @@ public enum WorkoutComparison {
         _ strokesB: [Stroke],
         steps: Int = 120
     ) -> DistanceOverlay? {
+        guard steps > 0 else { return nil }
         guard let endA = strokesA.last?.d, endA > 0,
               let endB = strokesB.last?.d, endB > 0 else { return nil }
         let aligned = min(endA, endB)
@@ -319,18 +320,20 @@ public enum WorkoutComparison {
 
         var best = 0
         var windowStart = 0
+        var currentSum = 0
 
         for windowEnd in 0..<strokes.count {
+            currentSum += strokes[windowEnd].watts
+
             // Shrink window to fit within 5 seconds
             while windowEnd > windowStart,
                   strokes[windowEnd].t - strokes[windowStart].t > 5.0 {
+                currentSum -= strokes[windowStart].watts
                 windowStart += 1
             }
-            // Compute average power in window
+
             let count = windowEnd - windowStart + 1
-            guard count > 0 else { continue }
-            let sum = strokes[windowStart...windowEnd].reduce(0) { $0 + $1.watts }
-            let avg = sum / count
+            let avg = currentSum / count
             if avg > best { best = avg }
         }
 
