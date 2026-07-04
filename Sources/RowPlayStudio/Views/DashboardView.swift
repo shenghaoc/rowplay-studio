@@ -3,6 +3,7 @@ import RowPlayCore
 import SwiftUI
 
 struct DashboardView: View {
+    @ObservedObject var library: WorkoutLibrary
     var summary: DashboardSummary
     var workouts: [Workout]
     var pbIds: Set<Int>
@@ -12,6 +13,8 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Dashboard")
                     .font(.largeTitle.weight(.semibold))
+
+                LiveModePanelView(library: library)
 
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 140, maximum: 220))
