@@ -4,27 +4,36 @@ import os
 /// Redaction marker substituted for sensitive content.
 public let redactedPlaceholder = "[REDACTED]"
 
+private struct RedactionRule {
+    let regex: NSRegularExpression
+    let replacement: String
+}
+
 /// Regex-based patterns that match personally sensitive data.
 ///
 /// Applied sequentially before logging. Mirrors the web app's `logger.ts`
 /// patterns adapted for Swift's regex engine.
-private let sensitivePatterns: [NSRegularExpression] = {
-    let patternStrings: [String] = [
+private let sensitivePatterns: [RedactionRule] = {
+    let patternSpecs: [(pattern: String, replacement: String)] = [
         // Concept2 API token: 32+ character hex string
-        #"\b[a-f0-9]{32,}\b"#,
+        (#"\b[a-f0-9]{32,}\b"#, redactedPlaceholder),
         // Authorization: Bearer ... header
-        #"Authorization:\s*Bearer\s+\S+"#,
+        (#"Authorization:\s*Bearer\s+\S+"#, redactedPlaceholder),
         // Cookie headers
-        #"(Cookie|Set-Cookie):\s*[^\n]+"#,
-        // Generic token values in JSON: "token": "..." — captures the value portion
-        #""token"\s*:\s*"[^"]+""#,
+        (#"(Cookie|Set-Cookie):\s*[^\n]+"#, "$1: \(redactedPlaceholder)"),
+        // Generic token values in JSON: preserve the key and replace only the value.
+        (#"("(?:token|access_token)"\s*:\s*")[^"]+(")"#, "$1\(redactedPlaceholder)$2"),
         // Query/form credential keys: token=..., access_token=...
-        #"\b(token|access_token)\s*=\s*[^\s&]+"#,
-        // Full workout payloads (JSON object > 100 chars, non-greedy nested)
-        #"\{(?:[^{}]|\{[^{}]*\}){100,}\}"#,
+        (#"\b(token|access_token)\s*=\s*[^\s&]+"#, "$1=\(redactedPlaceholder)"),
+        // Full workout payloads (JSON object or array > 100 chars, shallow nested)
+        (#"\{(?:[^{}]|\{[^{}]*\}){100,}\}"#, redactedPlaceholder),
+        (#"\[(?:[^\[\]]|\[[^\[\]]*\]){100,}\]"#, redactedPlaceholder),
     ]
-    return patternStrings.compactMap { pattern in
-        try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+    return patternSpecs.compactMap { spec in
+        guard let regex = try? NSRegularExpression(pattern: spec.pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+        return RedactionRule(regex: regex, replacement: spec.replacement)
     }
 }()
 
@@ -46,13 +55,13 @@ public func redact(_ value: Any) -> String {
     }
 
     var result = input
-    for pattern in sensitivePatterns {
+    for rule in sensitivePatterns {
         let range = NSRange(result.startIndex..., in: result)
-        result = pattern.stringByReplacingMatches(
+        result = rule.regex.stringByReplacingMatches(
             in: result,
             options: [],
             range: range,
-            withTemplate: redactedPlaceholder
+            withTemplate: rule.replacement
         )
     }
     return result

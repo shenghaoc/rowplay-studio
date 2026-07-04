@@ -3,11 +3,11 @@ import XCTest
 
 /// A WorkoutCache that throws on every operation, for testing error paths.
 private final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
-    func saveWorkouts(_ workouts: [Workout]) throws { throw NSError(domain: "test", code: 1) }
-    func saveDetail(_ detail: WorkoutDetail) throws { throw NSError(domain: "test", code: 1) }
-    func loadAllWorkouts() throws -> [Workout] { throw NSError(domain: "test", code: 1) }
-    func loadWorkout(id: Int) throws -> WorkoutDetail? { throw NSError(domain: "test", code: 1) }
-    func deleteAll() throws { throw NSError(domain: "test", code: 1) }
+    func saveWorkouts(_ workouts: [Workout]) async throws { throw NSError(domain: "test", code: 1) }
+    func saveDetail(_ detail: WorkoutDetail) async throws { throw NSError(domain: "test", code: 1) }
+    func loadAllWorkouts() async throws -> [Workout] { throw NSError(domain: "test", code: 1) }
+    func loadWorkout(id: Int) async throws -> WorkoutDetail? { throw NSError(domain: "test", code: 1) }
+    func deleteAll() async throws { throw NSError(domain: "test", code: 1) }
 }
 
 @available(macOS 14.0, *)
@@ -38,10 +38,11 @@ final class SyncStateTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.state.totalWorkouts, 0)
     }
 
-    func testInitialWorkoutCountFromCache() throws {
+    func testRefreshesInitialWorkoutCountFromCache() async throws {
         let workouts = DemoWorkoutLibrary.details.map(\.workout)
-        try cache.saveWorkouts(workouts)
+        try await cache.saveWorkouts(workouts)
         let freshTracker = SyncStateTracker(cache: cache)
+        await freshTracker.refreshWorkoutCount()
         XCTAssertEqual(freshTracker.state.totalWorkouts, workouts.count)
     }
 
@@ -54,30 +55,30 @@ final class SyncStateTrackerTests: XCTestCase {
         XCTAssertNil(tracker.state.lastErrorDate)
     }
 
-    func testSyncCompleted() {
+    func testSyncCompleted() async {
         tracker.syncStarted()
-        tracker.syncCompleted()
+        await tracker.syncCompleted()
         XCTAssertFalse(tracker.state.inProgress)
         XCTAssertNotNil(tracker.state.lastSyncDate)
         XCTAssertNil(tracker.state.lastError)
     }
 
-    func testSyncFailed() {
+    func testSyncFailed() async {
         tracker.syncStarted()
         let error = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "Network timeout"])
-        tracker.syncFailed(error: error)
+        await tracker.syncFailed(error: error)
         XCTAssertFalse(tracker.state.inProgress)
         XCTAssertNotNil(tracker.state.lastError)
         XCTAssertNotNil(tracker.state.lastErrorDate)
         XCTAssertNil(tracker.state.lastSyncDate)
     }
 
-    func testSyncFailedRedactsError() {
+    func testSyncFailedRedactsError() async {
         tracker.syncStarted()
         let error = NSError(domain: "test", code: 1, userInfo: [
             NSLocalizedDescriptionKey: "Authorization: Bearer abcdef1234567890abcdef1234567890"
         ])
-        tracker.syncFailed(error: error)
+        await tracker.syncFailed(error: error)
         XCTAssertNotNil(tracker.state.lastError)
         // The error should be redacted — should not contain the token.
         XCTAssertFalse(tracker.state.lastError?.contains("abcdef1234567890abcdef1234567890") ?? false)
@@ -86,51 +87,52 @@ final class SyncStateTrackerTests: XCTestCase {
 
     // MARK: - State transitions
 
-    func testRetryAfterError() {
+    func testRetryAfterError() async {
         tracker.syncStarted()
-        tracker.syncFailed(error: NSError(domain: "test", code: 1))
+        await tracker.syncFailed(error: NSError(domain: "test", code: 1))
         // Retry
         tracker.syncStarted()
         XCTAssertNil(tracker.state.lastError)
         XCTAssertTrue(tracker.state.inProgress)
 
-        tracker.syncCompleted()
+        await tracker.syncCompleted()
         XCTAssertFalse(tracker.state.inProgress)
         XCTAssertNotNil(tracker.state.lastSyncDate)
         XCTAssertNil(tracker.state.lastError)
     }
 
-    func testRefreshWorkoutCount() throws {
+    func testRefreshWorkoutCount() async throws {
         XCTAssertEqual(tracker.state.totalWorkouts, 0)
         let workouts = DemoWorkoutLibrary.details.map(\.workout)
-        try cache.saveWorkouts(workouts)
-        tracker.refreshWorkoutCount()
+        try await cache.saveWorkouts(workouts)
+        await tracker.refreshWorkoutCount()
         XCTAssertEqual(tracker.state.totalWorkouts, workouts.count)
     }
 
-    func testSyncCompletedRefreshesWorkoutCount() throws {
-        try cache.saveWorkouts([DemoWorkoutLibrary.details[0].workout])
+    func testSyncCompletedRefreshesWorkoutCount() async throws {
+        try await cache.saveWorkouts([DemoWorkoutLibrary.details[0].workout])
         tracker.syncStarted()
-        try cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
-        tracker.syncCompleted()
+        try await cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
+        await tracker.syncCompleted()
         XCTAssertEqual(tracker.state.totalWorkouts, DemoWorkoutLibrary.details.count)
     }
 
     // MARK: - Error handling
 
-    func testRefreshWorkoutCountHandlesCacheError() {
+    func testRefreshWorkoutCountHandlesCacheError() async {
         let throwingCache = ThrowingWorkoutCache()
         let errorTracker = SyncStateTracker(cache: throwingCache)
+        await errorTracker.refreshWorkoutCount()
         // Should not crash; totalWorkouts stays at 0.
         XCTAssertEqual(errorTracker.state.totalWorkouts, 0)
     }
 
-    func testSyncFailedRefreshesWorkoutCount() throws {
-        try cache.saveWorkouts([DemoWorkoutLibrary.details[0].workout])
+    func testSyncFailedRefreshesWorkoutCount() async throws {
+        try await cache.saveWorkouts([DemoWorkoutLibrary.details[0].workout])
         tracker.syncStarted()
-        try cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
+        try await cache.saveWorkouts(DemoWorkoutLibrary.details.map(\.workout))
         let error = NSError(domain: "test", code: 1)
-        tracker.syncFailed(error: error)
+        await tracker.syncFailed(error: error)
         XCTAssertEqual(tracker.state.totalWorkouts, DemoWorkoutLibrary.details.count,
             "syncFailed should refresh workout count from cache")
     }

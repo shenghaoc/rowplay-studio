@@ -66,7 +66,15 @@ public final class KeychainTokenStore: TokenStore {
         ]) { _, new in new }
 
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        guard addStatus == errSecSuccess else {
+        switch addStatus {
+        case errSecSuccess:
+            return
+        case errSecDuplicateItem:
+            let retryStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
+            guard retryStatus == errSecSuccess else {
+                throw TokenStoreError.keychainError(retryStatus)
+            }
+        default:
             throw TokenStoreError.keychainError(addStatus)
         }
     }
@@ -133,20 +141,20 @@ public final class FakeTokenStore: TokenStore, @unchecked Sendable {
     }
 
     public func saveToken(_ token: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        storedToken = token
+        lock.withLock {
+            storedToken = token
+        }
     }
 
     public func loadToken() throws -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedToken
+        lock.withLock {
+            storedToken
+        }
     }
 
     public func deleteToken() throws {
-        lock.lock()
-        defer { lock.unlock() }
-        storedToken = nil
+        lock.withLock {
+            storedToken = nil
+        }
     }
 }

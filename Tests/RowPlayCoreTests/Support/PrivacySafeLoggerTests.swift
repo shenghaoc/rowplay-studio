@@ -45,6 +45,13 @@ final class PrivacySafeLoggerTests: XCTestCase {
         let result = redact(input)
         XCTAssertTrue(result.contains("[REDACTED]"))
         XCTAssertFalse(result.contains("super-secret-value-12345"))
+        XCTAssertEqual(result, #"{"token": "[REDACTED]"}"#)
+    }
+
+    func testRedactsAccessTokenJsonValue() {
+        let input = #"{"access_token": "super-secret-value-12345"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"access_token": "[REDACTED]"}"#)
     }
 
     // MARK: - redact() — large JSON blobs
@@ -52,6 +59,14 @@ final class PrivacySafeLoggerTests: XCTestCase {
     func testRedactsLargeJsonBlob() {
         let payload = String(repeating: "x", count: 200)
         let input = "{\"\(payload)\": \"value\"}"
+        let result = redact(input)
+        XCTAssertEqual(result, "[REDACTED]")
+    }
+
+    func testRedactsLargeJsonArrayBlob() {
+        let payload = (0..<20).map { #"{"id": \#($0), "name": "workout-\#($0)"}"# }.joined(separator: ",")
+        let input = "[\(payload)]"
+        XCTAssertGreaterThan(input.count, 100)
         let result = redact(input)
         XCTAssertEqual(result, "[REDACTED]")
     }

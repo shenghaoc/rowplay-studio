@@ -2,7 +2,7 @@
 
 ## Goal
 
-Establish the safe boundaries for Concept2 integration in the native app: a Keychain-backed token store, an injectable API client protocol, a workout cache abstraction, privacy-safe logging, and sync state tracking. Real network sync is intentionally deferred — this PR creates the interfaces and testable implementations.
+Establish the safe boundaries for Concept2 integration in the native app: a Keychain-backed token store, an injectable API client protocol, an async workout cache abstraction, privacy-safe logging, and sync state tracking. Real network sync is intentionally deferred — this PR creates the interfaces and testable implementations.
 
 ## Architecture
 
@@ -44,16 +44,17 @@ Protocol for local workout storage:
 
 ```swift
 public protocol WorkoutCache: Sendable {
-    func saveWorkouts(_ workouts: [Workout]) throws
-    func saveDetail(_ detail: WorkoutDetail) throws
-    func loadAllWorkouts() throws -> [Workout]
-    func loadWorkout(id: Int) throws -> WorkoutDetail?
-    func deleteAll() throws
+    func saveWorkouts(_ workouts: [Workout]) async throws
+    func saveDetail(_ detail: WorkoutDetail) async throws
+    func loadAllWorkouts() async throws -> [Workout]
+    func loadWorkout(id: Int) async throws -> WorkoutDetail?
+    func deleteAll() async throws
 }
 ```
 
 - `InMemoryWorkoutCache` uses `[Int: Workout]` and `[Int: WorkoutDetail]` dictionaries.
 - Workouts are stored by `id` for O(1) lookup.
+- Methods are async so future SQLite or file-backed implementations can perform I/O off the main actor without changing callers.
 - `deleteAll()` is the disconnect/logout path.
 
 ### 4. Privacy-Safe Logger (`RowPlayCore/Support/PrivacySafeLogger.swift`)
@@ -64,8 +65,10 @@ Redaction layer over `os.Logger`:
 - Patterns:
   - Hex tokens: `/\b[a-f0-9]{32,}\b/gi` → `[REDACTED]`
   - Bearer headers: `/Authorization:\s*Bearer\s+\S+/gi` → `[REDACTED]`
-  - Token values: `/(?<="token"\s*:\s*")[^"]+(?=")/gi` → `[REDACTED]`
-  - Large JSON blobs: `/\{(?:[^{}]|\{[^{}]*\}){100,}\}/g` → `[REDACTED]`
+  - Cookie headers: `/(Cookie|Set-Cookie):\s*[^\n]+/gi` → `$1: [REDACTED]`
+  - Token values: `/"(?:token|access_token)"\s*:\s*"[^"]+"/gi` → preserve key, replace value with `[REDACTED]`
+  - Query/form credentials: `/\b(token|access_token)\s*=\s*[^\s&]+/gi` → `$1=[REDACTED]`
+  - Large JSON blobs: objects or arrays over 100 characters → `[REDACTED]`
 - `PrivacySafeLogger` wraps `os.Logger` and applies `redact()` to the main message and all string arguments.
 - Interpolated error strings are redacted before emission to avoid logging tokens or authorization headers.
 
@@ -84,7 +87,7 @@ public struct SyncState: Equatable, Sendable {
 ```
 
 - `SyncStateTracker` is `@Observable` and `@MainActor` (macOS 14+).
-- Reads workout count from the cache protocol.
+- Reads workout count asynchronously from the cache protocol.
 - Transitions: idle → syncing → complete/error.
 
 ## File Layout
@@ -118,7 +121,7 @@ docs/
 ## Non-Goals
 
 - No real URLSession-based Concept2 sync.
-- No SQLite/Core Data.
+- No SQLite/Core Data implementation.
 - No replay, export, share, live mode, or Bluetooth.
 - No Cloudflare KV/D1 assumptions.
 - No OAuth flow (BYOT only).

@@ -52,13 +52,12 @@ public final class SyncStateTracker {
         self.cache = cache
         self.logger = logger
         self.state = SyncState()
-        refreshWorkoutCount()
     }
 
     /// Refresh the workout count from the cache.
-    public func refreshWorkoutCount() {
+    public func refreshWorkoutCount() async {
         do {
-            let workouts = try cache.loadAllWorkouts()
+            let workouts = try await cache.loadAllWorkouts()
             state.totalWorkouts = workouts.count
         } catch {
             logger.warn("Failed to count cached workouts: \(error)")
@@ -73,21 +72,21 @@ public final class SyncStateTracker {
     }
 
     /// Mark a sync as successfully completed.
-    public func syncCompleted() {
+    public func syncCompleted() async {
         state.inProgress = false
         state.lastSyncDate = Date()
         state.lastError = nil
         state.lastErrorDate = nil
-        refreshWorkoutCount()
+        await refreshWorkoutCount()
     }
 
     /// Record a sync failure.
-    public func syncFailed(error: Error) {
+    public func syncFailed(error: Error) async {
         state.inProgress = false
         state.lastError = redact(error)
         state.lastErrorDate = Date()
         logger.error("Sync failed: \(error)")
         // A partial sync may have cached workouts before the failure.
-        refreshWorkoutCount()
+        await refreshWorkoutCount()
     }
 }

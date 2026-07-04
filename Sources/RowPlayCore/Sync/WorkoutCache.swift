@@ -4,20 +4,20 @@ import Foundation
 ///
 /// The cache stores workout summaries and detail records for offline-first
 /// access. Implementations do not prescribe a specific storage backend —
-/// a future SQLite implementation can conform without changing callers.
+/// async calls allow a future SQLite implementation to avoid blocking callers.
 ///
 /// `deleteAll()` is the disconnect/logout path: it clears the entire cache.
 public protocol WorkoutCache: Sendable {
     /// Persist workout summaries, upserting by workout ID.
-    func saveWorkouts(_ workouts: [Workout]) throws
+    func saveWorkouts(_ workouts: [Workout]) async throws
     /// Persist a full workout detail (including strokes and splits).
-    func saveDetail(_ detail: WorkoutDetail) throws
+    func saveDetail(_ detail: WorkoutDetail) async throws
     /// Load all cached workout summaries, newest first.
-    func loadAllWorkouts() throws -> [Workout]
+    func loadAllWorkouts() async throws -> [Workout]
     /// Load full detail for a specific workout, or nil if not cached.
-    func loadWorkout(id: Int) throws -> WorkoutDetail?
+    func loadWorkout(id: Int) async throws -> WorkoutDetail?
     /// Delete all cached data (disconnect/logout).
-    func deleteAll() throws
+    func deleteAll() async throws
 }
 
 /// In-memory workout cache for tests, previews, and early integration.
@@ -31,44 +31,44 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
 
     public init() {}
 
-    public func saveWorkouts(_ workouts: [Workout]) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        for workout in workouts {
-            self.workouts[workout.id] = workout
-            // Keep cached detail in sync: update the summary embedded in any
-            // existing detail so loadWorkout(id:) doesn't return stale metadata.
-            if var detail = details[workout.id] {
-                detail.workout = workout
-                details[workout.id] = detail
+    public func saveWorkouts(_ workouts: [Workout]) async throws {
+        lock.withLock {
+            for workout in workouts {
+                self.workouts[workout.id] = workout
+                // Keep cached detail in sync: update the summary embedded in any
+                // existing detail so loadWorkout(id:) doesn't return stale metadata.
+                if var detail = details[workout.id] {
+                    detail.workout = workout
+                    details[workout.id] = detail
+                }
             }
         }
     }
 
-    public func saveDetail(_ detail: WorkoutDetail) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        details[detail.workout.id] = detail
-        // Also upsert the summary.
-        workouts[detail.workout.id] = detail.workout
+    public func saveDetail(_ detail: WorkoutDetail) async throws {
+        lock.withLock {
+            details[detail.workout.id] = detail
+            // Also upsert the summary.
+            workouts[detail.workout.id] = detail.workout
+        }
     }
 
-    public func loadAllWorkouts() throws -> [Workout] {
-        lock.lock()
-        defer { lock.unlock() }
-        return workouts.values.sorted { $0.date > $1.date }
+    public func loadAllWorkouts() async throws -> [Workout] {
+        lock.withLock {
+            workouts.values.sorted { $0.date > $1.date }
+        }
     }
 
-    public func loadWorkout(id: Int) throws -> WorkoutDetail? {
-        lock.lock()
-        defer { lock.unlock() }
-        return details[id]
+    public func loadWorkout(id: Int) async throws -> WorkoutDetail? {
+        lock.withLock {
+            details[id]
+        }
     }
 
-    public func deleteAll() throws {
-        lock.lock()
-        defer { lock.unlock() }
-        workouts.removeAll()
-        details.removeAll()
+    public func deleteAll() async throws {
+        lock.withLock {
+            workouts.removeAll()
+            details.removeAll()
+        }
     }
 }

@@ -25,18 +25,19 @@ The native app must define an injectable boundary for Concept2 API calls.
 
 The native app must provide a local workout cache for offline-first access.
 
-- **R3.1** `WorkoutCache` protocol defines `saveWorkouts(_:)`, `loadAllWorkouts()`, `loadWorkout(id:)`, and `deleteAll()`.
+- **R3.1** `WorkoutCache` protocol defines async `saveWorkouts(_:)`, `saveDetail(_:)`, `loadAllWorkouts()`, `loadWorkout(id:)`, and `deleteAll()` operations.
 - **R3.2** `InMemoryWorkoutCache` provides a simple in-memory implementation suitable for demo data and early integration.
 - **R3.3** The cache stores `Workout` and `WorkoutDetail` models as-is (no schema translation needed at this stage).
 - **R3.4** `deleteAll()` clears the entire cache — used for disconnect/logout flows.
 - **R3.5** The cache protocol intentionally does not prescribe a storage backend; a future SQLite implementation can conform without changing callers.
+- **R3.6** Cache methods are async so persistent backends can avoid blocking the main actor.
 
 ## R4: Privacy-Safe Logging
 
 The native app must redact sensitive data before logging.
 
 - **R4.1** `PrivacySafeLogger` wraps `os.Logger` and redacts strings before emitting.
-- **R4.2** `RedactionPattern` defines known sensitive patterns: hex tokens (32+ chars), Bearer headers, generic `token=...` patterns, and raw JSON blobs > 100 characters.
+- **R4.2** Redaction rules define known sensitive patterns: hex tokens (32+ chars), Bearer headers, cookie headers, JSON `token` / `access_token` values, generic `token=...` patterns, and raw JSON object or array blobs > 100 characters.
 - **R4.3** `redact(_:)` is a pure function that applies all patterns and returns a sanitized string.
 - **R4.4** `PrivacySafeLogger.error(_:)` and `.warn(_:)` apply redaction to the main message and all string arguments.
 - **R4.5** Error messages are redacted before they are emitted to the system log, including errors interpolated into the main message string.
@@ -55,8 +56,8 @@ The native app must track sync progress without importing Cloudflare D1 assumpti
 
 - **R6.1** `KeychainTokenStoreTests` verify save/load/delete round-trip through `FakeTokenStore` (real Keychain tests require signing and are out of scope for CI).
 - **R6.2** `MockConcept2ClientTests` verify fixture data is returned correctly and pagination works.
-- **R6.3** `WorkoutCacheTests` verify save, load, delete, and idempotent operations through `InMemoryWorkoutCache`.
-- **R6.4** `PrivacySafeLoggerTests` verify redaction of hex tokens, Bearer headers, JSON blobs, and idempotency.
+- **R6.3** `WorkoutCacheTests` verify async save, load, delete, and idempotent operations through `InMemoryWorkoutCache`.
+- **R6.4** `PrivacySafeLoggerTests` verify redaction of hex tokens, Bearer headers, cookie headers, query credentials, JSON token values, JSON object and array blobs, and idempotency.
 - **R6.5** `SyncStateTrackerTests` verify state transitions: idle → syncing → complete/error.
 - **R6.6** `swift test` passes.
 - **R6.7** `swift build` passes.

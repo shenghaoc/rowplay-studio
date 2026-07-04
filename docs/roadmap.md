@@ -73,18 +73,19 @@ Status: merged to `main`.
 
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
-Status: in progress on `codex/phase-04-sync-storage-foundation`.
+Status: foundation slice in progress on `codex/phase-04-sync-storage-foundation`.
 
 Scope:
 
-- Implement BYOT Concept2 token entry with Keychain storage.
-- Add a URLSession Concept2 client and a local SQLite-backed workout cache.
-- Preserve rowplay's privacy invariant: tokens do not enter logs, exported fixtures, or analytics payloads.
+- Foundation PR: add a Keychain-backed token store boundary, injectable Concept2 API client protocol, async workout cache abstraction, privacy-safe logging, and sync state tracking.
+- Follow-up PRs: wire BYOT token entry UI, implement the URLSession Concept2 client, add persistent SQLite-backed workout cache, and connect the sync workflow to the app shell.
+- Preserve rowplay's privacy invariant: tokens do not enter UserDefaults, plain files, logs, exported fixtures, or analytics payloads.
 - Keep Cloudflare-specific KV/D1 assumptions out of native core.
 
 Exit criteria:
 
-- A user can sync Concept2 workouts into the native local cache.
+- Foundation PR has tested safe boundaries for tokens, client injection, local cache, sync state, and redaction.
+- Full phase completion requires a user to sync Concept2 workouts into a persistent native local cache.
 - Disconnect/delete purges local cached data and Keychain token state.
 - Privacy-sensitive logs are redacted and covered by tests.
 
