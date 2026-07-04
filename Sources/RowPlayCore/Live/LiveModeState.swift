@@ -88,6 +88,7 @@ public struct LiveModeState: Equatable, Sendable {
 
     /// Schedule the next poll at the given date.
     public mutating func tickScheduled(at date: Date) {
+        guard enabled else { return }
         nextPollAt = date
     }
 

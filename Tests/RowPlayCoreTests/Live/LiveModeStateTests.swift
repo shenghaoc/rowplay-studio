@@ -140,9 +140,17 @@ final class LiveModeStateTests: XCTestCase {
 
     func testTickScheduled() {
         var state = LiveModeState()
+        state.start()
         let future = Date().addingTimeInterval(60)
         state.tickScheduled(at: future)
         XCTAssertEqual(state.nextPollAt, future)
+    }
+
+    func testTickScheduledIgnoredWhenDisabled() {
+        var state = LiveModeState()
+        let future = Date().addingTimeInterval(60)
+        state.tickScheduled(at: future)
+        XCTAssertNil(state.nextPollAt)
     }
 
     // MARK: - Stale Detection
