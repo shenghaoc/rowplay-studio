@@ -98,12 +98,12 @@ final class WorkoutExportTests: XCTestCase {
 
     func testCsvCellProtectsFormulaInjection() {
         let result = WorkoutExport.csvCell("=cmd")
-        XCTAssertEqual(result, "\t=cmd")
+        XCTAssertEqual(result, "'=cmd")
     }
 
     func testCsvCellProtectsAtSign() {
         let result = WorkoutExport.csvCell("@SUM(A1)")
-        XCTAssertEqual(result, "\t@SUM(A1)")
+        XCTAssertEqual(result, "'@SUM(A1)")
     }
 
     func testCsvCellNil() {
