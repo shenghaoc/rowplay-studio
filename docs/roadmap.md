@@ -109,6 +109,8 @@ Exit criteria:
 
 ## Phase 6 - Live Mode
 
+Status: foundation slice in progress on `codex/phase-06-live-mode-foundation`.
+
 Scope:
 
 - Add near-live polling through Concept2/ErgData-compatible sources when credentials are available.

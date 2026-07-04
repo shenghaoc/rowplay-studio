@@ -41,3 +41,9 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/routes/api/workouts/[id]/hr-import` | `Sources/RowPlayStudio/Views/HrImportPanelView.swift` | Phase 5 wires offline HR sample-series import to the native detail view using the core merge engine. |
 | `src/components/AnnotationPanel.svelte` | `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` | Phase 5 wires local annotation add/delete behavior to the native detail view. |
 | `src/routes/api/workouts/[id]/share` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires local share package save behavior without public URL generation. |
+| `src/lib/liveMode.ts` (interval, backoff, stale) | `Sources/RowPlayCore/Live/LivePollingCadence.swift` | Phase 6 ports polling interval presets, effective interval, backoff computation, and staleness threshold. |
+| `src/lib/liveMode.ts` + `liveMode.svelte.ts` (state) | `Sources/RowPlayCore/Live/LiveModeState.swift` | Phase 6 ports the live-mode state machine as a pure value type with explicit transition events. |
+| `src/lib/liveMode.svelte.ts` (polling) | `Sources/RowPlayCore/Live/LiveSource.swift` | Phase 6 defines the injectable `LiveSource` protocol and `LivePollResult` model. |
+| `src/routes/api/live/mock/+server.ts` | `Sources/RowPlayCore/Live/MockLiveSource.swift` | Phase 6 ports mock workout generation as an actor-based `LiveSource` implementation. |
+| `src/lib/liveMode.svelte.ts` (demo samples) | `Sources/RowPlayCore/Live/DemoLiveSampleGenerator.swift` | Phase 6 adds sequential in-progress sample generation for UI development. |
+| `src/components/LiveModePanel.svelte` | `Sources/RowPlayStudio/Views/LiveModePanelView.swift` | Phase 6 wires native live mode toggle, interval chips, and polling status to the dashboard. |

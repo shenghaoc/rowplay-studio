@@ -16,7 +16,10 @@ final class WorkoutLibrary: ObservableObject {
         }
     }
     @Published private(set) var pbIds: Set<Int> = []
+    @Published var liveState: LiveModeState = LiveModeState()
     let annotationStore: any AnnotationStore
+
+    private(set) var liveSource: any LiveSource = MockLiveSource()
 
     // Caches to prevent expensive O(N) and O(N log N) recomputations on every render
     private(set) var workouts: [Workout] = []
@@ -96,6 +99,32 @@ final class WorkoutLibrary: ObservableObject {
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
         query = WorkoutQuery.defaultQuery
+    }
+
+    // MARK: - Live Mode
+
+    func startLiveMode() {
+        liveState.start()
+    }
+
+    func stopLiveMode() {
+        liveState.stop()
+    }
+
+    func setLiveInterval(_ sec: Int) {
+        liveState.intervalChanged(sec)
+    }
+
+    func setLiveSource(_ source: any LiveSource) {
+        liveSource = source
+    }
+
+    func ingestLiveResult(_ result: LivePollResult) {
+        let existingIDs = Set(details.map(\.id))
+        let newWorkouts = result.workouts.filter { !existingIDs.contains($0.id) }
+        guard !newWorkouts.isEmpty else { return }
+        let newDetails = newWorkouts.map { WorkoutDetail(workout: $0, strokes: [], splits: []) }
+        details.append(contentsOf: newDetails)
     }
 
     private func comparableContext(for workout: Workout) -> ComparableContext {

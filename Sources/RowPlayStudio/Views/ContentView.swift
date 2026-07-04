@@ -25,6 +25,7 @@ struct ContentView: View {
                 )
             } else {
                 DashboardView(
+                    library: library,
                     summary: library.filteredSummary,
                     workouts: library.filteredWorkouts,
                     pbIds: library.pbIds
