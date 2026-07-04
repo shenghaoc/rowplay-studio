@@ -16,7 +16,13 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
             if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
-                WorkoutDetailView(detail: detail, summary: library.summary)
+                WorkoutDetailView(
+                    detail: detail,
+                    summary: library.summary,
+                    comparisonCandidates: library.comparisonCandidates(for: detail.id),
+                    annotationStore: library.annotationStore,
+                    onUpdateDetail: library.updateDetail
+                )
             } else {
                 DashboardView(
                     summary: library.filteredSummary,

@@ -1,0 +1,247 @@
+import Charts
+import Foundation
+import RowPlayCore
+import SwiftUI
+
+struct WorkoutComparisonPanel: View {
+    var detail: WorkoutDetail
+    var candidates: [WorkoutDetail]
+
+    @State private var selectedCandidateID: Int?
+
+    var body: some View {
+        GroupBox("Compare") {
+            if candidates.isEmpty {
+                ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    Picker("Compare With", selection: candidateSelection) {
+                        ForEach(candidates) { candidate in
+                            Text(candidateLabel(candidate))
+                                .tag(candidate.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 360, alignment: .leading)
+
+                    if let candidate = selectedCandidate {
+                        let verdict = WorkoutComparison.compareVerdict(detail, candidate)
+                        Label(verdictText(verdict), systemImage: verdictIcon(verdict))
+                            .font(.headline)
+
+                        statsGrid(candidate: candidate)
+
+                        intervalRows(candidate: candidate)
+
+                        overlayChart(candidate: candidate)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onAppear(perform: alignSelection)
+                .onChange(of: candidates.map(\.id)) { _, _ in
+                    alignSelection()
+                }
+                .onChange(of: detail.id) { _, _ in
+                    selectedCandidateID = nil
+                    alignSelection()
+                }
+            }
+        }
+    }
+
+    private var candidateSelection: Binding<Int> {
+        Binding {
+            selectedCandidateID ?? candidates.first?.id ?? 0
+        } set: { newValue in
+            selectedCandidateID = newValue
+        }
+    }
+
+    private var selectedCandidate: WorkoutDetail? {
+        guard let id = selectedCandidateID ?? candidates.first?.id else { return nil }
+        return candidates.first { $0.id == id }
+    }
+
+    private func alignSelection() {
+        guard let selectedCandidateID,
+              candidates.contains(where: { $0.id == selectedCandidateID }) else {
+            selectedCandidateID = candidates.first?.id
+            return
+        }
+    }
+
+    private func candidateLabel(_ candidate: WorkoutDetail) -> String {
+        let date = candidate.workout.date.formatted(.dateTime.year().month(.abbreviated).day())
+        return "\(date) · \(candidate.workout.workoutType) · \(RowPlayFormatting.pace(candidate.workout.pace))"
+    }
+
+    private func verdictText(_ verdict: CompareVerdict) -> String {
+        switch verdict.winner {
+        case .a:
+            return "Current workout ahead by \(deltaText(verdict))"
+        case .b:
+            return "Comparison workout ahead by \(deltaText(verdict))"
+        case .tie:
+            return "Even result"
+        }
+    }
+
+    private func verdictIcon(_ verdict: CompareVerdict) -> String {
+        switch verdict.winner {
+        case .a: return "checkmark.seal"
+        case .b: return "arrow.left.arrow.right"
+        case .tie: return "equal"
+        }
+    }
+
+    private func deltaText(_ verdict: CompareVerdict) -> String {
+        if let timeDeltaSec = verdict.timeDeltaSec {
+            return RowPlayFormatting.time(abs(timeDeltaSec), tenths: true)
+        }
+        if let paceDelta = verdict.paceDelta {
+            return "\(formatDouble(abs(paceDelta))) sec/500m"
+        }
+        return "0.0 sec"
+    }
+
+    private func statsGrid(candidate: WorkoutDetail) -> some View {
+        let current = WorkoutComparison.sideStats(detail)
+        let comparison = WorkoutComparison.sideStats(candidate)
+
+        return Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 8) {
+            GridRow {
+                Text("Metric")
+                Text("Current")
+                Text("Comparison")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+
+            metricRow("Time", RowPlayFormatting.time(current.time, tenths: true), RowPlayFormatting.time(comparison.time, tenths: true))
+            metricRow("Pace", RowPlayFormatting.pace(current.pace), RowPlayFormatting.pace(comparison.pace))
+            metricRow("Avg Watts", "\(current.avgWatts)", "\(comparison.avgWatts)")
+            metricRow("Best 5s", "\(current.best5sPower)", "\(comparison.best5sPower)")
+            metricRow("Avg HR", current.avgHr.map(String.init) ?? "-", comparison.avgHr.map(String.init) ?? "-")
+            metricRow("Peak HR", current.peakHr.map(String.init) ?? "-", comparison.peakHr.map(String.init) ?? "-")
+            metricRow("DPS", formatDouble(current.avgDps), formatDouble(comparison.avgDps))
+            metricRow("Consistency", "\(formatDouble(current.paceConsistency))%", "\(formatDouble(comparison.paceConsistency))%")
+        }
+        .font(.callout)
+    }
+
+    private func metricRow(_ label: String, _ current: String, _ comparison: String) -> some View {
+        GridRow {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Text(current)
+                .monospacedDigit()
+            Text(comparison)
+                .monospacedDigit()
+        }
+    }
+
+    @ViewBuilder
+    private func intervalRows(candidate: WorkoutDetail) -> some View {
+        if let rows = WorkoutComparison.compareIntervalReps(detail, candidate), !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Intervals")
+                    .font(.subheadline.weight(.semibold))
+
+                Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 6) {
+                    GridRow {
+                        Text("#")
+                        Text("Current")
+                        Text("Comparison")
+                        Text("Delta")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                    ForEach(rows.prefix(8), id: \.index) { row in
+                        GridRow {
+                            Text("\(row.index)")
+                            Text(RowPlayFormatting.pace(row.paceA))
+                            Text(RowPlayFormatting.pace(row.paceB))
+                            Text("\(formatSigned(row.paceDelta)) sec/500m")
+                        }
+                        .monospacedDigit()
+                    }
+                }
+                .font(.caption)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func overlayChart(candidate: WorkoutDetail) -> some View {
+        let points = overlayPoints(candidate: candidate)
+        if !points.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pace Overlay")
+                    .font(.subheadline.weight(.semibold))
+
+                Chart(points) { point in
+                    LineMark(
+                        x: .value("Distance", point.distance),
+                        y: .value("Pace", point.pace)
+                    )
+                    .foregroundStyle(by: .value("Workout", point.series))
+                }
+                .chartXAxisLabel("metres")
+                .chartYAxisLabel("sec/500m")
+                .frame(height: 220)
+            }
+        }
+    }
+
+    private func overlayPoints(candidate: WorkoutDetail) -> [CompareOverlayPoint] {
+        guard let overlay = WorkoutComparison.buildDistanceOverlay(detail.strokes, candidate.strokes) else {
+            return []
+        }
+
+        var points: [CompareOverlayPoint] = []
+        for index in overlay.xs.indices {
+            let distance = overlay.xs[index]
+            if let pace = overlay.paceA[index] {
+                points.append(CompareOverlayPoint(
+                    id: "current-\(index)",
+                    distance: distance,
+                    pace: pace,
+                    series: "Current"
+                ))
+            }
+            if let pace = overlay.paceB[index] {
+                points.append(CompareOverlayPoint(
+                    id: "comparison-\(index)",
+                    distance: distance,
+                    pace: pace,
+                    series: "Comparison"
+                ))
+            }
+        }
+        return points
+    }
+
+    private func formatDouble(_ value: Double) -> String {
+        String(format: "%.1f", value)
+    }
+
+    private func formatSigned(_ value: Double) -> String {
+        let formatted = formatDouble(abs(value))
+        if value > 0 {
+            return "+\(formatted)"
+        }
+        if value < 0 {
+            return "-\(formatted)"
+        }
+        return formatted
+    }
+}
+
+private struct CompareOverlayPoint: Identifiable {
+    let id: String
+    let distance: Double
+    let pace: Double
+    let series: String
+}

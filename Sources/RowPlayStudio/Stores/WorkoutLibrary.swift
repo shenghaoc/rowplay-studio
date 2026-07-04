@@ -16,6 +16,7 @@ final class WorkoutLibrary: ObservableObject {
         }
     }
     @Published private(set) var pbIds: Set<Int> = []
+    let annotationStore: any AnnotationStore
 
     // Caches to prevent expensive O(N) and O(N log N) recomputations on every render
     private(set) var workouts: [Workout] = []
@@ -27,9 +28,14 @@ final class WorkoutLibrary: ObservableObject {
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
 
-    init(details: [WorkoutDetail], query: WorkoutListQuery = WorkoutQuery.defaultQuery) {
+    init(
+        details: [WorkoutDetail],
+        query: WorkoutListQuery = WorkoutQuery.defaultQuery,
+        annotationStore: any AnnotationStore = InMemoryAnnotationStore()
+    ) {
         self.details = details
         self.query = query
+        self.annotationStore = annotationStore
         updateAllDerivedData()
     }
 
@@ -43,9 +49,62 @@ final class WorkoutLibrary: ObservableObject {
         detailByID[id]
     }
 
+    func updateDetail(_ detail: WorkoutDetail) {
+        guard let index = details.firstIndex(where: { $0.id == detail.id }) else { return }
+        var updatedDetails = details
+        updatedDetails[index] = detail
+        details = updatedDetails
+    }
+
+    func comparisonCandidates(for workoutID: Int) -> [WorkoutDetail] {
+        guard let target = detailByID[workoutID] else { return [] }
+        let targetContext = comparableContext(for: target.workout)
+
+        return details
+            .filter { candidate in
+                candidate.id != workoutID && candidate.workout.sport == target.workout.sport
+            }
+            .sorted { lhs, rhs in
+                let lhsComparable = ComparabilityGuard.areComparable(
+                    targetContext,
+                    comparableContext(for: lhs.workout)
+                )
+                let rhsComparable = ComparabilityGuard.areComparable(
+                    targetContext,
+                    comparableContext(for: rhs.workout)
+                )
+                if lhsComparable != rhsComparable {
+                    return lhsComparable && !rhsComparable
+                }
+
+                let lhsDistanceDelta = abs(lhs.workout.distance - target.workout.distance)
+                let rhsDistanceDelta = abs(rhs.workout.distance - target.workout.distance)
+                if lhsDistanceDelta != rhsDistanceDelta {
+                    return lhsDistanceDelta < rhsDistanceDelta
+                }
+
+                let lhsTimeDelta = abs(lhs.workout.time - target.workout.time)
+                let rhsTimeDelta = abs(rhs.workout.time - target.workout.time)
+                if lhsTimeDelta != rhsTimeDelta {
+                    return lhsTimeDelta < rhsTimeDelta
+                }
+
+                return lhs.workout.date > rhs.workout.date
+            }
+    }
+
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
         query = WorkoutQuery.defaultQuery
+    }
+
+    private func comparableContext(for workout: Workout) -> ComparableContext {
+        ComparableContext(
+            sport: workout.sport,
+            distance: workout.distance,
+            time: workout.time,
+            workoutType: workout.workoutType
+        )
     }
 
     private func updateAllDerivedData() {

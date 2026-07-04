@@ -91,16 +91,21 @@ Exit criteria:
 
 ## Phase 5 - Compare, Export, Share, And Annotations
 
+Status: foundation slice in progress on `codex/phase-05-workout-tools-foundation`.
+
 Scope:
 
-- Add side-by-side comparison, interval/rep comparison, HR import, private annotations, CSV/JSON/TCX export, and share workflows.
-- Decide whether share links are generated through a companion web service or exported as local replay packages.
+- Foundation PR: port compare verdict, side stats, interval comparison, distance overlay, rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package format.
+- Native wiring in this PR: add workout detail tools for comparison, CSV/JSON export, offline HR sample-series import, local annotations, and local share package save.
+- Follow-up PRs: connect annotation storage to a persistent backend, add TCX export, add full FIT/TCX/GPX HR file parsing if needed, and implement companion web share service integration.
+- Preserve rowplay's privacy invariant: share packages strip hardware-identifying metadata.
 
 Exit criteria:
 
-- Exported data round-trips with the web app where formats overlap.
+- Foundation PR has tested domain models for comparison, export, HR import, annotations, and share packages, plus native detail wiring for the safe local workflow slice.
+- Full phase completion requires exported data to round-trip with the web app where formats overlap.
 - Share behavior is explicit about which data becomes public.
-- Annotation and HR import flows work offline.
+- Annotation, comparison, export, local share, and HR sample import flows work offline.
 
 ## Phase 6 - Live Mode
 
