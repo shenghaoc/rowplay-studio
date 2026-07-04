@@ -153,7 +153,8 @@ public enum RowPlayDateTime {
         let value = text.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        guard value.count <= 30 else { return nil }
+        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        guard value.utf16.count <= 30 else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = logbookRegex.firstMatch(in: value, range: range) else {
@@ -182,7 +183,8 @@ public enum RowPlayDateTime {
         let value = key.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        guard value.count <= 20 else { return nil }
+        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        guard value.utf16.count <= 20 else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         guard let match = dayKeyRegex.firstMatch(in: value, range: range) else { return nil }

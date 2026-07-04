@@ -17,7 +17,8 @@ public enum PaceInput {
         let s = raw.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        guard s.count <= 20 else { return nil }
+        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        guard s.utf16.count <= 20 else { return nil }
 
         let range = NSRange(s.startIndex..<s.endIndex, in: s)
 
