@@ -15,6 +15,18 @@ struct SettingsView: View {
                 Toggle("Reduce motion", isOn: $reduceReplayMotion)
             }
 
+            Section("Hardware") {
+                HStack(alignment: .firstTextBaseline) {
+                    Label("Erg connection", systemImage: "dot.radiowaves.left.and.right")
+                    Spacer()
+                    Text("Mock only")
+                        .foregroundStyle(.secondary)
+                }
+                Text("Bluetooth devices are not available in this build.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Units") {
                 Picker("Distance", selection: $preferredDistanceUnit) {
                     Text("Metric").tag("metric")
@@ -28,4 +40,3 @@ struct SettingsView: View {
         .frame(width: 420)
     }
 }
-

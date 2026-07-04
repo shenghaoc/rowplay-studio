@@ -47,3 +47,9 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/routes/api/live/mock/+server.ts` | `Sources/RowPlayCore/Live/MockLiveSource.swift` | Phase 6 ports mock workout generation as an actor-based `LiveSource` implementation. |
 | `src/lib/liveMode.svelte.ts` (demo samples) | `Sources/RowPlayCore/Live/DemoLiveSampleGenerator.swift` | Phase 6 adds sequential in-progress sample generation for UI development. |
 | `src/components/LiveModePanel.svelte` | `Sources/RowPlayStudio/Views/LiveModePanelView.swift` | Phase 6 wires native live mode toggle, interval chips, and polling status to the dashboard. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgDevice.swift` | Phase 7 defines the ergometer device value type with stable id, display name, sport, and connection kind. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnectionState.swift` | Phase 7 defines the connection lifecycle state enum with human-readable failure reasons. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgTelemetrySample.swift` | Phase 7 defines the live hardware telemetry sample model, field-compatible with Stroke and LiveWorkoutSample. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnection.swift` | Phase 7 defines the injectable ergometer connection protocol boundary. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/MockErgConnection.swift` | Phase 7 provides a deterministic mock hardware connection for testing and UI development. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row without real pairing, scanning, or permissions. |
