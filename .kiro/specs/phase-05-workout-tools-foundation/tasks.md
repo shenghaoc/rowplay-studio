@@ -7,6 +7,11 @@
 - [x] Create `Sources/RowPlayCore/Annotations/Annotation.swift` with Annotation model.
 - [x] Create `Sources/RowPlayCore/Annotations/AnnotationStore.swift` with AnnotationStore protocol and InMemoryAnnotationStore.
 - [x] Create `Sources/RowPlayCore/Share/SharePackage.swift` with SharePackage model, builder, and encode/decode.
+- [x] Add `WorkoutToolsView` composition on the native workout detail surface.
+- [x] Add `WorkoutFileActionsView` with CSV, JSON, and local share package save actions.
+- [x] Add `HrImportPanelView` with offline HR sample-series import and selected-workout update wiring.
+- [x] Add `WorkoutComparisonPanel` with compare target selection, verdict, stats, interval rows, and pace overlay.
+- [x] Add `AnnotationPanelView` with local add/delete behavior through the async annotation store.
 - [x] Create `Tests/RowPlayCoreTests/Compare/WorkoutComparisonTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Compare/RepDetectionTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Export/WorkoutExportTests.swift`.

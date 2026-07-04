@@ -5,6 +5,9 @@ import SwiftUI
 struct WorkoutDetailView: View {
     var detail: WorkoutDetail
     var summary: DashboardSummary
+    var comparisonCandidates: [WorkoutDetail]
+    var annotationStore: any AnnotationStore
+    var onUpdateDetail: (WorkoutDetail) -> Void
     @State private var showingReplay = false
 
     var body: some View {
@@ -13,6 +16,12 @@ struct WorkoutDetailView: View {
                 header
                 metricStrip
                 replayButton
+                WorkoutToolsView(
+                    detail: detail,
+                    comparisonCandidates: comparisonCandidates,
+                    annotationStore: annotationStore,
+                    onUpdateDetail: onUpdateDetail
+                )
                 strokeChart
                 splitTable
             }
@@ -149,4 +158,3 @@ struct WorkoutDetailView: View {
         String(Int(RowPlayFormatting.paceToWatts(for: detail.workout.sport, pacePer500m: detail.workout.pace).rounded()))
     }
 }
-

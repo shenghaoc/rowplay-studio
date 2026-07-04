@@ -36,3 +36,8 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/types.ts` (Annotation) | `Sources/RowPlayCore/Annotations/Annotation.swift` | Phase 5 ports the Annotation model. |
 | `src/routes/api/workouts/[id]/annotations` | `Sources/RowPlayCore/Annotations/AnnotationStore.swift` | Phase 5 ports annotation store as async `AnnotationStore` protocol + `InMemoryAnnotationStore`. |
 | `src/lib/server/share.ts` (redaction) | `Sources/RowPlayCore/Share/SharePackage.swift` | Phase 5 ports share package format with hardware metadata redaction. |
+| `src/routes/compare/+page.svelte` | `Sources/RowPlayStudio/Views/WorkoutComparisonPanel.swift` | Phase 5 wires native compare selection, verdict, side stats, interval rows, and pace overlay on the workout detail surface. |
+| `src/routes/api/export` and `src/routes/api/export/[id]` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires current-workout CSV/JSON export through the native save panel. |
+| `src/routes/api/workouts/[id]/hr-import` | `Sources/RowPlayStudio/Views/HrImportPanelView.swift` | Phase 5 wires offline HR sample-series import to the native detail view using the core merge engine. |
+| `src/components/AnnotationPanel.svelte` | `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` | Phase 5 wires local annotation add/delete behavior to the native detail view. |
+| `src/routes/api/workouts/[id]/share` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires local share package save behavior without public URL generation. |
