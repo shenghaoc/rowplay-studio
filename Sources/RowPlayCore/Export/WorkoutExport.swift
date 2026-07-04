@@ -92,11 +92,15 @@ public enum WorkoutExport {
     static func csvCell<T>(_ value: T?) -> String {
         guard let value else { return "" }
         var s = String(describing: value)
-        // Formula injection protection: prefix formula-triggering characters
-        let formulaChars: [Character] = ["=", "+", "-", "@", "\t"]
-        if let first = s.first, formulaChars.contains(first) {
-            s = "\t" + s
+
+        // Formula injection protection: strip leading whitespace that might bypass checks,
+        // then prefix formula-triggering characters with a single quote (OWASP recommendation).
+        let trimmed = s.trimmingCharacters(in: .whitespaces)
+        let formulaChars: [Character] = ["=", "+", "-", "@", "\t", "\r"]
+        if let first = trimmed.first, formulaChars.contains(first) {
+            s = "'" + s
         }
+
         // RFC 4180 escaping
         if s.contains("\"") || s.contains(",") || s.contains("\n") || s.contains("\r") {
             s = "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\""
