@@ -97,6 +97,17 @@ final class AnnotationStoreTests: XCTestCase {
         XCTAssertEqual(loaded.count, 1)
     }
 
+    func testDeleteAll() async throws {
+        _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: "A", createdAt: 1_000_000))
+        _ = try await store.saveAnnotation(workoutId: 2, Annotation(id: 0, timestamp: 60, text: "B", createdAt: 1_000_001))
+        try await store.deleteAll()
+
+        let w1 = try await store.loadAnnotations(workoutId: 1)
+        let w2 = try await store.loadAnnotations(workoutId: 2)
+        XCTAssertTrue(w1.isEmpty)
+        XCTAssertTrue(w2.isEmpty)
+    }
+
     func testDeleteAllClearsAnnotationsAndResetsIds() async throws {
         _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: "First", createdAt: 1_000_000))
         _ = try await store.saveAnnotation(workoutId: 2, Annotation(id: 0, timestamp: 60, text: "Second", createdAt: 1_000_001))
