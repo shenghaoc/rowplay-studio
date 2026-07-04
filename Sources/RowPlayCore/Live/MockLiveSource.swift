@@ -76,7 +76,12 @@ public actor MockLiveSource: LiveSource {
     }
 }
 
-/// Simple seeded RNG for deterministic test output.
+/// Simple seeded PRNG for deterministic test and mock output.
+///
+/// Uses a linear congruential generator (LCG) which has known statistical
+/// limitations (e.g., correlated low-order bits). This is acceptable here
+/// since it is only used for mock workout generation and test determinism,
+/// not for cryptographic or high-quality random purposes.
 struct SeededGenerator: RandomNumberGenerator {
     private var state: UInt64
 
