@@ -32,17 +32,20 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
     }
 
     public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
+        var normalized = annotation
+        normalized.text = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
         // Validate before saving
-        if let error = annotation.validate() {
+        if let error = normalized.validate() {
             throw AnnotationError.validationFailed(error)
         }
 
-        return lock.withLock {
+        return try lock.withLock {
             var annotations = storage[workoutId] ?? []
 
-            if annotation.id == 0 {
+            if normalized.id == 0 {
                 // Create new
-                var newAnnotation = annotation
+                var newAnnotation = normalized
                 newAnnotation.id = nextId
                 nextId += 1
                 annotations.append(newAnnotation)
@@ -50,19 +53,14 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
                 return newAnnotation
             } else {
                 // Update existing
-                if let index = annotations.firstIndex(where: { $0.id == annotation.id }) {
-                    annotations[index] = annotation
+                if let index = annotations.firstIndex(where: { $0.id == normalized.id }) {
+                    var updated = normalized
+                    updated.createdAt = annotations[index].createdAt
+                    annotations[index] = updated
                     storage[workoutId] = annotations
-                    return annotation
-                } else {
-                    // ID was specified but not found — treat as create
-                    var newAnnotation = annotation
-                    newAnnotation.id = nextId
-                    nextId += 1
-                    annotations.append(newAnnotation)
-                    storage[workoutId] = annotations
-                    return newAnnotation
+                    return updated
                 }
+                throw AnnotationError.notFound
             }
         }
     }
@@ -79,4 +77,5 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
 /// Errors from annotation operations.
 public enum AnnotationError: Error, Equatable {
     case validationFailed(String)
+    case notFound
 }

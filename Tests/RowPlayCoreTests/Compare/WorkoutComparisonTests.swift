@@ -105,6 +105,46 @@ final class WorkoutComparisonTests: XCTestCase {
         XCTAssertEqual(stats.avgWatts, 200)
     }
 
+    func testSideStatsUsesSportAwareWattsFallback() {
+        let workout = makeWorkout(sport: .bike, distance: 2000, time: 480, pace: 100)
+        let detail = makeDetail(workout: workout)
+        let stats = WorkoutComparison.sideStats(detail)
+        XCTAssertEqual(stats.avgWatts, 44)
+    }
+
+    func testSideStatsComputesDpsFromPaceAndCadence() {
+        let strokes = [
+            makeStroke(t: 0, d: 10, pace: 120, spm: 30),
+            makeStroke(t: 2, d: 25, pace: 150, spm: 20),
+        ]
+        let detail = makeDetail(workout: makeWorkout(), strokes: strokes)
+        let stats = WorkoutComparison.sideStats(detail)
+        let expected = (30_000 / (120.0 * 30.0) + 30_000 / (150.0 * 20.0)) / 2
+        XCTAssertEqual(stats.avgDps, expected, accuracy: 0.001)
+    }
+
+    func testSideStatsRoundsComputedHeartRateAverage() {
+        let strokes = [
+            makeStroke(t: 0, d: 0, hr: 100),
+            makeStroke(t: 2, d: 20, hr: 101),
+        ]
+        let detail = makeDetail(workout: makeWorkout(), strokes: strokes)
+        let stats = WorkoutComparison.sideStats(detail)
+        XCTAssertEqual(stats.avgHr, 101)
+    }
+
+    func testSideStatsBest5sPowerUsesTimeWeightedWindow() {
+        let strokes = [
+            makeStroke(t: 0, d: 0, watts: 100),
+            makeStroke(t: 1, d: 10, watts: 100),
+            makeStroke(t: 5, d: 50, watts: 300),
+            makeStroke(t: 6, d: 60, watts: 300),
+        ]
+        let detail = makeDetail(workout: makeWorkout(), strokes: strokes)
+        let stats = WorkoutComparison.sideStats(detail)
+        XCTAssertEqual(stats.best5sPower, 220)
+    }
+
     // MARK: - Interval Compare
 
     func testCompareIntervalRepsBothInterval() {

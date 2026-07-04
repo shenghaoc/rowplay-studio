@@ -93,6 +93,15 @@ final class HrImportTests: XCTestCase {
         XCTAssertEqual(stats.max, 150)
     }
 
+    func testSummarizeHrRoundsAverageLikeWeb() {
+        let strokes = [
+            makeStroke(t: 0, d: 0, hr: 100),
+            makeStroke(t: 2, d: 10, hr: 101),
+        ]
+        let stats = HrImport.summarizeHr(strokes)
+        XCTAssertEqual(stats.avg, 101)
+    }
+
     func testSummarizeHrNoData() {
         let strokes = [makeStroke(t: 0, d: 0, hr: nil)]
         let stats = HrImport.summarizeHr(strokes)
@@ -145,5 +154,33 @@ final class HrImportTests: XCTestCase {
         XCTAssertNotNil(result.workout.heartRateAvg)
         // All strokes should have HR now
         XCTAssertTrue(result.strokes.allSatisfy { $0.heartRate != nil && $0.heartRate! > 0 })
+    }
+
+    func testApplyHrImportRoundsSplitAverageLikeWeb() {
+        let workout = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 1_000_000),
+            sport: .rower,
+            distance: 20,
+            time: 4,
+            pace: 100,
+            workoutType: "fixed_distance",
+            hasStrokeData: true
+        )
+        let strokes = [
+            makeStroke(t: 0, d: 0),
+            makeStroke(t: 2, d: 10),
+            makeStroke(t: 4, d: 20),
+        ]
+        let splits = [
+            Split(index: 0, distance: 20, time: 4, pace: 100),
+        ]
+        let detail = WorkoutDetail(workout: workout, strokes: strokes, splits: splits)
+
+        let samples = [HrSample(t: 0, hr: 100), HrSample(t: 4, hr: 101)]
+        let result = HrImport.applyHrImport(detail, samples: samples, offsetSec: 0)
+
+        XCTAssertEqual(result.workout.heartRateAvg, 101)
+        XCTAssertEqual(result.splits[0].heartRate?.average, 101)
     }
 }

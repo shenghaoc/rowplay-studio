@@ -162,7 +162,10 @@ public enum WorkoutComparison {
         if let wattMinutes = detail.workout.wattMinutes, detail.workout.time > 0 {
             avgWatts = Int((wattMinutes * 60 / detail.workout.time).rounded())
         } else {
-            avgWatts = Int(RowPlayFormatting.paceToWatts(detail.workout.pace).rounded())
+            avgWatts = Int(RowPlayFormatting.paceToWatts(
+                for: detail.workout.sport,
+                pacePer500m: detail.workout.pace
+            ).rounded())
         }
 
         // Best 5-second power: sliding window over strokes
@@ -172,7 +175,7 @@ public enum WorkoutComparison {
         let hrStats = computeHrStats(strokes: strokes, fallbackAvg: detail.workout.heartRateAvg)
 
         // DPS (distance per stroke)
-        let avgDps = computeAvgDps(strokes: strokes, totalDistance: detail.workout.distance)
+        let avgDps = computeAvgDps(strokes: strokes)
 
         // Pace consistency (coefficient of variation)
         let paceConsistency = computePaceConsistency(strokes: strokes)
@@ -314,30 +317,46 @@ public enum WorkoutComparison {
 
     /// Best 5-second average power from strokes.
     private static func computeBest5sPower(strokes: [Stroke]) -> Int {
-        guard strokes.count >= 2 else {
-            return strokes.first.map { $0.watts } ?? 0
+        guard strokes.count >= 2 else { return 0 }
+        let total = strokes[strokes.count - 1].t
+        guard total >= 5 else { return 0 }
+
+        var energy = Array(repeating: 0.0, count: strokes.count)
+        var previous = strokes[0]
+        for index in 1..<strokes.count {
+            let current = strokes[index]
+            energy[index] = energy[index - 1]
+                + ((Double(current.watts + previous.watts) / 2) * (current.t - previous.t))
+            previous = current
         }
 
-        var best = 0
-        var windowStart = 0
-        var currentSum = 0
+        let duration = 5.0
+        var best = 0.0
+        var windowEnd = 0
 
-        for windowEnd in 0..<strokes.count {
-            currentSum += strokes[windowEnd].watts
+        for windowStart in 0..<strokes.count {
+            let startTime = strokes[windowStart].t
+            let endTime = startTime + duration
+            if endTime > total { break }
 
-            // Shrink window to fit within 5 seconds
-            while windowEnd > windowStart,
-                  strokes[windowEnd].t - strokes[windowStart].t > 5.0 {
-                currentSum -= strokes[windowStart].watts
-                windowStart += 1
+            while windowEnd < strokes.count - 1, strokes[windowEnd + 1].t <= endTime {
+                windowEnd += 1
             }
 
-            let count = windowEnd - windowStart + 1
-            let avg = currentSum / count
+            let energyAtEnd: Double
+            if windowEnd == strokes.count - 1 {
+                energyAtEnd = energy[windowEnd]
+            } else {
+                let span = strokes[windowEnd + 1].t - strokes[windowEnd].t
+                let fraction = span == 0 ? 0 : (endTime - strokes[windowEnd].t) / span
+                energyAtEnd = energy[windowEnd] + (energy[windowEnd + 1] - energy[windowEnd]) * fraction
+            }
+
+            let avg = (energyAtEnd - energy[windowStart]) / duration
             if avg > best { best = avg }
         }
 
-        return best
+        return Int(best.rounded())
     }
 
     /// Compute HR statistics from strokes.
@@ -354,18 +373,23 @@ public enum WorkoutComparison {
             }
         }
 
-        let computedAvg = count > 0 ? sum / count : nil
+        let computedAvg = count > 0 ? Int((Double(sum) / Double(count)).rounded()) : nil
         let avg = (fallbackAvg != nil && fallbackAvg! > 0) ? fallbackAvg : computedAvg
         let finalPeak = count > 0 ? peak : nil
         return (avg, finalPeak)
     }
 
     /// Average distance per stroke.
-    private static func computeAvgDps(strokes: [Stroke], totalDistance: Double) -> Double {
-        guard let lastStroke = strokes.last, lastStroke.d > 0 else { return 0 }
-        let strokeCount = strokes.count
-        guard strokeCount > 0 else { return 0 }
-        return lastStroke.d / Double(strokeCount)
+    private static func computeAvgDps(strokes: [Stroke]) -> Double {
+        var sum = 0.0
+        var count = 0
+        for stroke in strokes {
+            if let dps = ReplayInspector.distancePerStroke(pace: stroke.pace, cadence: stroke.cadence) {
+                sum += dps
+                count += 1
+            }
+        }
+        return count > 0 ? sum / Double(count) : 0
     }
 
     /// Pace coefficient of variation (%).

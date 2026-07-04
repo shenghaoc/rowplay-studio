@@ -71,7 +71,7 @@ public enum HrImport {
         }
 
         guard count > 0 else { return (nil, nil, nil) }
-        return (sum / count, minHr, maxHr)
+        return (Int((Double(sum) / Double(count)).rounded()), minHr, maxHr)
     }
 
     /// True when any stroke carries HR data.
@@ -115,7 +115,7 @@ public enum HrImport {
             }
 
             guard countHr > 0 else { return split }
-            let avgHr = sumHr / countHr
+            let avgHr = Int((Double(sumHr) / Double(countHr)).rounded())
             var updated = split
             updated.heartRate = HeartRateDetail(average: avgHr)
             return updated

@@ -57,6 +57,28 @@ final class AnnotationStoreTests: XCTestCase {
         XCTAssertEqual(loaded[0].text, "Updated")
     }
 
+    func testUpdatePreservesCreatedAt() async throws {
+        var saved = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: "Original", createdAt: 1_000_000))
+        saved.text = "Updated"
+        saved.createdAt = 2_000_000
+
+        let updated = try await store.saveAnnotation(workoutId: 1, saved)
+
+        XCTAssertEqual(updated.createdAt, 1_000_000)
+    }
+
+    func testUpdateMissingAnnotationThrows() async {
+        let annotation = Annotation(id: 99, timestamp: 30, text: "Missing", createdAt: 1_000_000)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, annotation)
+            XCTFail("Expected missing annotation error")
+        } catch let error as AnnotationError {
+            XCTAssertEqual(error, .notFound)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     // MARK: - Delete
 
     func testDeleteAnnotation() async throws {
@@ -103,6 +125,12 @@ final class AnnotationStoreTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+    }
+
+    func testSaveTrimsText() async throws {
+        let annotation = Annotation(id: 0, timestamp: 30, text: "  Good catch  ", createdAt: 1_000_000)
+        let saved = try await store.saveAnnotation(workoutId: 1, annotation)
+        XCTAssertEqual(saved.text, "Good catch")
     }
 
     func testSaveTooLongTextThrows() async {
