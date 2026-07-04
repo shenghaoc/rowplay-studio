@@ -231,8 +231,8 @@ public enum WorkoutComparison {
         guard steps > 0 else { return nil }
         guard let endA = strokesA.last?.d, endA > 0,
               let endB = strokesB.last?.d, endB > 0 else { return nil }
-        let aligned = min(endA, endB)
-        guard aligned > 0 else { return nil }
+        let alignedMetres = min(endA, endB)
+        guard alignedMetres > 0 else { return nil }
 
         var xs: [Double] = []
         var paceA: [Double?] = []
@@ -243,7 +243,7 @@ public enum WorkoutComparison {
         var hrB: [Double?] = []
 
         for i in 0...steps {
-            let d = aligned * Double(i) / Double(steps)
+            let d = alignedMetres * Double(i) / Double(steps)
             xs.append(d)
             let sa = sampleStrokeAtDistance(strokesA, d)
             let sb = sampleStrokeAtDistance(strokesB, d)
@@ -259,7 +259,7 @@ public enum WorkoutComparison {
             xs: xs, paceA: paceA, paceB: paceB,
             powerA: powerA, powerB: powerB,
             hrA: hrA, hrB: hrB,
-            alignedMetres: aligned
+            alignedMetres: alignedMetres
         )
     }
 
