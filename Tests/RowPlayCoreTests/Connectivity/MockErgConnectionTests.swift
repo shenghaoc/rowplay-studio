@@ -2,6 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 final class MockErgConnectionTests: XCTestCase {
+    private static let inFlightConnectionDelay: Duration = .milliseconds(250)
 
     // MARK: - Connection State Transitions
 
@@ -33,7 +34,7 @@ final class MockErgConnectionTests: XCTestCase {
     }
 
     func testDisconnectDuringInFlightConnectDoesNotBecomeConnected() async throws {
-        let connection = MockErgConnection()
+        let connection = MockErgConnection(connectionDelay: Self.inFlightConnectionDelay)
         let device = ErgDevice(displayName: "Test Rower", sport: .rower)
 
         let connectTask = Task {
@@ -49,7 +50,7 @@ final class MockErgConnectionTests: XCTestCase {
     }
 
     func testConnectCancellationCleansUpState() async throws {
-        let connection = MockErgConnection()
+        let connection = MockErgConnection(connectionDelay: Self.inFlightConnectionDelay)
         let device = ErgDevice(displayName: "Test Rower", sport: .rower)
 
         let connectTask = Task {
@@ -80,7 +81,7 @@ final class MockErgConnectionTests: XCTestCase {
     }
 
     func testFailureDuringInFlightConnectDoesNotBecomeConnected() async throws {
-        let connection = MockErgConnection()
+        let connection = MockErgConnection(connectionDelay: Self.inFlightConnectionDelay)
         let device = ErgDevice(displayName: "Test Rower", sport: .rower)
 
         let connectTask = Task {
@@ -312,11 +313,11 @@ final class MockErgConnectionTests: XCTestCase {
     }
 
     private func waitForState(_ state: ErgConnectionState, in connection: MockErgConnection) async throws {
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< 500 {
             if connection.currentState == state {
                 return
             }
-            try await Task.sleep(nanoseconds: 1_000_000)
+            try await Task.sleep(for: .milliseconds(1))
         }
         throw AsyncTestError.timedOut
     }
@@ -331,7 +332,7 @@ final class MockErgConnectionTests: XCTestCase {
                 return await iterator.next()
             }
             group.addTask {
-                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                try await Task.sleep(for: .nanoseconds(Int64(timeoutNanoseconds)))
                 throw AsyncTestError.timedOut
             }
 

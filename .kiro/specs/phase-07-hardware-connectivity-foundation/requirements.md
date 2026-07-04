@@ -50,6 +50,7 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R5.10** Simulated mock connection failure must finish the active telemetry stream and clear the connected device reference.
 - **R5.11** Mock telemetry cadence, watts, and heart rate values must never be negative, even with unusual base inputs.
 - **R5.12** Mock telemetry timestamps must be deterministic for a given seed and tick sequence.
+- **R5.13** Mock connection delay must be configurable so tests can exercise in-flight connection states deterministically.
 
 ## R6: Module Boundaries
 

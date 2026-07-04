@@ -14,6 +14,7 @@ public final class MockErgConnection: @unchecked Sendable {
     private var _distance: Double = 0
     private var _rng: SeededGenerator
     private let _seed: UInt64
+    private let _connectionDelay: Duration
     private var _connectionAttemptID: UInt64 = 0
     private var _streamGeneration: UInt64 = 0
 
@@ -27,13 +28,15 @@ public final class MockErgConnection: @unchecked Sendable {
         baseCadence: Double = 26,
         baseWatts: Int = 200,
         baseHeartRate: Int? = 155,
-        seed: UInt64 = 42
+        seed: UInt64 = 42,
+        connectionDelay: Duration = .milliseconds(10)
     ) {
         self.basePace = basePace
         self.baseCadence = baseCadence
         self.baseWatts = baseWatts
         self.baseHeartRate = baseHeartRate
         self._seed = seed
+        self._connectionDelay = connectionDelay
         self._rng = SeededGenerator(seed: seed)
     }
 
@@ -54,7 +57,7 @@ public final class MockErgConnection: @unchecked Sendable {
         let attemptID = beginConnectionAttempt(to: device)
 
         do {
-            try await Task.sleep(for: .milliseconds(10))
+            try await Task.sleep(for: _connectionDelay)
             try Task.checkCancellation()
             completeConnectionAttempt(attemptID, device: device)
         } catch {
