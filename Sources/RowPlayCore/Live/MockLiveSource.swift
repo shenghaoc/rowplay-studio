@@ -21,7 +21,7 @@ public actor MockLiveSource: LiveSource {
         let workouts: [Workout] = knownIDs.contains(workout.id) ? [] : [workout]
         let added = workouts.count
 
-        return LivePollResult(workouts: workouts, added: added, total: added)
+        return LivePollResult(workouts: workouts, added: added)
     }
 
     private func generateWorkout(sport: Sport) -> Workout {

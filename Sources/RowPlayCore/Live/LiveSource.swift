@@ -4,12 +4,10 @@ import Foundation
 public struct LivePollResult: Equatable, Sendable {
     public let workouts: [Workout]
     public let added: Int
-    public let total: Int
 
-    public init(workouts: [Workout], added: Int, total: Int) {
+    public init(workouts: [Workout], added: Int) {
         self.workouts = workouts
         self.added = added
-        self.total = total
     }
 }
 

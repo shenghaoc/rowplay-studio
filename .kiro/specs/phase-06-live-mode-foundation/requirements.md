@@ -5,9 +5,9 @@
 The native app must model live-mode polling state as a pure, testable state machine in `RowPlayCore`.
 
 - **R1.1** `LiveModeStatus` enum defines states: `idle`, `polling`, `error`, `stopped`.
-- **R1.2** `LiveModeState` tracks `enabled`, `status`, `intervalSec`, `failures`, `lastPollAt`, `nextPollAt`, and `consecutiveFailures`.
+- **R1.2** `LiveModeState` tracks `enabled`, `status`, `intervalSec`, `consecutiveFailures`, `lastPollAt`, and `nextPollAt`.
 - **R1.3** `LiveModeState` transitions are driven by explicit events: `start`, `stop`, `pollStarted`, `pollSucceeded`, `pollFailed`, `tickScheduled`, `intervalChanged`.
-- **R1.4** The state machine enforces that `pollStarted` is only valid when status is `idle`; successive `pollStarted` events while `polling` are ignored.
+- **R1.4** The state machine enforces that `pollStarted` is only valid when status is `idle` or `error`; successive `pollStarted` events while `polling` are ignored.
 - **R1.5** `LiveModeState.isStale(lastSampleAge:)` returns true when the most recent sample exceeds a staleness threshold derived from the current interval (2× the configured interval).
 
 ## R2: Polling Cadence and Backoff

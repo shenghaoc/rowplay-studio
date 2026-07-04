@@ -53,13 +53,25 @@ final class MockLiveSourceTests: XCTestCase {
         XCTAssertEqual(workout.source, "MockLive")
     }
 
-    func testPollWithAllKnownIDsReturnsEmpty() async throws {
+    func testPollFiltersOutKnownIDs() async throws {
         let source = MockLiveSource()
-        // Generate one workout and mark its ID as known
         let first = try await source.poll(knownIDs: [])
-        let knownIDs = Set(first.workouts.map(\.id))
-        // The next workout has a different ID, so this should still return it
-        let second = try await source.poll(knownIDs: knownIDs)
+        let firstID = first.workouts[0].id
+        // Pass the generated ID as known; next poll generates a new ID so still returns it
+        let second = try await source.poll(knownIDs: [firstID])
         XCTAssertEqual(second.workouts.count, 1)
+        XCTAssertNotEqual(second.workouts[0].id, firstID)
+    }
+
+    func testPollReturnsEmptyWhenGeneratedIDIsKnown() async throws {
+        // Pre-seed a source and capture the first generated ID
+        let source = MockLiveSource(startID: 50_000)
+        let first = try await source.poll(knownIDs: [])
+        let knownID = first.workouts[0].id
+        // Create a new source with the same startID so it generates the same first ID
+        let source2 = MockLiveSource(startID: knownID)
+        let result = try await source2.poll(knownIDs: [knownID])
+        XCTAssertEqual(result.workouts.count, 0)
+        XCTAssertEqual(result.added, 0)
     }
 }
