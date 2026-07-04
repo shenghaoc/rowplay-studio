@@ -109,7 +109,7 @@ Exit criteria:
 
 ## Phase 6 - Live Mode
 
-Status: foundation slice in progress on `codex/phase-06-live-mode-foundation`.
+Status: merged to `main`.
 
 Scope:
 
@@ -124,14 +124,19 @@ Exit criteria:
 
 ## Phase 7 - Hardware Connectivity
 
+Status: foundation slice in progress on `codex/phase-07-hardware-connectivity-foundation`.
+
 Scope:
 
-- Evaluate Bluetooth FTMS and Concept2 PM connectivity after the core native app is stable.
-- Treat hardware as an optional transport feeding the same live/replay model, not as a rewrite of analytics or storage.
+- Foundation PR: add hardware connection protocol boundary, device model, connection state machine, telemetry sample type, and deterministic mock connection.
+- This PR does NOT implement real Bluetooth, real FTMS, or real Concept2 PM protocols.
+- Follow-up PRs: implement CoreBluetooth transport, add FTMS parsing, add Concept2 PM protocol support, and wire hardware telemetry into the live/replay model.
+- Hardware samples should feed the same live/replay data model from Phase 6.
 
 Exit criteria:
 
-- Transport capability matrix is documented.
+- Foundation PR has tested safe boundaries for device discovery, connection lifecycle, and telemetry ingestion.
+- Full phase completion requires a user to connect to a real ergometer and see live telemetry.
 - Bluetooth work begins only after privacy, replay, storage, and live-mode foundations are in place.
 
 ## Review Strategy
