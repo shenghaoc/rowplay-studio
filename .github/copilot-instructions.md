@@ -2,6 +2,8 @@
 
 Native macOS port of rowplay — Concept2 logbook analytics and real-time workout replay for RowErg, SkiErg, and BikeErg athletes. SwiftPM package with a `RowPlayCore` library and `RowPlayStudio` SwiftUI app.
 
+`AGENTS.md` is the shared repository guide for coding agents. Keep this Copilot entrypoint aligned with `AGENTS.md`; use it for instructions Copilot should receive in GitHub and VS Code surfaces.
+
 ## Build, Test, and Run
 
 ```bash

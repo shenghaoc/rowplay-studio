@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+`AGENTS.md` is the shared repository guide for all coding agents. Keep this Claude-specific entrypoint aligned with `AGENTS.md`; use it only for details Claude Code needs to see directly.
+
 ## Project
 
 RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It's built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
