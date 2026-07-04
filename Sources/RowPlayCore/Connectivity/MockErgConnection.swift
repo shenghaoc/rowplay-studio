@@ -13,6 +13,9 @@ public final class MockErgConnection: @unchecked Sendable {
     private var _elapsed: TimeInterval = 0
     private var _distance: Double = 0
     private var _rng: SeededGenerator
+    private let _seed: UInt64
+    private var _connectionAttemptID: UInt64 = 0
+    private var _streamGeneration: UInt64 = 0
 
     public let basePace: TimeInterval
     public let baseCadence: Double
@@ -30,6 +33,7 @@ public final class MockErgConnection: @unchecked Sendable {
         self.baseCadence = baseCadence
         self.baseWatts = baseWatts
         self.baseHeartRate = baseHeartRate
+        self._seed = seed
         self._rng = SeededGenerator(seed: seed)
     }
 
@@ -47,33 +51,25 @@ public final class MockErgConnection: @unchecked Sendable {
 
     /// Simulate connecting to a device. Transitions through connecting → connected.
     public func connect(to device: ErgDevice) async throws {
-        lock.lock()
-        _state = .connecting
-        _connectedDevice = device
-        lock.unlock()
+        let attemptID = beginConnectionAttempt(to: device)
 
         // Simulate a brief connection delay
         try await Task.sleep(nanoseconds: 10_000_000) // 10ms
 
-        lock.lock()
-        _state = .connected
-        lock.unlock()
+        completeConnectionAttempt(attemptID, device: device)
     }
 
     /// Disconnect from the current device.
     public func disconnect() async {
-        lock.lock()
-        _state = .disconnected
-        _connectedDevice = nil
-        _sampleContinuation?.finish()
-        _sampleContinuation = nil
-        lock.unlock()
+        let continuationToFinish = markDisconnectedAndTakeContinuation()
+        continuationToFinish?.finish()
     }
 
     /// Simulate a connection failure with a human-readable reason.
     public func simulateFailure(reason: String) {
         lock.lock()
         defer { lock.unlock() }
+        _connectionAttemptID += 1
         _state = .failed(reason: reason)
     }
 
@@ -82,8 +78,10 @@ public final class MockErgConnection: @unchecked Sendable {
     /// Returns the emitted sample for assertion convenience.
     @discardableResult
     public func emitSample() -> ErgTelemetrySample {
+        let sample: ErgTelemetrySample
+        let continuation: AsyncStream<ErgTelemetrySample>.Continuation?
+
         lock.lock()
-        defer { lock.unlock() }
 
         _tick += 1
         let segmentDuration: TimeInterval = 1 // 1 second per tick
@@ -91,7 +89,7 @@ public final class MockErgConnection: @unchecked Sendable {
 
         // Pace varies ±3 sec/500m
         let paceVariation = Double(Int.random(in: -3 ... 3, using: &_rng))
-        let currentPace = basePace + paceVariation
+        let currentPace = max(1.0, basePace + paceVariation)
 
         // Distance from pace: d = (segmentDuration / pace) * 500
         let segmentDistance = (segmentDuration / currentPace) * 500
@@ -105,7 +103,7 @@ public final class MockErgConnection: @unchecked Sendable {
         let hrVariation = Int.random(in: -2 ... 2, using: &_rng)
         let currentHR = baseHeartRate.map { $0 + hrVariation }
 
-        let sample = ErgTelemetrySample(
+        sample = ErgTelemetrySample(
             elapsed: _elapsed,
             distance: _distance,
             pace: currentPace,
@@ -114,8 +112,10 @@ public final class MockErgConnection: @unchecked Sendable {
             heartRate: currentHR,
             timestamp: Date()
         )
+        continuation = _sampleContinuation
+        lock.unlock()
 
-        _sampleContinuation?.yield(sample)
+        continuation?.yield(sample)
         return sample
     }
 
@@ -124,26 +124,78 @@ public final class MockErgConnection: @unchecked Sendable {
     /// Samples are emitted when `emitSample()` is called, not on a timer.
     /// The stream finishes when `disconnect()` is called.
     public func telemetryStream() -> AsyncStream<ErgTelemetrySample> {
-        lock.lock()
-        defer { lock.unlock() }
-
         let (stream, continuation) = AsyncStream<ErgTelemetrySample>.makeStream()
+        let previousContinuation: AsyncStream<ErgTelemetrySample>.Continuation?
+        let generation: UInt64
+
+        lock.lock()
+        previousContinuation = _sampleContinuation
+        _streamGeneration += 1
+        generation = _streamGeneration
         _sampleContinuation = continuation
+        lock.unlock()
+
+        continuation.onTermination = { [weak self] _ in
+            self?.clearContinuation(generation: generation)
+        }
+
+        previousContinuation?.finish()
         return stream
     }
 
     /// Reset the mock to its initial state.
     public func reset() {
+        let continuationToFinish: AsyncStream<ErgTelemetrySample>.Continuation?
+
         lock.lock()
-        defer { lock.unlock() }
+        _connectionAttemptID += 1
         _state = .disconnected
         _connectedDevice = nil
-        _sampleContinuation?.finish()
+        continuationToFinish = _sampleContinuation
         _sampleContinuation = nil
         _tick = 0
         _elapsed = 0
         _distance = 0
-        _rng = SeededGenerator(seed: 42)
+        _rng = SeededGenerator(seed: _seed)
+        lock.unlock()
+
+        continuationToFinish?.finish()
+    }
+
+    private func clearContinuation(generation: UInt64) {
+        lock.lock()
+        defer { lock.unlock() }
+        if _streamGeneration == generation {
+            _sampleContinuation = nil
+        }
+    }
+
+    private func beginConnectionAttempt(to device: ErgDevice) -> UInt64 {
+        lock.lock()
+        defer { lock.unlock() }
+        _connectionAttemptID += 1
+        _state = .connecting
+        _connectedDevice = device
+        return _connectionAttemptID
+    }
+
+    private func completeConnectionAttempt(_ attemptID: UInt64, device: ErgDevice) {
+        lock.lock()
+        defer { lock.unlock() }
+        if _connectionAttemptID == attemptID, _state == .connecting, _connectedDevice == device {
+            _state = .connected
+        }
+    }
+
+    private func markDisconnectedAndTakeContinuation() -> AsyncStream<ErgTelemetrySample>.Continuation? {
+        lock.lock()
+        defer { lock.unlock() }
+        _connectionAttemptID += 1
+        _state = .disconnected
+        _connectedDevice = nil
+        let continuationToFinish = _sampleContinuation
+        _sampleContinuation = nil
+        return continuationToFinish
     }
 }
 
