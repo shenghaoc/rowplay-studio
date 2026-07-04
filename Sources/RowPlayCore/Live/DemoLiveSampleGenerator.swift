@@ -43,6 +43,7 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
     private let basePace: TimeInterval
     private let baseStrokeRate: Double
     private let baseHR: Int
+    private let initialSeed: UInt64
     private var elapsed: TimeInterval
     private var distance: Double
     private var rng: SeededGenerator
@@ -61,6 +62,7 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
         self.basePace = basePace
         self.baseStrokeRate = baseStrokeRate
         self.baseHR = baseHR
+        self.initialSeed = seed
         self.elapsed = 0
         self.distance = 0
         self.rng = SeededGenerator(seed: seed)
@@ -79,7 +81,7 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
         elapsed += segmentDuration
 
         // Pace varies ±5 sec/500m around the base
-        let paceVariation = Double(rng.next(in: -5 ... 5))
+        let paceVariation = Double(Int.random(in: -5 ... 5, using: &rng))
         let currentPace = basePace + paceVariation
 
         // Distance from pace: d = (segmentDuration / pace) * 500
@@ -87,7 +89,7 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
         distance += segmentDistance
 
         // HR varies ±3 bpm
-        let hrVariation = rng.next(in: -3 ... 3)
+        let hrVariation = Int.random(in: -3 ... 3, using: &rng)
         let currentHR = baseHR + hrVariation
 
         return LiveWorkoutSample(
@@ -96,7 +98,7 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
             distance: distance,
             time: elapsed,
             pace: currentPace,
-            strokeRate: baseStrokeRate + Double(rng.next(in: -2 ... 2)),
+            strokeRate: baseStrokeRate + Double(Int.random(in: -2 ... 2, using: &rng)),
             heartRateAvg: currentHR,
             date: date
         )
@@ -109,6 +111,6 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
         elapsed = 0
         distance = 0
         tick = 0
-        rng = SeededGenerator(seed: 123)
+        rng = SeededGenerator(seed: initialSeed)
     }
 }

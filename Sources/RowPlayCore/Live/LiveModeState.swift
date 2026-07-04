@@ -65,13 +65,14 @@ public struct LiveModeState: Equatable, Sendable {
     }
 
     /// Mark a poll as in-progress. Valid when idle or in error state (retry).
-    public mutating func pollStarted(at date: Date = Date()) {
-        guard status == .idle || status == .error else { return }
+    public mutating func pollStarted() {
+        guard enabled, status == .idle || status == .error else { return }
         status = .polling
     }
 
     /// Mark a poll as succeeded, resetting backoff.
     public mutating func pollSucceeded(at date: Date = Date()) {
+        guard enabled, status == .polling else { return }
         status = .idle
         consecutiveFailures = 0
         lastPollAt = date
@@ -79,6 +80,7 @@ public struct LiveModeState: Equatable, Sendable {
 
     /// Mark a poll as failed, incrementing the failure count.
     public mutating func pollFailed(at date: Date = Date()) {
+        guard enabled, status == .polling else { return }
         status = .error
         consecutiveFailures += 1
         lastPollAt = date

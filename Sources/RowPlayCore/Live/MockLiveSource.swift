@@ -16,7 +16,7 @@ public actor MockLiveSource: LiveSource {
     }
 
     public func poll(knownIDs: Set<Int>) async throws -> LivePollResult {
-        let sport = sportDistribution[rng.next(in: 0...(sportDistribution.count - 1))]
+        let sport = sportDistribution[Int.random(in: 0...(sportDistribution.count - 1), using: &rng)]
         let workout = generateWorkout(sport: sport)
         let workouts: [Workout] = knownIDs.contains(workout.id) ? [] : [workout]
         let added = workouts.count
@@ -31,9 +31,9 @@ public actor MockLiveSource: LiveSource {
         let (distance, time, pace) = sportParameters(sport: sport)
         let strokeRate: Double
         switch sport {
-        case .rower:   strokeRate = Double(rng.next(in: 18...32))
-        case .skierg:  strokeRate = Double(rng.next(in: 24...40))
-        case .bike:    strokeRate = Double(rng.next(in: 60...100))
+        case .rower:   strokeRate = Double(Int.random(in: 18...32, using: &rng))
+        case .skierg:  strokeRate = Double(Int.random(in: 24...40, using: &rng))
+        case .bike:    strokeRate = Double(Int.random(in: 60...100, using: &rng))
         }
 
         return Workout(
@@ -45,7 +45,7 @@ public actor MockLiveSource: LiveSource {
             pace: pace,
             strokeRate: strokeRate,
             strokeCount: Int(time / (60.0 / strokeRate) * 1.0),
-            heartRateAvg: rng.next(in: 120...175),
+            heartRateAvg: Int.random(in: 120...175, using: &rng),
             caloriesTotal: Int(distance / 10.0),
             workoutType: "JustRow",
             source: "MockLive",
@@ -58,18 +58,18 @@ public actor MockLiveSource: LiveSource {
     private func sportParameters(sport: Sport) -> (distance: Double, time: TimeInterval, pace: TimeInterval) {
         switch sport {
         case .rower:
-            let distance = Double(rng.next(in: 2_000...10_000))
-            let pacePer500m = TimeInterval(rng.next(in: 110...145))
+            let distance = Double(Int.random(in: 2_000...10_000, using: &rng))
+            let pacePer500m = TimeInterval(Int.random(in: 110...145, using: &rng))
             let time = distance / 500.0 * pacePer500m
             return (distance, time, pacePer500m)
         case .skierg:
-            let distance = Double(rng.next(in: 1_000...5_000))
-            let pacePer500m = TimeInterval(rng.next(in: 105...140))
+            let distance = Double(Int.random(in: 1_000...5_000, using: &rng))
+            let pacePer500m = TimeInterval(Int.random(in: 105...140, using: &rng))
             let time = distance / 500.0 * pacePer500m
             return (distance, time, pacePer500m)
         case .bike:
-            let distance = Double(rng.next(in: 4_000...20_000))
-            let pacePer500m = TimeInterval(rng.next(in: 75...110))
+            let distance = Double(Int.random(in: 4_000...20_000, using: &rng))
+            let pacePer500m = TimeInterval(Int.random(in: 75...110, using: &rng))
             let time = distance / 500.0 * pacePer500m
             return (distance, time, pacePer500m)
         }
@@ -87,11 +87,5 @@ struct SeededGenerator: RandomNumberGenerator {
     mutating func next() -> UInt64 {
         state = state &* 6364136223846793005 &+ 1442695040888963407
         return state
-    }
-
-    mutating func next(in range: ClosedRange<Int>) -> Int {
-        let span = UInt64(range.count)
-        let offset = next() % span
-        return range.lowerBound + Int(offset)
     }
 }

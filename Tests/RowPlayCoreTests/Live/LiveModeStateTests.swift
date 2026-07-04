@@ -182,6 +182,29 @@ final class LiveModeStateTests: XCTestCase {
         XCTAssertFalse(state.hasWarning)
     }
 
+    func testPollSucceededIgnoredAfterStop() {
+        var state = LiveModeState()
+        state.start()
+        state.pollStarted()
+        state.stop()
+        state.pollSucceeded(at: Date())
+        XCTAssertFalse(state.enabled)
+        XCTAssertEqual(state.status, .stopped)
+        XCTAssertNil(state.lastPollAt)
+    }
+
+    func testPollFailedIgnoredAfterStop() {
+        var state = LiveModeState()
+        state.start()
+        state.pollStarted()
+        state.stop()
+        state.pollFailed(at: Date())
+        XCTAssertFalse(state.enabled)
+        XCTAssertEqual(state.status, .stopped)
+        XCTAssertEqual(state.consecutiveFailures, 0)
+        XCTAssertNil(state.lastPollAt)
+    }
+
     // MARK: - Equatable
 
     func testEquatable() {

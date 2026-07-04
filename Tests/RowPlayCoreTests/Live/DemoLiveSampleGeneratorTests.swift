@@ -57,6 +57,17 @@ final class DemoLiveSampleGeneratorTests: XCTestCase {
         XCTAssertEqual(first.time, afterReset.time)
     }
 
+    func testResetRestoresCustomSeedSequence() {
+        let gen = DemoLiveSampleGenerator(seed: 99)
+        let first = gen.nextSample()
+        _ = gen.nextSample()
+        gen.reset()
+        let afterReset = gen.nextSample()
+        XCTAssertEqual(first.distance, afterReset.distance)
+        XCTAssertEqual(first.time, afterReset.time)
+        XCTAssertEqual(first.pace, afterReset.pace)
+    }
+
     func testSamplePreservesSport() {
         for sport in Sport.allCases {
             let gen = DemoLiveSampleGenerator(sport: sport)

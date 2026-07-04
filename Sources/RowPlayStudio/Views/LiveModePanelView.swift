@@ -17,7 +17,7 @@ struct LiveModePanelView: View {
                         .foregroundStyle(.orange)
                         .help("\(library.liveState.consecutiveFailures) consecutive failures")
                 }
-                Toggle("", isOn: Binding(
+                Toggle("Enable Live Mode", isOn: Binding(
                     get: { library.liveState.enabled },
                     set: { enabled in
                         if enabled {

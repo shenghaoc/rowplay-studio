@@ -120,8 +120,12 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     func ingestLiveResult(_ result: LivePollResult) {
-        let existingIDs = Set(details.map(\.id))
-        let newWorkouts = result.workouts.filter { !existingIDs.contains($0.id) }
+        var existingIDs = Set(details.map(\.id))
+        var newWorkouts: [Workout] = []
+        for workout in result.workouts where !existingIDs.contains(workout.id) {
+            newWorkouts.append(workout)
+            existingIDs.insert(workout.id)
+        }
         guard !newWorkouts.isEmpty else { return }
         let newDetails = newWorkouts.map { WorkoutDetail(workout: $0, strokes: [], splits: []) }
         details.append(contentsOf: newDetails)
