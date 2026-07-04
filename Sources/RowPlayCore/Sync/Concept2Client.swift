@@ -64,6 +64,10 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
             _fetchWorkoutsCallCount += 1
         }
 
+        guard perPage > 0 else {
+            return Concept2Page(workouts: [], totalPages: 0)
+        }
+
         let sorted = details.sorted { $0.workout.date > $1.workout.date }
         let workouts = sorted.map(\.workout)
         let totalPages = max(1, Int(ceil(Double(workouts.count) / Double(perPage))))

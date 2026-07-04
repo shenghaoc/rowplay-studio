@@ -55,6 +55,18 @@ final class Concept2ClientTests: XCTestCase {
         XCTAssertEqual(page.workouts.count, DemoWorkoutLibrary.details.count)
     }
 
+    func testFetchWorkoutsZeroPerPageReturnsEmpty() async throws {
+        let page = try await client.fetchWorkouts(page: 1, perPage: 0)
+        XCTAssertTrue(page.workouts.isEmpty)
+        XCTAssertEqual(page.totalPages, 0)
+    }
+
+    func testFetchWorkoutsNegativePerPageReturnsEmpty() async throws {
+        let page = try await client.fetchWorkouts(page: 1, perPage: -5)
+        XCTAssertTrue(page.workouts.isEmpty)
+        XCTAssertEqual(page.totalPages, 0)
+    }
+
     func testFetchWorkoutsTracksCallCount() async throws {
         _ = try await client.fetchWorkouts(page: 1, perPage: 10)
         _ = try await client.fetchWorkouts(page: 2, perPage: 10)

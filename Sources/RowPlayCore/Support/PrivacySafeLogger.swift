@@ -14,8 +14,12 @@ private let sensitivePatterns: [NSRegularExpression] = {
         #"\b[a-f0-9]{32,}\b"#,
         // Authorization: Bearer ... header
         #"Authorization:\s*Bearer\s+\S+"#,
+        // Cookie headers
+        #"(?i)(Cookie|Set-Cookie):\s*[^\n]+"#,
         // Generic token values in JSON: "token": "..." — captures the value portion
         #""token"\s*:\s*"[^"]+""#,
+        // Query/form credential keys: token=..., access_token=...
+        #"(?i)\b(token|access_token)\s*=\s*[^\s&]+"#,
         // Full workout payloads (JSON object > 100 chars, non-greedy nested)
         #"\{(?:[^{}]|\{[^{}]*\}){100,}\}"#,
     ]

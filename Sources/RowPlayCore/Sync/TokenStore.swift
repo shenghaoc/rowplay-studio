@@ -38,20 +38,31 @@ public final class KeychainTokenStore: TokenStore {
         guard let data = token.data(using: .utf8) else {
             throw TokenStoreError.encodingFailed
         }
-        // Delete any existing item first to avoid errSecDuplicateItem.
-        try deleteToken()
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw TokenStoreError.keychainError(status)
+        // Try updating an existing item first; fall through to add if none exists.
+        let updateAttributes: [String: Any] = [
+            kSecValueData as String: data,
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        // No existing item — add a new one.
+        let addQuery = query.merging([
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        ]) { _, new in new }
+
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw TokenStoreError.keychainError(addStatus)
         }
     }
 

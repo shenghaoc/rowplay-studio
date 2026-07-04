@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Tracks the state of a Concept2 sync operation.
 ///

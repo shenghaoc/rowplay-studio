@@ -62,6 +62,38 @@ final class PrivacySafeLoggerTests: XCTestCase {
         XCTAssertEqual(result, input, "Small JSON objects should not be redacted")
     }
 
+    // MARK: - redact() — Cookie headers
+
+    func testRedactsCookieHeader() {
+        let input = "Cookie: session_id=abcdef1234567890abcdef1234567890"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("session_id=abcdef1234567890abcdef1234567890"))
+    }
+
+    func testRedactsSetCookieHeader() {
+        let input = "Set-Cookie: auth_token=supersecretvalue123; Path=/"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("supersecretvalue123"))
+    }
+
+    // MARK: - redact() — token= query/form credentials
+
+    func testRedactsTokenQueryParameter() {
+        let input = "https://api.example.com/callback?token=abcdef1234567890&state=xyz"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("abcdef1234567890"))
+    }
+
+    func testRedactsAccessTokenQueryParameter() {
+        let input = "access_token=supersecrettokenvalue12345"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("supersecrettokenvalue12345"))
+    }
+
     // MARK: - redact() — idempotency
 
     func testRedactIsIdempotent() {

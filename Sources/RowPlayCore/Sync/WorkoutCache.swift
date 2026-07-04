@@ -36,6 +36,12 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
         defer { lock.unlock() }
         for workout in workouts {
             self.workouts[workout.id] = workout
+            // Keep cached detail in sync: update the summary embedded in any
+            // existing detail so loadWorkout(id:) doesn't return stale metadata.
+            if var detail = details[workout.id] {
+                detail.workout = workout
+                details[workout.id] = detail
+            }
         }
     }
 
