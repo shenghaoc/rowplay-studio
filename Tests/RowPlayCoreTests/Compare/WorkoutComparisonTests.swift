@@ -229,4 +229,14 @@ final class WorkoutComparisonTests: XCTestCase {
     func testBuildDistanceOverlayEmpty() {
         XCTAssertNil(WorkoutComparison.buildDistanceOverlay([], []))
     }
+
+    func testBuildDistanceOverlayRejectsNonPositiveSteps() {
+        let strokes = [
+            makeStroke(t: 0, d: 0),
+            makeStroke(t: 1, d: 50),
+        ]
+
+        XCTAssertNil(WorkoutComparison.buildDistanceOverlay(strokes, strokes, steps: 0))
+        XCTAssertNil(WorkoutComparison.buildDistanceOverlay(strokes, strokes, steps: -1))
+    }
 }
