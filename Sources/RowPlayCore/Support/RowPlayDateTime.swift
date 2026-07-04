@@ -153,7 +153,8 @@ public enum RowPlayDateTime {
         let value = text.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        // Use utf16.count to match NSRegularExpression's UTF-16 basis
+        // Max valid logbook "YYYY-MM-DD HH:MM:SS" is 19 chars; 30 gives headroom
         guard value.utf16.count <= 30 else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
@@ -183,7 +184,8 @@ public enum RowPlayDateTime {
         let value = key.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        // Use utf16.count to match NSRegularExpression's UTF-16 basis
+        // Max valid day key "YYYY-MM-DD" is 10 chars; 20 gives headroom
         guard value.utf16.count <= 20 else { return nil }
 
         let range = NSRange(value.startIndex..<value.endIndex, in: value)

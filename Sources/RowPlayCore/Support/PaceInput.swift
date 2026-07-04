@@ -17,7 +17,8 @@ public enum PaceInput {
         let s = raw.trimmingCharacters(in: .whitespaces)
 
         // Security: Prevent DoS by limiting length before regex
-        // Use utf16.count for O(1) check (NSString-backed) vs String.count O(N)
+        // Use utf16.count to match NSRegularExpression's UTF-16 basis
+        // Max valid pace ~18 chars (e.g. "999999:59.99"); 20 gives headroom
         guard s.utf16.count <= 20 else { return nil }
 
         let range = NSRange(s.startIndex..<s.endIndex, in: s)
