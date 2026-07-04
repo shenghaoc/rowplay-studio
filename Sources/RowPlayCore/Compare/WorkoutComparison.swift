@@ -161,11 +161,13 @@ public enum WorkoutComparison {
         let avgWatts: Int
         if let wattMinutes = detail.workout.wattMinutes, detail.workout.time > 0 {
             avgWatts = Int((wattMinutes * 60 / detail.workout.time).rounded())
-        } else {
+        } else if detail.workout.pace > 0 {
             avgWatts = Int(RowPlayFormatting.paceToWatts(
                 for: detail.workout.sport,
                 pacePer500m: detail.workout.pace
             ).rounded())
+        } else {
+            avgWatts = 0
         }
 
         // Best 5-second power: sliding window over strokes

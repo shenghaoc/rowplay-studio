@@ -113,7 +113,7 @@ public enum RepDetection {
         }
 
         var e = 0
-        for s in strokes {
+        for s in strokes.sorted(by: { $0.t < $1.t }) {
             while e < edges.count, s.t > edges[e] { e += 1 }
             let idx = e < splitToWork.count ? splitToWork[e] : -1
             if idx >= 0 { buckets[idx].append(s) }

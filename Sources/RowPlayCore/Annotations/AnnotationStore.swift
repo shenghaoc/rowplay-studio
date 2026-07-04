@@ -69,9 +69,13 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
 
     public func deleteAnnotation(workoutId: Int, id: Int) async throws {
         lock.withLock {
-            var annotations = storage[workoutId] ?? []
+            guard var annotations = storage[workoutId] else { return }
             annotations.removeAll { $0.id == id }
-            storage[workoutId] = annotations
+            if annotations.isEmpty {
+                storage.removeValue(forKey: workoutId)
+            } else {
+                storage[workoutId] = annotations
+            }
         }
     }
 

@@ -100,7 +100,7 @@ public enum HrImport {
             var countHr = 0
 
             // Advance strokeIdx to start of this split
-            while strokeIdx < mergedStrokes.count, mergedStrokes[strokeIdx].d <= startD {
+            while strokeIdx < mergedStrokes.count, startD > 0, mergedStrokes[strokeIdx].d <= startD {
                 strokeIdx += 1
             }
 
