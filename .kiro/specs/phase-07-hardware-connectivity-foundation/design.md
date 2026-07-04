@@ -84,9 +84,13 @@ The mock does NOT use real timers. Tests call `emitSample()` directly for determ
 
 Review hardening added to the mock:
 - Connection attempts use an attempt token so a delayed `connect(to:)` cannot overwrite a later `disconnect()` or `simulateFailure(reason:)`.
+- Cancelled connection attempts clean up `connecting` state and clear the connected device reference when no later state transition superseded them.
 - Reset restores the initial seed supplied to the instance, keeping custom-seed sequences deterministic.
 - `telemetryStream()` finishes any previous stream before replacing it and clears the stored continuation when the active stream terminates.
+- `simulateFailure(reason:)` finishes the active telemetry stream and clears the connected device reference.
 - Generated pace is clamped to a positive minimum before deriving distance, preventing infinite or negative distance increments for unusual mock inputs.
+- Generated cadence, watts, and heart rate values are clamped to non-negative values for unusual mock inputs.
+- Mock sample timestamps are derived from elapsed time so full sample equality remains deterministic for a given seed and tick sequence.
 
 ## Mock-Only Settings Hook
 

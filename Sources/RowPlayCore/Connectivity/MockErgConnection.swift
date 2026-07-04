@@ -53,10 +53,14 @@ public final class MockErgConnection: @unchecked Sendable {
     public func connect(to device: ErgDevice) async throws {
         let attemptID = beginConnectionAttempt(to: device)
 
-        // Simulate a brief connection delay
-        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-
-        completeConnectionAttempt(attemptID, device: device)
+        do {
+            try await Task.sleep(for: .milliseconds(10))
+            try Task.checkCancellation()
+            completeConnectionAttempt(attemptID, device: device)
+        } catch {
+            cancelConnectionAttempt(attemptID)
+            throw error
+        }
     }
 
     /// Disconnect from the current device.
@@ -67,10 +71,17 @@ public final class MockErgConnection: @unchecked Sendable {
 
     /// Simulate a connection failure with a human-readable reason.
     public func simulateFailure(reason: String) {
+        let continuationToFinish: AsyncStream<ErgTelemetrySample>.Continuation?
+
         lock.lock()
-        defer { lock.unlock() }
         _connectionAttemptID += 1
         _state = .failed(reason: reason)
+        _connectedDevice = nil
+        continuationToFinish = _sampleContinuation
+        _sampleContinuation = nil
+        lock.unlock()
+
+        continuationToFinish?.finish()
     }
 
     /// Emit a deterministic telemetry sample to the stream.
@@ -97,20 +108,21 @@ public final class MockErgConnection: @unchecked Sendable {
 
         // Watts varies ±10
         let wattsVariation = Int.random(in: -10 ... 10, using: &_rng)
-        let currentWatts = baseWatts + wattsVariation
+        let currentWatts = max(0, baseWatts + wattsVariation)
 
         // HR varies ±2 bpm
         let hrVariation = Int.random(in: -2 ... 2, using: &_rng)
-        let currentHR = baseHeartRate.map { $0 + hrVariation }
+        let currentHR = baseHeartRate.map { max(0, $0 + hrVariation) }
+        let currentCadence = max(0, baseCadence + Double(Int.random(in: -1 ... 1, using: &_rng)))
 
         sample = ErgTelemetrySample(
             elapsed: _elapsed,
             distance: _distance,
             pace: currentPace,
-            cadence: baseCadence + Double(Int.random(in: -1 ... 1, using: &_rng)),
+            cadence: currentCadence,
             watts: currentWatts,
             heartRate: currentHR,
-            timestamp: Date()
+            timestamp: Date(timeIntervalSince1970: _elapsed)
         )
         continuation = _sampleContinuation
         lock.unlock()
@@ -184,6 +196,15 @@ public final class MockErgConnection: @unchecked Sendable {
         defer { lock.unlock() }
         if _connectionAttemptID == attemptID, _state == .connecting, _connectedDevice == device {
             _state = .connected
+        }
+    }
+
+    private func cancelConnectionAttempt(_ attemptID: UInt64) {
+        lock.lock()
+        defer { lock.unlock() }
+        if _connectionAttemptID == attemptID, _state == .connecting {
+            _state = .disconnected
+            _connectedDevice = nil
         }
     }
 

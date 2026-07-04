@@ -48,6 +48,30 @@ final class MockErgConnectionTests: XCTestCase {
         XCTAssertNil(connection.connectedDevice)
     }
 
+    func testConnectCancellationCleansUpState() async throws {
+        let connection = MockErgConnection()
+        let device = ErgDevice(displayName: "Test Rower", sport: .rower)
+
+        let connectTask = Task {
+            try await connection.connect(to: device)
+        }
+        try await waitForState(.connecting, in: connection)
+
+        connectTask.cancel()
+
+        do {
+            try await connectTask.value
+            XCTFail("Cancelled connection should throw CancellationError")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Cancelled connection threw unexpected error: \(error)")
+        }
+
+        XCTAssertEqual(connection.currentState, .disconnected)
+        XCTAssertNil(connection.connectedDevice)
+    }
+
     func testSimulateFailurePreservesReason() {
         let connection = MockErgConnection()
         connection.simulateFailure(reason: "Device out of range")
@@ -68,6 +92,22 @@ final class MockErgConnectionTests: XCTestCase {
         try await connectTask.value
 
         XCTAssertEqual(connection.currentState, .failed(reason: "Signal lost"))
+        XCTAssertNil(connection.connectedDevice)
+    }
+
+    func testFailureFinishesTelemetryStreamAndClearsDevice() async throws {
+        let connection = MockErgConnection()
+        let device = ErgDevice(displayName: "Test Rower", sport: .rower)
+
+        try await connection.connect(to: device)
+        let stream = connection.telemetryStream()
+
+        connection.simulateFailure(reason: "Signal lost")
+        let valueAfterFailure = try await nextSample(from: stream)
+
+        XCTAssertNil(valueAfterFailure)
+        XCTAssertEqual(connection.currentState, .failed(reason: "Signal lost"))
+        XCTAssertNil(connection.connectedDevice)
     }
 
     func testConnectThenFailureThenConnect() async throws {
@@ -140,6 +180,17 @@ final class MockErgConnectionTests: XCTestCase {
         XCTAssertGreaterThan(sample.watts, 0)
     }
 
+    func testTelemetryClampsNonNegativeValues() {
+        let connection = MockErgConnection(baseCadence: -5, baseWatts: -5, baseHeartRate: -1)
+
+        for _ in 0 ..< 10 {
+            let sample = connection.emitSample()
+            XCTAssertGreaterThanOrEqual(sample.cadence, 0)
+            XCTAssertGreaterThanOrEqual(sample.watts, 0)
+            XCTAssertGreaterThanOrEqual(sample.heartRate ?? 0, 0)
+        }
+    }
+
     func testTelemetryIsDeterministic() {
         let c1 = MockErgConnection(seed: 99)
         let c2 = MockErgConnection(seed: 99)
@@ -152,6 +203,8 @@ final class MockErgConnectionTests: XCTestCase {
         XCTAssertEqual(s1.pace, s2.pace)
         XCTAssertEqual(s1.cadence, s2.cadence)
         XCTAssertEqual(s1.watts, s2.watts)
+        XCTAssertEqual(s1.heartRate, s2.heartRate)
+        XCTAssertEqual(s1.timestamp, s2.timestamp)
     }
 
     func testReplacingTelemetryStreamFinishesPreviousStream() async throws {
@@ -226,6 +279,7 @@ final class MockErgConnectionTests: XCTestCase {
         XCTAssertEqual(afterReset.cadence, first.cadence)
         XCTAssertEqual(afterReset.watts, first.watts)
         XCTAssertEqual(afterReset.heartRate, first.heartRate)
+        XCTAssertEqual(afterReset.timestamp, first.timestamp)
     }
 
     func testFailureStateIsTerminal() {

@@ -46,6 +46,10 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R5.6** Resetting a mock connection must preserve the instance's original deterministic seed.
 - **R5.7** Replacing or terminating telemetry streams must clean up stale continuations.
 - **R5.8** Mock telemetry pace must remain positive so distance never moves backward, even with unusual base pace inputs.
+- **R5.9** Cancelling an in-flight mock connection attempt must clean up the connecting state and connected device reference.
+- **R5.10** Simulated mock connection failure must finish the active telemetry stream and clear the connected device reference.
+- **R5.11** Mock telemetry cadence, watts, and heart rate values must never be negative, even with unusual base inputs.
+- **R5.12** Mock telemetry timestamps must be deterministic for a given seed and tick sequence.
 
 ## R6: Module Boundaries
 
@@ -76,8 +80,12 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R8.12** Tests verify custom-seed reset restores the original deterministic sequence.
 - **R8.13** Tests verify replacing the telemetry stream finishes the previous stream.
 - **R8.14** Tests verify non-positive base pace is clamped to a positive value.
-- **R8.15** `swift test` passes.
-- **R8.16** `swift build` passes.
+- **R8.15** Tests verify cancelling an in-flight connection cleans up the mock state.
+- **R8.16** Tests verify simulated failure finishes the active telemetry stream and clears the connected device.
+- **R8.17** Tests verify mock telemetry clamps cadence, watts, and heart rate to non-negative values.
+- **R8.18** Tests verify deterministic telemetry includes deterministic timestamps.
+- **R8.19** `swift test` passes.
+- **R8.20** `swift build` passes.
 
 ## R9: Non-Goals
 
