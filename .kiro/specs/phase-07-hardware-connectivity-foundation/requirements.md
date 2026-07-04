@@ -54,26 +54,32 @@ The native app must provide a deterministic mock hardware connection for testing
 - **R6.3** No SwiftUI or AppKit imports in `RowPlayCore` in this PR.
 - **R6.4** No entitlements, Info.plist Bluetooth permission strings, or background hardware sessions.
 
-## R7: Test Coverage
+## R7: Mock-Only UI Hook
 
-- **R7.1** `MockErgConnectionTests` cover connection state transitions.
-- **R7.2** `MockErgConnectionTests` cover deterministic telemetry output.
-- **R7.3** `ErgTelemetrySampleTests` cover sample field validation.
-- **R7.4** Tests verify mock connection starts disconnected.
-- **R7.5** Tests verify mock connection can transition to connected.
-- **R7.6** Tests verify mock connection can transition back to disconnected.
-- **R7.7** Tests verify mock telemetry elapsed time increases.
-- **R7.8** Tests verify mock telemetry distance does not go backward.
-- **R7.9** Tests verify mock telemetry contains cadence and watts.
-- **R7.10** Tests verify failure state preserves a human-readable reason.
-- **R7.11** Tests verify in-flight connect cancellation/failure does not resurrect the connection.
-- **R7.12** Tests verify custom-seed reset restores the original deterministic sequence.
-- **R7.13** Tests verify replacing the telemetry stream finishes the previous stream.
-- **R7.14** Tests verify non-positive base pace is clamped to a positive value.
-- **R7.15** `swift test` passes.
-- **R7.16** `swift build` passes.
+- **R7.1** If Phase 7 is visible in the app, it must be a mock-only status surface and must not present real pairing or scanning controls.
+- **R7.2** The Settings surface may show that hardware support is currently mock-only.
+- **R7.3** The UI must not request permissions, start device scans, or imply real Bluetooth availability.
 
-## R8: Non-Goals
+## R8: Test Coverage
+
+- **R8.1** `MockErgConnectionTests` cover connection state transitions.
+- **R8.2** `MockErgConnectionTests` cover deterministic telemetry output.
+- **R8.3** `ErgTelemetrySampleTests` cover sample field validation.
+- **R8.4** Tests verify mock connection starts disconnected.
+- **R8.5** Tests verify mock connection can transition to connected.
+- **R8.6** Tests verify mock connection can transition back to disconnected.
+- **R8.7** Tests verify mock telemetry elapsed time increases.
+- **R8.8** Tests verify mock telemetry distance does not go backward.
+- **R8.9** Tests verify mock telemetry contains cadence and watts.
+- **R8.10** Tests verify failure state preserves a human-readable reason.
+- **R8.11** Tests verify in-flight connect cancellation/failure does not resurrect the connection.
+- **R8.12** Tests verify custom-seed reset restores the original deterministic sequence.
+- **R8.13** Tests verify replacing the telemetry stream finishes the previous stream.
+- **R8.14** Tests verify non-positive base pace is clamped to a positive value.
+- **R8.15** `swift test` passes.
+- **R8.16** `swift build` passes.
+
+## R9: Non-Goals
 
 - No real Bluetooth scanning or device discovery.
 - No real device pairing.

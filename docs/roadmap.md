@@ -129,6 +129,7 @@ Status: foundation slice in progress on `codex/phase-07-hardware-connectivity-fo
 Scope:
 
 - Foundation PR: add hardware connection protocol boundary, device model, connection state machine, telemetry sample type, and deterministic mock connection.
+- The app only exposes a mock-only Settings status row in this slice; it does not offer pairing or scanning.
 - This PR does NOT implement real Bluetooth, real FTMS, or real Concept2 PM protocols.
 - Follow-up PRs: implement CoreBluetooth transport, add FTMS parsing, add Concept2 PM protocol support, and wire hardware telemetry into the live/replay model.
 - Hardware samples should feed the same live/replay data model from Phase 6.

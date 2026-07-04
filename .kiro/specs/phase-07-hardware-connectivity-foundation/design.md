@@ -88,6 +88,12 @@ Review hardening added to the mock:
 - `telemetryStream()` finishes any previous stream before replacing it and clears the stored continuation when the active stream terminates.
 - Generated pace is clamped to a positive minimum before deriving distance, preventing infinite or negative distance increments for unusual mock inputs.
 
+## Mock-Only Settings Hook
+
+The Settings view includes a small Hardware section that reports `Erg connection` as `Mock only` and states that Bluetooth devices are not available in this build. This is intentionally informational: it does not expose pairing controls, permission prompts, device scans, or background hardware behavior.
+
+This keeps the user experience honest while the underlying Phase 7 boundary exists without a real transport.
+
 ## Relationship to Phase 6 Live Sources
 
 Phase 6 established `LiveSource` for poll-based workout data from Concept2's API. Phase 7 adds a lower-level boundary for direct hardware connections. These are complementary:

@@ -52,3 +52,4 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgTelemetrySample.swift` | Phase 7 defines the live hardware telemetry sample model, field-compatible with Stroke and LiveWorkoutSample. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnection.swift` | Phase 7 defines the injectable ergometer connection protocol boundary. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/MockErgConnection.swift` | Phase 7 provides a deterministic mock hardware connection for testing and UI development. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row without real pairing, scanning, or permissions. |
