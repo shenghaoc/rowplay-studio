@@ -29,3 +29,10 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/server/db.ts` (workout cache) | `Sources/RowPlayCore/Sync/WorkoutCache.swift` | Phase 4 ports workout cache as async `WorkoutCache` protocol + `InMemoryWorkoutCache`; SQLite deferred to follow-up. |
 | `src/lib/server/logger.ts` | `Sources/RowPlayCore/Support/PrivacySafeLogger.swift` | Phase 4 ports privacy-safe logging with `redact()` and `PrivacySafeLogger`. |
 | `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/SyncStateTracker.swift` | Phase 4 ports sync state tracking as `SyncState` + `SyncStateTracker` observable. |
+| `src/lib/analytics.ts` (comparison) | `Sources/RowPlayCore/Compare/WorkoutComparison.swift` | Phase 5 ports compareVerdict, sideStats, compareIntervalReps, and buildDistanceOverlay. |
+| `src/lib/repComparison.ts` | `Sources/RowPlayCore/Compare/RepDetection.swift` | Phase 5 ports detectReps, repAvgPace, repsHaveHr, and rep series alignment. |
+| `src/lib/server/export.ts` | `Sources/RowPlayCore/Export/WorkoutExport.swift` | Phase 5 ports CSV and JSON export formatting (TCX deferred). |
+| `src/lib/hrImport.ts` | `Sources/RowPlayCore/Import/HrImport.swift` | Phase 5 ports HR interpolation, merge, and summarize logic. |
+| `src/lib/types.ts` (Annotation) | `Sources/RowPlayCore/Annotations/Annotation.swift` | Phase 5 ports the Annotation model. |
+| `src/routes/api/workouts/[id]/annotations` | `Sources/RowPlayCore/Annotations/AnnotationStore.swift` | Phase 5 ports annotation store as async `AnnotationStore` protocol + `InMemoryAnnotationStore`. |
+| `src/lib/server/share.ts` (redaction) | `Sources/RowPlayCore/Share/SharePackage.swift` | Phase 5 ports share package format with hardware metadata redaction. |

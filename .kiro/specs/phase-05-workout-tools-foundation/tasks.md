@@ -1,0 +1,21 @@
+# Phase 05 Compare, Export, Share, and Annotations Foundation Tasks
+
+- [x] Create `Sources/RowPlayCore/Compare/WorkoutComparison.swift` with CompareVerdict, WorkoutSideStats, IntervalCompareRow, DistanceOverlay, and comparison logic.
+- [x] Create `Sources/RowPlayCore/Compare/RepDetection.swift` with RepSeries and detectReps logic.
+- [x] Create `Sources/RowPlayCore/Export/WorkoutExport.swift` with CSV and JSON export formatting.
+- [x] Create `Sources/RowPlayCore/Import/HrImport.swift` with HrSample, interpolation, merge, and summarize logic.
+- [x] Create `Sources/RowPlayCore/Annotations/Annotation.swift` with Annotation model.
+- [x] Create `Sources/RowPlayCore/Annotations/AnnotationStore.swift` with AnnotationStore protocol and InMemoryAnnotationStore.
+- [x] Create `Sources/RowPlayCore/Share/SharePackage.swift` with SharePackage model, builder, and encode/decode.
+- [x] Create `Tests/RowPlayCoreTests/Compare/WorkoutComparisonTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Compare/RepDetectionTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Export/WorkoutExportTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Import/HrImportTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Annotations/AnnotationStoreTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Share/SharePackageTests.swift`.
+- [x] Create `.kiro/specs/phase-05-workout-tools-foundation` spec documents.
+- [x] Update `docs/source-map.md` with Phase 5 mappings.
+- [x] Update `docs/roadmap.md` Phase 5 status.
+- [x] Run `swift test` — all tests pass (334 tests, 0 failures).
+- [x] Run `swift build` — clean build.
+- [x] Run `git diff --check` — no whitespace errors.
