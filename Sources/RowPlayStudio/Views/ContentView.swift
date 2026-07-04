@@ -27,8 +27,8 @@ struct ContentView: View {
                 DashboardView(
                     library: library,
                     summary: library.filteredSummary,
-                    workouts: library.filteredWorkouts,
-                    pbIds: library.pbIds
+                    personalBests: library.filteredPersonalBests,
+                    recentPaceWorkouts: library.filteredRecentPaceWorkouts
                 )
             }
         }
