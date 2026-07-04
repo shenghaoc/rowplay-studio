@@ -119,7 +119,9 @@ final class WorkoutComparisonTests: XCTestCase {
         ]
         let detail = makeDetail(workout: makeWorkout(), strokes: strokes)
         let stats = WorkoutComparison.sideStats(detail)
-        let expected = (30_000 / (120.0 * 30.0) + 30_000 / (150.0 * 20.0)) / 2
+        let firstDps = 30_000.0 / (120.0 * 30.0)
+        let secondDps = 30_000.0 / (150.0 * 20.0)
+        let expected = (firstDps + secondDps) / 2
         XCTAssertEqual(stats.avgDps, expected, accuracy: 0.001)
     }
 
