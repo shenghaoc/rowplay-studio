@@ -50,14 +50,19 @@ final class SharePackageTests: XCTestCase {
         XCTAssertEqual(package.splits.count, 2)
     }
 
-    func testBuildRedactsSensitiveFields() {
+    func testBuildRedactsSensitiveFields() throws {
         let detail = makeDetail()
         let package = SharePackageBuilder.build(from: detail)
+        let data = try SharePackageCodec.encode(package)
+        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
 
-        // These hardware-identifying fields should NOT be present
-        // (they're not on native WorkoutSummary anyway, but verify the struct design)
-        // The WorkoutSummary struct intentionally excludes serialNumber, device, etc.
-        XCTAssertNotNil(package.workout)
+        XCTAssertFalse(json.contains("\"serialNumber\""))
+        XCTAssertFalse(json.contains("\"serial_number\""))
+        XCTAssertFalse(json.contains("\"device\""))
+        XCTAssertFalse(json.contains("\"deviceOs\""))
+        XCTAssertFalse(json.contains("\"device_os\""))
+        XCTAssertFalse(json.contains("\"deviceOsVersion\""))
+        XCTAssertFalse(json.contains("\"device_os_version\""))
     }
 
     // MARK: - Encode / Decode Round-Trip
