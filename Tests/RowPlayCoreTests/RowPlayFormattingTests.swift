@@ -89,6 +89,68 @@ final class RowPlayFormattingTests: XCTestCase {
         XCTAssertEqual(RowPlayFormatting.distance(.nan), "--")
     }
 
+    // MARK: - distance() imperial
+
+    func testDistanceImperialFeet() {
+        // 100 m ≈ 328 ft
+        XCTAssertEqual(RowPlayFormatting.distance(100, unit: .imperial), "328 ft")
+    }
+
+    func testDistanceImperialMiles() {
+        // 1609.344 m = 1 mile
+        XCTAssertEqual(RowPlayFormatting.distance(1_609.344, unit: .imperial), "1.00 mi")
+    }
+
+    func testDistanceImperialThreshold() {
+        // 304.8 m = 1000 ft → switches to miles
+        XCTAssertEqual(RowPlayFormatting.distance(304.8, unit: .imperial), "0.19 mi")
+    }
+
+    func testDistanceImperialBelowThreshold() {
+        // 304 m < 304.8 → still feet
+        XCTAssertEqual(RowPlayFormatting.distance(304, unit: .imperial), "997 ft")
+    }
+
+    func testDistanceImperial5k() {
+        // 5000 m ≈ 3.11 mi
+        let result = RowPlayFormatting.distance(5_000, unit: .imperial)
+        XCTAssertTrue(result.hasSuffix("mi"))
+        XCTAssertTrue(result.hasPrefix("3."))
+    }
+
+    func testDistanceImperialZero() {
+        XCTAssertEqual(RowPlayFormatting.distance(0, unit: .imperial), "0 ft")
+    }
+
+    func testDistanceImperialInfinite() {
+        XCTAssertEqual(RowPlayFormatting.distance(.infinity, unit: .imperial), "--")
+    }
+
+    func testDistanceImperialNaN() {
+        XCTAssertEqual(RowPlayFormatting.distance(.nan, unit: .imperial), "--")
+    }
+
+    // MARK: - distance() default unit is metric
+
+    func testDistanceDefaultIsMetric() {
+        XCTAssertEqual(RowPlayFormatting.distance(5_000), RowPlayFormatting.distance(5_000, unit: .metric))
+    }
+
+    // MARK: - DistanceUnit
+
+    func testDistanceUnitFromMetric() {
+        XCTAssertEqual(DistanceUnit.from("metric"), .metric)
+    }
+
+    func testDistanceUnitFromImperial() {
+        XCTAssertEqual(DistanceUnit.from("imperial"), .imperial)
+    }
+
+    func testDistanceUnitFromUnknownDefaultsMetric() {
+        XCTAssertEqual(DistanceUnit.from("unknown"), .metric)
+        XCTAssertEqual(DistanceUnit.from(""), .metric)
+    }
+
     // MARK: - paceToWatts()
 
     func testPaceToWattsNormal() {

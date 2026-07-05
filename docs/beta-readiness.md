@@ -16,6 +16,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - **Live mode**: State machine, polling cadence with backoff, `LiveSource` protocol, `MockLiveSource`, `DemoLiveSampleGenerator`, and a native live-mode panel.
 - **Hardware connectivity**: `ErgDevice`, `ErgConnectionState`, `ErgTelemetrySample`, `ErgConnection` protocol, and `MockErgConnection` with deterministic telemetry.
 - **Native shell**: `NavigationSplitView` layout, sidebar with sort/sport pickers, dashboard with metric tiles and PB highlights, workout detail with replay/tools, settings with mock-only hardware status.
+- **Settings wiring**: `demoModeEnabled` controls demo data loading, `reduceReplayMotion` lowers replay animation frame rate, `preferredDistanceUnit` switches distance formatting between metric and imperial.
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
 - **Test suite**: all tests pass with no failures.
 
@@ -34,17 +35,16 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ### Must-Fix
 
-1. **Dead settings in SettingsView**: `demoModeEnabled`, `reduceReplayMotion`, and `preferredDistanceUnit` are exposed in the UI but not wired to any behavior. Either remove them or wire them.
-2. **No production Concept2 sync**: `Concept2APIClient` and `WorkoutCache` are protocol-only with mock implementations. A real URLSession client and SQLite cache are needed for actual sync.
-3. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
-4. **No persistent storage**: `InMemoryWorkoutCache` and `InMemoryAnnotationStore` lose data on restart. SQLite or Core Data backing is needed.
+1. **No production Concept2 sync**: `Concept2APIClient` and `WorkoutCache` are protocol-only with mock implementations. A real URLSession client and SQLite cache are needed for actual sync.
+2. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
+3. **No persistent storage**: `InMemoryWorkoutCache` and `InMemoryAnnotationStore` lose data on restart. SQLite or Core Data backing is needed.
 
 ### Should-Fix
 
-5. **`WorkoutAnalytics.durationBand` has no direct tests**: Tested only indirectly through `ComparabilityGuard`.
-6. **No TCX export**: Deferred from Phase 5; needed for round-trip with Concept2 ecosystem tools.
-7. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
-8. **No companion web share service**: Share packages are local-only; no public URL generation.
+4. **`WorkoutAnalytics.durationBand` has no direct tests**: Tested only indirectly through `ComparabilityGuard`.
+5. **No TCX export**: Deferred from Phase 5; needed for round-trip with Concept2 ecosystem tools.
+6. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
+7. **No companion web share service**: Share packages are local-only; no public URL generation.
 
 ## Must Not Ship Yet
 
@@ -55,8 +55,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ## Recommended Next PRs
 
-1. **Wire dead settings**: Connect `reduceReplayMotion` to `ReplayView`, `preferredDistanceUnit` to distance formatting, and either wire or remove `demoModeEnabled`.
-2. **Add `RowPlayFormatting` edge-case tests**: The new `RowPlayFormattingTests` covers happy paths; add stress tests for very large values and boundary conditions.
-3. **SQLite workout cache**: Implement `SQLiteWorkoutCache` conforming to the existing `WorkoutCache` protocol with migration tests.
-4. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
-5. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
+1. **Add `RowPlayFormatting` edge-case tests**: The new `RowPlayFormattingTests` covers happy paths; add stress tests for very large values and boundary conditions.
+2. **SQLite workout cache**: Implement `SQLiteWorkoutCache` conforming to the existing `WorkoutCache` protocol with migration tests.
+3. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
+4. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.

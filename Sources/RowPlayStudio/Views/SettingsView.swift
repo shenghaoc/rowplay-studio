@@ -1,18 +1,16 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("demoModeEnabled") private var demoModeEnabled = true
-    @AppStorage("reduceReplayMotion") private var reduceReplayMotion = false
-    @AppStorage("preferredDistanceUnit") private var preferredDistanceUnit = "metric"
+    @EnvironmentObject private var preferences: AppPreferences
 
     var body: some View {
         Form {
             Section("Library") {
-                Toggle("Demo mode", isOn: $demoModeEnabled)
+                Toggle("Demo mode", isOn: $preferences.demoModeEnabled)
             }
 
             Section("Replay") {
-                Toggle("Reduce motion", isOn: $reduceReplayMotion)
+                Toggle("Reduce motion", isOn: $preferences.reduceReplayMotion)
             }
 
             Section("Hardware") {
@@ -28,7 +26,7 @@ struct SettingsView: View {
             }
 
             Section("Units") {
-                Picker("Distance", selection: $preferredDistanceUnit) {
+                Picker("Distance", selection: $preferences.preferredDistanceUnit) {
                     Text("Metric").tag("metric")
                     Text("Imperial").tag("imperial")
                 }

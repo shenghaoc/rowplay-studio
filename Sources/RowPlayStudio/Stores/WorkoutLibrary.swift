@@ -103,6 +103,15 @@ final class WorkoutLibrary: ObservableObject {
         query = WorkoutQuery.defaultQuery
     }
 
+    var isEmpty: Bool {
+        details.isEmpty
+    }
+
+    func clearData() {
+        details = []
+        query = WorkoutQuery.defaultQuery
+    }
+
     // MARK: - Live Mode
 
     func startLiveMode(at date: Date = Date()) {

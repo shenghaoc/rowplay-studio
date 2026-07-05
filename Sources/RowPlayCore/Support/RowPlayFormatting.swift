@@ -2,6 +2,7 @@ import Foundation
 
 public enum RowPlayFormatting {
     public static let bikeWattsFromNormalizedPaceDivisor = 8.0
+    private static let feetThreshold: Double = 304.8 // 1000 feet in metres
 
     public static func time(_ seconds: TimeInterval, tenths: Bool = false) -> String {
         guard seconds.isFinite, seconds >= 0 else {
@@ -30,14 +31,24 @@ public enum RowPlayFormatting {
         return "\(time(secondsPer500m, tenths: true))/500m"
     }
 
-    public static func distance(_ metres: Double) -> String {
+    public static func distance(_ metres: Double, unit: DistanceUnit = .metric) -> String {
         guard metres.isFinite else {
             return "--"
         }
-        if metres >= 1_000 {
-            return "\(String(format: "%.2f", metres / 1_000)) km"
+        switch unit {
+        case .metric:
+            if metres >= 1_000 {
+                return "\(String(format: "%.2f", metres / 1_000)) km"
+            }
+            return "\(Int(metres.rounded())) m"
+        case .imperial:
+            if metres >= feetThreshold {
+                let miles = metres / 1_609.344
+                return "\(String(format: "%.2f", miles)) mi"
+            }
+            let feet = metres * 3.28084
+            return "\(Int(feet.rounded())) ft"
         }
-        return "\(Int(metres.rounded())) m"
     }
 
     public static func paceToWatts(_ pacePer500m: TimeInterval) -> Double {
