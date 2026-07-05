@@ -107,6 +107,9 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(pbLabel(pb.distance) == "Half" ? "Half Marathon" : (pbLabel(pb.distance) == "Marathon" ? "Marathon" : Measurement(value: pb.distance, unit: UnitLength.meters).formatted(.measurement(width: .wide)))) \(pb.sport.displayName) Personal Best")
+                        .accessibilityValue("\(Duration.seconds(pb.time).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))), \(Duration.seconds(pb.pace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters, \(pb.date, format: .dateTime.year().month(.abbreviated).day())")
                     }
                 }
             }
@@ -158,6 +161,9 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(sport.sport.displayName) Summary")
+                        .accessibilityValue("\(sport.sessions) sessions, \(Measurement(value: sport.distance, unit: UnitLength.meters).formatted(.measurement(width: .wide))), Best Pace: \(Duration.seconds(sport.bestPace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters")
                     }
                 }
             }
