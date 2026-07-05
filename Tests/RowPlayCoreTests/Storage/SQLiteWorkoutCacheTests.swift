@@ -1,3 +1,4 @@
+import SQLite3
 import XCTest
 @testable import RowPlayCore
 
@@ -31,6 +32,14 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
 
         let workouts = try await cache.listWorkouts()
         XCTAssertTrue(workouts.isEmpty)
+    }
+
+    func testMigrationCreatesDateIndex() throws {
+        try cache.migrate()
+
+        let indexNames = try queryStrings("PRAGMA index_list(workouts);", column: 1)
+
+        XCTAssertTrue(indexNames.contains("idx_workouts_date"))
     }
 
     func testMigrationIsIdempotent() throws {
@@ -113,6 +122,60 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         XCTAssertEqual(loaded?.splits.count, detail.splits.count)
     }
 
+    func testListWorkoutsReadsSummaryColumnsWithoutDetailDecode() async throws {
+        try cache.migrate()
+
+        var workout = DemoWorkoutLibrary.details.first!.workout
+        workout.strokeRate = 28
+        workout.strokeCount = 240
+        workout.heartRateAvg = 152
+        workout.caloriesTotal = 108
+        workout.wattMinutes = 96.5
+        workout.dragFactor = 126
+        workout.comments = "Summary from columns"
+        workout.source = "Concept2 Online Logbook"
+        workout.verified = false
+        workout.hasStrokeData = true
+        workout.isInterval = true
+        let detail = WorkoutDetail(
+            workout: workout,
+            strokes: DemoWorkoutLibrary.details.first!.strokes,
+            splits: DemoWorkoutLibrary.details.first!.splits
+        )
+        try await cache.save(detail: detail)
+        try executeSQL("UPDATE workouts SET detail_json = 'not-json' WHERE id = \(workout.id);")
+
+        let listed = try await cache.listWorkouts()
+        let loaded = try XCTUnwrap(listed.first { $0.id == workout.id })
+
+        XCTAssertEqual(loaded.sport, workout.sport)
+        XCTAssertEqual(loaded.date, workout.date)
+        XCTAssertEqual(loaded.distance, workout.distance, accuracy: 0.01)
+        XCTAssertEqual(loaded.time, workout.time, accuracy: 0.01)
+        XCTAssertEqual(loaded.pace, workout.pace, accuracy: 0.01)
+        XCTAssertEqual(loaded.strokeRate, workout.strokeRate)
+        XCTAssertEqual(loaded.strokeCount, workout.strokeCount)
+        XCTAssertEqual(loaded.heartRateAvg, workout.heartRateAvg)
+        XCTAssertEqual(loaded.caloriesTotal, workout.caloriesTotal)
+        XCTAssertEqual(loaded.wattMinutes, workout.wattMinutes)
+        XCTAssertEqual(loaded.dragFactor, workout.dragFactor)
+        XCTAssertEqual(loaded.workoutType, workout.workoutType)
+        XCTAssertEqual(loaded.comments, workout.comments)
+        XCTAssertEqual(loaded.source, workout.source)
+        XCTAssertEqual(loaded.verified, workout.verified)
+        XCTAssertEqual(loaded.hasStrokeData, workout.hasStrokeData)
+        XCTAssertEqual(loaded.isInterval, workout.isInterval)
+
+        do {
+            _ = try await cache.detail(id: workout.id)
+            XCTFail("Expected corrupt detail JSON to throw")
+        } catch WorkoutCacheError.decodingFailed {
+            // Expected: full-detail reads still validate detail_json.
+        } catch {
+            XCTFail("Expected decodingFailed, got \(error)")
+        }
+    }
+
     // MARK: - Delete
 
     func testDeleteRemovesSingleWorkout() async throws {
@@ -174,5 +237,48 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         XCTAssertEqual(loaded?.strokes.count, detail.strokes.count)
 
         cache = cache2
+    }
+
+    // MARK: - Raw SQLite Helpers
+
+    private func executeSQL(_ sql: String) throws {
+        try withRawDatabase { db in
+            guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+                throw sqliteError("exec failed: \(String(cString: sqlite3_errmsg(db)))")
+            }
+        }
+    }
+
+    private func queryStrings(_ sql: String, column: Int32) throws -> [String] {
+        try withRawDatabase { db in
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw sqliteError("prepare failed: \(String(cString: sqlite3_errmsg(db)))")
+            }
+
+            var values: [String] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let cString = sqlite3_column_text(stmt, column) else { continue }
+                values.append(String(cString: cString))
+            }
+            return values
+        }
+    }
+
+    private func withRawDatabase<T>(_ body: (OpaquePointer?) throws -> T) throws -> T {
+        var db: OpaquePointer?
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(dbPath, &db, flags, nil) == SQLITE_OK else {
+            throw sqliteError("open failed")
+        }
+        defer { sqlite3_close_v2(db) }
+
+        return try body(db)
+    }
+
+    private func sqliteError(_ message: String) -> NSError {
+        NSError(domain: "SQLiteWorkoutCacheTests", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
