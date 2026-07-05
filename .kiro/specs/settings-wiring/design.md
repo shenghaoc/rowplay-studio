@@ -11,11 +11,11 @@ Create `Sources/RowPlayStudio/Stores/AppPreferences.swift` as the single publish
 final class AppPreferences: ObservableObject {
     @Published var demoModeEnabled: Bool
     @Published var reduceReplayMotion: Bool
-    @Published var preferredDistanceUnit: String
+    @Published var distanceUnit: DistanceUnit
 }
 ```
 
-The model reads and writes the existing `UserDefaults` keys:
+The model exposes the distance unit as `DistanceUnit` and reads/writes the existing `UserDefaults` keys:
 
 - `demoModeEnabled`
 - `reduceReplayMotion`

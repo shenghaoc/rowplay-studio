@@ -26,7 +26,6 @@ final class AppPreferencesTests: XCTestCase {
 
         XCTAssertTrue(preferences.demoModeEnabled)
         XCTAssertFalse(preferences.reduceReplayMotion)
-        XCTAssertEqual(preferences.preferredDistanceUnit, "metric")
         XCTAssertEqual(preferences.distanceUnit, .metric)
     }
 
@@ -39,7 +38,6 @@ final class AppPreferencesTests: XCTestCase {
 
         XCTAssertFalse(preferences.demoModeEnabled)
         XCTAssertTrue(preferences.reduceReplayMotion)
-        XCTAssertEqual(preferences.preferredDistanceUnit, "imperial")
         XCTAssertEqual(preferences.distanceUnit, .imperial)
     }
 
@@ -48,7 +46,7 @@ final class AppPreferencesTests: XCTestCase {
 
         preferences.demoModeEnabled = false
         preferences.reduceReplayMotion = true
-        preferences.preferredDistanceUnit = "imperial"
+        preferences.distanceUnit = .imperial
 
         XCTAssertFalse(defaults.bool(forKey: AppPreferences.demoModeEnabledKey))
         XCTAssertTrue(defaults.bool(forKey: AppPreferences.reduceReplayMotionKey))
@@ -60,13 +58,7 @@ final class AppPreferencesTests: XCTestCase {
 
         let preferences = AppPreferences(defaults: defaults)
 
-        XCTAssertEqual(preferences.preferredDistanceUnit, "metric")
         XCTAssertEqual(preferences.distanceUnit, .metric)
-
-        preferences.preferredDistanceUnit = "furlongs"
-
-        XCTAssertEqual(preferences.preferredDistanceUnit, "metric")
-        XCTAssertEqual(defaults.string(forKey: AppPreferences.preferredDistanceUnitKey), "metric")
     }
 
     func testReduceMotionCanBeChangedWithoutChangingOtherDefaults() {
