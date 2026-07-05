@@ -24,7 +24,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RowPlayStudioTests",
-            dependencies: ["RowPlayStudio"]
+            dependencies: ["RowPlayStudio", "RowPlayCore"]
         )
     ]
 )

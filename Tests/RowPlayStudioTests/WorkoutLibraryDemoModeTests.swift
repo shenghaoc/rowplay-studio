@@ -137,6 +137,11 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
     }
 
     private func waitForDemoModeNotification() async {
-        await Task.yield()
+        // Allow the NotificationCenter → Task { @MainActor } dispatch to settle.
+        // A single Task.yield() is sufficient in most environments; the loop
+        // provides resilience against CI/slow-machine scheduling variance.
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
