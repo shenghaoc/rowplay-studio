@@ -37,21 +37,40 @@ CREATE TABLE IF NOT EXISTS workouts (
     distance REAL NOT NULL,
     time REAL NOT NULL,
     pace REAL NOT NULL,
+    stroke_rate REAL,
+    stroke_count INTEGER,
+    heart_rate_avg INTEGER,
+    calories_total INTEGER,
+    watt_minutes REAL,
+    drag_factor INTEGER,
+    comments TEXT,
+    source TEXT,
+    verified INTEGER NOT NULL DEFAULT 1,
+    has_stroke_data INTEGER NOT NULL DEFAULT 0,
+    is_interval INTEGER NOT NULL DEFAULT 0,
     detail_json TEXT NOT NULL,
     updated_at REAL NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts (date DESC);
 ```
 
 **Why JSON in detail_json?**
 
-This PR is a foundation. Normalizing strokes and splits into separate tables adds complexity without immediate benefit. The JSON column stores the full `WorkoutDetail` for later dashboard/replay use. Schema normalization is deferred to a future PR if query performance or storage size requires it.
+This PR is a foundation. Summary columns store the complete `Workout` shape needed by `listWorkouts()` so the newest-first list can avoid decoding full detail JSON for every row. The JSON column stores the full `WorkoutDetail` for later dashboard/replay use. Normalizing strokes and splits into separate tables is deferred to a future PR if query performance or storage size requires it.
 
 ### Migration Strategy
 
 - Uses `PRAGMA user_version` for version tracking.
-- `migrate()` is idempotent: runs `CREATE TABLE IF NOT EXISTS` and sets `user_version = 1`.
+- `migrate()` is idempotent: runs `CREATE TABLE IF NOT EXISTS`, adds any missing v1 summary columns via `PRAGMA table_info`, creates `idx_workouts_date`, and sets `user_version = 1`.
 - Opening a cache does **not** auto-migrate. The caller must call `migrate()` explicitly.
 - This prevents accidental data loss from schema changes.
+
+### Query Shape
+
+- `listWorkouts()` returns all cached workout summaries newest first using the summary columns and `idx_workouts_date`.
+- Pagination is a future API candidate if local caches grow enough that returning every summary row creates memory pressure.
+- `detail(id:)` decodes the full `WorkoutDetail` JSON for the selected workout.
 
 ### JSON Encoding
 

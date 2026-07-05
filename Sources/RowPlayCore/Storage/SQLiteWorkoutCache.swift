@@ -49,7 +49,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         let rc = sqlite3_open_v2(path, &db, flags, nil)
         guard rc == SQLITE_OK else {
             let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown error"
-            sqlite3_close(db)
+            sqlite3_close_v2(db)
             db = nil
             throw WorkoutCacheError.openFailed("sqlite3_open_v2 failed (\(rc)): \(msg)")
         }
@@ -158,6 +158,14 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
     public func save(detail: WorkoutDetail) async throws {
         try await withDatabase { [self] in
+            try execute(sql: "BEGIN TRANSACTION;", context: "begin transaction saveDetail")
+            var transactionIsOpen = true
+            defer {
+                if transactionIsOpen {
+                    sqlite3_exec(db, "ROLLBACK TRANSACTION;", nil, nil, nil)
+                }
+            }
+
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
 
@@ -171,6 +179,9 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
             guard sqlite3_step(stmt) == SQLITE_DONE else {
                 throw WorkoutCacheError.queryFailed("insert saveDetail: \(errmsg)")
             }
+
+            try execute(sql: "COMMIT TRANSACTION;", context: "commit transaction saveDetail")
+            transactionIsOpen = false
         }
     }
 
@@ -369,6 +380,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         let rc = sqlite3_step(stmt)
         if rc == SQLITE_ROW {
             var existing = try decodeDetail(from: stmt, column: 0, context: "existing workout \(workout.id)")
+            // Keep cached strokes/splits while refreshing the embedded summary.
             existing.workout = workout
             return existing
         }

@@ -22,11 +22,11 @@ The new `SQLiteWorkoutCache` must conform to the existing async `WorkoutCache` p
 
 ### R2: SQLite v1 schema stores WorkoutDetail JSON
 
-The cache stores full `WorkoutDetail` as JSON in a `detail_json` column. A `workouts` table with summary columns (id, sport, date, workout_type, distance, time, pace) plus `detail_json` and `updated_at` provides the foundation for future query support.
+The cache stores full `WorkoutDetail` as JSON in a `detail_json` column. A `workouts` table stores the complete `Workout` summary shape in columns, including optional metrics, comments, source, and boolean flags, plus `detail_json` and `updated_at`. `listWorkouts()` reads those summary columns directly, newest first, using a date index.
 
 ### R3: Migration is idempotent
 
-`migrate()` can be called multiple times without failure. It creates the table if missing and sets `PRAGMA user_version = 1`.
+`migrate()` can be called multiple times without failure. It creates the table if missing, adds missing v1 summary columns, creates the date index, and sets `PRAGMA user_version = 1`.
 
 ### R4: Opening a cache does not silently drop data
 
@@ -56,7 +56,10 @@ Required tests:
 2. Migration is idempotent (migrate twice without failure)
 3. Save and load detail round-trips (id, sport, distance, time, pace, strokes, splits)
 4. Save many and list sorts newest first
-5. Delete removes single workout
-6. DeleteAll clears rows
-7. Missing detail returns nil
-8. Cache persists across instances (two SQLiteWorkoutCache instances on same path)
+5. Save summary refresh preserves existing full detail payloads
+6. List reads summary columns without decoding detail JSON
+7. Migration creates the date index
+8. Delete removes single workout
+9. DeleteAll clears rows
+10. Missing detail returns nil
+11. Cache persists across instances (two SQLiteWorkoutCache instances on same path)
