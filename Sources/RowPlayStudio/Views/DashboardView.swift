@@ -163,10 +163,14 @@ struct DashboardView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(sport.sport.displayName) Summary")
-                        .accessibilityValue("\(sport.sessions) sessions, \(Measurement(value: sport.distance, unit: UnitLength.meters).formatted(.measurement(width: .wide))), Best Pace: \(Duration.seconds(sport.bestPace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters")
+                        .accessibilityValue(Self.sportSummaryAccessibilityValue(sport, unit: unit))
                     }
                 }
             }
         }
+    }
+
+    static func sportSummaryAccessibilityValue(_ sport: SportSummary, unit: DistanceUnit) -> String {
+        "\(sport.sessions) sessions, \(RowPlayFormatting.distance(sport.distance, unit: unit)), Best Pace: \(Duration.seconds(sport.bestPace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters"
     }
 }

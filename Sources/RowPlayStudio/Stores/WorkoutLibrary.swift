@@ -36,6 +36,10 @@ final class WorkoutLibrary: ObservableObject {
     private var detailByID: [Int: WorkoutDetail] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
+    private var demoDetailIDs: Set<Int>
+    private static let demoDetailsByID = Dictionary(
+        uniqueKeysWithValues: DemoWorkoutLibrary.details.map { ($0.id, $0) }
+    )
 
     init(
         details: [WorkoutDetail],
@@ -48,6 +52,7 @@ final class WorkoutLibrary: ObservableObject {
         self.annotationStore = annotationStore
         self.defaults = defaults
         demoModeEnabled = Self.persistedDemoModeEnabled(in: defaults)
+        demoDetailIDs = Self.demoIDs(in: details)
         updateAllDerivedData()
         observeDemoModeChanges()
     }
@@ -114,6 +119,7 @@ final class WorkoutLibrary: ObservableObject {
 
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
+        demoDetailIDs = Set(DemoWorkoutLibrary.details.map(\.id))
         query = WorkoutQuery.defaultQuery
     }
 
@@ -123,6 +129,7 @@ final class WorkoutLibrary: ObservableObject {
 
     func clearData() {
         details = []
+        demoDetailIDs = []
         query = WorkoutQuery.defaultQuery
     }
 
@@ -153,12 +160,13 @@ final class WorkoutLibrary: ObservableObject {
             let missingDemoDetails = DemoWorkoutLibrary.details.filter { !existingIDs.contains($0.id) }
             if !missingDemoDetails.isEmpty {
                 details.append(contentsOf: missingDemoDetails)
+                demoDetailIDs.formUnion(missingDemoDetails.map(\.id))
                 query = WorkoutQuery.defaultQuery
             }
         } else if !demoEnabled && !details.isEmpty {
-            let demoIDs = Set(DemoWorkoutLibrary.details.map(\.id))
             let previousCount = details.count
-            details.removeAll(where: { demoIDs.contains($0.id) })
+            details.removeAll(where: { demoDetailIDs.contains($0.id) })
+            demoDetailIDs = []
             if details.count != previousCount {
                 query = WorkoutQuery.defaultQuery
             }
@@ -167,6 +175,12 @@ final class WorkoutLibrary: ObservableObject {
 
     private static func persistedDemoModeEnabled(in defaults: UserDefaults) -> Bool {
         defaults.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
+    }
+
+    private static func demoIDs(in details: [WorkoutDetail]) -> Set<Int> {
+        Set(details.compactMap { detail in
+            demoDetailsByID[detail.id] == detail ? detail.id : nil
+        })
     }
 
     // MARK: - Live Mode

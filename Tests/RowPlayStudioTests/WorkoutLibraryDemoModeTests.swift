@@ -109,6 +109,20 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         XCTAssertEqual(library.details, [realWorkout])
     }
 
+    func testDemoModeNotificationPreservesRealWorkoutWithDemoIDWhenDisabled() async {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        let realWorkout = makeRealWorkoutDetail(id: DemoWorkoutLibrary.defaultWorkoutID)
+        let library = WorkoutLibrary(details: [realWorkout], defaults: defaults)
+
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
+
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
+
+        XCTAssertEqual(library.details, [realWorkout])
+    }
+
     func testUnrelatedDefaultsChangeDoesNotReloadDemoData() {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
         let library = WorkoutLibrary(details: [], defaults: defaults)
