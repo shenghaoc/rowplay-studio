@@ -51,7 +51,7 @@ final class WorkoutLibrary: ObservableObject {
 
     /// Creates a library populated with demo data if the persisted preference allows it.
     static func demo() -> WorkoutLibrary {
-        let demoEnabled = UserDefaults.standard.object(forKey: "demoModeEnabled") as? Bool ?? true
+        let demoEnabled = UserDefaults.standard.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
         return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [])
     }
 
@@ -131,7 +131,7 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     @objc private func handleDemoModeChanged() {
-        let demoEnabled = UserDefaults.standard.object(forKey: "demoModeEnabled") as? Bool ?? true
+        let demoEnabled = UserDefaults.standard.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
         if demoEnabled && details.isEmpty {
             details = DemoWorkoutLibrary.details
             query = WorkoutQuery.defaultQuery

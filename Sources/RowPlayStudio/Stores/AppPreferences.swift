@@ -1,7 +1,6 @@
 import Combine
 import Foundation
 import RowPlayCore
-import SwiftUI
 
 /// Shared application preferences backed by UserDefaults.
 ///

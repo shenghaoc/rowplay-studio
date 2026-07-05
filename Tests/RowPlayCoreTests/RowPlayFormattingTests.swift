@@ -138,17 +138,17 @@ final class RowPlayFormattingTests: XCTestCase {
 
     // MARK: - DistanceUnit
 
-    func testDistanceUnitFromMetric() {
-        XCTAssertEqual(DistanceUnit.from("metric"), .metric)
+    func testDistanceUnitRawValueMetric() {
+        XCTAssertEqual(DistanceUnit(rawValue: "metric"), .metric)
     }
 
-    func testDistanceUnitFromImperial() {
-        XCTAssertEqual(DistanceUnit.from("imperial"), .imperial)
+    func testDistanceUnitRawValueImperial() {
+        XCTAssertEqual(DistanceUnit(rawValue: "imperial"), .imperial)
     }
 
-    func testDistanceUnitFromUnknownDefaultsMetric() {
-        XCTAssertEqual(DistanceUnit.from("unknown"), .metric)
-        XCTAssertEqual(DistanceUnit.from(""), .metric)
+    func testDistanceUnitRawValueUnknownReturnsNil() {
+        XCTAssertNil(DistanceUnit(rawValue: "unknown"))
+        XCTAssertNil(DistanceUnit(rawValue: ""))
     }
 
     // MARK: - paceToWatts()
