@@ -106,6 +106,23 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertEqual(result, "'@SUM(A1)")
     }
 
+    func testCsvCellProtectsLeadingWhitespaceBypass() {
+        let result = WorkoutExport.csvCell(" =cmd")
+        XCTAssertEqual(result, "' =cmd")
+    }
+
+    func testCsvCellProtectsLineFeedPrefix() {
+        let result = WorkoutExport.csvCell("\n=HYPERLINK(\"http://evil.com\")")
+        // LF triggers both formula prefix ('), and RFC 4180 quoting (wraps in "")
+        XCTAssertEqual(result, "\"'\n=HYPERLINK(\"\"http://evil.com\"\")\"")
+    }
+
+    func testCsvCellProtectsCarriageReturnPrefix() {
+        let result = WorkoutExport.csvCell("\r=cmd")
+        // CR triggers both formula prefix ('), and RFC 4180 quoting (wraps in "")
+        XCTAssertEqual(result, "\"'\r=cmd\"")
+    }
+
     func testCsvCellNil() {
         XCTAssertEqual(WorkoutExport.csvCell(nil as String?), "")
     }

@@ -96,7 +96,7 @@ public enum WorkoutExport {
         // Formula injection protection: strip leading whitespace that might bypass checks,
         // then prefix formula-triggering characters with a single quote (OWASP recommendation).
         let trimmed = s.trimmingCharacters(in: .whitespaces)
-        let formulaChars: [Character] = ["=", "+", "-", "@", "\t", "\r"]
+        let formulaChars: [Character] = ["=", "+", "-", "@", "\t", "\r", "\n"]
         if let first = trimmed.first, formulaChars.contains(first) {
             s = "'" + s
         }
