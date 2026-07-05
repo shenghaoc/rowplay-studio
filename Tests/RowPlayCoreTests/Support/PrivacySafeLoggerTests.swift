@@ -66,6 +66,18 @@ final class PrivacySafeLoggerTests: XCTestCase {
         XCTAssertEqual(result, #"{"client_secret": "[REDACTED]"}"#)
     }
 
+    func testRedactsIdTokenJsonValue() {
+        let input = #"{"id_token": "eyJhbGciOiJSUzI1NiJ9"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"id_token": "[REDACTED]"}"#)
+    }
+
+    func testRedactsPasswordJsonValue() {
+        let input = #"{"password": "hunter2"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"password": "[REDACTED]"}"#)
+    }
+
     // MARK: - redact() — large JSON blobs
 
     func testRedactsLargeJsonBlob() {
@@ -133,6 +145,20 @@ final class PrivacySafeLoggerTests: XCTestCase {
         let result = redact(input)
         XCTAssertTrue(result.contains("[REDACTED]"))
         XCTAssertFalse(result.contains("secret-value-xyz"))
+    }
+
+    func testRedactsIdTokenQueryParameter() {
+        let input = "id_token=eyJhbGciOiJSUzI1NiJ9.payload"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("eyJhbGciOiJSUzI1NiJ9.payload"))
+    }
+
+    func testRedactsPasswordQueryParameter() {
+        let input = "password=hunter2"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("hunter2"))
     }
 
     // MARK: - redact() — idempotency
