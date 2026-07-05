@@ -63,12 +63,27 @@ public enum WorkoutExport {
 
     // MARK: - Filenames
 
-    /// Generate a stable export filename.
-    public static func exportFilename(ext: String) -> String {
+    // MARK: - Formatters (Performance Optimization)
+    // Instantiating DateFormatter is expensive. Reusing static formatters
+    // significantly speeds up formatting loops during batch exports.
+    private static let filenameDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = TimeZone(identifier: "UTC")
-        let dateKey = formatter.string(from: Date())
+        return formatter
+    }()
+
+    private static let logbookDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    /// Generate a stable export filename.
+    public static func exportFilename(ext: String) -> String {
+        let dateKey = filenameDateFormatter.string(from: Date())
         return "rowplay-logbook-\(dateKey).\(ext)"
     }
 
@@ -79,11 +94,7 @@ public enum WorkoutExport {
 
     /// Concept2 logbook timestamp string (`YYYY-MM-DD HH:MM:SS`) interpreted in UTC.
     static func logbookDateString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: date)
+        return logbookDateFormatter.string(from: date)
     }
 
     // MARK: - CSV Cell Escaping (RFC 4180 + formula injection protection)
