@@ -22,9 +22,9 @@ private let sensitivePatterns: [RedactionRule] = {
         // Cookie headers
         (#"(Cookie|Set-Cookie):\s*[^\n]+"#, "$1: \(redactedPlaceholder)"),
         // Generic token values in JSON: preserve the key and replace only the value.
-        (#"("(?:token|access_token)"\s*:\s*")[^"]+(")"#, "$1\(redactedPlaceholder)$2"),
+        (#"("(?:token|access_token|refresh_token|id_token|client_secret|password)"\s*:\s*")(?:\\.|[^"\\])*(")"#, "$1\(redactedPlaceholder)$2"),
         // Query/form credential keys: token=..., access_token=...
-        (#"\b(token|access_token)\s*=\s*[^\s&]+"#, "$1=\(redactedPlaceholder)"),
+        (#"\b(token|access_token|refresh_token|id_token|client_secret|password)\s*=\s*[^\s&]+"#, "$1=\(redactedPlaceholder)"),
         // Full workout payloads (JSON object or array > 100 chars, shallow nested)
         (#"\{(?:[^{}]|\{[^{}]*\}){100,}\}"#, redactedPlaceholder),
         (#"\[(?:[^\[\]]|\[[^\[\]]*\]){100,}\]"#, redactedPlaceholder),

@@ -54,6 +54,38 @@ final class PrivacySafeLoggerTests: XCTestCase {
         XCTAssertEqual(result, #"{"access_token": "[REDACTED]"}"#)
     }
 
+    func testRedactsRefreshTokenJsonValue() {
+        let input = #"{"refresh_token": "refresh-12345"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"refresh_token": "[REDACTED]"}"#)
+    }
+
+    func testRedactsClientSecretJsonValue() {
+        let input = #"{"client_secret": "secret-abc"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"client_secret": "[REDACTED]"}"#)
+    }
+
+    func testRedactsIdTokenJsonValue() {
+        let input = #"{"id_token": "eyJhbGciOiJSUzI1NiJ9"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"id_token": "[REDACTED]"}"#)
+    }
+
+    func testRedactsPasswordJsonValue() {
+        let input = #"{"password": "hunter2"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"password": "[REDACTED]"}"#)
+    }
+
+    func testRedactsEscapedJsonSecretValue() {
+        let input = #"{"password": "abc\"def", "safe": "visible"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"password": "[REDACTED]", "safe": "visible"}"#)
+        XCTAssertFalse(result.contains("abc"))
+        XCTAssertFalse(result.contains("def"))
+    }
+
     // MARK: - redact() — large JSON blobs
 
     func testRedactsLargeJsonBlob() {
@@ -107,6 +139,34 @@ final class PrivacySafeLoggerTests: XCTestCase {
         let result = redact(input)
         XCTAssertTrue(result.contains("[REDACTED]"))
         XCTAssertFalse(result.contains("supersecrettokenvalue12345"))
+    }
+
+    func testRedactsRefreshTokenQueryParameter() {
+        let input = "refresh_token=refresh-abc12345"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("refresh-abc12345"))
+    }
+
+    func testRedactsClientSecretQueryParameter() {
+        let input = "client_secret=secret-value-xyz"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("secret-value-xyz"))
+    }
+
+    func testRedactsIdTokenQueryParameter() {
+        let input = "id_token=eyJhbGciOiJSUzI1NiJ9.payload"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("eyJhbGciOiJSUzI1NiJ9.payload"))
+    }
+
+    func testRedactsPasswordQueryParameter() {
+        let input = "password=hunter2"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("hunter2"))
     }
 
     // MARK: - redact() — idempotency
