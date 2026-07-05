@@ -54,6 +54,18 @@ final class PrivacySafeLoggerTests: XCTestCase {
         XCTAssertEqual(result, #"{"access_token": "[REDACTED]"}"#)
     }
 
+    func testRedactsRefreshTokenJsonValue() {
+        let input = #"{"refresh_token": "refresh-12345"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"refresh_token": "[REDACTED]"}"#)
+    }
+
+    func testRedactsClientSecretJsonValue() {
+        let input = #"{"client_secret": "secret-abc"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"client_secret": "[REDACTED]"}"#)
+    }
+
     // MARK: - redact() — large JSON blobs
 
     func testRedactsLargeJsonBlob() {
@@ -107,6 +119,20 @@ final class PrivacySafeLoggerTests: XCTestCase {
         let result = redact(input)
         XCTAssertTrue(result.contains("[REDACTED]"))
         XCTAssertFalse(result.contains("supersecrettokenvalue12345"))
+    }
+
+    func testRedactsRefreshTokenQueryParameter() {
+        let input = "refresh_token=refresh-abc12345"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("refresh-abc12345"))
+    }
+
+    func testRedactsClientSecretQueryParameter() {
+        let input = "client_secret=secret-value-xyz"
+        let result = redact(input)
+        XCTAssertTrue(result.contains("[REDACTED]"))
+        XCTAssertFalse(result.contains("secret-value-xyz"))
     }
 
     // MARK: - redact() — idempotency
