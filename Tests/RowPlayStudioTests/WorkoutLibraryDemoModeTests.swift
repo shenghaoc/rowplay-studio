@@ -77,6 +77,33 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         XCTAssertTrue(library.isEmpty)
     }
 
+    func testDemoModeNotificationPreservesNonDemoWorkoutsWhenDisabled() {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let realWorkout = WorkoutDetail(
+            workout: Workout(
+                id: 99_999,
+                date: Date(),
+                sport: .rower,
+                distance: 2_000,
+                time: 480,
+                pace: 120,
+                workoutType: "Imported",
+                source: "Local",
+                hasStrokeData: false
+            ),
+            strokes: [],
+            splits: []
+        )
+        let library = WorkoutLibrary(
+            details: DemoWorkoutLibrary.details + [realWorkout],
+            defaults: defaults
+        )
+
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+
+        XCTAssertEqual(library.details, [realWorkout])
+    }
+
     func testUnrelatedDefaultsChangeDoesNotReloadDemoData() {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
         let library = WorkoutLibrary(details: [], defaults: defaults)

@@ -18,9 +18,9 @@ struct ReplayView: View {
     }
 
     var body: some View {
-        // When reduce motion is enabled, pause the timeline to stop decorative
-        // animation. Users can still scrub manually via the slider.
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing || reduceMotion)) { timelineContext in
+        // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
+        let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
+        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
             VStack(spacing: 0) {
                 replayCanvas
                     .frame(minHeight: 300)
@@ -42,17 +42,6 @@ struct ReplayView: View {
             }
         }
         .navigationTitle("Replay")
-        .onAppear {
-            // If reduce motion is on at launch, ensure playback is paused.
-            if reduceMotion && state.playing {
-                state.pause()
-            }
-        }
-        .onChange(of: reduceMotion) { _, isReduced in
-            if isReduced && state.playing {
-                state.pause()
-            }
-        }
         .onDisappear {
             state.pause()
         }

@@ -37,12 +37,12 @@ public enum RowPlayFormatting {
         }
         switch unit {
         case .metric:
-            if metres >= 1_000 {
+            if abs(metres) >= 1_000 {
                 return "\(String(format: "%.2f", metres / 1_000)) km"
             }
             return "\(Int(metres.rounded())) m"
         case .imperial:
-            if metres >= feetThreshold {
+            if abs(metres) >= feetThreshold {
                 let miles = metres / 1_609.344
                 return "\(String(format: "%.2f", miles)) mi"
             }
@@ -68,4 +68,3 @@ public enum RowPlayFormatting {
         workout.sport == .bike ? workout.distance / 2 : workout.distance
     }
 }
-

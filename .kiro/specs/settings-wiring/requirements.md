@@ -31,7 +31,7 @@ A single `AppPreferences` `ObservableObject` must expose all three persisted set
 
 ### R3: Reduce Motion Preference
 
-- When `reduceReplayMotion` is `true`, the replay view should disable decorative animation (e.g., the `TimelineView` animation loop).
+- When `reduceReplayMotion` is `true`, the replay view should reduce decorative animation intensity while keeping playback controls functional.
 - When `false`, animation runs normally.
 - If the replay surface does not yet support meaningful reduced-motion behavior, the preference must still be exposed through app state with a clear note.
 

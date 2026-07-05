@@ -73,6 +73,10 @@ final class RowPlayFormattingTests: XCTestCase {
         XCTAssertEqual(RowPlayFormatting.distance(5000), "5.00 km")
     }
 
+    func testDistanceNegativeKilometresUsesAbsoluteThreshold() {
+        XCTAssertEqual(RowPlayFormatting.distance(-1_500), "-1.50 km")
+    }
+
     func testDistanceExactlyOneKm() {
         XCTAssertEqual(RowPlayFormatting.distance(1000), "1.00 km")
     }
@@ -99,6 +103,10 @@ final class RowPlayFormattingTests: XCTestCase {
     func testDistanceImperialMiles() {
         // 1609.344 m = 1 mile
         XCTAssertEqual(RowPlayFormatting.distance(1_609.344, unit: .imperial), "1.00 mi")
+    }
+
+    func testDistanceImperialNegativeMilesUsesAbsoluteThreshold() {
+        XCTAssertEqual(RowPlayFormatting.distance(-500, unit: .imperial), "-0.31 mi")
     }
 
     func testDistanceImperialThreshold() {

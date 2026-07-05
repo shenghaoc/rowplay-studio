@@ -136,6 +136,16 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     @objc private func handleDemoModeChanged() {
+        if Thread.isMainThread {
+            updateDemoModeState()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateDemoModeState()
+            }
+        }
+    }
+
+    private func updateDemoModeState() {
         let demoEnabled = Self.persistedDemoModeEnabled(in: defaults)
         guard demoEnabled != demoModeEnabled else { return }
         demoModeEnabled = demoEnabled
@@ -144,8 +154,12 @@ final class WorkoutLibrary: ObservableObject {
             details = DemoWorkoutLibrary.details
             query = WorkoutQuery.defaultQuery
         } else if !demoEnabled && !details.isEmpty {
-            details = []
-            query = WorkoutQuery.defaultQuery
+            let demoIDs = Set(DemoWorkoutLibrary.details.map(\.id))
+            let previousCount = details.count
+            details.removeAll(where: { demoIDs.contains($0.id) })
+            if details.count != previousCount {
+                query = WorkoutQuery.defaultQuery
+            }
         }
     }
 

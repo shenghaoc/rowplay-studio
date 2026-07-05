@@ -36,10 +36,21 @@ final class AppPreferences: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                self.demoModeEnabled = self.defaults.object(forKey: Self.demoModeEnabledKey) as? Bool ?? true
-                self.reduceReplayMotion = self.defaults.object(forKey: Self.reduceReplayMotionKey) as? Bool ?? false
+                let newDemoMode = self.defaults.object(forKey: Self.demoModeEnabledKey) as? Bool ?? true
+                if self.demoModeEnabled != newDemoMode {
+                    self.demoModeEnabled = newDemoMode
+                }
+
+                let newReduceMotion = self.defaults.object(forKey: Self.reduceReplayMotionKey) as? Bool ?? false
+                if self.reduceReplayMotion != newReduceMotion {
+                    self.reduceReplayMotion = newReduceMotion
+                }
+
                 let unitString = self.defaults.string(forKey: Self.preferredDistanceUnitKey) ?? ""
-                self.distanceUnit = DistanceUnit(rawValue: unitString) ?? .metric
+                let newDistanceUnit = DistanceUnit(rawValue: unitString) ?? .metric
+                if self.distanceUnit != newDistanceUnit {
+                    self.distanceUnit = newDistanceUnit
+                }
             }
 
         // Persist changes made through @Published bindings.
