@@ -18,7 +18,7 @@ This PR adds a local SQLite workout cache foundation. It does **not** implement:
 
 ### R1: SQLiteWorkoutCache conforms to WorkoutCache protocol
 
-The new `SQLiteWorkoutCache` must conform to the existing `WorkoutCache` protocol in `RowPlayCore/Sync/WorkoutCache.swift`. All protocol methods must be implemented.
+The new `SQLiteWorkoutCache` must conform to the existing async `WorkoutCache` protocol in `RowPlayCore/Sync/WorkoutCache.swift`. The cache surface supports `migrate()`, `save(detail:)`, `save(details:)`, `listWorkouts()`, `detail(id:)`, `delete(id:)`, and `deleteAll()`. Legacy Phase 4 aliases remain available for existing call sites.
 
 ### R2: SQLite v1 schema stores WorkoutDetail JSON
 
@@ -46,7 +46,7 @@ The cache does not auto-migrate on open. Callers must explicitly call `migrate()
 
 ### R8: delete(id:) removes a single workout
 
-The cache supports deleting a single workout by ID. After deletion, `loadWorkout(id:)` returns nil for that ID and other workouts remain unaffected.
+The cache supports deleting a single workout by ID. After deletion, `detail(id:)` returns nil for that ID and other workouts remain unaffected.
 
 ### R9: Tests cover all required behaviors
 

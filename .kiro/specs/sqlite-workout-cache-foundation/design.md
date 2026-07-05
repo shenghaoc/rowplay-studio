@@ -12,14 +12,19 @@ Sources/RowPlayCore/Storage/SQLiteWorkoutCacheMigration.swift  # New migration l
 Tests/RowPlayCoreTests/Storage/SQLiteWorkoutCacheTests.swift  # New tests
 ```
 
-### Protocol Extension
+### Protocol Shape
 
-The existing `WorkoutCache` protocol gets two new methods:
+The existing async `WorkoutCache` protocol is extended to support the storage-foundation surface from the implementation prompt:
 
+- `migrate() throws` — ensure the backing store is ready
+- `save(detail: WorkoutDetail) async throws` — save one full detail
+- `save(details: [WorkoutDetail]) async throws` — save many full details
+- `listWorkouts() async throws -> [Workout]` — list summaries newest first
+- `detail(id: Workout.ID) async throws -> WorkoutDetail?` — load one full detail
 - `delete(id: Workout.ID) async throws` — delete a single workout
-- `listWorkouts() async throws -> [Workout]` — alias for loadAllWorkouts()
+- `deleteAll() async throws` — clear all cached rows
 
-`InMemoryWorkoutCache` gains implementations for both.
+Legacy Phase 4 method names (`saveDetail`, `saveWorkouts`, `loadAllWorkouts`, `loadWorkout`) remain available as compatibility wrappers for existing call sites.
 
 ### SQLite Schema (v1)
 

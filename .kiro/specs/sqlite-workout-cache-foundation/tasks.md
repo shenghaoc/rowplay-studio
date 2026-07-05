@@ -2,7 +2,8 @@
 
 ## T1: Extend WorkoutCache protocol
 
-- Add `delete(id:)` and `listWorkouts()` to `WorkoutCache` protocol.
+- Add `migrate()`, `save(detail:)`, `save(details:)`, `listWorkouts()`, `detail(id:)`, `delete(id:)`, and `deleteAll()` support to the async `WorkoutCache` protocol surface.
+- Preserve legacy Phase 4 aliases for existing callers.
 - Add implementations to `InMemoryWorkoutCache`.
 - Existing tests continue to pass.
 

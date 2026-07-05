@@ -47,9 +47,9 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         try cache.migrate()
 
         let detail = DemoWorkoutLibrary.details.first!
-        try await cache.saveDetail(detail)
+        try await cache.save(detail: detail)
 
-        let loaded = try await cache.loadWorkout(id: detail.workout.id)
+        let loaded = try await cache.detail(id: detail.workout.id)
 
         XCTAssertNotNil(loaded)
         guard let loaded else { return XCTFail("loaded is nil") }
@@ -66,9 +66,7 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         try cache.migrate()
 
         let details = DemoWorkoutLibrary.details
-        for detail in details {
-            try await cache.saveDetail(detail)
-        }
+        try await cache.save(details: details)
 
         let workouts = try await cache.listWorkouts()
 
@@ -104,15 +102,15 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         let first = details[0]
         let second = details[1]
 
-        try await cache.saveDetail(first)
-        try await cache.saveDetail(second)
+        try await cache.save(detail: first)
+        try await cache.save(detail: second)
 
         try await cache.delete(id: first.workout.id)
 
-        let loadedFirst = try await cache.loadWorkout(id: first.workout.id)
+        let loadedFirst = try await cache.detail(id: first.workout.id)
         XCTAssertNil(loadedFirst)
 
-        let loadedSecond = try await cache.loadWorkout(id: second.workout.id)
+        let loadedSecond = try await cache.detail(id: second.workout.id)
         XCTAssertNotNil(loadedSecond)
         XCTAssertEqual(loadedSecond?.workout.id, second.workout.id)
     }
@@ -120,9 +118,7 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
     func testDeleteAllClearsRows() async throws {
         try cache.migrate()
 
-        for detail in DemoWorkoutLibrary.details {
-            try await cache.saveDetail(detail)
-        }
+        try await cache.save(details: DemoWorkoutLibrary.details)
 
         try await cache.deleteAll()
 
@@ -135,7 +131,7 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
     func testMissingDetailReturnsNil() async throws {
         try cache.migrate()
 
-        let loaded = try await cache.loadWorkout(id: 999_999)
+        let loaded = try await cache.detail(id: 999_999)
         XCTAssertNil(loaded)
     }
 
@@ -145,14 +141,14 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         try cache.migrate()
 
         let detail = DemoWorkoutLibrary.details.first!
-        try await cache.saveDetail(detail)
+        try await cache.save(detail: detail)
 
         // Create a new instance pointing at the same database file.
         cache = nil
         let cache2 = try SQLiteWorkoutCache(path: dbPath)
         try cache2.migrate()
 
-        let loaded = try await cache2.loadWorkout(id: detail.workout.id)
+        let loaded = try await cache2.detail(id: detail.workout.id)
         XCTAssertNotNil(loaded)
         XCTAssertEqual(loaded?.workout.id, detail.workout.id)
         XCTAssertEqual(loaded?.strokes.count, detail.strokes.count)

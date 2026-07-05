@@ -67,6 +67,65 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
     // MARK: - WorkoutCache
 
+    public func save(details: [WorkoutDetail]) async throws {
+        try queue.sync {
+            guard !details.isEmpty else { return }
+
+            try execute(sql: "BEGIN TRANSACTION;", context: "begin transaction save details")
+            var transactionIsOpen = true
+            defer {
+                if transactionIsOpen {
+                    sqlite3_exec(db, "ROLLBACK TRANSACTION;", nil, nil, nil)
+                }
+            }
+
+            let sql = """
+                INSERT OR REPLACE INTO workouts (id, sport, date, workout_type, distance, time, pace, detail_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw WorkoutCacheError.queryFailed("prepare save details: \(errmsg)")
+            }
+
+            let now = Date().timeIntervalSince1970
+
+            for detail in details {
+                let data: Data
+                do {
+                    data = try encoder.encode(detail)
+                } catch {
+                    throw WorkoutCacheError.encodingFailed("Failed to encode detail \(detail.workout.id)")
+                }
+                guard let json = String(data: data, encoding: .utf8) else {
+                    throw WorkoutCacheError.encodingFailed("UTF-8 conversion failed for detail \(detail.workout.id)")
+                }
+
+                let w = detail.workout
+                sqlite3_reset(stmt)
+                sqlite3_clear_bindings(stmt)
+                sqlite3_bind_int64(stmt, 1, sqlite3_int64(w.id))
+                sqlite3_bind_text(stmt, 2, w.sport.rawValue, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(stmt, 3, w.date.timeIntervalSince1970)
+                sqlite3_bind_text(stmt, 4, w.workoutType, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(stmt, 5, w.distance)
+                sqlite3_bind_double(stmt, 6, w.time)
+                sqlite3_bind_double(stmt, 7, w.pace)
+                sqlite3_bind_text(stmt, 8, json, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(stmt, 9, now)
+
+                guard sqlite3_step(stmt) == SQLITE_DONE else {
+                    throw WorkoutCacheError.queryFailed("insert save details: \(errmsg)")
+                }
+            }
+
+            try execute(sql: "COMMIT TRANSACTION;", context: "commit transaction save details")
+            transactionIsOpen = false
+        }
+    }
+
     public func saveWorkouts(_ workouts: [Workout]) async throws {
         try queue.sync {
             guard !workouts.isEmpty else { return }
@@ -126,7 +185,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         }
     }
 
-    public func saveDetail(_ detail: WorkoutDetail) async throws {
+    public func save(detail: WorkoutDetail) async throws {
         try queue.sync {
             let sql = """
                 INSERT OR REPLACE INTO workouts (id, sport, date, workout_type, distance, time, pace, detail_json, updated_at)
@@ -194,7 +253,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         }
     }
 
-    public func loadWorkout(id: Int) async throws -> WorkoutDetail? {
+    public func detail(id: Workout.ID) async throws -> WorkoutDetail? {
         try queue.sync {
             let sql = "SELECT detail_json FROM workouts WHERE id = ?;"
             var stmt: OpaquePointer?

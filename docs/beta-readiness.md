@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while production sync, persistent storage, and real hardware transport remain beta blockers below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while production sync, persistent annotation storage, and real hardware transport remain beta blockers below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
 
 ### What Is Implemented
 
@@ -35,7 +35,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ### Must-Fix
 
-1. **No production Concept2 sync**: `Concept2APIClient` and `WorkoutCache` are protocol-only with mock implementations. A real URLSession client and SQLite cache are needed for actual sync.
+1. **No production Concept2 sync**: `Concept2APIClient` remains mock-only, and no URLSession client or app sync workflow writes remote Concept2 data into the local cache. `WorkoutCache` now has a SQLite foundation that stores `WorkoutDetail` JSON in a v1 schema, but sync integration is still future work.
 2. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
 3. **No persistent annotation storage**: `InMemoryAnnotationStore` loses data on restart. SQLite or Core Data backing is needed for annotations. (Workout cache now has a SQLite foundation via `SQLiteWorkoutCache`.)
 
@@ -49,11 +49,11 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 ## Must Not Ship Yet
 
 - **Real Bluetooth/CoreBluetooth**: No entitlements, no permission strings, no background sessions. The mock boundary is correct for this stage.
-- **Production Concept2 sync**: The URLSession client and SQLite cache are follow-up work. Do not wire mock clients into a user-facing sync flow.
+- **Production Concept2 sync**: The URLSession client and app sync workflow are follow-up work. Do not wire mock clients into a user-facing sync flow.
 - **Public sharing**: Share packages must not generate public URLs or leak hardware-identifying metadata until a companion service exists with proper privacy review.
 - **OAuth flow**: BYOT only. OAuth requires a registered Concept2 app and security review.
 
 ## Recommended Next PRs
 
 1. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
-3. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
+2. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
