@@ -78,6 +78,14 @@ final class PrivacySafeLoggerTests: XCTestCase {
         XCTAssertEqual(result, #"{"password": "[REDACTED]"}"#)
     }
 
+    func testRedactsEscapedJsonSecretValue() {
+        let input = #"{"password": "abc\"def", "safe": "visible"}"#
+        let result = redact(input)
+        XCTAssertEqual(result, #"{"password": "[REDACTED]", "safe": "visible"}"#)
+        XCTAssertFalse(result.contains("abc"))
+        XCTAssertFalse(result.contains("def"))
+    }
+
     // MARK: - redact() — large JSON blobs
 
     func testRedactsLargeJsonBlob() {
