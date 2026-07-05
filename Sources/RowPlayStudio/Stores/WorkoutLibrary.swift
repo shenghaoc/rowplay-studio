@@ -32,15 +32,20 @@ final class WorkoutLibrary: ObservableObject {
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
+    private let defaults: UserDefaults
+    private var demoModeEnabled: Bool
 
     init(
         details: [WorkoutDetail],
         query: WorkoutListQuery = WorkoutQuery.defaultQuery,
-        annotationStore: any AnnotationStore = InMemoryAnnotationStore()
+        annotationStore: any AnnotationStore = InMemoryAnnotationStore(),
+        defaults: UserDefaults = .standard
     ) {
         self.details = details
         self.query = query
         self.annotationStore = annotationStore
+        self.defaults = defaults
+        demoModeEnabled = Self.persistedDemoModeEnabled(in: defaults)
         updateAllDerivedData()
         observeDemoModeChanges()
     }
@@ -50,9 +55,9 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     /// Creates a library populated with demo data if the persisted preference allows it.
-    static func demo() -> WorkoutLibrary {
-        let demoEnabled = UserDefaults.standard.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
-        return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [])
+    static func demo(defaults: UserDefaults = .standard) -> WorkoutLibrary {
+        let demoEnabled = persistedDemoModeEnabled(in: defaults)
+        return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [], defaults: defaults)
     }
 
     private(set) var availableWorkoutTypes: [String] = []
@@ -126,12 +131,15 @@ final class WorkoutLibrary: ObservableObject {
             self,
             selector: #selector(handleDemoModeChanged),
             name: UserDefaults.didChangeNotification,
-            object: nil
+            object: defaults
         )
     }
 
     @objc private func handleDemoModeChanged() {
-        let demoEnabled = UserDefaults.standard.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
+        let demoEnabled = Self.persistedDemoModeEnabled(in: defaults)
+        guard demoEnabled != demoModeEnabled else { return }
+        demoModeEnabled = demoEnabled
+
         if demoEnabled && details.isEmpty {
             details = DemoWorkoutLibrary.details
             query = WorkoutQuery.defaultQuery
@@ -139,6 +147,10 @@ final class WorkoutLibrary: ObservableObject {
             details = []
             query = WorkoutQuery.defaultQuery
         }
+    }
+
+    private static func persistedDemoModeEnabled(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool ?? true
     }
 
     // MARK: - Live Mode

@@ -22,7 +22,7 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
     }
 
     func testClearDataRemovesDemoWorkoutsAndResetsQuery() {
-        let library = WorkoutLibrary.demo()
+        let library = WorkoutLibrary.demo(defaults: defaults)
         library.query.searchText = "row"
 
         library.clearData()
@@ -45,20 +45,43 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
     }
 
     func testDemoLibraryLoadsWhenDemoModeEnabled() {
-        // Ensure demo mode is on
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
-        let library = WorkoutLibrary(details: DemoWorkoutLibrary.details)
+        let library = WorkoutLibrary.demo(defaults: defaults)
 
         XCTAssertFalse(library.isEmpty)
     }
 
     func testDemoLibraryStartsEmptyWhenDemoModeDisabled() {
         defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
-        // WorkoutLibrary.demo() reads UserDefaults.standard, not our test defaults,
-        // so test the clearData path instead.
-        let library = WorkoutLibrary(details: DemoWorkoutLibrary.details)
+        let library = WorkoutLibrary.demo(defaults: defaults)
 
-        library.clearData()
+        XCTAssertTrue(library.isEmpty)
+    }
+
+    func testDemoModeNotificationReloadsDemoDataWhenEnabled() {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        let library = WorkoutLibrary.demo(defaults: defaults)
+
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+
+        XCTAssertFalse(library.isEmpty)
+        XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
+    }
+
+    func testDemoModeNotificationClearsDemoDataWhenDisabled() {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let library = WorkoutLibrary.demo(defaults: defaults)
+
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+
+        XCTAssertTrue(library.isEmpty)
+    }
+
+    func testUnrelatedDefaultsChangeDoesNotReloadDemoData() {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        defaults.set("imperial", forKey: AppPreferences.preferredDistanceUnitKey)
 
         XCTAssertTrue(library.isEmpty)
     }
