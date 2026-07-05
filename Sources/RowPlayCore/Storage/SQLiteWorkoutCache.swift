@@ -555,11 +555,8 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
             throw WorkoutCacheError.decodingFailed("NULL \(context)")
         }
         let length = sqlite3_column_bytes(stmt, column)
-        let data = Data(bytes: bytes, count: Int(length))
-        guard let value = String(data: data, encoding: .utf8) else {
-            throw WorkoutCacheError.decodingFailed("UTF-8 conversion failed for \(context)")
-        }
-        return value
+        let buffer = UnsafeBufferPointer(start: bytes, count: Int(length))
+        return String(decoding: buffer, as: UTF8.self)
     }
 
     private func optionalStringColumn(_ stmt: OpaquePointer?, _ column: Int32) throws -> String? {
