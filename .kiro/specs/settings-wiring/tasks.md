@@ -10,5 +10,6 @@
 - [x] 8. Wire `preferredDistanceUnit` through `WorkoutDetailView`, `ReplayView`, `LiveModePanelView`
 - [x] 9. Wire `reduceReplayMotion` in `ReplayView`
 - [x] 10. Wire `demoModeEnabled` in `ContentView` and `RowPlayStudioApp`
-- [x] 11. Update `docs/beta-readiness.md` and `docs/source-map.md`
-- [x] 12. Validate: `swift test`, `swift build`, `git diff --check`
+- [x] 11. Add app-target tests for shared preferences and demo library clear/reload behavior
+- [x] 12. Update `docs/beta-readiness.md` and `docs/source-map.md`
+- [x] 13. Validate: `swift test`, `swift build`, `git diff --check`

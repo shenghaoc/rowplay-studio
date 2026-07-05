@@ -6,7 +6,7 @@ PR #15 (audit) identified that `SettingsView` exposes three controls (`demoModeE
 
 ## Existing Settings
 
-The following settings already exist in `SettingsView` with `@AppStorage` bindings:
+PR #15 found these settings in `SettingsView` with `@AppStorage` bindings:
 
 | Key | Type | Default | Current state |
 |---|---|---|---|
@@ -20,7 +20,7 @@ No new settings are added in this PR.
 
 ### R1: Shared Preferences Model
 
-A single `AppPreferences` `ObservableObject` must expose all three persisted settings. All views that read these settings must use the shared model, not independent local `@AppStorage` instances.
+A single `AppPreferences` `ObservableObject` must expose all three persisted settings using the existing persisted keys. All views that read these settings must use the shared model, not independent local `@AppStorage` instances.
 
 ### R2: Distance Unit Preference
 

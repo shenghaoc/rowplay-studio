@@ -4,18 +4,24 @@
 
 ### AppPreferences Store
 
-Create `Sources/RowPlayStudio/Stores/AppPreferences.swift`:
+Create `Sources/RowPlayStudio/Stores/AppPreferences.swift` as the single published settings model:
 
 ```swift
 @MainActor
 final class AppPreferences: ObservableObject {
-    @AppStorage("demoModeEnabled") var demoModeEnabled = true
-    @AppStorage("reduceReplayMotion") var reduceReplayMotion = false
-    @AppStorage("preferredDistanceUnit") var preferredDistanceUnit = "metric"
+    @Published var demoModeEnabled: Bool
+    @Published var reduceReplayMotion: Bool
+    @Published var preferredDistanceUnit: String
 }
 ```
 
-Injected via `@EnvironmentObject` from `RowPlayStudioApp`. All views read from this single instance.
+The model reads and writes the existing `UserDefaults` keys:
+
+- `demoModeEnabled`
+- `reduceReplayMotion`
+- `preferredDistanceUnit`
+
+Injected via `@EnvironmentObject` from `RowPlayStudioApp`. All views read from this single instance so settings changes publish through `objectWillChange`.
 
 ### Distance Formatting
 
@@ -38,7 +44,7 @@ Pace remains `/500m` always (no change).
 | File | Change |
 |---|---|
 | `RowPlayStudioApp.swift` | Create `@StateObject` preferences, inject via `.environmentObject`, wire demo mode toggle |
-| `SettingsView.swift` | Replace local `@AppStorage` with `@EnvironmentObject` |
+| `SettingsView.swift` | Replace local settings storage with `@EnvironmentObject` |
 | `ContentView.swift` | Add `@EnvironmentObject`, empty state when demo off |
 | `SidebarView.swift` | Read distance unit from environment, format with `distance(_:unit:)` |
 | `DashboardView.swift` | Read distance unit from environment, format with `distance(_:unit:)` |
@@ -63,7 +69,7 @@ In `ReplayView`, when `reduceReplayMotion` is `true`:
 
 ## Non-Goals
 
-- No new `@AppStorage` keys
+- No new persisted setting keys
 - No new settings controls
 - No Concept2 sync, SQLite, or CoreBluetooth
 - No replay renderer rewrite
