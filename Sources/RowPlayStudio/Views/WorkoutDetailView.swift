@@ -8,7 +8,10 @@ struct WorkoutDetailView: View {
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
     var onUpdateDetail: (WorkoutDetail) -> Void
+    @EnvironmentObject private var preferences: AppPreferences
     @State private var showingReplay = false
+
+    private var unit: DistanceUnit { preferences.distanceUnit }
 
     var body: some View {
         ScrollView {
@@ -68,7 +71,7 @@ struct WorkoutDetailView: View {
 
     private var metricStrip: some View {
         HStack(spacing: 12) {
-            MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance), systemImage: "ruler")
+            MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance, unit: unit), systemImage: "ruler")
             MetricTile(title: "Time", value: RowPlayFormatting.time(detail.workout.time, tenths: true), systemImage: "timer")
             MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer")
             MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome")
@@ -136,7 +139,7 @@ struct WorkoutDetailView: View {
                 ForEach(detail.splits) { split in
                     GridRow {
                         Text("\(split.index)")
-                        Text(RowPlayFormatting.distance(split.distance))
+                        Text(RowPlayFormatting.distance(split.distance, unit: unit))
                         Text(RowPlayFormatting.time(split.time, tenths: true))
                         Text(RowPlayFormatting.pace(split.pace))
                         Text(split.cadence.map { String(Int($0.rounded())) } ?? "-")

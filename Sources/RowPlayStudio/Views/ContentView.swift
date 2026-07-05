@@ -5,6 +5,7 @@ struct ContentView: View {
     private static let dashboardSelectionID = -1
 
     @ObservedObject var library: WorkoutLibrary
+    @EnvironmentObject private var preferences: AppPreferences
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
 
     var body: some View {
@@ -15,7 +16,9 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+            if library.isEmpty && !preferences.demoModeEnabled {
+                emptyState
+            } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
                 WorkoutDetailView(
                     detail: detail,
                     summary: library.summary,
@@ -45,12 +48,22 @@ struct ContentView: View {
                 .frame(width: 280)
 
                 Button {
+                    guard preferences.demoModeEnabled else { return }
                     library.reloadDemoData()
                     storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
                 } label: {
                     Label("Reload Demo Library", systemImage: "arrow.clockwise")
                 }
+                .disabled(!preferences.demoModeEnabled)
             }
+        }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Workouts", systemImage: "figure.rower")
+        } description: {
+            Text("Enable Demo Mode in Settings to explore sample workouts, or add real workout data.")
         }
     }
 

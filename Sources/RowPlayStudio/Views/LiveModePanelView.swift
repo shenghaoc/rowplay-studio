@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LiveModePanelView: View {
     @ObservedObject var library: WorkoutLibrary
+    @EnvironmentObject private var preferences: AppPreferences
     private let demoTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -72,7 +73,7 @@ struct LiveModePanelView: View {
                 }
 
                 HStack(spacing: 16) {
-                    sampleMetric("Distance", RowPlayFormatting.distance(sample.distance))
+                    sampleMetric("Distance", RowPlayFormatting.distance(sample.distance, unit: preferences.distanceUnit))
                     sampleMetric("Time", RowPlayFormatting.time(sample.time, tenths: true))
                     sampleMetric("Pace", RowPlayFormatting.pace(sample.pace))
                     sampleMetric("Rate", "\(Int(sample.strokeRate.rounded())) \(sample.sport.cadenceUnit)")

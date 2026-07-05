@@ -5,8 +5,12 @@ import SwiftUI
 struct ReplayView: View {
     let detail: WorkoutDetail
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var preferences: AppPreferences
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
+
+    private var unit: DistanceUnit { preferences.distanceUnit }
+    private var reduceMotion: Bool { preferences.reduceReplayMotion }
 
     init(detail: WorkoutDetail) {
         self.detail = detail
@@ -14,7 +18,9 @@ struct ReplayView: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing)) { timelineContext in
+        // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
+        let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
+        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
             VStack(spacing: 0) {
                 replayCanvas
                     .frame(minHeight: 300)
@@ -108,7 +114,7 @@ struct ReplayView: View {
     private var telemetryBar: some View {
         HStack(spacing: 16) {
             TelemetryItem(label: "Time", value: RowPlayFormatting.time(state.currentFrame.t, tenths: true))
-            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d))
+            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d, unit: unit))
             TelemetryItem(label: "Pace", value: RowPlayFormatting.pace(state.currentFrame.pace))
             TelemetryItem(label: detail.workout.sport.cadenceUnit, value: cadenceText)
             TelemetryItem(label: "Watts", value: "\(state.currentFrame.watts)")

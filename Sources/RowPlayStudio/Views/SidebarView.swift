@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @ObservedObject var library: WorkoutLibrary
+    @EnvironmentObject private var preferences: AppPreferences
     @Binding var selectedWorkoutID: Int?
 
     var body: some View {
@@ -12,7 +13,8 @@ struct SidebarView: View {
                 ForEach(filteredDetails) { detail in
                     WorkoutSidebarRow(
                         workout: detail.workout,
-                        isPB: library.pbIds.contains(detail.workout.id)
+                        isPB: library.pbIds.contains(detail.workout.id),
+                        distanceUnit: preferences.distanceUnit
                     )
                     .tag(detail.id)
                 }
@@ -85,6 +87,7 @@ struct SidebarView: View {
 private struct WorkoutSidebarRow: View {
     var workout: Workout
     var isPB: Bool
+    var distanceUnit: DistanceUnit
 
     var body: some View {
         Label {
@@ -109,7 +112,7 @@ private struct WorkoutSidebarRow: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
-                    Text(RowPlayFormatting.distance(workout.distance))
+                    Text(RowPlayFormatting.distance(workout.distance, unit: distanceUnit))
                         .font(.caption)
                     Text("·")
                         .font(.caption)

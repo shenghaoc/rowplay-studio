@@ -21,7 +21,10 @@ let package = Package(
             name: "RowPlayCoreTests",
             dependencies: ["RowPlayCore"],
             resources: [.copy("Fixtures/performance-predictor-parity.json")]
+        ),
+        .testTarget(
+            name: "RowPlayStudioTests",
+            dependencies: ["RowPlayStudio", "RowPlayCore"]
         )
     ]
 )
-

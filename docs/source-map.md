@@ -5,7 +5,7 @@ This file records the first mapping from the existing rowplay web repository to 
 | Web Source | Native Target | Notes |
 | --- | --- | --- |
 | `src/lib/types.ts` | `Sources/RowPlayCore/Models` | Core Concept2 domain models are being ported as Swift value types. |
-| `src/lib/format.ts` | `Sources/RowPlayCore/Support/RowPlayFormatting.swift` | Phase 0 ports time, pace, distance, challenge distance, and sport-specific watts. |
+| `src/lib/format.ts` | `Sources/RowPlayCore/Support/RowPlayFormatting.swift` | Phase 0 ports time, pace, distance, challenge distance, and sport-specific watts; settings-wiring PR adds `DistanceUnit` and imperial formatting. |
 | `src/lib/paceInput.ts` | `Sources/RowPlayCore/Support/PaceInput.swift` | Phase 1 ports pace string parsing and formatting. |
 | `src/lib/datetime.ts` | `Sources/RowPlayCore/Support/RowPlayDateTime.swift` | Phase 1 ports logbook timestamp parsing, day-key arithmetic, and timezone-aware day resolution. |
 | `src/lib/privacy.ts` | `Sources/RowPlayCore/Support/PrivacyRedaction.swift` | Phase 1 ports the share-link privacy guard (`isPubliclyShareable`). |
@@ -52,10 +52,12 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgTelemetrySample.swift` | Phase 7 defines the live hardware telemetry sample model, field-compatible with Stroke and LiveWorkoutSample. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnection.swift` | Phase 7 defines the injectable ergometer connection protocol boundary. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/MockErgConnection.swift` | Phase 7 provides a deterministic mock hardware connection for testing and UI development. |
-| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row without real pairing, scanning, or permissions. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row; settings-wiring PR connects controls to shared `AppPreferences`. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/App/RowPlayStudioApp.swift` | Phase 0 creates the `@main` app entry point with `WindowGroup`, `Settings` scene, and app delegate. |
-| (new — no web equivalent) | `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` | Phase 0 creates the central `@MainActor ObservableObject` app state store; Phase 2 adds query-driven filtering. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` | Phase 0 creates the central `@MainActor ObservableObject` app state store; settings-wiring PR adds `isEmpty` and `clearData()`. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/ContentView.swift` | Phase 0 creates the root `NavigationSplitView` container with toolbar sport picker and searchable modifier. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/MetricTile.swift` | Phase 0 creates a reusable metric tile component for dashboard and detail views. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutDetailView.swift` | Phase 0 creates the workout detail surface; Phase 3 adds replay navigation. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolsView.swift` | Phase 5 creates the composition surface for workout tools (compare, export, HR import, annotations). |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Stores/AppPreferences.swift` | Settings wiring PR centralizes `demoModeEnabled`, `reduceReplayMotion`, and `preferredDistanceUnit` as a shared observable. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Models/DistanceUnit.swift` | Settings wiring PR adds `DistanceUnit` enum (`metric`/`imperial`) for distance formatting. |

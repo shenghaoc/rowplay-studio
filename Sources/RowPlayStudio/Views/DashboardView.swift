@@ -4,9 +4,12 @@ import SwiftUI
 
 struct DashboardView: View {
     @ObservedObject var library: WorkoutLibrary
+    @EnvironmentObject private var preferences: AppPreferences
     var summary: DashboardSummary
     var workouts: [Workout]
     var pbIds: Set<Int>
+
+    private var unit: DistanceUnit { preferences.distanceUnit }
 
     var body: some View {
         ScrollView {
@@ -20,8 +23,8 @@ struct DashboardView: View {
                     GridItem(.adaptive(minimum: 140, maximum: 220))
                 ], spacing: 12) {
                     MetricTile(title: "Sessions", value: "\(summary.sessions)", systemImage: "calendar")
-                    MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
-                    MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance), systemImage: "flag.checkered")
+                    MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance, unit: unit), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                    MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance, unit: unit), systemImage: "flag.checkered")
                     MetricTile(title: "Time", value: RowPlayFormatting.time(summary.totalTime), systemImage: "clock")
                     MetricTile(title: "Avg Pace", value: RowPlayFormatting.pace(summary.averagePace), systemImage: "speedometer")
                 }
@@ -37,11 +40,11 @@ struct DashboardView: View {
                     Chart(summary.bySport) { item in
                         BarMark(
                             x: .value("Sport", item.sport.displayName),
-                            y: .value("Distance", item.distance / 1_000)
+                            y: .value("Distance", unit == .imperial ? item.distance / 1_609.344 : item.distance / 1_000)
                         )
                         .foregroundStyle(by: .value("Sport", item.sport.displayName))
                     }
-                    .chartYAxisLabel("km")
+                    .chartYAxisLabel(unit == .imperial ? "mi" : "km")
                     .frame(height: 220)
                 }
 
@@ -147,7 +150,7 @@ struct DashboardView: View {
                             Text("\(sport.sessions) sessions")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(RowPlayFormatting.distance(sport.distance))
+                            Text(RowPlayFormatting.distance(sport.distance, unit: unit))
                                 .font(.subheadline.monospacedDigit())
                             Text("Best: \(RowPlayFormatting.pace(sport.bestPace))")
                                 .font(.caption)

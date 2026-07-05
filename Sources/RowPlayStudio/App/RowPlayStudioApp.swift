@@ -5,12 +5,14 @@ import SwiftUI
 @main
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var preferences = AppPreferences()
     @StateObject private var library = WorkoutLibrary.demo()
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
             ContentView(library: library)
                 .frame(minWidth: 1_000, minHeight: 680)
+                .environmentObject(preferences)
         }
         .commands {
             SidebarCommands()
@@ -19,11 +21,13 @@ struct RowPlayStudioApp: App {
                     library.reloadDemoData()
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(!preferences.demoModeEnabled)
             }
         }
 
         Settings {
             SettingsView()
+                .environmentObject(preferences)
         }
     }
 }
