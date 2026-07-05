@@ -4,7 +4,7 @@ This roadmap ports rowplay from SvelteKit/Cloudflare to native macOS first while
 
 ## Phase 0 - Native Bootstrap
 
-Status: in progress in the initial direct-to-main scaffold.
+Status: merged to `main`.
 
 Scope:
 
@@ -23,7 +23,7 @@ Exit criteria:
 
 ## Phase 1 - Core Parity Foundation
 
-Status: in progress on `codex/phase-01-core-parity-foundation`.
+Status: merged to `main` (PR #1).
 
 Scope:
 
@@ -53,7 +53,7 @@ Exit criteria:
 - Dashboard calculations come from `RowPlayCore`, not view-local math.
 - `swift test` and `swift build` pass.
 
-Status: implemented in draft PR #2 on `codex/phase-02-native-dashboard-library`; pending merge.
+Status: merged to `main` (PR #2).
 
 ## Phase 3 - Replay Engine And Native Renderer
 
@@ -73,7 +73,7 @@ Status: merged to `main`.
 
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
-Status: foundation slice in progress on `codex/phase-04-sync-storage-foundation`.
+Status: foundation slice merged to `main` (PR #7); full production sync and persistent storage work remains in progress.
 
 Scope:
 
@@ -91,7 +91,7 @@ Exit criteria:
 
 ## Phase 5 - Compare, Export, Share, And Annotations
 
-Status: foundation slice in progress on `codex/phase-05-workout-tools-foundation`.
+Status: foundation slice merged to `main` (PR #8); persistent annotations, TCX export, full HR file parsing, and public sharing remain in progress.
 
 Scope:
 
@@ -124,7 +124,7 @@ Exit criteria:
 
 ## Phase 7 - Hardware Connectivity
 
-Status: foundation slice in progress on `codex/phase-07-hardware-connectivity-foundation`.
+Status: foundation slice merged to `main` (PR #10); real Bluetooth, FTMS, and Concept2 PM transport work remains in progress.
 
 Scope:
 

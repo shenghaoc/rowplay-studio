@@ -53,3 +53,9 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnection.swift` | Phase 7 defines the injectable ergometer connection protocol boundary. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/MockErgConnection.swift` | Phase 7 provides a deterministic mock hardware connection for testing and UI development. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row without real pairing, scanning, or permissions. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/App/RowPlayStudioApp.swift` | Phase 0 creates the `@main` app entry point with `WindowGroup`, `Settings` scene, and app delegate. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` | Phase 0 creates the central `@MainActor ObservableObject` app state store; Phase 2 adds query-driven filtering. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/ContentView.swift` | Phase 0 creates the root `NavigationSplitView` container with toolbar sport picker and searchable modifier. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/MetricTile.swift` | Phase 0 creates a reusable metric tile component for dashboard and detail views. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutDetailView.swift` | Phase 0 creates the workout detail surface; Phase 3 adds replay navigation. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolsView.swift` | Phase 5 creates the composition surface for workout tools (compare, export, HR import, annotations). |

@@ -22,6 +22,6 @@
 - [x] Create `.kiro/specs/phase-05-workout-tools-foundation` spec documents.
 - [x] Update `docs/source-map.md` with Phase 5 mappings.
 - [x] Update `docs/roadmap.md` Phase 5 status.
-- [x] Run `swift test` — all tests pass (355 tests, 0 failures).
+- [x] Run `swift test` — all tests pass.
 - [x] Run `swift build` — clean build.
 - [x] Run `git diff --check` — no whitespace errors.
