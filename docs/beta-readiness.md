@@ -55,7 +55,6 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ## Recommended Next PRs
 
-1. **Add `RowPlayFormatting` edge-case tests**: The new `RowPlayFormattingTests` covers happy paths; add stress tests for very large values and boundary conditions.
-2. **SQLite workout cache**: Implement `SQLiteWorkoutCache` conforming to the existing `WorkoutCache` protocol with migration tests.
-3. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
-4. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
+1. **SQLite workout cache**: Implement `SQLiteWorkoutCache` conforming to the existing `WorkoutCache` protocol with migration tests.
+2. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
+3. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.

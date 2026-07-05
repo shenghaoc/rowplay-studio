@@ -237,4 +237,112 @@ final class RowPlayFormattingTests: XCTestCase {
     func testBikeWattsDivisor() {
         XCTAssertEqual(RowPlayFormatting.bikeWattsFromNormalizedPaceDivisor, 8.0)
     }
+
+    // MARK: - Stress: time() boundaries
+
+    func testTimeOneSecond() {
+        XCTAssertEqual(RowPlayFormatting.time(1), "0:01")
+    }
+
+    func testTimeFiftyNineSeconds() {
+        XCTAssertEqual(RowPlayFormatting.time(59), "0:59")
+    }
+
+    func testTimeSixtySeconds() {
+        XCTAssertEqual(RowPlayFormatting.time(60), "1:00")
+    }
+
+    func testTimeSixtyOneSeconds() {
+        XCTAssertEqual(RowPlayFormatting.time(61), "1:01")
+    }
+
+    func testTime59Minutes59Seconds() {
+        XCTAssertEqual(RowPlayFormatting.time(3599), "59:59")
+    }
+
+    func testTimeThirtySixHundredSeconds() {
+        XCTAssertEqual(RowPlayFormatting.time(3600), "1:00:00")
+    }
+
+    func testTimeTenthsForNormalMinuteValue() {
+        XCTAssertEqual(RowPlayFormatting.time(125, tenths: true), "2:05.0")
+    }
+
+    // MARK: - Stress: pace() NaN
+
+    func testPaceNaNReturnsPlaceholder() {
+        XCTAssertEqual(RowPlayFormatting.pace(.nan), "--:--")
+    }
+
+    // MARK: - Stress: distance() boundaries
+
+    func testDistanceOneMetre() {
+        XCTAssertEqual(RowPlayFormatting.distance(1), "1 m")
+    }
+
+    func testDistance999Metres() {
+        XCTAssertEqual(RowPlayFormatting.distance(999), "999 m")
+    }
+
+    func testDistance1234Metres() {
+        XCTAssertEqual(RowPlayFormatting.distance(1234), "1.23 km")
+    }
+
+    func testDistanceVeryLarge() {
+        XCTAssertEqual(RowPlayFormatting.distance(1_000_000), "1000.00 km")
+    }
+
+    func testDistanceNegativeOneMetre() {
+        XCTAssertEqual(RowPlayFormatting.distance(-1), "-1 m")
+    }
+
+    func testDistanceImperialOneMetre() {
+        // 1 m ≈ 3 ft
+        XCTAssertEqual(RowPlayFormatting.distance(1, unit: .imperial), "3 ft")
+    }
+
+    func testDistanceImperialVeryLarge() {
+        XCTAssertEqual(RowPlayFormatting.distance(1_000_000, unit: .imperial), "621.37 mi")
+    }
+
+    func testDistanceImperialNaNReturnsPlaceholder() {
+        XCTAssertEqual(RowPlayFormatting.distance(.nan, unit: .imperial), "--")
+    }
+
+    func testDistanceMetricAndImperialDiffer() {
+        let metres: Double = 5_000
+        let metric = RowPlayFormatting.distance(metres)
+        let imperial = RowPlayFormatting.distance(metres, unit: .imperial)
+        XCTAssertNotEqual(metric, imperial)
+        XCTAssertTrue(metric.hasSuffix("km"))
+        XCTAssertTrue(imperial.hasSuffix("mi"))
+    }
+
+    // MARK: - Stress: paceToWatts() edge cases
+
+    func testPaceToWattsVerySlowPace() {
+        // 600s/500m = very slow → watts ≈ 1.62
+        let watts = RowPlayFormatting.paceToWatts(600)
+        XCTAssertEqual(watts, 1.62, accuracy: 0.01)
+        let normalWatts = RowPlayFormatting.paceToWatts(120)
+        XCTAssertLessThan(watts, normalWatts)
+    }
+
+    func testPaceToWattsNaNReturnsZero() {
+        XCTAssertEqual(RowPlayFormatting.paceToWatts(.nan), 0)
+    }
+
+    // MARK: - Stress: paceToWatts(for:pacePer500m:) invalid input
+
+    func testPaceToWattsForRowerInvalidPace() {
+        XCTAssertEqual(RowPlayFormatting.paceToWatts(for: .rower, pacePer500m: -1), 0)
+    }
+
+    func testPaceToWattsForSkiErgInvalidPace() {
+        XCTAssertEqual(RowPlayFormatting.paceToWatts(for: .skierg, pacePer500m: -1), 0)
+    }
+
+    func testPaceToWattsForBikeInvalidPace() {
+        XCTAssertEqual(RowPlayFormatting.paceToWatts(for: .bike, pacePer500m: -1), 0)
+    }
 }
