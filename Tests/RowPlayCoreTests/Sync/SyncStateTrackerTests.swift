@@ -7,6 +7,8 @@ private final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
     func saveDetail(_ detail: WorkoutDetail) async throws { throw NSError(domain: "test", code: 1) }
     func loadAllWorkouts() async throws -> [Workout] { throw NSError(domain: "test", code: 1) }
     func loadWorkout(id: Int) async throws -> WorkoutDetail? { throw NSError(domain: "test", code: 1) }
+    func delete(id: Int) async throws { throw NSError(domain: "test", code: 1) }
+    func listWorkouts() async throws -> [Workout] { throw NSError(domain: "test", code: 1) }
     func deleteAll() async throws { throw NSError(domain: "test", code: 1) }
 }
 

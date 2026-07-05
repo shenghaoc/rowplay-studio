@@ -16,6 +16,11 @@ public protocol WorkoutCache: Sendable {
     func loadAllWorkouts() async throws -> [Workout]
     /// Load full detail for a specific workout, or nil if not cached.
     func loadWorkout(id: Int) async throws -> WorkoutDetail?
+    /// Delete a single workout by ID. No-op if the ID does not exist.
+    func delete(id: Int) async throws
+    /// Load all cached workout summaries, newest first.
+    /// Alias for `loadAllWorkouts()`.
+    func listWorkouts() async throws -> [Workout]
     /// Delete all cached data (disconnect/logout).
     func deleteAll() async throws
 }
@@ -62,6 +67,19 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
     public func loadWorkout(id: Int) async throws -> WorkoutDetail? {
         lock.withLock {
             details[id]
+        }
+    }
+
+    public func delete(id: Int) async throws {
+        lock.withLock {
+            workouts.removeValue(forKey: id)
+            details.removeValue(forKey: id)
+        }
+    }
+
+    public func listWorkouts() async throws -> [Workout] {
+        lock.withLock {
+            workouts.values.sorted { $0.date > $1.date }
         }
     }
 

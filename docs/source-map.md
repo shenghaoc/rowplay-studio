@@ -61,3 +61,6 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolsView.swift` | Phase 5 creates the composition surface for workout tools (compare, export, HR import, annotations). |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Stores/AppPreferences.swift` | Settings wiring PR centralizes `demoModeEnabled`, `reduceReplayMotion`, and `preferredDistanceUnit` as a shared observable. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Models/DistanceUnit.swift` | Settings wiring PR adds `DistanceUnit` enum (`metric`/`imperial`) for distance formatting. |
+| `src/lib/server/db.ts` (SQLite cache) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCache.swift` | SQLite workout cache foundation: stores `WorkoutDetail` JSON in a v1 schema with migration support. Full normalized stroke/split schema is future work. |
+| `src/lib/server/db.ts` (errors) | `Sources/RowPlayCore/Storage/WorkoutCacheError.swift` | Typed errors for SQLite cache operations: open, migration, query, encoding, decoding. |
+| `src/lib/server/db.ts` (migrations) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCacheMigration.swift` | Idempotent schema migration using `PRAGMA user_version` for version tracking. |

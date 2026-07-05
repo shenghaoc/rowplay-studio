@@ -11,7 +11,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - **Query/filter/sort**: `WorkoutQuery` engine with sport, date, distance/duration chips, search, PB-only filtering, and multi-field sorting.
 - **Replay engine**: Sampling (`sampleAt`/`sampleIndexAt`), motion timing, comparability guard, ghost selection, sport themes, inspector helpers, and a `ReplayState` playback state machine.
 - **Replay renderer**: SwiftUI Canvas 2D replay surface with playback controls, scrubber, speed picker, and telemetry overlay.
-- **Sync boundaries**: `TokenStore` protocol (Keychain-backed), `Concept2APIClient` protocol (mock only), `WorkoutCache` protocol (in-memory), `SyncStateTracker`, and `PrivacySafeLogger` with tested redaction.
+- **Sync boundaries**: `TokenStore` protocol (Keychain-backed), `Concept2APIClient` protocol (mock only), `WorkoutCache` protocol (in-memory + SQLite foundation), `SyncStateTracker`, and `PrivacySafeLogger` with tested redaction.
 - **Workout tools**: Comparison (verdict, side stats, interval reps, distance overlay), rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package.
 - **Live mode**: State machine, polling cadence with backoff, `LiveSource` protocol, `MockLiveSource`, `DemoLiveSampleGenerator`, and a native live-mode panel.
 - **Hardware connectivity**: `ErgDevice`, `ErgConnectionState`, `ErgTelemetrySample`, `ErgConnection` protocol, and `MockErgConnection` with deterministic telemetry.
@@ -37,7 +37,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 1. **No production Concept2 sync**: `Concept2APIClient` and `WorkoutCache` are protocol-only with mock implementations. A real URLSession client and SQLite cache are needed for actual sync.
 2. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
-3. **No persistent storage**: `InMemoryWorkoutCache` and `InMemoryAnnotationStore` lose data on restart. SQLite or Core Data backing is needed.
+3. **No persistent annotation storage**: `InMemoryAnnotationStore` loses data on restart. SQLite or Core Data backing is needed for annotations. (Workout cache now has a SQLite foundation via `SQLiteWorkoutCache`.)
 
 ### Should-Fix
 
@@ -55,6 +55,5 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ## Recommended Next PRs
 
-1. **SQLite workout cache**: Implement `SQLiteWorkoutCache` conforming to the existing `WorkoutCache` protocol with migration tests.
-2. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
+1. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
 3. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
