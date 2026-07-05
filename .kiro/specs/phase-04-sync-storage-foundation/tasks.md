@@ -13,6 +13,6 @@
 - [x] Create `.kiro/specs/phase-04-sync-storage-foundation` spec documents.
 - [x] Update `docs/source-map.md` with Phase 4 mappings.
 - [x] Update `docs/roadmap.md` Phase 4 status.
-- [x] Run `swift test` — all tests pass (265 tests, 0 failures).
+- [x] Run `swift test` — all tests pass.
 - [x] Run `swift build` — clean build.
 - [x] Run `git diff --check` — no whitespace errors.
