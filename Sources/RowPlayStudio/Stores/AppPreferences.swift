@@ -30,7 +30,7 @@ final class AppPreferences: ObservableObject {
         let unitString = defaults.string(forKey: Self.preferredDistanceUnitKey) ?? ""
         self.distanceUnit = DistanceUnit(rawValue: unitString) ?? .metric
 
-        // Subscribe to external UserDefaults changes (e.g. from SettingsView @AppStorage).
+        // Subscribe to external UserDefaults changes (e.g. from another process or extension).
         externalCancellable = NotificationCenter.default
             .publisher(for: UserDefaults.didChangeNotification, object: defaults)
             .receive(on: DispatchQueue.main)
@@ -83,11 +83,5 @@ final class AppPreferences: ObservableObject {
                 }
             }
             .store(in: &internalCancellables)
-    }
-
-    /// The string representation for backward-compatible storage.
-    var preferredDistanceUnit: String {
-        get { distanceUnit.rawValue }
-        set { distanceUnit = DistanceUnit(rawValue: newValue) ?? .metric }
     }
 }
