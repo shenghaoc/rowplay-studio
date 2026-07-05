@@ -6,8 +6,8 @@ struct DashboardView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     var summary: DashboardSummary
-    var workouts: [Workout]
-    var pbIds: Set<Int>
+    var personalBests: [DashboardPersonalBest]
+    var recentPaceWorkouts: [Workout]
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
@@ -77,8 +77,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var personalBestsSection: some View {
-        let pbs = WorkoutAnalytics.dashboardPersonalBests(for: workouts, pbIds: pbIds)
-        if !pbs.isEmpty {
+        if !personalBests.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Personal Bests")
                     .font(.title3.weight(.semibold))
@@ -86,7 +85,7 @@ struct DashboardView: View {
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 180, maximum: 240))
                 ], spacing: 10) {
-                    ForEach(pbs) { pb in
+                    ForEach(personalBests) { pb in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
                                 Image(systemName: pb.sport.iconName)
@@ -163,16 +162,5 @@ struct DashboardView: View {
                 }
             }
         }
-    }
-
-    private var recentPaceWorkouts: [Workout] {
-        // Use the active sport filter if set; otherwise default to the sport with the most workouts.
-        let sport: Sport = {
-            let sports = Set(workouts.map(\.sport))
-            if sports.count == 1, let only = sports.first { return only }
-            return Dictionary(grouping: workouts, by: \.sport)
-                .max(by: { $0.value.count < $1.value.count })?.key ?? .rower
-        }()
-        return WorkoutAnalytics.recentPaceWorkouts(for: workouts, sport: sport, limit: 10)
     }
 }

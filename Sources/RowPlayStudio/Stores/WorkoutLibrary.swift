@@ -29,6 +29,8 @@ final class WorkoutLibrary: ObservableObject {
     private(set) var filteredDetails: [WorkoutDetail] = []
     private(set) var summary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
     private(set) var filteredSummary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
+    private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
+    private(set) var filteredRecentPaceWorkouts: [Workout] = []
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
@@ -246,5 +248,13 @@ final class WorkoutLibrary: ObservableObject {
         filteredWorkouts = WorkoutQuery.filterAndSortWorkouts(workouts, query: query, pbIds: pbIds)
         filteredDetails = filteredWorkouts.compactMap { detailByID[$0.id] }
         filteredSummary = WorkoutAnalytics.dashboardSummary(for: filteredWorkouts)
+        filteredPersonalBests = WorkoutAnalytics.dashboardPersonalBests(for: filteredWorkouts, pbIds: pbIds)
+
+        // Use the active sport filter if set; otherwise default to the sport with the most workouts.
+        let sport: Sport = query.sport ?? {
+            let grouped = Dictionary(grouping: filteredWorkouts, by: \.sport)
+            return grouped.max(by: { $0.value.count < $1.value.count })?.key ?? .rower
+        }()
+        filteredRecentPaceWorkouts = WorkoutAnalytics.recentPaceWorkouts(for: filteredWorkouts, sport: sport, limit: 10)
     }
 }
