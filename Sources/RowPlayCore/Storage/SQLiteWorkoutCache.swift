@@ -13,6 +13,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     private let dbPath: String
     private var db: OpaquePointer?
     private let queue = DispatchQueue(label: "com.rowplay-studio.sqlite-workout-cache")
+    private let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_destructor_type.self)
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -68,6 +69,16 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
     public func saveWorkouts(_ workouts: [Workout]) async throws {
         try queue.sync {
+            guard !workouts.isEmpty else { return }
+
+            try execute(sql: "BEGIN TRANSACTION;", context: "begin transaction saveWorkouts")
+            var transactionIsOpen = true
+            defer {
+                if transactionIsOpen {
+                    sqlite3_exec(db, "ROLLBACK TRANSACTION;", nil, nil, nil)
+                }
+            }
+
             let sql = """
                 INSERT OR REPLACE INTO workouts (id, sport, date, workout_type, distance, time, pace, detail_json, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -96,19 +107,22 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
                 sqlite3_bind_int64(stmt, 1, sqlite3_int64(workout.id))
-                sqlite3_bind_text(stmt, 2, (workout.sport.rawValue as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 2, workout.sport.rawValue, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 3, workout.date.timeIntervalSince1970)
-                sqlite3_bind_text(stmt, 4, (workout.workoutType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 4, workout.workoutType, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 5, workout.distance)
                 sqlite3_bind_double(stmt, 6, workout.time)
                 sqlite3_bind_double(stmt, 7, workout.pace)
-                sqlite3_bind_text(stmt, 8, (json as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 8, json, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 9, now)
 
                 guard sqlite3_step(stmt) == SQLITE_DONE else {
                     throw WorkoutCacheError.queryFailed("insert saveWorkouts: \(errmsg)")
                 }
             }
+
+            try execute(sql: "COMMIT TRANSACTION;", context: "commit transaction saveWorkouts")
+            transactionIsOpen = false
         }
     }
 
@@ -137,13 +151,13 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
             let w = detail.workout
             sqlite3_bind_int64(stmt, 1, sqlite3_int64(w.id))
-            sqlite3_bind_text(stmt, 2, (w.sport.rawValue as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, w.sport.rawValue, -1, SQLITE_TRANSIENT)
             sqlite3_bind_double(stmt, 3, w.date.timeIntervalSince1970)
-            sqlite3_bind_text(stmt, 4, (w.workoutType as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 4, w.workoutType, -1, SQLITE_TRANSIENT)
             sqlite3_bind_double(stmt, 5, w.distance)
             sqlite3_bind_double(stmt, 6, w.time)
             sqlite3_bind_double(stmt, 7, w.pace)
-            sqlite3_bind_text(stmt, 8, (json as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 8, json, -1, SQLITE_TRANSIENT)
             sqlite3_bind_double(stmt, 9, Date().timeIntervalSince1970)
 
             guard sqlite3_step(stmt) == SQLITE_DONE else {
@@ -269,5 +283,11 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
     private var errmsg: String {
         db.map { String(cString: sqlite3_errmsg($0)) } ?? "no db handle"
+    }
+
+    private func execute(sql: String, context: String) throws {
+        guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+            throw WorkoutCacheError.queryFailed("\(context): \(errmsg)")
+        }
     }
 }
