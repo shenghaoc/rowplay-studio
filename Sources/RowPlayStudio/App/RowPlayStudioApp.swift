@@ -13,24 +13,11 @@ struct RowPlayStudioApp: App {
             ContentView(library: library)
                 .frame(minWidth: 1_000, minHeight: 680)
                 .environmentObject(preferences)
-                .onAppear {
-                    if !preferences.demoModeEnabled {
-                        library.clearData()
-                    }
-                }
-                .onChange(of: preferences.demoModeEnabled) { _, enabled in
-                    if enabled && library.isEmpty {
-                        library.reloadDemoData()
-                    } else if !enabled {
-                        library.clearData()
-                    }
-                }
         }
         .commands {
             SidebarCommands()
             CommandMenu("Workout") {
                 Button("Reload Demo Library") {
-                    guard preferences.demoModeEnabled else { return }
                     library.reloadDemoData()
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])

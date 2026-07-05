@@ -42,10 +42,17 @@ final class WorkoutLibrary: ObservableObject {
         self.query = query
         self.annotationStore = annotationStore
         updateAllDerivedData()
+        observeDemoModeChanges()
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    /// Creates a library populated with demo data if the persisted preference allows it.
     static func demo() -> WorkoutLibrary {
-        WorkoutLibrary(details: DemoWorkoutLibrary.details)
+        let demoEnabled = UserDefaults.standard.object(forKey: "demoModeEnabled") as? Bool ?? true
+        return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [])
     }
 
     private(set) var availableWorkoutTypes: [String] = []
@@ -110,6 +117,28 @@ final class WorkoutLibrary: ObservableObject {
     func clearData() {
         details = []
         query = WorkoutQuery.defaultQuery
+    }
+
+    // MARK: - Demo Mode Observation
+
+    private func observeDemoModeChanges() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDemoModeChanged),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleDemoModeChanged() {
+        let demoEnabled = UserDefaults.standard.object(forKey: "demoModeEnabled") as? Bool ?? true
+        if demoEnabled && details.isEmpty {
+            details = DemoWorkoutLibrary.details
+            query = WorkoutQuery.defaultQuery
+        } else if !demoEnabled && !details.isEmpty {
+            details = []
+            query = WorkoutQuery.defaultQuery
+        }
     }
 
     // MARK: - Live Mode

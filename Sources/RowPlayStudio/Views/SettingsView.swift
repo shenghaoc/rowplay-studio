@@ -1,3 +1,4 @@
+import RowPlayCore
 import SwiftUI
 
 struct SettingsView: View {
@@ -26,9 +27,9 @@ struct SettingsView: View {
             }
 
             Section("Units") {
-                Picker("Distance", selection: $preferences.preferredDistanceUnit) {
-                    Text("Metric").tag("metric")
-                    Text("Imperial").tag("imperial")
+                Picker("Distance", selection: $preferences.distanceUnit) {
+                    Text("Metric").tag(DistanceUnit.metric)
+                    Text("Imperial").tag(DistanceUnit.imperial)
                 }
                 .pickerStyle(.segmented)
             }
