@@ -58,30 +58,70 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         XCTAssertTrue(library.isEmpty)
     }
 
-    func testDemoModeNotificationReloadsDemoDataWhenEnabled() {
+    func testDemoModeNotificationReloadsDemoDataWhenEnabled() async {
         defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
         let library = WorkoutLibrary.demo(defaults: defaults)
 
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
 
         XCTAssertFalse(library.isEmpty)
         XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
     }
 
-    func testDemoModeNotificationClearsDemoDataWhenDisabled() {
+    func testDemoModeNotificationAppendsDemoDataWhenEnabledWithoutRemovingExistingWorkouts() async {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        let realWorkout = makeRealWorkoutDetail()
+        let library = WorkoutLibrary(details: [realWorkout], defaults: defaults)
+
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
+
+        XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count + 1)
+        XCTAssertTrue(library.details.contains(realWorkout))
+        XCTAssertEqual(
+            Set(library.details.map(\.id)).count,
+            DemoWorkoutLibrary.details.count + 1
+        )
+    }
+
+    func testDemoModeNotificationClearsDemoDataWhenDisabled() async {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
         let library = WorkoutLibrary.demo(defaults: defaults)
 
         defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
 
         XCTAssertTrue(library.isEmpty)
     }
 
-    func testDemoModeNotificationPreservesNonDemoWorkoutsWhenDisabled() {
+    func testDemoModeNotificationPreservesNonDemoWorkoutsWhenDisabled() async {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
-        let realWorkout = WorkoutDetail(
+        let realWorkout = makeRealWorkoutDetail()
+        let library = WorkoutLibrary(
+            details: DemoWorkoutLibrary.details + [realWorkout],
+            defaults: defaults
+        )
+
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        await waitForDemoModeNotification()
+
+        XCTAssertEqual(library.details, [realWorkout])
+    }
+
+    func testUnrelatedDefaultsChangeDoesNotReloadDemoData() {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        defaults.set("imperial", forKey: AppPreferences.preferredDistanceUnitKey)
+
+        XCTAssertTrue(library.isEmpty)
+    }
+
+    private func makeRealWorkoutDetail(id: Int = 99_999) -> WorkoutDetail {
+        WorkoutDetail(
             workout: Workout(
-                id: 99_999,
+                id: id,
                 date: Date(),
                 sport: .rower,
                 distance: 2_000,
@@ -94,22 +134,9 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
             strokes: [],
             splits: []
         )
-        let library = WorkoutLibrary(
-            details: DemoWorkoutLibrary.details + [realWorkout],
-            defaults: defaults
-        )
-
-        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
-
-        XCTAssertEqual(library.details, [realWorkout])
     }
 
-    func testUnrelatedDefaultsChangeDoesNotReloadDemoData() {
-        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
-        let library = WorkoutLibrary(details: [], defaults: defaults)
-
-        defaults.set("imperial", forKey: AppPreferences.preferredDistanceUnitKey)
-
-        XCTAssertTrue(library.isEmpty)
+    private func waitForDemoModeNotification() async {
+        await Task.yield()
     }
 }

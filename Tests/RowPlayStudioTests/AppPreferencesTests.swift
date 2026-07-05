@@ -48,7 +48,7 @@ final class AppPreferencesTests: XCTestCase {
         preferences.reduceReplayMotion = true
         preferences.distanceUnit = .imperial
 
-        XCTAssertFalse(defaults.bool(forKey: AppPreferences.demoModeEnabledKey))
+        XCTAssertEqual(defaults.object(forKey: AppPreferences.demoModeEnabledKey) as? Bool, false)
         XCTAssertTrue(defaults.bool(forKey: AppPreferences.reduceReplayMotionKey))
         XCTAssertEqual(defaults.string(forKey: AppPreferences.preferredDistanceUnitKey), "imperial")
     }

@@ -57,21 +57,30 @@ final class AppPreferences: ObservableObject {
         $demoModeEnabled
             .dropFirst()
             .sink { [weak self] value in
-                self?.defaults.set(value, forKey: Self.demoModeEnabledKey)
+                guard let self else { return }
+                if self.defaults.object(forKey: Self.demoModeEnabledKey) as? Bool != value {
+                    self.defaults.set(value, forKey: Self.demoModeEnabledKey)
+                }
             }
             .store(in: &internalCancellables)
 
         $reduceReplayMotion
             .dropFirst()
             .sink { [weak self] value in
-                self?.defaults.set(value, forKey: Self.reduceReplayMotionKey)
+                guard let self else { return }
+                if self.defaults.bool(forKey: Self.reduceReplayMotionKey) != value {
+                    self.defaults.set(value, forKey: Self.reduceReplayMotionKey)
+                }
             }
             .store(in: &internalCancellables)
 
         $distanceUnit
             .dropFirst()
             .sink { [weak self] value in
-                self?.defaults.set(value.rawValue, forKey: Self.preferredDistanceUnitKey)
+                guard let self else { return }
+                if self.defaults.string(forKey: Self.preferredDistanceUnitKey) != value.rawValue {
+                    self.defaults.set(value.rawValue, forKey: Self.preferredDistanceUnitKey)
+                }
             }
             .store(in: &internalCancellables)
     }

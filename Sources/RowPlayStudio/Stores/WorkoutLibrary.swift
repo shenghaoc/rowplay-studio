@@ -135,13 +135,9 @@ final class WorkoutLibrary: ObservableObject {
         )
     }
 
-    @objc private func handleDemoModeChanged() {
-        if Thread.isMainThread {
-            updateDemoModeState()
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.updateDemoModeState()
-            }
+    @objc private nonisolated func handleDemoModeChanged() {
+        Task { @MainActor [weak self] in
+            self?.updateDemoModeState()
         }
     }
 
@@ -150,9 +146,13 @@ final class WorkoutLibrary: ObservableObject {
         guard demoEnabled != demoModeEnabled else { return }
         demoModeEnabled = demoEnabled
 
-        if demoEnabled && details.isEmpty {
-            details = DemoWorkoutLibrary.details
-            query = WorkoutQuery.defaultQuery
+        if demoEnabled {
+            let existingIDs = Set(details.map(\.id))
+            let missingDemoDetails = DemoWorkoutLibrary.details.filter { !existingIDs.contains($0.id) }
+            if !missingDemoDetails.isEmpty {
+                details.append(contentsOf: missingDemoDetails)
+                query = WorkoutQuery.defaultQuery
+            }
         } else if !demoEnabled && !details.isEmpty {
             let demoIDs = Set(DemoWorkoutLibrary.details.map(\.id))
             let previousCount = details.count
