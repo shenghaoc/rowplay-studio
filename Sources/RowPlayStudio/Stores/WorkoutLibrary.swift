@@ -187,11 +187,9 @@ final class WorkoutLibrary: ObservableObject {
         filteredPersonalBests = WorkoutAnalytics.dashboardPersonalBests(for: filteredWorkouts, pbIds: pbIds)
 
         // Use the active sport filter if set; otherwise default to the sport with the most workouts.
-        let sport: Sport = {
-            let sports = Set(filteredWorkouts.map(\.sport))
-            if sports.count == 1, let only = sports.first { return only }
-            return Dictionary(grouping: filteredWorkouts, by: \.sport)
-                .max(by: { $0.value.count < $1.value.count })?.key ?? .rower
+        let sport: Sport = query.sport ?? {
+            let grouped = Dictionary(grouping: filteredWorkouts, by: \.sport)
+            return grouped.max(by: { $0.value.count < $1.value.count })?.key ?? .rower
         }()
         filteredRecentPaceWorkouts = WorkoutAnalytics.recentPaceWorkouts(for: filteredWorkouts, sport: sport, limit: 10)
     }
