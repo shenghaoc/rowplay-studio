@@ -134,5 +134,8 @@ private struct WorkoutSidebarRow: View {
             Image(systemName: workout.sport.iconName)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(workout.sport.displayName) \(workout.workoutType)\(isPB ? ", Personal Best" : "")"))
+        .accessibilityValue(Text("\(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day()); \(RowPlayFormatting.distance(workout.distance, unit: distanceUnit)); \(RowPlayFormatting.time(workout.time)); \(RowPlayFormatting.pace(workout.pace))"))
     }
 }
