@@ -99,7 +99,7 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
         }
     }
 
-    public func delete(id: Int) async throws {
+    public func delete(id: Workout.ID) async throws {
         lock.withLock {
             workouts.removeValue(forKey: id)
             details.removeValue(forKey: id)

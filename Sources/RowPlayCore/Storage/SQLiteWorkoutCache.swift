@@ -50,7 +50,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     deinit {
-        sqlite3_close(db)
+        sqlite3_close_v2(db)
     }
 
     // MARK: - Migration
@@ -68,7 +68,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     // MARK: - WorkoutCache
 
     public func save(details: [WorkoutDetail]) async throws {
-        try queue.sync {
+        try await withDatabase { [self] in
             guard !details.isEmpty else { return }
 
             try execute(sql: "BEGIN TRANSACTION;", context: "begin transaction save details")
@@ -127,7 +127,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func saveWorkouts(_ workouts: [Workout]) async throws {
-        try queue.sync {
+        try await withDatabase { [self] in
             guard !workouts.isEmpty else { return }
 
             try execute(sql: "BEGIN TRANSACTION;", context: "begin transaction saveWorkouts")
@@ -142,40 +142,39 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
                 INSERT OR REPLACE INTO workouts (id, sport, date, workout_type, distance, time, pace, detail_json, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """
-            var stmt: OpaquePointer?
-            defer { sqlite3_finalize(stmt) }
+            var selectStmt: OpaquePointer?
+            defer { sqlite3_finalize(selectStmt) }
+            let selectSQL = "SELECT detail_json FROM workouts WHERE id = ?;"
+            guard sqlite3_prepare_v2(db, selectSQL, -1, &selectStmt, nil) == SQLITE_OK else {
+                throw WorkoutCacheError.queryFailed("prepare existing detail saveWorkouts: \(errmsg)")
+            }
 
-            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            var insertStmt: OpaquePointer?
+            defer { sqlite3_finalize(insertStmt) }
+
+            guard sqlite3_prepare_v2(db, sql, -1, &insertStmt, nil) == SQLITE_OK else {
                 throw WorkoutCacheError.queryFailed("prepare saveWorkouts: \(errmsg)")
             }
 
             let now = Date().timeIntervalSince1970
 
             for workout in workouts {
-                let stub = WorkoutDetail(workout: workout, strokes: [], splits: [])
-                let data: Data
-                do {
-                    data = try encoder.encode(stub)
-                } catch {
-                    throw WorkoutCacheError.encodingFailed("Failed to encode workout \(workout.id)")
-                }
-                guard let json = String(data: data, encoding: .utf8) else {
-                    throw WorkoutCacheError.encodingFailed("UTF-8 conversion failed for workout \(workout.id)")
-                }
+                let detail = try detailForSummary(workout, using: selectStmt)
+                let json = try jsonString(for: detail, context: "workout \(workout.id)")
 
-                sqlite3_reset(stmt)
-                sqlite3_clear_bindings(stmt)
-                sqlite3_bind_int64(stmt, 1, sqlite3_int64(workout.id))
-                sqlite3_bind_text(stmt, 2, workout.sport.rawValue, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(stmt, 3, workout.date.timeIntervalSince1970)
-                sqlite3_bind_text(stmt, 4, workout.workoutType, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(stmt, 5, workout.distance)
-                sqlite3_bind_double(stmt, 6, workout.time)
-                sqlite3_bind_double(stmt, 7, workout.pace)
-                sqlite3_bind_text(stmt, 8, json, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(stmt, 9, now)
+                sqlite3_reset(insertStmt)
+                sqlite3_clear_bindings(insertStmt)
+                sqlite3_bind_int64(insertStmt, 1, sqlite3_int64(workout.id))
+                sqlite3_bind_text(insertStmt, 2, workout.sport.rawValue, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(insertStmt, 3, workout.date.timeIntervalSince1970)
+                sqlite3_bind_text(insertStmt, 4, workout.workoutType, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(insertStmt, 5, workout.distance)
+                sqlite3_bind_double(insertStmt, 6, workout.time)
+                sqlite3_bind_double(insertStmt, 7, workout.pace)
+                sqlite3_bind_text(insertStmt, 8, json, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(insertStmt, 9, now)
 
-                guard sqlite3_step(stmt) == SQLITE_DONE else {
+                guard sqlite3_step(insertStmt) == SQLITE_DONE else {
                     throw WorkoutCacheError.queryFailed("insert saveWorkouts: \(errmsg)")
                 }
             }
@@ -186,7 +185,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func save(detail: WorkoutDetail) async throws {
-        try queue.sync {
+        try await withDatabase { [self] in
             let sql = """
                 INSERT OR REPLACE INTO workouts (id, sport, date, workout_type, distance, time, pace, detail_json, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -198,15 +197,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
                 throw WorkoutCacheError.queryFailed("prepare saveDetail: \(errmsg)")
             }
 
-            let data: Data
-            do {
-                data = try encoder.encode(detail)
-            } catch {
-                throw WorkoutCacheError.encodingFailed("Failed to encode detail \(detail.workout.id)")
-            }
-            guard let json = String(data: data, encoding: .utf8) else {
-                throw WorkoutCacheError.encodingFailed("UTF-8 conversion failed for detail \(detail.workout.id)")
-            }
+            let json = try jsonString(for: detail, context: "detail \(detail.workout.id)")
 
             let w = detail.workout
             sqlite3_bind_int64(stmt, 1, sqlite3_int64(w.id))
@@ -226,7 +217,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func loadAllWorkouts() async throws -> [Workout] {
-        try queue.sync {
+        try await withDatabase { [self] in
             let sql = "SELECT detail_json FROM workouts ORDER BY date DESC;"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
@@ -236,17 +227,15 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
             }
 
             var results: [Workout] = []
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                guard let cString = sqlite3_column_text(stmt, 0) else { continue }
-                let json = String(cString: cString)
-                guard let data = json.data(using: .utf8) else { continue }
-
-                let detail: WorkoutDetail
-                do {
-                    detail = try decoder.decode(WorkoutDetail.self, from: data)
-                } catch {
-                    continue
+            while true {
+                let rc = sqlite3_step(stmt)
+                if rc == SQLITE_DONE {
+                    break
                 }
+                guard rc == SQLITE_ROW else {
+                    throw WorkoutCacheError.queryFailed("step loadAllWorkouts: \(errmsg)")
+                }
+                let detail = try decodeDetail(from: stmt, column: 0, context: "workout list row")
                 results.append(detail.workout)
             }
             return results
@@ -254,7 +243,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func detail(id: Workout.ID) async throws -> WorkoutDetail? {
-        try queue.sync {
+        try await withDatabase { [self] in
             let sql = "SELECT detail_json FROM workouts WHERE id = ?;"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
@@ -265,29 +254,19 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
 
             sqlite3_bind_int64(stmt, 1, sqlite3_int64(id))
 
-            guard sqlite3_step(stmt) == SQLITE_ROW else {
+            let rc = sqlite3_step(stmt)
+            if rc == SQLITE_DONE {
                 return nil
             }
-
-            guard let cString = sqlite3_column_text(stmt, 0) else {
-                throw WorkoutCacheError.decodingFailed("NULL detail_json for workout \(id)")
+            guard rc == SQLITE_ROW else {
+                throw WorkoutCacheError.queryFailed("step loadWorkout \(id): \(errmsg)")
             }
-
-            let json = String(cString: cString)
-            guard let data = json.data(using: .utf8) else {
-                throw WorkoutCacheError.decodingFailed("UTF-8 conversion failed for workout \(id)")
-            }
-
-            do {
-                return try decoder.decode(WorkoutDetail.self, from: data)
-            } catch {
-                throw WorkoutCacheError.decodingFailed("JSON decode failed for workout \(id)")
-            }
+            return try decodeDetail(from: stmt, column: 0, context: "workout \(id)")
         }
     }
 
-    public func delete(id: Int) async throws {
-        try queue.sync {
+    public func delete(id: Workout.ID) async throws {
+        try await withDatabase { [self] in
             let sql = "DELETE FROM workouts WHERE id = ?;"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
@@ -309,7 +288,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func deleteAll() async throws {
-        try queue.sync {
+        try await withDatabase { [self] in
             let sql = "DELETE FROM workouts;"
             guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
                 throw WorkoutCacheError.queryFailed("deleteAll: \(errmsg)")
@@ -344,9 +323,64 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         db.map { String(cString: sqlite3_errmsg($0)) } ?? "no db handle"
     }
 
+    private func withDatabase<T>(_ operation: @escaping () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    continuation.resume(returning: try operation())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private func execute(sql: String, context: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
             throw WorkoutCacheError.queryFailed("\(context): \(errmsg)")
+        }
+    }
+
+    private func jsonString(for detail: WorkoutDetail, context: String) throws -> String {
+        let data: Data
+        do {
+            data = try encoder.encode(detail)
+        } catch {
+            throw WorkoutCacheError.encodingFailed("Failed to encode \(context)")
+        }
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw WorkoutCacheError.encodingFailed("UTF-8 conversion failed for \(context)")
+        }
+        return json
+    }
+
+    private func detailForSummary(_ workout: Workout, using stmt: OpaquePointer?) throws -> WorkoutDetail {
+        sqlite3_reset(stmt)
+        sqlite3_clear_bindings(stmt)
+        sqlite3_bind_int64(stmt, 1, sqlite3_int64(workout.id))
+
+        let rc = sqlite3_step(stmt)
+        if rc == SQLITE_ROW {
+            var existing = try decodeDetail(from: stmt, column: 0, context: "existing workout \(workout.id)")
+            existing.workout = workout
+            return existing
+        }
+        if rc == SQLITE_DONE {
+            return WorkoutDetail(workout: workout, strokes: [], splits: [])
+        }
+        throw WorkoutCacheError.queryFailed("select existing detail saveWorkouts \(workout.id): \(errmsg)")
+    }
+
+    private func decodeDetail(from stmt: OpaquePointer?, column: Int32, context: String) throws -> WorkoutDetail {
+        guard let bytes = sqlite3_column_text(stmt, column) else {
+            throw WorkoutCacheError.decodingFailed("NULL detail_json for \(context)")
+        }
+        let length = sqlite3_column_bytes(stmt, column)
+        let data = Data(bytes: bytes, count: Int(length))
+        do {
+            return try decoder.decode(WorkoutDetail.self, from: data)
+        } catch {
+            throw WorkoutCacheError.decodingFailed("JSON decode failed for \(context)")
         }
     }
 }

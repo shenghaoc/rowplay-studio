@@ -93,6 +93,26 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         })
     }
 
+    func testSaveWorkoutsPreservesExistingDetailPayload() async throws {
+        try cache.migrate()
+
+        let detail = DemoWorkoutLibrary.details.first!
+        try await cache.save(detail: detail)
+
+        var updatedWorkout = detail.workout
+        updatedWorkout.date = detail.workout.date.addingTimeInterval(60)
+        updatedWorkout.comments = "Updated summary"
+        try await cache.saveWorkouts([updatedWorkout])
+
+        let loaded = try await cache.detail(id: detail.workout.id)
+
+        XCTAssertNotNil(loaded)
+        XCTAssertEqual(loaded?.workout.date, updatedWorkout.date)
+        XCTAssertEqual(loaded?.workout.comments, updatedWorkout.comments)
+        XCTAssertEqual(loaded?.strokes.count, detail.strokes.count)
+        XCTAssertEqual(loaded?.splits.count, detail.splits.count)
+    }
+
     // MARK: - Delete
 
     func testDeleteRemovesSingleWorkout() async throws {
