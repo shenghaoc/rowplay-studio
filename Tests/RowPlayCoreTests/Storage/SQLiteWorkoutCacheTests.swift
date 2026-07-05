@@ -50,6 +50,27 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         XCTAssertEqual(version, 1)
     }
 
+    func testMigrationBackfillsSummaryColumnsForLegacyV1Schema() async throws {
+        cache = nil
+        try? FileManager.default.removeItem(atPath: dbPath)
+        try createLegacyV1Schema()
+        cache = try SQLiteWorkoutCache(path: dbPath)
+
+        try cache.migrate()
+
+        let columns = try queryStrings("PRAGMA table_info(workouts);", column: 1)
+        XCTAssertTrue(columns.contains("comments"))
+        XCTAssertTrue(columns.contains("has_stroke_data"))
+
+        let indexNames = try queryStrings("PRAGMA index_list(workouts);", column: 1)
+        XCTAssertTrue(indexNames.contains("idx_workouts_date"))
+
+        let workout = DemoWorkoutLibrary.details.first!.workout
+        try await cache.saveWorkouts([workout])
+        let listed = try await cache.listWorkouts()
+        XCTAssertEqual(listed.map(\.id), [workout.id])
+    }
+
     // MARK: - Save and Load
 
     func testSaveAndLoadDetailRoundTrips() async throws {
@@ -69,6 +90,23 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         XCTAssertEqual(loaded.workout.pace, detail.workout.pace, accuracy: 0.01)
         XCTAssertEqual(loaded.strokes.count, detail.strokes.count)
         XCTAssertEqual(loaded.splits.count, detail.splits.count)
+
+        // Verify stroke values, not just count.
+        if let firstStroke = loaded.strokes.first,
+           let originalStroke = detail.strokes.first {
+            XCTAssertEqual(firstStroke.t, originalStroke.t, accuracy: 0.001)
+            XCTAssertEqual(firstStroke.d, originalStroke.d, accuracy: 0.01)
+            XCTAssertEqual(firstStroke.pace, originalStroke.pace, accuracy: 0.001)
+            XCTAssertEqual(firstStroke.cadence, originalStroke.cadence, accuracy: 0.01)
+        }
+
+        // Verify split values, not just count.
+        if let firstSplit = loaded.splits.first,
+           let originalSplit = detail.splits.first {
+            XCTAssertEqual(firstSplit.distance, originalSplit.distance, accuracy: 0.01)
+            XCTAssertEqual(firstSplit.time, originalSplit.time, accuracy: 0.001)
+            XCTAssertEqual(firstSplit.pace, originalSplit.pace, accuracy: 0.001)
+        }
     }
 
     func testSaveManyAndListWorkoutsSortsNewestFirst() async throws {
@@ -218,6 +256,63 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         XCTAssertNil(loaded)
     }
 
+    // MARK: - Edge Cases
+
+    func testDeleteNonExistentWorkoutIsNoOp() async throws {
+        try cache.migrate()
+
+        let detail = DemoWorkoutLibrary.details.first!
+        try await cache.save(detail: detail)
+
+        // Deleting an ID that does not exist should not throw.
+        try await cache.delete(id: 999_999)
+
+        // The real workout should still be there.
+        let loaded = try await cache.detail(id: detail.workout.id)
+        XCTAssertNotNil(loaded)
+        XCTAssertEqual(loaded?.workout.id, detail.workout.id)
+    }
+
+    func testNilOptionalsRemainNilAfterRoundTrip() async throws {
+        try cache.migrate()
+
+        // Find a workout with nil optional fields.
+        let bikeDetail = DemoWorkoutLibrary.details.first { $0.workout.sport == .bike }
+        let detail = try XCTUnwrap(bikeDetail, "Expected a bike workout in demo data")
+        XCTAssertTrue(detail.workout.dragFactor == nil || detail.workout.comments == nil || detail.workout.source == nil,
+            "Test needs a workout with at least one nil optional to be meaningful")
+
+        try await cache.save(detail: detail)
+
+        let loaded = try await cache.detail(id: detail.workout.id)
+        XCTAssertNotNil(loaded)
+        guard let loaded else { return }
+
+        // Verify nil optionals survived the round-trip.
+        XCTAssertEqual(loaded.workout.strokeRate, detail.workout.strokeRate)
+        XCTAssertEqual(loaded.workout.strokeCount, detail.workout.strokeCount)
+        XCTAssertEqual(loaded.workout.heartRateAvg, detail.workout.heartRateAvg)
+        XCTAssertEqual(loaded.workout.caloriesTotal, detail.workout.caloriesTotal)
+        XCTAssertEqual(loaded.workout.wattMinutes, detail.workout.wattMinutes)
+        XCTAssertEqual(loaded.workout.dragFactor, detail.workout.dragFactor)
+        XCTAssertEqual(loaded.workout.comments, detail.workout.comments)
+        XCTAssertEqual(loaded.workout.source, detail.workout.source)
+    }
+
+    func testSaveWorkoutsForNewWorkoutCreatesEmptyDetail() async throws {
+        try cache.migrate()
+
+        // Save a summary for a workout that has never been saved as a detail.
+        let workout = DemoWorkoutLibrary.details.first!.workout
+        try await cache.saveWorkouts([workout])
+
+        let detail = try await cache.detail(id: workout.id)
+        XCTAssertNotNil(detail)
+        XCTAssertEqual(detail?.workout.id, workout.id)
+        XCTAssertTrue(detail?.strokes.isEmpty ?? false)
+        XCTAssertTrue(detail?.splits.isEmpty ?? false)
+    }
+
     // MARK: - Persistence
 
     func testCachePersistsAcrossInstances() async throws {
@@ -240,6 +335,28 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
     }
 
     // MARK: - Raw SQLite Helpers
+
+    private func createLegacyV1Schema() throws {
+        try withRawDatabase(flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX) { db in
+            let sql = """
+                CREATE TABLE workouts (
+                    id INTEGER PRIMARY KEY,
+                    sport TEXT NOT NULL,
+                    date REAL NOT NULL,
+                    workout_type TEXT NOT NULL,
+                    distance REAL NOT NULL,
+                    time REAL NOT NULL,
+                    pace REAL NOT NULL,
+                    detail_json TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                PRAGMA user_version = 1;
+                """
+            guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+                throw sqliteError("create legacy schema failed: \(String(cString: sqlite3_errmsg(db)))")
+            }
+        }
+    }
 
     private func executeSQL(_ sql: String) throws {
         try withRawDatabase { db in
@@ -267,9 +384,11 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         }
     }
 
-    private func withRawDatabase<T>(_ body: (OpaquePointer?) throws -> T) throws -> T {
+    private func withRawDatabase<T>(
+        flags: Int32 = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+        _ body: (OpaquePointer?) throws -> T
+    ) throws -> T {
         var db: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(dbPath, &db, flags, nil) == SQLITE_OK else {
             throw sqliteError("open failed")
         }

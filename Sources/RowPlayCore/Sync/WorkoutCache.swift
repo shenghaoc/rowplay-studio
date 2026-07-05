@@ -17,6 +17,9 @@ public protocol WorkoutCache: Sendable {
     /// Persist workout summaries, upserting by workout ID.
     func saveWorkouts(_ workouts: [Workout]) async throws
     /// Load full detail for a specific workout, or nil if not cached.
+    ///
+    /// If a workout was saved via ``saveWorkouts(_:)`` without a prior
+    /// ``save(detail:)``, this returns a placeholder with empty strokes/splits.
     func detail(id: Workout.ID) async throws -> WorkoutDetail?
     /// Load all cached workout summaries, newest first.
     func listWorkouts() async throws -> [Workout]
@@ -82,6 +85,10 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
                 if var detail = details[workout.id] {
                     detail.workout = workout
                     details[workout.id] = detail
+                } else {
+                    // Create a placeholder detail so detail(id:) returns a value
+                    // consistent with SQLiteWorkoutCache behavior.
+                    details[workout.id] = WorkoutDetail(workout: workout, strokes: [], splits: [])
                 }
             }
         }
