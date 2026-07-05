@@ -12,7 +12,12 @@ let package = Package(
         .library(name: "RowPlayCore", targets: ["RowPlayCore"])
     ],
     targets: [
-        .target(name: "RowPlayCore"),
+        .target(
+            name: "RowPlayCore",
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
+            ]
+        ),
         .executableTarget(
             name: "RowPlayStudio",
             dependencies: ["RowPlayCore"]
