@@ -122,7 +122,7 @@ enum Concept2Mapper {
                 distance: distance,
                 time: time,
                 pace: pace,
-                cadence: Double(s.strokeRate ?? 0),
+                cadence: s.strokeRate.map(Double.init),
                 heartRate: heartRate,
                 isRest: isRest
             )
