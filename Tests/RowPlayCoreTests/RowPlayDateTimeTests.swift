@@ -184,7 +184,9 @@ final class RowPlayDateTimeTests: XCTestCase {
 
     func testNowISOStringReturnsISOFormat() {
         let iso = RowPlayDateTime.nowISOString()
-        XCTAssertTrue(iso.contains("T"))
-        XCTAssertTrue(iso.hasSuffix("Z"))
+        // Full ISO 8601 internet date-time: yyyy-MM-dd'T'HH:mm:ss'Z'
+        XCTAssertEqual(iso.count, 20)
+        let pattern = #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"#
+        XCTAssertNotNil(iso.range(of: pattern, options: .regularExpression))
     }
 }

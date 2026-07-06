@@ -39,6 +39,9 @@ public enum RowPlayDateTime {
         return f
     }()
 
+    /// Guards `dayKeyFormatter` — `DateFormatter` is not thread-safe.
+    private static let dayKeyFormatterLock = NSLock()
+
     private static let gregorian: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = utc
@@ -65,7 +68,9 @@ public enum RowPlayDateTime {
 
     /// Convert a `Date` to a `YYYY-MM-DD` string in UTC.
     public static func dayKeyFromDate(_ date: Date) -> String {
-        dayKeyFormatter.string(from: date)
+        dayKeyFormatterLock.lock()
+        defer { dayKeyFormatterLock.unlock() }
+        return dayKeyFormatter.string(from: date)
     }
 
     /// Today as `YYYY-MM-DD` in UTC.
@@ -84,6 +89,8 @@ public enum RowPlayDateTime {
     public static func dayKeyAddingDays(_ days: Int, to key: String) -> String {
         guard let date = parseDayKey(key) else { return key }
         guard let result = gregorian.date(byAdding: .day, value: days, to: date) else { return key }
+        dayKeyFormatterLock.lock()
+        defer { dayKeyFormatterLock.unlock() }
         return dayKeyFormatter.string(from: result)
     }
 
