@@ -11,7 +11,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - **Query/filter/sort**: `WorkoutQuery` engine with sport, date, distance/duration chips, search, PB-only filtering, and multi-field sorting.
 - **Replay engine**: Sampling (`sampleAt`/`sampleIndexAt`), motion timing, comparability guard, ghost selection, sport themes, inspector helpers, and a `ReplayState` playback state machine.
 - **Replay renderer**: SwiftUI Canvas 2D replay surface with playback controls, scrubber, speed picker, and telemetry overlay.
-- **Sync boundaries**: `TokenStore` protocol (Keychain-backed), `Concept2APIClient` protocol (mock only), `WorkoutCache` protocol (in-memory + SQLite foundation), `SyncStateTracker`, and `PrivacySafeLogger` with tested redaction.
+- **Sync boundaries**: `TokenStore` protocol (Keychain-backed), `Concept2APIClient` protocol (mock + URLSession foundation), `WorkoutCache` protocol (in-memory + SQLite foundation), `SyncStateTracker`, and `PrivacySafeLogger` with tested redaction.
 - **Workout tools**: Comparison (verdict, side stats, interval reps, distance overlay), rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package.
 - **Live mode**: State machine, polling cadence with backoff, `LiveSource` protocol, `MockLiveSource`, `DemoLiveSampleGenerator`, and a native live-mode panel.
 - **Hardware connectivity**: `ErgDevice`, `ErgConnectionState`, `ErgTelemetrySample`, `ErgConnection` protocol, and `MockErgConnection` with deterministic telemetry.
@@ -35,7 +35,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ### Must-Fix
 
-1. **No production Concept2 sync**: `Concept2APIClient` remains mock-only, and no URLSession client or app sync workflow writes remote Concept2 data into the local cache. `WorkoutCache` now has a SQLite foundation that stores `WorkoutDetail` JSON in a v1 schema, but sync integration is still future work.
+1. **No production Concept2 sync**: `URLSessionConcept2Client` foundation exists with BYOT token injection and fake-transport tests, but the app sync workflow that orchestrates fetching and writes into the local cache is still future work. `WorkoutCache` has a SQLite foundation that stores `WorkoutDetail` JSON in a v1 schema; connecting the URLSession client to the cache remains a follow-up.
 2. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
 3. **No persistent annotation storage**: `InMemoryAnnotationStore` loses data on restart. SQLite or Core Data backing is needed for annotations. (Workout cache now has a SQLite foundation via `SQLiteWorkoutCache`.)
 
@@ -55,5 +55,5 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 
 ## Recommended Next PRs
 
-1. **URLSession Concept2 client**: Implement `URLSessionConcept2Client` conforming to `Concept2APIClient` with BYOT token injection.
+1. **Concept2 sync workflow**: Wire `URLSessionConcept2Client` into the app sync flow to fetch workouts from the logbook and write them into `SQLiteWorkoutCache`.
 2. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
