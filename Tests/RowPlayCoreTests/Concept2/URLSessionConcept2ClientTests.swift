@@ -51,7 +51,11 @@ final class SequenceHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var _responses: [Result<(Data, HTTPURLResponse), Error>]
     private var _index = 0
-    private(set) var capturedRequests: [URLRequest] = []
+    private var _capturedRequests: [URLRequest] = []
+
+    var capturedRequests: [URLRequest] {
+        lock.withLock { _capturedRequests }
+    }
 
     init(responses: [Result<(Data, HTTPURLResponse), Error>]) {
         _responses = responses
@@ -59,7 +63,7 @@ final class SequenceHTTPTransport: HTTPTransport, @unchecked Sendable {
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         let result: Result<(Data, HTTPURLResponse), Error> = lock.withLock {
-            capturedRequests.append(request)
+            _capturedRequests.append(request)
             let idx = _index
             _index += 1
             return idx < _responses.count ? _responses[idx] : _responses.last!
