@@ -178,5 +178,8 @@ struct LiveModePanelView: View {
                 .font(.caption.monospacedDigit())
         }
         .frame(minWidth: 64, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
