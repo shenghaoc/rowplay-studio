@@ -43,8 +43,12 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     // MARK: - Concept2APIClient
 
     public func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
+        guard perPage > 0 else {
+            return Concept2Page(workouts: [], totalPages: 1)
+        }
+        let effectivePage = max(1, page)
         let response: Concept2WorkoutSummaryResponse = try await request(
-            endpoint: .workoutSummaries(page: page, number: perPage)
+            endpoint: .workoutSummaries(page: effectivePage, number: perPage)
         )
         let workouts = response.data.map(Concept2Mapper.mapWorkout)
         let totalPages = response.meta?.pagination?.totalPages ?? 1

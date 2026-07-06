@@ -5,6 +5,7 @@ import XCTest
 
 /// Fake HTTP transport for testing. Captures requests and returns configured responses.
 final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
     /// The last URLRequest passed to `data(for:)`.
     private(set) var capturedRequest: URLRequest?
     /// The number of times `data(for:)` was called.
@@ -14,8 +15,10 @@ final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
     var result: Result<(Data, HTTPURLResponse), Error>!
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        capturedRequest = request
-        callCount += 1
+        lock.withLock {
+            capturedRequest = request
+            callCount += 1
+        }
         switch result! {
         case let .success((data, response)):
             return (data, response)

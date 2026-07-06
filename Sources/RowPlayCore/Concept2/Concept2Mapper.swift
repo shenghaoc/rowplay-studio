@@ -10,14 +10,17 @@ import Foundation
 ///   per 1000m for bike) → divide by 10, then by 2 for bike to normalise to
 ///   seconds per 500m.
 enum Concept2Mapper {
-    /// Date formatter for Concept2 API timestamps ("yyyy-MM-dd HH:mm:ss").
-    static let apiDateFormatter: DateFormatter = {
+    /// Create a date formatter for Concept2 API timestamps ("yyyy-MM-dd HH:mm:ss").
+    ///
+    /// A new instance is created per call because `DateFormatter` is not thread-safe
+    /// and this mapper may be invoked concurrently from different async contexts.
+    private static func makeAPIDateFormatter() -> DateFormatter {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
         fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.timeZone = TimeZone(secondsFromGMT: 0)
         return fmt
-    }()
+    }
 
     // MARK: - Workout Summary
 
@@ -31,7 +34,7 @@ enum Concept2Mapper {
 
         return Workout(
             id: raw.id,
-            date: apiDateFormatter.date(from: raw.date) ?? Date(timeIntervalSince1970: 0),
+            date: Self.makeAPIDateFormatter().date(from: raw.date) ?? Date(timeIntervalSince1970: 0),
             sport: sport,
             distance: distance,
             time: timeSeconds,
@@ -128,23 +131,23 @@ enum Concept2Mapper {
 
     // MARK: - Watts Calculation
 
+    /// BikeErg PM uses the cubic formula on the 1000m split; normalised sec/500m
+    /// overstates power by 2³ = 8. Matches `BIKE_WATTS_FROM_NORMALIZED_PACE_DIVISOR`.
+    private static let bikeWattsDivisor = 8.0
+
     /// Convert pace (seconds per 500m) to watts using the Concept2 formula.
     ///
     /// Matches `paceToWattsForSport` in the web app's `format.ts`.
-    /// For bike: pace is seconds per 1000m. For rower/skierg: seconds per 500m.
+    /// All paces are normalised to sec/500m before calling this function.
+    /// For bike, the result is divided by 8 to compensate for the PM's
+    /// use of 1000m splits in the cubic formula.
     static func paceToWatts(sport: Sport, pace: Double) -> Int {
         guard pace > 0 else { return 0 }
-        // Concept2 formula: watts = 2.80 / pace³ (pace in seconds per metre)
-        let pacePerMetre: Double
-        switch sport {
-        case .bike:
-            pacePerMetre = pace / 1000
-        case .rower, .skierg:
-            pacePerMetre = pace / 500
-        }
-        guard pacePerMetre > 0 else { return 0 }
+        // Concept2 formula: watts = 2.80 / (pace/500)³
+        let pacePerMetre = pace / 500
         let watts = 2.80 / (pacePerMetre * pacePerMetre * pacePerMetre)
         guard watts.isFinite, watts <= Double(Int.max) else { return 0 }
-        return Int(watts.rounded())
+        let adjusted = sport == .bike ? watts / bikeWattsDivisor : watts
+        return Int(adjusted.rounded())
     }
 }

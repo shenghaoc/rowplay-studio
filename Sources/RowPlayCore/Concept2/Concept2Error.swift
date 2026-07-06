@@ -46,9 +46,9 @@ extension Concept2Error: CustomStringConvertible {
 /// is not included in `Concept2Error` to avoid leaking sensitive data.
 public struct Concept2TransportError: Error, Sendable {
     /// The underlying error from the transport layer.
-    public let underlying: any Error
+    public let underlying: any Error & Sendable
 
-    public init(underlying: any Error) {
+    public init(underlying: any Error & Sendable) {
         self.underlying = underlying
     }
 }
