@@ -165,3 +165,13 @@ struct Concept2RawStroke: Decodable {
     /// Heart rate (optional).
     let hr: Int?
 }
+
+// MARK: - Strokes Response
+
+/// Top-level response from the workout strokes endpoint.
+///
+/// Matches: `GET /api/users/me/results/{id}/strokes`
+/// Shape: `{ data: RawStroke[] }`
+struct Concept2StrokesResponse: Decodable {
+    let data: [Concept2RawStroke]
+}

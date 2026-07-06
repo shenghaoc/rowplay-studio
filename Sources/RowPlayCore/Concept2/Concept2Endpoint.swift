@@ -10,6 +10,8 @@ public enum Concept2Endpoint {
     case workoutSummaries(page: Int, number: Int)
     /// Fetch full workout detail by Concept2 workout ID.
     case workoutDetail(id: Int)
+    /// Fetch per-stroke data for a workout.
+    case workoutStrokes(id: Int)
 
     /// The API path component (without the base URL).
     public var path: String {
@@ -18,6 +20,8 @@ public enum Concept2Endpoint {
             "/api/users/me/results"
         case let .workoutDetail(id):
             "/api/users/me/results/\(id)"
+        case let .workoutStrokes(id):
+            "/api/users/me/results/\(id)/strokes"
         }
     }
 
@@ -31,6 +35,8 @@ public enum Concept2Endpoint {
             ]
         case .workoutDetail:
             [URLQueryItem(name: "include", value: "metadata")]
+        case .workoutStrokes:
+            []
         }
     }
 

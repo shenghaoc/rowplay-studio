@@ -16,7 +16,7 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     private let logger: PrivacySafeLogger
 
     /// The Concept2 logbook API base URL.
-    public static let defaultBaseURL = URL(string: "https://logbook.concept2.com")!
+    public static let defaultBaseURL = URL(string: "https://log.concept2.com")!
 
     /// Create a client with an injected BYOT token.
     ///
@@ -61,16 +61,28 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
         )
         let raw = response.data
         let workout = Concept2Mapper.mapWorkout(raw)
+        let sport = Sport.fromConcept2Type(raw.type)
 
-        // Map splits from the raw response.
-        // Note: The web app calls a separate /strokes endpoint for per-stroke data.
-        // For this foundation, we map from the detail response only.
-        // Full stroke fetching will be added when sync orchestration is implemented.
+        // Fetch per-stroke data when available (matches web app's getWorkout).
+        var strokes: [Stroke] = []
+        if raw.strokeData == true {
+            do {
+                let strokesResponse: Concept2StrokesResponse = try await request(
+                    endpoint: .workoutStrokes(id: id)
+                )
+                strokes = Concept2Mapper.mapStrokes(strokesResponse.data, sport: sport)
+            } catch {
+                // Stroke fetch failure is non-fatal — fall back to empty strokes.
+                // Matches the web app's try/catch around the /strokes call.
+                logger.warn("Stroke fetch failed for workout \(id): \(error)")
+            }
+        }
+
         let splits = Concept2Mapper.mapSplits(raw)
 
         return WorkoutDetail(
             workout: workout,
-            strokes: [],
+            strokes: strokes,
             splits: splits
         )
     }

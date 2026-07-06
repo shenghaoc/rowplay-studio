@@ -2,7 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 final class Concept2EndpointTests: XCTestCase {
-    private let baseURL = URL(string: "https://logbook.concept2.com")!
+    private let baseURL = URL(string: "https://log.concept2.com")!
 
     // MARK: - Workout Summaries
 
@@ -51,7 +51,7 @@ final class Concept2EndpointTests: XCTestCase {
     func testFullURLConstruction() throws {
         let endpoint = Concept2Endpoint.workoutSummaries(page: 2, number: 100)
         let url = try endpoint.url(from: baseURL)
-        XCTAssertEqual(url.absoluteString, "https://logbook.concept2.com/api/users/me/results?page=2&number=100")
+        XCTAssertEqual(url.absoluteString, "https://log.concept2.com/api/users/me/results?page=2&number=100")
     }
 
     func testBaseURLWithPathPrefixIsPreserved() throws {

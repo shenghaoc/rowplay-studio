@@ -6,13 +6,18 @@ import XCTest
 /// Fake HTTP transport for testing. Captures requests and returns configured responses.
 final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
-    private var _capturedRequest: URLRequest?
+    private var _capturedRequests: [URLRequest] = []
     private var _callCount = 0
     private var _result: Result<(Data, HTTPURLResponse), Error>!
 
+    /// All requests passed to `data(for:)`, in order.
+    var capturedRequests: [URLRequest] {
+        lock.withLock { _capturedRequests }
+    }
+
     /// The last URLRequest passed to `data(for:)`.
     var capturedRequest: URLRequest? {
-        lock.withLock { _capturedRequest }
+        lock.withLock { _capturedRequests.last }
     }
 
     /// The number of times `data(for:)` was called.
@@ -28,11 +33,38 @@ final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         lock.withLock {
-            _capturedRequest = request
+            _capturedRequests.append(request)
             _callCount += 1
         }
         let currentResult = lock.withLock { _result! }
         switch currentResult {
+        case let .success((data, response)):
+            return (data, response)
+        case let .failure(error):
+            throw error
+        }
+    }
+}
+
+/// Fake transport that returns responses in sequence (for multi-request operations).
+final class SequenceHTTPTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _responses: [Result<(Data, HTTPURLResponse), Error>]
+    private var _index = 0
+    private(set) var capturedRequests: [URLRequest] = []
+
+    init(responses: [Result<(Data, HTTPURLResponse), Error>]) {
+        _responses = responses
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        let result: Result<(Data, HTTPURLResponse), Error> = lock.withLock {
+            capturedRequests.append(request)
+            let idx = _index
+            _index += 1
+            return idx < _responses.count ? _responses[idx] : _responses.last!
+        }
+        switch result {
         case let .success((data, response)):
             return (data, response)
         case let .failure(error):
@@ -116,9 +148,9 @@ private let sampleDetailJSON = """
 
 final class URLSessionConcept2ClientTests: XCTestCase {
     private let testToken = "test-secret-token-abcdef1234567890ab"
-    private let baseURL = URL(string: "https://logbook.concept2.com")!
+    private let baseURL = URL(string: "https://log.concept2.com")!
 
-    private func makeClient(transport: FakeHTTPTransport) -> URLSessionConcept2Client {
+    private func makeClient(transport: any HTTPTransport) -> URLSessionConcept2Client {
         URLSessionConcept2Client(baseURL: baseURL, token: testToken, transport: transport)
     }
 
@@ -143,14 +175,18 @@ final class URLSessionConcept2ClientTests: XCTestCase {
     }
 
     func testWorkoutDetailRequestUsesExpectedPath() async throws {
-        let transport = FakeHTTPTransport()
-        let data = sampleDetailJSON.data(using: .utf8)!
-        transport.result = .success((data, httpResponse(statusCode: 200)))
+        let detailData = sampleDetailJSON.data(using: .utf8)!
+        let strokesData = "{\"data\":[]}".data(using: .utf8)!
+        let transport = SequenceHTTPTransport(responses: [
+            .success((detailData, httpResponse(statusCode: 200))),
+            .success((strokesData, httpResponse(statusCode: 200))),
+        ])
         let client = makeClient(transport: transport)
 
         _ = try await client.fetchWorkoutDetail(id: 1001)
 
-        let request = try XCTUnwrap(transport.capturedRequest)
+        // First request should be the detail endpoint.
+        let request = try XCTUnwrap(transport.capturedRequests.first)
         let url = try XCTUnwrap(request.url)
         XCTAssertEqual(url.path, "/api/users/me/results/1001")
 

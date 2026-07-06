@@ -57,8 +57,22 @@ enum Concept2Mapper {
             source: raw.source,
             verified: raw.verified ?? true,
             hasStrokeData: raw.strokeData ?? false,
-            isInterval: raw.workout?.intervals?.isEmpty == false
+            isInterval: Self.isIntervalWorkout(type: raw.workoutType, intervals: raw.workout?.intervals)
         )
+    }
+
+    // MARK: - Interval Detection
+
+    /// Determine if a workout is an interval workout.
+    ///
+    /// Checks `workout_type` first (e.g., "FixedDistanceInterval", "VariableInterval")
+    /// because the Concept2 API commonly omits the `workout` object in summary responses.
+    /// Falls back to checking `workout.intervals` when the type is ambiguous.
+    private static func isIntervalWorkout(type: String?, intervals: [Concept2RawSplit]?) -> Bool {
+        if let type, type.lowercased().contains("interval") {
+            return true
+        }
+        return intervals?.isEmpty == false
     }
 
     // MARK: - Heart Rate
