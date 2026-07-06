@@ -2,38 +2,48 @@
 
 ## Implementation
 
-- [ ] Create `Sources/RowPlayCore/Concept2/HTTPTransport.swift` — protocol + URLSession implementation
-- [ ] Create `Sources/RowPlayCore/Concept2/Concept2Endpoint.swift` — endpoint enum with URL construction
-- [ ] Create `Sources/RowPlayCore/Concept2/Concept2Error.swift` — typed errors with redaction
-- [ ] Create `Sources/RowPlayCore/Concept2/Concept2Models.swift` — raw API response models
-- [ ] Create `Sources/RowPlayCore/Concept2/Concept2Mapper.swift` — raw → domain mapping
-- [ ] Create `Sources/RowPlayCore/Concept2/URLSessionConcept2Client.swift` — main client
+- [x] Create `Sources/RowPlayCore/Concept2/HTTPTransport.swift` — protocol + URLSession implementation
+- [x] Create `Sources/RowPlayCore/Concept2/Concept2Endpoint.swift` — endpoint enum with URL construction, custom base-path preservation, and strokes endpoint support
+- [x] Create `Sources/RowPlayCore/Concept2/Concept2Error.swift` — typed errors with redaction and transport wrapper
+- [x] Create `Sources/RowPlayCore/Concept2/Concept2Models.swift` — raw API response models for summaries, details, and strokes
+- [x] Create `Sources/RowPlayCore/Concept2/Concept2Mapper.swift` — raw → domain mapping, workout-type interval detection, and bike watt normalization
+- [x] Create `Sources/RowPlayCore/Concept2/URLSessionConcept2Client.swift` — main client with detail + optional strokes fetch
 
 ## Tests
 
-- [ ] Create `Tests/RowPlayCoreTests/Concept2/URLSessionConcept2ClientTests.swift`
-  - [ ] testWorkoutSummariesRequestUsesExpectedPath
-  - [ ] testAuthorizationHeaderUsesInjectedToken
-  - [ ] testAcceptHeaderRequestsJSON
-  - [ ] testDecodesWorkoutSummaryResponse
-  - [ ] testNon2xxThrowsTypedError
-  - [ ] testTransportFailurePropagatesAsConcept2Error
-  - [ ] testClientDoesNotPersistToken
-- [ ] Create `Tests/RowPlayCoreTests/Concept2/Concept2EndpointTests.swift`
-  - [ ] testWorkoutSummariesPath
-  - [ ] testWorkoutSummariesPagination
-  - [ ] testWorkoutDetailPath
-  - [ ] testBaseURLPreserved
+- [x] Create `Tests/RowPlayCoreTests/Concept2/URLSessionConcept2ClientTests.swift`
+  - [x] testWorkoutSummariesRequestUsesExpectedPath
+  - [x] testAuthorizationHeaderUsesInjectedToken
+  - [x] testAcceptHeaderRequestsJSON
+  - [x] testDecodesWorkoutSummaryResponse
+  - [x] testDecodesWorkoutDetailResponse
+  - [x] testWorkoutDetailRequestUsesExpectedPath
+  - [x] testNon2xxThrowsTypedError
+  - [x] testTransportFailurePropagatesAsConcept2Error
+  - [x] testClientDoesNotPersistToken
+- [x] Create `Tests/RowPlayCoreTests/Concept2/Concept2EndpointTests.swift`
+  - [x] testWorkoutSummariesPath
+  - [x] testWorkoutSummariesPagination
+  - [x] testWorkoutDetailPath
+  - [x] testWorkoutDetailIncludesMetadataParam
+  - [x] testBaseURLPreserved
+  - [x] testBaseURLWithPathPrefixIsPreserved
+- [x] Create `Tests/RowPlayCoreTests/Concept2/Concept2MapperTests.swift`
+  - [x] workout summary defaults and heart-rate union mapping
+  - [x] bike stroke pace normalization and interval offset accumulation
+  - [x] split rest detection and nil cadence preservation
+  - [x] bike watt regression coverage
 
 ## Docs
 
-- [ ] Update `docs/source-map.md`
-- [ ] Update `docs/beta-readiness.md`
-- [ ] Update `docs/roadmap.md` if needed
+- [x] Update `docs/source-map.md`
+- [x] Update `docs/beta-readiness.md`
+- [x] Update `docs/roadmap.md` if needed
+- [x] Keep this Kiro spec aligned with the final code and PR scope
 
 ## Validation
 
-- [ ] `swift test` passes
-- [ ] `swift build` passes
-- [ ] `git diff --check` clean
-- [ ] No UI, Bluetooth, SQLite schema, or real network changes
+- [x] `swift test` passes
+- [x] `swift build` passes
+- [x] `git diff --check` clean
+- [x] No UI, Bluetooth, SQLite schema, or real network changes

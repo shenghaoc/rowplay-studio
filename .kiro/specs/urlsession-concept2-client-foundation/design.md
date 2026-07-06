@@ -27,18 +27,21 @@ Production implementation wrapping `URLSession.shared`. The `URLSession` is inje
 Enum with cases for each supported API endpoint:
 - `.workoutSummaries(page:number:)` → `GET /api/users/me/results`
 - `.workoutDetail(id:)` → `GET /api/users/me/results/{id}`
+- `.workoutStrokes(id:)` → `GET /api/users/me/results/{id}/strokes`
 
-Constructs the full URL from a base URL.
+Constructs the full URL from a base URL, preserving any existing path prefix
+on custom hosts such as API gateways or local mock servers.
 
 ### Concept2Error
 
-Typed error enum covering:
+Typed error types covering:
 - `.unauthorized` — 401
 - `.forbidden` — 403
 - `.rateLimited` — 429
 - `.httpError(statusCode:)` — other non-2xx
-- `.transport(Error)` — underlying URLSession/transport failure
-- `.decoding(Error)` — JSON decode failure
+- `.invalidURL(path)` — URL construction failure
+- `.decodingFailed` — JSON decode failure
+- `Concept2TransportError` — underlying URLSession/transport failure
 
 All descriptions redact sensitive data.
 
@@ -53,8 +56,10 @@ Minimal Codable structs matching the Concept2 logbook JSON:
 ### Concept2Mapper
 
 Static mapping functions:
-- `Concept2RawResult.toDomain()` → `Workout`
+- `Concept2RawResult` → `Workout` with `workout_type`-aware interval detection
 - Raw strokes/splits → `[Stroke]` / `[Split]` with unit normalization (tenths → seconds, decimetres → metres)
+- Bike watt calculation matching the web app's normalized sec/500m formula
+- Heart-rate mapping for both integer and `{ average, min, max }` payloads
 
 ### URLSessionConcept2Client
 
@@ -63,12 +68,14 @@ Static mapping functions:
 - Sets `Authorization: Bearer <token>` and `Accept: application/vnd.c2logbook.v1+json` on every request
 - Does not log, persist, or expose the token
 - Maps HTTP status codes to typed `Concept2Error` cases
+- Fetches `/strokes` for workout details when `stroke_data == true`
+- Logs decoding failures and non-fatal stroke-fetch failures through `PrivacySafeLogger`
 
 ## Web API Reference
 
 From `src/lib/server/concept2.ts`:
 
-- **Base URL**: `https://logbook.concept2.com` (configurable)
+- **Base URL**: `https://log.concept2.com` (configurable)
 - **Auth header**: `Authorization: Bearer <token>`
 - **Accept header**: `application/vnd.c2logbook.v1+json`
 - **List endpoint**: `GET /api/users/me/results?page={page}&number={number}`
@@ -90,5 +97,6 @@ The API returns:
 ## Test Strategy
 
 - `FakeHTTPTransport`: captures `URLRequest`, returns configurable `Data`/`HTTPURLResponse` or throws.
+- `SequenceHTTPTransport`: returns ordered responses for multi-request detail fetches (`detail` then `strokes`).
 - No real network, no real tokens, no sleeps.
-- Tests verify: path construction, auth header, accept header, JSON decoding, non-2xx errors, transport failure propagation, token privacy in errors.
+- Tests verify: path construction, auth header, accept header, JSON decoding, detail stroke-fetch sequencing, non-2xx errors, transport failure propagation, token privacy in errors, and mapper regression behavior.
