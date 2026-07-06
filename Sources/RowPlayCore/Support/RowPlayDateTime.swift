@@ -147,11 +147,9 @@ public enum RowPlayDateTime {
 
     // MARK: - ISO Helpers
 
-    private static let isoFormatter = ISO8601DateFormatter()
-
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {
-        isoFormatter.string(from: Date())
+        Date().formatted(.iso8601)
     }
 
     // MARK: - Private
