@@ -73,7 +73,7 @@ Status: merged to `main`.
 
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
-Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; full production sync and URLSession client remain in progress.
+Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; URLSession Concept2 client foundation added; full production sync workflow remains in progress.
 
 Scope:
 
