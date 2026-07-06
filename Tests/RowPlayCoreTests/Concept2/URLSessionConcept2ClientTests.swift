@@ -6,20 +6,33 @@ import XCTest
 /// Fake HTTP transport for testing. Captures requests and returns configured responses.
 final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
+    private var _capturedRequest: URLRequest?
+    private var _callCount = 0
+    private var _result: Result<(Data, HTTPURLResponse), Error>!
+
     /// The last URLRequest passed to `data(for:)`.
-    private(set) var capturedRequest: URLRequest?
+    var capturedRequest: URLRequest? {
+        lock.withLock { _capturedRequest }
+    }
+
     /// The number of times `data(for:)` was called.
-    private(set) var callCount = 0
+    var callCount: Int {
+        lock.withLock { _callCount }
+    }
 
     /// The result to return on the next call. Set this before calling client methods.
-    var result: Result<(Data, HTTPURLResponse), Error>!
+    var result: Result<(Data, HTTPURLResponse), Error>! {
+        get { lock.withLock { _result } }
+        set { lock.withLock { _result = newValue } }
+    }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         lock.withLock {
-            capturedRequest = request
-            callCount += 1
+            _capturedRequest = request
+            _callCount += 1
         }
-        switch result! {
+        let currentResult = lock.withLock { _result! }
+        switch currentResult {
         case let .success((data, response)):
             return (data, response)
         case let .failure(error):

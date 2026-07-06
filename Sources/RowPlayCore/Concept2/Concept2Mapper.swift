@@ -10,16 +10,23 @@ import Foundation
 ///   per 1000m for bike) → divide by 10, then by 2 for bike to normalise to
 ///   seconds per 500m.
 enum Concept2Mapper {
-    /// Create a date formatter for Concept2 API timestamps ("yyyy-MM-dd HH:mm:ss").
+    /// Cached date formatter for Concept2 API timestamps ("yyyy-MM-dd HH:mm:ss").
     ///
-    /// A new instance is created per call because `DateFormatter` is not thread-safe
-    /// and this mapper may be invoked concurrently from different async contexts.
-    private static func makeAPIDateFormatter() -> DateFormatter {
+    /// `DateFormatter` is not thread-safe, so access is serialised through `formatterLock`.
+    private static let formatterLock = NSLock()
+    private static let apiDateFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
         fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.timeZone = TimeZone(secondsFromGMT: 0)
         return fmt
+    }()
+
+    /// Thread-safe date parsing.
+    private static func parseDate(_ string: String) -> Date? {
+        formatterLock.withLock {
+            apiDateFormatter.date(from: string)
+        }
     }
 
     // MARK: - Workout Summary
@@ -34,7 +41,7 @@ enum Concept2Mapper {
 
         return Workout(
             id: raw.id,
-            date: Self.makeAPIDateFormatter().date(from: raw.date) ?? Date(timeIntervalSince1970: 0),
+            date: parseDate(raw.date) ?? Date(timeIntervalSince1970: 0),
             sport: sport,
             distance: distance,
             time: timeSeconds,
@@ -146,7 +153,7 @@ enum Concept2Mapper {
         // Concept2 formula: watts = 2.80 / (pace/500)³
         let pacePerMetre = pace / 500
         let watts = 2.80 / (pacePerMetre * pacePerMetre * pacePerMetre)
-        guard watts.isFinite, watts <= Double(Int.max) else { return 0 }
+        guard watts.isFinite, watts < 1_000_000.0 else { return 0 }
         let adjusted = sport == .bike ? watts / bikeWattsDivisor : watts
         return Int(adjusted.rounded())
     }
