@@ -13,6 +13,7 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     private let token: String
     private let transport: any HTTPTransport
     private let decoder: JSONDecoder
+    private let logger: PrivacySafeLogger
 
     /// The Concept2 logbook API base URL.
     public static let defaultBaseURL = URL(string: "https://logbook.concept2.com")!
@@ -24,16 +25,19 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     ///   - token: The BYOT access token. Held in memory only.
     ///   - transport: The HTTP transport to use. Defaults to `URLSessionHTTPTransport`.
     ///   - decoder: JSON decoder for response parsing.
+    ///   - logger: Privacy-safe logger for diagnostics. Defaults to `"concept2-client"` category.
     public init(
         baseURL: URL = defaultBaseURL,
         token: String,
         transport: any HTTPTransport = URLSessionHTTPTransport(),
-        decoder: JSONDecoder = JSONDecoder()
+        decoder: JSONDecoder = JSONDecoder(),
+        logger: PrivacySafeLogger = PrivacySafeLogger(category: "concept2-client")
     ) {
         self.baseURL = baseURL
         self.token = token
         self.transport = transport
         self.decoder = decoder
+        self.logger = logger
     }
 
     // MARK: - Concept2APIClient
@@ -101,6 +105,7 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
+            logger.warn("Concept2 response decoding failed: \(error)")
             throw Concept2Error.decodingFailed
         }
     }

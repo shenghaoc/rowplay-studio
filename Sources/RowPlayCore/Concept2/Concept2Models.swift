@@ -58,7 +58,7 @@ struct Concept2RawResult: Decodable {
     let verified: Bool?
     let restTime: Double?
     let restDistance: Double?
-    let heartRate: Concept2RawHeartRate?
+    let heartRate: Concept2RawHeartRateValue?
     let workout: Concept2RawWorkout?
     let metadata: Concept2RawMetadata?
 

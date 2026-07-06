@@ -27,7 +27,7 @@ enum Concept2Mapper {
         let timeSeconds = raw.time / 10
         let distance = raw.distance
         let pace = distance > 0 ? timeSeconds / (distance / 500) : 0
-        let heartRate = mapHeartRate(raw.heartRate)
+        let heartRate = mapHeartRateValue(raw.heartRate)
 
         return Workout(
             id: raw.id,
@@ -144,6 +144,7 @@ enum Concept2Mapper {
         }
         guard pacePerMetre > 0 else { return 0 }
         let watts = 2.80 / (pacePerMetre * pacePerMetre * pacePerMetre)
+        guard watts.isFinite, watts <= Double(Int.max) else { return 0 }
         return Int(watts.rounded())
     }
 }

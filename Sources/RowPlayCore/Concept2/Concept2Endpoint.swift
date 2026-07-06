@@ -43,7 +43,9 @@ public enum Concept2Endpoint {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             throw Concept2Error.invalidURL(path)
         }
-        components.path = path
+        let basePath = baseURL.path
+        let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        components.path = basePath.hasSuffix("/") ? basePath + cleanPath : basePath + "/" + cleanPath
         components.queryItems = queryItems.isEmpty ? nil : queryItems
         guard let url = components.url else {
             throw Concept2Error.invalidURL(path)

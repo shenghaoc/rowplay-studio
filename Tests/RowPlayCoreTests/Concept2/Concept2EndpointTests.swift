@@ -53,4 +53,11 @@ final class Concept2EndpointTests: XCTestCase {
         let url = try endpoint.url(from: baseURL)
         XCTAssertEqual(url.absoluteString, "https://logbook.concept2.com/api/users/me/results?page=2&number=100")
     }
+
+    func testBaseURLWithPathPrefixIsPreserved() throws {
+        let customBase = URL(string: "https://gateway.example.com/api/v1")!
+        let endpoint = Concept2Endpoint.workoutSummaries(page: 1, number: 10)
+        let url = try endpoint.url(from: customBase)
+        XCTAssertEqual(url.path, "/api/v1/api/users/me/results")
+    }
 }
