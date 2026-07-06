@@ -169,7 +169,7 @@ struct LiveModePanelView: View {
         return "\(sec / 60)m"
     }
 
-    private func sampleMetric(_ label: String, _ value: String) -> some View {
+    private func sampleMetric(_ label: LocalizedStringKey, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption2)
@@ -178,5 +178,8 @@ struct LiveModePanelView: View {
                 .font(.caption.monospacedDigit())
         }
         .frame(minWidth: 64, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
