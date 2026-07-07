@@ -188,9 +188,9 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
         }
     }
 
-    // MARK: - testCacheFailureThrowsSyncError
+    // MARK: - testCacheFailureIncrementsFailedCount
 
-    func testCacheFailureThrowsSyncError() async throws {
+    func testCacheFailureIncrementsFailedCount() async throws {
         let detail = makeDetail(id: 1)
 
         let client = FakeConcept2Client()
@@ -212,9 +212,9 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.failedCount, 1)
     }
 
-    // MARK: - testMappingFailureThrowsSyncError
+    // MARK: - testDetailFetchFailureIncrementsFailedCount
 
-    func testMappingFailureThrowsSyncError() async throws {
+    func testDetailFetchFailureIncrementsFailedCount() async throws {
         let detail = makeDetail(id: 1)
 
         let client = FakeConcept2Client()
@@ -271,12 +271,17 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
     func testErrorsDoNotExposeToken() async throws {
         let secretToken = "test-secret-token-abc123"
 
+        // Use a custom error whose description contains the token,
+        // so we can verify that redact() strips it before it reaches
+        // the WorkoutSyncError description.
+        struct LeakyError: Error, CustomStringConvertible {
+            let token: String
+            var description: String { "Auth failed with token=\(token)" }
+        }
+
         let client = FakeConcept2Client()
         client.fetchWorkoutsHandler = { _, _ in
-            // Simulate an error that might contain the token in a real scenario.
-            // In our fake, we throw a clean error — but we verify the redaction
-            // path works by checking the error description.
-            throw Concept2Error.unauthorized
+            throw LeakyError(token: secretToken)
         }
 
         let cache = InMemoryWorkoutCache()
@@ -290,6 +295,46 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
             XCTAssertFalse(description.contains(secretToken),
                 "Error description must not contain the token string")
         }
+    }
+
+    // MARK: - testSyncAllWithNoWorkoutsReturnsZeroCounts
+
+    func testSyncAllWithNoWorkoutsReturnsZeroCounts() async throws {
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [], totalPages: 1)
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        let result = try await coordinator.syncAll()
+
+        XCTAssertEqual(result.fetchedCount, 0)
+        XCTAssertEqual(result.savedCount, 0)
+        XCTAssertEqual(result.failedCount, 0)
+    }
+
+    // MARK: - testTimestampsArePopulated
+
+    func testTimestampsArePopulated() async throws {
+        let detail = makeDetail(id: 1)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail.workout], totalPages: 1)
+        }
+        client.fetchDetailHandler = { _ in detail }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        let result = try await coordinator.syncAll()
+
+        XCTAssertLessThanOrEqual(result.startedAt, result.finishedAt)
+        // finishedAt should be very close to now (within 5 seconds).
+        let now = Date()
+        XCTAssertLessThanOrEqual(result.finishedAt, now)
     }
 
     // MARK: - testPartialFailureContinuesSync
@@ -365,6 +410,70 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
         }
 
         // Only workout 1 was attempted before the auth error aborted the loop.
+        XCTAssertEqual(client.fetchDetailIDs, [1])
+    }
+
+    // MARK: - testForbiddenErrorAbortsSync
+
+    func testForbiddenErrorAbortsSync() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail1.workout, detail2.workout], totalPages: 1)
+        }
+        client.fetchDetailHandler = { id in
+            if id == 1 { throw Concept2Error.forbidden }
+            return detail2
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected WorkoutSyncError.clientFailed for forbidden error")
+        } catch let error as WorkoutSyncError {
+            if case .clientFailed = error {
+                // Expected
+            } else {
+                XCTFail("Expected clientFailed, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(client.fetchDetailIDs, [1])
+    }
+
+    // MARK: - testRateLimitAbortsSync
+
+    func testRateLimitAbortsSync() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail1.workout, detail2.workout], totalPages: 1)
+        }
+        client.fetchDetailHandler = { id in
+            if id == 1 { throw Concept2Error.rateLimited }
+            return detail2
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected WorkoutSyncError.clientFailed for rate-limit error")
+        } catch let error as WorkoutSyncError {
+            if case .clientFailed = error {
+                // Expected
+            } else {
+                XCTFail("Expected clientFailed, got \(error)")
+            }
+        }
+
         XCTAssertEqual(client.fetchDetailIDs, [1])
     }
 

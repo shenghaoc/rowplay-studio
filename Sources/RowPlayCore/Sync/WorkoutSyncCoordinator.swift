@@ -84,9 +84,9 @@ public final class WorkoutSyncCoordinator: Sendable {
                 let message = redact(error)
                 logger.warn("Detail fetch failed for workout \(workout.id): \(message)")
                 failedCount += 1
-                // Abort early on authentication failures to avoid spamming
-                // the API with invalid requests for every remaining workout.
-                if isAuthError(error) {
+                // Abort early on authentication or rate-limit failures to avoid
+                // spamming the API with invalid requests for every remaining workout.
+                if shouldAbortSync(error) {
                     throw WorkoutSyncError.clientFailed(message)
                 }
             }
@@ -121,13 +121,16 @@ public final class WorkoutSyncCoordinator: Sendable {
         return allWorkouts
     }
 
-    /// Check whether an error indicates an authentication/authorization failure.
-    private func isAuthError(_ error: Error) -> Bool {
+    /// Check whether an error indicates an authentication/authorization failure
+    /// or rate-limiting that should abort the sync loop.
+    private func shouldAbortSync(_ error: Error) -> Bool {
         if let clientError = error as? Concept2ClientError {
             return clientError == .notAuthenticated
         }
         if let concept2Error = error as? Concept2Error {
-            return concept2Error == .unauthorized || concept2Error == .forbidden
+            return concept2Error == .unauthorized
+                || concept2Error == .forbidden
+                || concept2Error == .rateLimited
         }
         return false
     }

@@ -14,8 +14,9 @@ Add a sync coordinator that bridges `Concept2APIClient` and `WorkoutCache`, fetc
 6. **Result reporting**: `WorkoutSyncResult` reports `fetchedCount`, `savedCount`, `failedCount`, `startedAt`, and `finishedAt`.
 7. **Partial failure tolerance**: Individual workout detail fetch or save failures are counted and do not abort the sync.
 8. **Typed errors**: `WorkoutSyncError` covers `clientFailed`, `cacheFailed`, and `mappingFailed` with privacy-safe descriptions.
-9. **Privacy**: Error descriptions must not include tokens, Authorization headers, or full raw workout payloads.
+9. **Privacy**: Error descriptions must not include tokens, Authorization headers, or full raw workout payloads. `redact()` must use `String(describing:)` to respect privacy-safe `CustomStringConvertible` implementations.
 10. **Idempotency**: Running `syncAll()` twice with the same data produces stable cache state (no duplicate rows).
+11. **Auth/rate-limit abort**: Detail fetch loops must abort early on authentication (401/403) or rate-limiting (429) errors to avoid amplified API pressure.
 
 ## Non-Goals (this PR)
 

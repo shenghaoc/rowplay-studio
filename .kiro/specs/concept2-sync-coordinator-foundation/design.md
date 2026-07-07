@@ -12,19 +12,6 @@ MockConcept2Client              InMemoryWorkoutCache / SQLiteWorkoutCache
 
 ## Components
 
-### WorkoutSyncState
-
-Lightweight enum for coordinator-level sync status:
-
-```swift
-public enum WorkoutSyncState: Equatable, Sendable {
-    case idle
-    case syncing
-    case completed(WorkoutSyncResult)
-    case failed(WorkoutSyncError)
-}
-```
-
 ### WorkoutSyncResult
 
 Value type returned by `syncAll()`:

@@ -73,4 +73,3 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/server/data.ts` (sync) | `Sources/RowPlayCore/Sync/WorkoutSyncCoordinator.swift` | Sync coordinator foundation: pages through Concept2 summaries, fetches detail for each, and saves into `WorkoutCache`. Depends on protocols only, not concrete implementations. |
 | `src/lib/server/data.ts` (sync result) | `Sources/RowPlayCore/Sync/WorkoutSyncResult.swift` | Value type reporting fetched/saved/failed counts and timestamps from a sync run. |
 | `src/lib/server/data.ts` (sync errors) | `Sources/RowPlayCore/Sync/WorkoutSyncError.swift` | Typed sync errors with privacy-safe descriptions: client, cache, and mapping failures. |
-| `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/WorkoutSyncState.swift` | Lightweight sync state enum: idle, syncing, completed, or failed. |

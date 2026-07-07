@@ -4,7 +4,6 @@
 
 - [ ] Create `Sources/RowPlayCore/Sync/WorkoutSyncResult.swift` — result value type with counts and timestamps
 - [ ] Create `Sources/RowPlayCore/Sync/WorkoutSyncError.swift` — typed errors with privacy-safe descriptions
-- [ ] Create `Sources/RowPlayCore/Sync/WorkoutSyncState.swift` — lightweight sync state enum
 - [ ] Create `Sources/RowPlayCore/Sync/WorkoutSyncCoordinator.swift` — sync orchestration bridging client to cache
 
 ## Tests
