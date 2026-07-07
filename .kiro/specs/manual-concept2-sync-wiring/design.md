@@ -38,7 +38,7 @@ Dependencies are injected via closures:
 - `SecureField` for token entry (local `@State`).
 - Save Token button — trims, validates non-empty and length <= 4096, saves via controller, clears field.
 - Sync Now button — disabled when `canSync` is false.
-- Disconnect button — destructive, disabled when not connected or syncing.
+- Disconnect button — destructive, disabled when not connected or syncing, and confirmed before deleting the token/cache.
 - Progress indicator during sync.
 - Status message after sync completes or fails.
 
@@ -71,7 +71,7 @@ Dependencies are injected via closures:
 
 1. `RowPlayStudioApp` creates `WorkoutLibrary.demo()` from persisted demo preferences.
 2. The main window task calls `Concept2SyncController.loadCachedWorkouts(into:)`.
-3. The controller returns immediately when no token is saved. If cached workouts exist, they replace any current library contents (including demo data).
+3. The controller returns immediately when no token is saved, sync is already in progress, or the library already contains data (including active demo data).
 4. Otherwise, it resolves `SQLiteWorkoutCache`, runs `migrate()`, loads all cached details, refreshes `SyncStateTracker`, and calls `WorkoutLibrary.replaceWithSyncedDetails`.
 5. This makes previously synced workouts visible after relaunch without a Concept2 network request.
 
