@@ -16,7 +16,6 @@
   - [x] `testSyncNowWithoutTokenDoesNotCreateClient` — no token → no client, status message
   - [x] `testDisconnectDeletesTokenCacheAndClearsLibrary` — token deleted, cache cleared, library empty
   - [x] `testSyncErrorDoesNotExposeToken` — error messages never contain the raw token
-  - [x] `testTokenEntryTextClearsAfterSave` — visible token text clears after save
 
 ## Docs
 

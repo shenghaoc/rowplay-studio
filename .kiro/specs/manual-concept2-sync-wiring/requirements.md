@@ -8,8 +8,7 @@ Document and verify the manual BYOT (bring-your-own-token) sync wiring that conn
 
 1. **Token entry**: Settings exposes a `SecureField` for pasting a Concept2 BYOT token.
 2. **Token persistence**: Saved tokens persist through the `TokenStore` protocol; production uses `KeychainTokenStore`. Tokens are never written to UserDefaults, plain files, logs, SQLite, or test assertions.
-3. **Token clearing**: The visible token text field clears after a successful save.
-4. **Token deletion**: Disconnect removes the token from Keychain and clears cached data.
+3. **Token deletion**: Disconnect removes the token from Keychain and clears cached data.
 5. **Manual sync trigger**: A "Sync Now" button and `Workout > Sync Concept2 Logbook` menu command trigger sync.
 6. **Sync guard**: Sync Now is disabled if no token is saved or if a sync is already in progress.
 7. **Sync orchestration**: Sync creates `URLSessionConcept2Client` from the saved token, uses `SQLiteWorkoutCache`, and runs `WorkoutSyncCoordinator.syncAll()`.

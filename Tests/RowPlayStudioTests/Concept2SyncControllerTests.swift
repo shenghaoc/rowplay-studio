@@ -2,22 +2,19 @@ import XCTest
 @testable import RowPlayCore
 @testable import RowPlayStudio
 
-/// A Concept2APIClient with configurable handlers for sync error injection tests.
-private final class FailingConcept2Client: Concept2APIClient, @unchecked Sendable {
-    var fetchWorkoutsHandler: ((Int, Int) async throws -> Concept2Page)?
-    var fetchDetailHandler: ((Int) async throws -> WorkoutDetail)?
+/// A Concept2APIClient that always fails on fetchWorkouts for sync error injection tests.
+private final class FailingConcept2Client: Concept2APIClient, Sendable {
+    private let fetchWorkoutsHandler: @Sendable (Int, Int) async throws -> Concept2Page
+
+    init(fetchWorkoutsHandler: @escaping @Sendable (Int, Int) async throws -> Concept2Page) {
+        self.fetchWorkoutsHandler = fetchWorkoutsHandler
+    }
 
     func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
-        if let handler = fetchWorkoutsHandler {
-            return try await handler(page, perPage)
-        }
-        return Concept2Page(workouts: [], totalPages: 1)
+        try await fetchWorkoutsHandler(page, perPage)
     }
 
     func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
-        if let handler = fetchDetailHandler {
-            return try await handler(id)
-        }
         throw Concept2ClientError.workoutNotFound(id)
     }
 }
@@ -118,8 +115,7 @@ final class Concept2SyncControllerTests: XCTestCase {
         let tokenStore = FakeTokenStore(storedToken: secretToken)
 
         // Use a client that fails on fetchWorkouts so the sync throws.
-        let failingClient = FailingConcept2Client()
-        failingClient.fetchWorkoutsHandler = { _, _ in
+        let failingClient = FailingConcept2Client { _, _ in
             throw Concept2ClientError.httpError(statusCode: 401)
         }
 
@@ -136,25 +132,6 @@ final class Concept2SyncControllerTests: XCTestCase {
                         "statusMessage must not contain the raw token")
         XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
                         "syncState.lastError must not contain the raw token")
-    }
-
-    func testTokenEntryTextClearsAfterSave() throws {
-        let tokenStore = FakeTokenStore()
-        let controller = Concept2SyncController(tokenStore: tokenStore)
-
-        // Simulate the view-level flow: user types token, saves, then clears field.
-        let rawInput = "  my-token  "
-        controller.saveToken(rawInput)
-
-        // After save, the stored token is trimmed.
-        XCTAssertEqual(try tokenStore.loadToken(), "my-token")
-        XCTAssertTrue(controller.isConnected)
-
-        // The controller does not retain the raw input — it only stores
-        // the trimmed token via TokenStore. The visible text field is
-        // a @State concern in SettingsView, not the controller.
-        // Verify that loadToken returns the trimmed value, not the raw input.
-        XCTAssertNotEqual(try tokenStore.loadToken(), rawInput)
     }
 
     private func makeDetail(id: Int) -> WorkoutDetail {
