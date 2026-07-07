@@ -45,6 +45,40 @@ private final class FailingDeleteCache: WorkoutCache, @unchecked Sendable {
     }
 }
 
+/// A WorkoutCache that throws from migrate but still allows deleteAll.
+private final class MigrateFailingDeleteTrackingCache: WorkoutCache, @unchecked Sendable {
+    private struct MigrationError: Error, CustomStringConvertible {
+        var description: String { "Migration failed" }
+    }
+
+    private let wrapped: InMemoryWorkoutCache
+    private let lock = NSLock()
+    private var _deleteAllCallCount = 0
+
+    init(wrapping cache: InMemoryWorkoutCache) {
+        self.wrapped = cache
+    }
+
+    var deleteAllCallCount: Int {
+        lock.withLock { _deleteAllCallCount }
+    }
+
+    func migrate() throws {
+        throw MigrationError()
+    }
+
+    func save(detail: WorkoutDetail) async throws { try await wrapped.save(detail: detail) }
+    func save(details: [WorkoutDetail]) async throws { try await wrapped.save(details: details) }
+    func saveWorkouts(_ workouts: [Workout]) async throws { try await wrapped.saveWorkouts(workouts) }
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? { try await wrapped.detail(id: id) }
+    func listWorkouts() async throws -> [Workout] { try await wrapped.listWorkouts() }
+    func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
+    func deleteAll() async throws {
+        lock.withLock { _deleteAllCallCount += 1 }
+        try await wrapped.deleteAll()
+    }
+}
+
 @MainActor
 final class Concept2SyncControllerTests: XCTestCase {
     private var suiteName: String!
@@ -216,6 +250,32 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertFalse(controller.isConnected)
         XCTAssertEqual(controller.syncState.totalWorkouts, 0)
         XCTAssertEqual(controller.statusMessage, "Concept2 disconnected.")
+    }
+
+    func testDisconnectAttemptsCacheDeleteWhenMigrationFails() async throws {
+        let detail = makeDetail(id: 111)
+        let wrappedCache = InMemoryWorkoutCache()
+        try await wrappedCache.save(detail: detail)
+        let failingCache = MigrateFailingDeleteTrackingCache(wrapping: wrappedCache)
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { failingCache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [detail], defaults: defaults)
+
+        await controller.disconnect(library: library)
+
+        let cachedWorkouts = try await wrappedCache.listWorkouts()
+        XCTAssertNil(try tokenStore.loadToken())
+        XCTAssertEqual(failingCache.deleteAllCallCount, 1)
+        XCTAssertTrue(cachedWorkouts.isEmpty)
+        XCTAssertTrue(library.isEmpty)
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertEqual(controller.syncState.totalWorkouts, 0)
+        XCTAssertNotNil(controller.syncState.lastError)
+        XCTAssertEqual(controller.statusMessage, "Concept2 token deleted; cache cleanup failed.")
     }
 
     func testSummaryFetchErrorDoesNotExposeToken() async throws {

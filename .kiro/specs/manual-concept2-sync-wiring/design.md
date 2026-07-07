@@ -81,7 +81,7 @@ Dependencies are injected via closures:
 - Token save failure → statusMessage: "Could not save Concept2 token."
 - Sync failure → statusMessage: "Concept2 sync failed." (generic, no details)
 - Cache hydration failure → statusMessage: "Could not load cached Concept2 workouts."
-- Disconnect migrates the cache before `deleteAll()` so a fresh SQLite cache instance after relaunch can still purge persisted rows.
+- Disconnect migrates the cache before `deleteAll()` so a fresh SQLite cache instance after relaunch can still purge persisted rows, and still attempts `deleteAll()` when migration fails after a cache instance was resolved.
 - `SyncStateTracker.syncFailed` stores redacted error in `syncState.lastError` (with a fallback if tracker is nil).
 - `WorkoutSyncError.description` applies `redact()` to associated strings.
 

@@ -20,6 +20,7 @@
   - [x] `testSyncNowWithoutTokenDoesNotCreateClient` — no token → no client, status message
   - [x] `testDisconnectDeletesTokenCacheAndClearsLibrary` — token deleted, cache cleared, library empty
   - [x] `testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache` — disconnect purges a fresh SQLite cache instance after relaunch
+  - [x] `testDisconnectAttemptsCacheDeleteWhenMigrationFails` — disconnect still attempts `deleteAll()` after a cache migration failure
   - [x] `testSyncErrorDoesNotExposeToken` — error messages never contain the raw token
 
 ## Docs
