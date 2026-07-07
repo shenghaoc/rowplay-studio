@@ -2,7 +2,7 @@ import XCTest
 @testable import RowPlayCore
 @testable import RowPlayStudio
 
-/// A Concept2APIClient that always fails on fetchWorkouts for sync error injection tests.
+/// A Concept2APIClient that delegates fetchWorkouts to a caller-provided handler and throws on fetchWorkoutDetail.
 private final class FailingConcept2Client: Concept2APIClient, Sendable {
     private let fetchWorkoutsHandler: @Sendable (Int, Int) async throws -> Concept2Page
 
@@ -16,6 +16,32 @@ private final class FailingConcept2Client: Concept2APIClient, Sendable {
 
     func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
         throw Concept2ClientError.workoutNotFound(id)
+    }
+}
+
+/// A WorkoutCache that wraps another cache but throws from deleteAll with a leaky error message.
+private final class FailingDeleteCache: WorkoutCache, @unchecked Sendable {
+    private let wrapped: InMemoryWorkoutCache
+    private let token: String
+
+    init(wrapping cache: InMemoryWorkoutCache, token: String) {
+        self.wrapped = cache
+        self.token = token
+    }
+
+    func migrate() throws { try wrapped.migrate() }
+    func save(detail: WorkoutDetail) async throws { try await wrapped.save(detail: detail) }
+    func save(details: [WorkoutDetail]) async throws { try await wrapped.save(details: details) }
+    func saveWorkouts(_ workouts: [Workout]) async throws { try await wrapped.saveWorkouts(workouts) }
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? { try await wrapped.detail(id: id) }
+    func listWorkouts() async throws -> [Workout] { try await wrapped.listWorkouts() }
+    func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
+    func deleteAll() async throws {
+        struct LeakyError: Error, CustomStringConvertible {
+            let token: String
+            var description: String { "Cache cleanup failed with token=\(token)" }
+        }
+        throw LeakyError(token: token)
     }
 }
 
@@ -110,7 +136,7 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Concept2 disconnected.")
     }
 
-    func testSyncErrorDoesNotExposeToken() async throws {
+    func testSummaryFetchErrorDoesNotExposeToken() async throws {
         let secretToken = "abcdef0123456789abcdef0123456789"
         let tokenStore = FakeTokenStore(storedToken: secretToken)
 
@@ -136,10 +162,36 @@ final class Concept2SyncControllerTests: XCTestCase {
 
         await controller.syncNow(into: library)
 
-        XCTAssertFalse(controller.statusMessage?.contains(secretToken) ?? false,
-                        "statusMessage must not contain the raw token")
+        // statusMessage is always the hardcoded "Concept2 sync failed." on error —
+        // it never contains error details. The meaningful assertion is lastError,
+        // which stores redact(error) and must not leak the token.
         XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
                         "syncState.lastError must not contain the raw token")
+    }
+
+    func testDisconnectErrorDoesNotExposeToken() async throws {
+        let secretToken = "abcdef0123456789abcdef0123456789"
+        let tokenStore = FakeTokenStore(storedToken: secretToken)
+
+        let cache = InMemoryWorkoutCache()
+        // Pre-populate cache so deleteAll is called, then make it throw.
+        try await cache.save(detail: makeDetail(id: 1))
+
+        // InMemoryWorkoutCache.deleteAll() doesn't throw, so we use a wrapper
+        // whose deleteAll throws an error embedding the token.
+        let failingCache = FailingDeleteCache(wrapping: cache, token: secretToken)
+
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { failingCache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [makeDetail(id: 1)], defaults: defaults)
+
+        await controller.disconnect(library: library)
+
+        XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
+                        "syncState.lastError must not contain the raw token on disconnect")
     }
 
     private func makeDetail(id: Int) -> WorkoutDetail {
