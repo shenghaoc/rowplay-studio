@@ -330,6 +330,44 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
         XCTAssertNotNil(cached3)
     }
 
+    // MARK: - testAuthErrorAbortsSync
+
+    func testAuthErrorAbortsSync() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+        let detail3 = makeDetail(id: 3)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(
+                workouts: [detail1.workout, detail2.workout, detail3.workout],
+                totalPages: 1
+            )
+        }
+        // Workout 1 fails with an auth error — sync should abort immediately.
+        client.fetchDetailHandler = { id in
+            if id == 1 { throw Concept2ClientError.notAuthenticated }
+            return [detail2, detail3].first { $0.workout.id == id }!
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected WorkoutSyncError.clientFailed for auth error")
+        } catch let error as WorkoutSyncError {
+            if case .clientFailed = error {
+                // Expected — sync aborted early due to auth failure.
+            } else {
+                XCTFail("Expected clientFailed, got \(error)")
+            }
+        }
+
+        // Only workout 1 was attempted before the auth error aborted the loop.
+        XCTAssertEqual(client.fetchDetailIDs, [1])
+    }
+
     // MARK: - testMultiPageSync
 
     func testMultiPageSync() async throws {

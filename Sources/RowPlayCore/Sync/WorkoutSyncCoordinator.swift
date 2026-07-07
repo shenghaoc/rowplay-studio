@@ -11,11 +11,10 @@ import Foundation
 /// Individual workout detail fetch or save failures are counted and
 /// do not abort the sync. Fundamental failures (e.g., the summary
 /// fetch itself fails) throw `WorkoutSyncError`.
-public final class WorkoutSyncCoordinator: @unchecked Sendable {
+public final class WorkoutSyncCoordinator: Sendable {
     private let client: Concept2APIClient
     private let cache: WorkoutCache
     private let logger: PrivacySafeLogger
-    private let lock = NSLock()
 
     /// Number of workouts to request per API page.
     ///
@@ -35,6 +34,7 @@ public final class WorkoutSyncCoordinator: @unchecked Sendable {
         perPage: Int = 250,
         logger: PrivacySafeLogger = PrivacySafeLogger(category: "sync-coordinator")
     ) {
+        precondition(perPage > 0, "perPage must be greater than 0")
         self.client = client
         self.cache = cache
         self.perPage = perPage
@@ -84,6 +84,11 @@ public final class WorkoutSyncCoordinator: @unchecked Sendable {
                 let message = redact(error)
                 logger.warn("Detail fetch failed for workout \(workout.id): \(message)")
                 failedCount += 1
+                // Abort early on authentication failures to avoid spamming
+                // the API with invalid requests for every remaining workout.
+                if isAuthError(error) {
+                    throw WorkoutSyncError.clientFailed(message)
+                }
             }
         }
 
@@ -114,5 +119,16 @@ public final class WorkoutSyncCoordinator: @unchecked Sendable {
         } while page <= totalPages
 
         return allWorkouts
+    }
+
+    /// Check whether an error indicates an authentication/authorization failure.
+    private func isAuthError(_ error: Error) -> Bool {
+        if let clientError = error as? Concept2ClientError {
+            return clientError == .notAuthenticated
+        }
+        if let concept2Error = error as? Concept2Error {
+            return concept2Error == .unauthorized || concept2Error == .forbidden
+        }
+        return false
     }
 }
