@@ -43,17 +43,23 @@ final class Concept2SyncController: ObservableObject {
     }
 
     func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard isConnected else { return }
+        guard isConnected, !syncState.inProgress else { return }
 
         do {
             let cache = try resolvedCache()
             try cache.migrate()
             let details = try await loadDetails(from: cache)
+
+            guard !details.isEmpty else { return }
+
+            // Re-check after suspension points — disconnect or syncNow may have
+            // interleaved during the await above.
+            guard isConnected, !syncState.inProgress else { return }
+
             let tracker = resolvedTracker(cache: cache)
             await tracker.refreshWorkoutCount()
             syncState = tracker.state
 
-            guard !details.isEmpty else { return }
             library.replaceWithSyncedDetails(details)
             statusMessage = "Loaded \(details.count) cached workouts."
         } catch {
@@ -152,7 +158,7 @@ final class Concept2SyncController: ObservableObject {
             syncState.lastErrorDate = Date()
         }
 
-        if !cacheCleanupFailed, let cache = try? resolvedCache() {
+        if !cacheCleanupFailed, let cache = self.cache {
             do {
                 try await cache.deleteAll()
                 let tracker = resolvedTracker(cache: cache)
