@@ -71,7 +71,7 @@ Dependencies are injected via closures:
 
 1. `RowPlayStudioApp` creates `WorkoutLibrary.demo()` from persisted demo preferences.
 2. The main window task calls `Concept2SyncController.loadCachedWorkouts(into:)`.
-3. The controller returns immediately when no token is saved or the library already contains demo/workout data.
+3. The controller returns immediately when no token is saved. If cached workouts exist, they replace any current library contents (including demo data).
 4. Otherwise, it resolves `SQLiteWorkoutCache`, runs `migrate()`, loads all cached details, refreshes `SyncStateTracker`, and calls `WorkoutLibrary.replaceWithSyncedDetails`.
 5. This makes previously synced workouts visible after relaunch without a Concept2 network request.
 

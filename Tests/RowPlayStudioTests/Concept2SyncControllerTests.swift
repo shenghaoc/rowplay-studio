@@ -161,6 +161,31 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Loaded 1 cached workouts.")
     }
 
+    func testLoadCachedWorkoutsReplacesDemoDataWhenDemoModeIsOn() async throws {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let detail = makeDetail(id: 77)
+        let cachePath = temporarySQLitePath()
+        defer { try? FileManager.default.removeItem(atPath: cachePath) }
+
+        let seedCache = try SQLiteWorkoutCache(path: cachePath)
+        try seedCache.migrate()
+        try await seedCache.save(detail: detail)
+
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { try SQLiteWorkoutCache(path: cachePath) },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary.demo(defaults: defaults)
+        XCTAssertFalse(library.isEmpty, "Demo mode populates library with demo data")
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertEqual(library.details, [detail], "Cached workouts replace demo data")
+        XCTAssertEqual(controller.syncState.totalWorkouts, 1)
+        XCTAssertEqual(controller.statusMessage, "Loaded 1 cached workouts.")
+    }
+
     func testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache() async throws {
         let detail = makeDetail(id: 99)
         let cachePath = temporarySQLitePath()

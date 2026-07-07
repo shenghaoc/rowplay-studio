@@ -16,6 +16,7 @@
   - [x] `testSaveTokenStoresTrimmedTokenAndMarksConnected` — trimmed token saved, isConnected true
   - [x] `testSyncNowLoadsCacheIntoLibraryAndDisablesDemoMode` — sync replaces library, disables demo
   - [x] `testLoadCachedWorkoutsHydratesLibraryAfterRelaunch` — persisted SQLite cache hydrates an empty library without network
+  - [x] `testLoadCachedWorkoutsReplacesDemoDataWhenDemoModeIsOn` — cached workouts replace demo data when demo mode is active
   - [x] `testSyncNowWithoutTokenDoesNotCreateClient` — no token → no client, status message
   - [x] `testDisconnectDeletesTokenCacheAndClearsLibrary` — token deleted, cache cleared, library empty
   - [x] `testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache` — disconnect purges a fresh SQLite cache instance after relaunch

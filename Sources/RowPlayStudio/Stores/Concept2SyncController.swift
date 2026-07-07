@@ -43,7 +43,7 @@ final class Concept2SyncController: ObservableObject {
     }
 
     func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard isConnected, library.isEmpty else { return }
+        guard isConnected else { return }
 
         do {
             let cache = try resolvedCache()
@@ -144,15 +144,25 @@ final class Concept2SyncController: ObservableObject {
         var cacheCleanupFailed = false
         do {
             let cache = try resolvedCache()
+            // Migrate so a fresh SQLite cache instance can open the DB.
             try cache.migrate()
-            try await cache.deleteAll()
-            let tracker = resolvedTracker(cache: cache)
-            await tracker.refreshWorkoutCount()
-            syncState = tracker.state
         } catch {
             cacheCleanupFailed = true
             syncState.lastError = redact(error)
             syncState.lastErrorDate = Date()
+        }
+
+        if !cacheCleanupFailed, let cache = try? resolvedCache() {
+            do {
+                try await cache.deleteAll()
+                let tracker = resolvedTracker(cache: cache)
+                await tracker.refreshWorkoutCount()
+                syncState = tracker.state
+            } catch {
+                cacheCleanupFailed = true
+                syncState.lastError = redact(error)
+                syncState.lastErrorDate = Date()
+            }
         }
 
         library.clearData()
