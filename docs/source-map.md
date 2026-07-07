@@ -70,3 +70,7 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/server/concept2.ts` (models) | `Sources/RowPlayCore/Concept2/Concept2Models.swift` | Minimal Codable response models for the Concept2 logbook API: workout summaries, detail, strokes, and splits. |
 | `src/lib/server/concept2.ts` (mapping) | `Sources/RowPlayCore/Concept2/Concept2Mapper.swift` | Maps raw Concept2 API responses to domain types with unit normalization (tenths → seconds, decimetres → metres, bike pace divisor). |
 | `src/lib/server/concept2.ts` (client) | `Sources/RowPlayCore/Concept2/URLSessionConcept2Client.swift` | URLSession-backed `Concept2APIClient` with BYOT token injection. Token is held in memory only, never persisted or logged. |
+| `src/lib/server/data.ts` (sync) | `Sources/RowPlayCore/Sync/WorkoutSyncCoordinator.swift` | Sync coordinator foundation: pages through Concept2 summaries, fetches detail for each, and saves into `WorkoutCache`. Depends on protocols only, not concrete implementations. |
+| `src/lib/server/data.ts` (sync result) | `Sources/RowPlayCore/Sync/WorkoutSyncResult.swift` | Value type reporting fetched/saved/failed counts and timestamps from a sync run. |
+| `src/lib/server/data.ts` (sync errors) | `Sources/RowPlayCore/Sync/WorkoutSyncError.swift` | Typed sync errors with privacy-safe descriptions: client, cache, and mapping failures. |
+| `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/WorkoutSyncState.swift` | Lightweight sync state enum: idle, syncing, completed, or failed. |

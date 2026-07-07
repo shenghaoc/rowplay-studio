@@ -73,13 +73,14 @@ Status: merged to `main`.
 
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
-Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; URLSession Concept2 client foundation added; full production sync workflow remains in progress.
+Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; URLSession Concept2 client foundation added; sync coordinator foundation added; full app-shell sync wiring remains in progress.
 
 Scope:
 
 - Foundation PR: add a Keychain-backed token store boundary, injectable Concept2 API client protocol, async workout cache abstraction, privacy-safe logging, and sync state tracking.
 - SQLite cache PR: add `SQLiteWorkoutCache` with v1 schema, idempotent migrations, and round-trip tests. Stores `WorkoutDetail` JSON for dashboard/replay cache foundation.
-- Follow-up PRs: wire BYOT token entry UI, implement the URLSession Concept2 client, and connect the sync workflow to the app shell.
+- Sync coordinator PR: add `WorkoutSyncCoordinator` that bridges `Concept2APIClient` to `WorkoutCache` with paging, detail fetch, partial failure handling, and privacy-safe error reporting.
+- Follow-up PRs: wire BYOT token entry UI, connect the sync coordinator to the app shell, and add user-facing sync trigger.
 - Preserve rowplay's privacy invariant: tokens do not enter UserDefaults, plain files, logs, exported fixtures, or analytics payloads.
 - Keep Cloudflare-specific KV/D1 assumptions out of native core.
 
