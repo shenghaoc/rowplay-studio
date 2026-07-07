@@ -9,6 +9,8 @@
 - [x] Wire Concept2 token save, sync, and disconnect actions into `SettingsView`
 - [x] Wire `Workout > Sync Concept2 Logbook` menu command
 - [x] Add `WorkoutLibrary.replaceWithSyncedDetails(_:)` so successful sync loads real cached workouts and disables demo mode
+- [x] Add launch-time cache hydration so persisted SQLite workouts are visible after app relaunch without another network sync
+- [x] Migrate the cache before disconnect cleanup so a fresh SQLite cache instance can purge persisted rows after relaunch
 
 ## Tests
 
@@ -29,8 +31,10 @@
 - [x] Create `Tests/RowPlayStudioTests/Concept2SyncControllerTests.swift`
   - [x] token save uses `TokenStore` and marks the app connected
   - [x] sync loads cached details into `WorkoutLibrary` and disables demo mode
+  - [x] startup cache hydration loads persisted SQLite details into an empty relaunch library
   - [x] sync without a token does not create a client
   - [x] disconnect deletes token, cache, and in-memory library state
+  - [x] disconnect after relaunch migrates and deletes a fresh SQLite cache instance
 
 ## Docs
 

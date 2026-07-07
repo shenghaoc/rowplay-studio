@@ -14,8 +14,9 @@ Document and verify the manual BYOT (bring-your-own-token) sync wiring that conn
 6. **Sync orchestration**: Sync creates `URLSessionConcept2Client` from the saved token, uses the workout cache, and runs `WorkoutSyncCoordinator.syncAll()`.
 7. **Result display**: Sync result (saved count, failure count) is shown in the UI status message.
 8. **Cache-backed loading**: After successful sync, `WorkoutLibrary.replaceWithSyncedDetails` loads cached workouts and disables demo mode so the sidebar shows real Concept2 data.
-9. **Privacy**: Error messages shown to users are short and non-sensitive. Tokens, Authorization headers, and raw payloads are never exposed.
-10. **Disconnect cleanup**: Disconnect deletes the token, clears the workout cache, and clears the in-memory library.
+9. **Launch cache hydration**: On app launch, if a token is saved and the in-memory library is empty, the app loads existing cached `WorkoutDetail` records from `SQLiteWorkoutCache` without running a network sync.
+10. **Privacy**: Error messages shown to users are short and non-sensitive. Tokens, Authorization headers, and raw payloads are never exposed.
+11. **Disconnect cleanup**: Disconnect deletes the token, migrates/opens the workout cache if needed, clears cached data, and clears the in-memory library.
 
 ## Non-Goals (this PR)
 

@@ -66,7 +66,8 @@ The coordinator is immutable and uses standard `Sendable`. It validates `perPage
 - Runs `WorkoutSyncCoordinator.syncAll()`.
 - Uses `SyncStateTracker` for in-progress, success, failure, and cached-count state.
 - Loads cached `WorkoutDetail` records into `WorkoutLibrary` after a successful sync.
-- Deletes the token and clears cached/library data on disconnect.
+- On app launch, loads cached `WorkoutDetail` records into an empty `WorkoutLibrary` when a saved token exists, without contacting the network.
+- Deletes the token and clears cached/library data on disconnect, migrating the cache first so a fresh SQLite cache instance can purge rows after relaunch.
 
 The controller accepts injected token store, cache factory, and client factory so tests use fake stores, `InMemoryWorkoutCache`, and mock clients without real network calls.
 
@@ -92,7 +93,8 @@ Fundamental failures (e.g., the initial `fetchWorkouts` call fails entirely) thr
 3. Save Token stores the token in Keychain.
 4. Sync Now or Workout > Sync Concept2 Logbook runs the coordinator.
 5. A successful sync replaces demo data with real cached workouts and disables demo mode.
-6. Disconnect deletes the token, clears the local workout cache, and clears the in-memory library.
+6. On later app launches, `RowPlayStudioApp` asks the controller to hydrate an empty library from the persisted cache.
+7. Disconnect deletes the token, migrates and clears the local workout cache, and clears the in-memory library.
 
 ## Web Reference
 
@@ -110,5 +112,6 @@ The native coordinator differs: it fetches detail eagerly during sync so the cac
 - `FailingConcept2Client`: configurable to throw on `fetchWorkouts` or `fetchWorkoutDetail`.
 - `FailingWorkoutCache`: configurable to throw on `save(detail:)`.
 - `InMemoryWorkoutCache`: existing in-memory cache for success-path and app-wiring tests.
+- Temporary `SQLiteWorkoutCache` files: relaunch-path tests for cache hydration and disconnect cleanup.
 - No real network, no real tokens, no sleeps.
-- Tests verify: correct counts, partial failure tolerance, idempotency, error privacy, cancellation propagation, auth/rate-limit aborts, migration before sync, no real network usage, token-store wiring, library replacement, and disconnect cleanup.
+- Tests verify: correct counts, partial failure tolerance, idempotency, error privacy, cancellation propagation, auth/rate-limit aborts, migration before sync, no real network usage, token-store wiring, library replacement, launch cache hydration, and disconnect cleanup.

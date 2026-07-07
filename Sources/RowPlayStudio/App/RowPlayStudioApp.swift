@@ -15,6 +15,9 @@ struct RowPlayStudioApp: App {
                 .frame(minWidth: 1_000, minHeight: 680)
                 .environmentObject(preferences)
                 .environmentObject(syncController)
+                .task {
+                    await syncController.loadCachedWorkouts(into: library)
+                }
         }
         .commands {
             SidebarCommands()

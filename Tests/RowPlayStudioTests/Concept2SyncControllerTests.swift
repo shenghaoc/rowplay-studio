@@ -136,6 +136,62 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Concept2 disconnected.")
     }
 
+    func testLoadCachedWorkoutsHydratesLibraryAfterRelaunch() async throws {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        let detail = makeDetail(id: 42)
+        let cachePath = temporarySQLitePath()
+        defer { try? FileManager.default.removeItem(atPath: cachePath) }
+
+        let seedCache = try SQLiteWorkoutCache(path: cachePath)
+        try seedCache.migrate()
+        try await seedCache.save(detail: detail)
+
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { try SQLiteWorkoutCache(path: cachePath) },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary.demo(defaults: defaults)
+        XCTAssertTrue(library.isEmpty)
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertEqual(library.details, [detail])
+        XCTAssertEqual(controller.syncState.totalWorkouts, 1)
+        XCTAssertEqual(controller.statusMessage, "Loaded 1 cached workouts.")
+    }
+
+    func testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache() async throws {
+        let detail = makeDetail(id: 99)
+        let cachePath = temporarySQLitePath()
+        defer { try? FileManager.default.removeItem(atPath: cachePath) }
+
+        let seedCache = try SQLiteWorkoutCache(path: cachePath)
+        try seedCache.migrate()
+        try await seedCache.save(detail: detail)
+
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { try SQLiteWorkoutCache(path: cachePath) },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [detail], defaults: defaults)
+
+        await controller.disconnect(library: library)
+
+        let verifyCache = try SQLiteWorkoutCache(path: cachePath)
+        try verifyCache.migrate()
+        let cachedWorkouts = try await verifyCache.listWorkouts()
+
+        XCTAssertNil(try tokenStore.loadToken())
+        XCTAssertTrue(cachedWorkouts.isEmpty)
+        XCTAssertTrue(library.isEmpty)
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertEqual(controller.syncState.totalWorkouts, 0)
+        XCTAssertEqual(controller.statusMessage, "Concept2 disconnected.")
+    }
+
     func testSummaryFetchErrorDoesNotExposeToken() async throws {
         let secretToken = "abcdef0123456789abcdef0123456789"
         let tokenStore = FakeTokenStore(storedToken: secretToken)
@@ -192,6 +248,12 @@ final class Concept2SyncControllerTests: XCTestCase {
 
         XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
                         "syncState.lastError must not contain the raw token on disconnect")
+    }
+
+    private func temporarySQLitePath() -> String {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("RowPlayStudioTests-\(UUID().uuidString).sqlite")
+            .path
     }
 
     private func makeDetail(id: Int) -> WorkoutDetail {

@@ -7,14 +7,18 @@
 - [x] Wire `Workout > Sync Concept2 Logbook` menu command in `RowPlayStudioApp`
 - [x] Add `WorkoutLibrary.replaceWithSyncedDetails(_:)` for cache-backed loading
 - [x] Add `WorkoutLibrary.clearData()` for disconnect cleanup
+- [x] Add launch-time cache hydration so an empty post-sync library reloads persisted SQLite workouts without a network sync
+- [x] Migrate the cache before disconnect cleanup so a fresh SQLite cache instance can purge persisted rows after relaunch
 
 ## Tests
 
 - [x] Create `Tests/RowPlayStudioTests/Concept2SyncControllerTests.swift`
   - [x] `testSaveTokenStoresTrimmedTokenAndMarksConnected` — trimmed token saved, isConnected true
   - [x] `testSyncNowLoadsCacheIntoLibraryAndDisablesDemoMode` — sync replaces library, disables demo
+  - [x] `testLoadCachedWorkoutsHydratesLibraryAfterRelaunch` — persisted SQLite cache hydrates an empty library without network
   - [x] `testSyncNowWithoutTokenDoesNotCreateClient` — no token → no client, status message
   - [x] `testDisconnectDeletesTokenCacheAndClearsLibrary` — token deleted, cache cleared, library empty
+  - [x] `testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache` — disconnect purges a fresh SQLite cache instance after relaunch
   - [x] `testSyncErrorDoesNotExposeToken` — error messages never contain the raw token
 
 ## Docs
@@ -26,7 +30,7 @@
 
 ## Validation
 
-- [x] `swift test` passes (633 tests, 0 failures)
+- [x] `swift test` passes (636 tests, 0 failures)
 - [x] `swift build` passes
 - [x] `git diff --check` clean
 - [x] No token in source except harmless fake test strings
