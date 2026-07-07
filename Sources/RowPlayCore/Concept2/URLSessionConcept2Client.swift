@@ -92,6 +92,9 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     /// Build a request for the given endpoint with auth and accept headers.
     private func buildRequest(endpoint: Concept2Endpoint) throws -> URLRequest {
         let url = try endpoint.url(from: baseURL)
+        guard url.scheme?.lowercased() == "https" else {
+            throw Concept2Error.insecureConnection
+        }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.c2logbook.v1+json", forHTTPHeaderField: "Accept")

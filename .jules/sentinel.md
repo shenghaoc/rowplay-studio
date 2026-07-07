@@ -7,3 +7,8 @@
 **Vulnerability:** The existing CSV Formula Injection protection checked the very first character of the input string for formula triggers (`=`, `+`, etc.). This could be bypassed by an attacker adding leading whitespace (e.g., ` =cmd|...`), which spreadsheet software like Excel trims before evaluating the formula.
 **Learning:** Checking the first character of an un-trimmed string is insufficient for CSV injection protection because spreadsheet parsers are robust against leading whitespace. Furthermore, the OWASP recommended prefix is a single quote (`'`), not a tab character (`\t`).
 **Prevention:** Always strip leading whitespace before determining if the string begins with a formula trigger character. If it does, prepend a single quote (`'`) to the original string.
+
+## 2026-07-05 - Unencrypted Sensitive Data Transmission
+**Vulnerability:** The Concept2 client allowed configuring an arbitrary `baseURL` which could use the plain HTTP scheme. By doing so, the user's secret BYOT `Bearer` token could be sent over the network in cleartext without TLS encryption, leading to potential token interception and account takeover.
+**Learning:** Network clients appending Bearer tokens or sensitive headers shouldn't blindly trust that the base URL provides transport layer security.
+**Prevention:** Always assert or guard that the final URL scheme is `https` before attaching authentication headers to the `URLRequest`. Fail securely if the scheme is `http`.

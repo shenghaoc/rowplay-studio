@@ -17,6 +17,8 @@ public enum Concept2Error: Error, Equatable {
     case invalidURL(String)
     /// The response body could not be decoded.
     case decodingFailed
+    /// Attempted to connect over unencrypted HTTP.
+    case insecureConnection
 }
 
 extension Concept2Error: CustomStringConvertible {
@@ -34,6 +36,8 @@ extension Concept2Error: CustomStringConvertible {
             "Concept2 API invalid URL for path: \(path)"
         case .decodingFailed:
             "Concept2 API response decoding failed"
+        case .insecureConnection:
+            "Concept2 API connection must use HTTPS"
         }
     }
 }
