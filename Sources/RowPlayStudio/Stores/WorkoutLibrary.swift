@@ -18,6 +18,8 @@ final class WorkoutLibrary: ObservableObject {
     @Published private(set) var pbIds: Set<Int> = []
     @Published var liveState: LiveModeState = LiveModeState()
     @Published private(set) var liveSample: LiveWorkoutSample?
+    /// Which data source the library last loaded from.
+    private(set) var librarySource: WorkoutLibrarySource = .empty
     let annotationStore: any AnnotationStore
 
     private(set) var liveSource: any LiveSource = MockLiveSource()
@@ -130,6 +132,34 @@ final class WorkoutLibrary: ObservableObject {
     func clearData() {
         details = []
         demoDetailIDs = []
+        librarySource = .empty
+        query = WorkoutQuery.defaultQuery
+    }
+
+    /// Disable demo mode if currently enabled (e.g. after syncing real Concept2 data).
+    func disableDemoModeIfNeeded() {
+        if demoModeEnabled {
+            demoModeEnabled = false
+            defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        }
+    }
+
+    /// Reload the library from the cache, falling back to demo data or empty as appropriate.
+    ///
+    /// This replaces all existing details with the fresh load result.
+    /// Cache errors propagate to the caller and do not silently fall back to demo data.
+    func loadFromSource(cache: WorkoutCache, demoModeEnabled: Bool) async throws {
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: demoModeEnabled
+        )
+        details = snapshot.details
+        librarySource = snapshot.source
+        if snapshot.source == .demo {
+            demoDetailIDs = Self.demoIDs(in: snapshot.details)
+        } else {
+            demoDetailIDs = []
+        }
         query = WorkoutQuery.defaultQuery
     }
 

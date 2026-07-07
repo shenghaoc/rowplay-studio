@@ -43,25 +43,24 @@ final class Concept2SyncController: ObservableObject {
     }
 
     func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard isConnected, !syncState.inProgress, library.isEmpty else { return }
+        guard isConnected, !syncState.inProgress else { return }
 
         do {
             let cache = try resolvedCache()
-            try cache.migrate()
-            let details = try await loadDetails(from: cache)
-
-            guard !details.isEmpty else { return }
-
-            // Re-check after suspension points — disconnect or syncNow may have
-            // interleaved during the await above, or demo data may have loaded.
-            guard isConnected, !syncState.inProgress, library.isEmpty else { return }
+            let previousCount = library.details.count
+            try await library.loadFromSource(
+                cache: cache,
+                demoModeEnabled: library.librarySource == .demo || library.isEmpty
+            )
 
             let tracker = resolvedTracker(cache: cache)
             await tracker.refreshWorkoutCount()
             syncState = tracker.state
 
-            library.replaceWithSyncedDetails(details)
-            statusMessage = "Loaded \(details.count) cached workouts."
+            let loadedCount = library.details.count
+            if loadedCount > previousCount {
+                statusMessage = "Loaded \(loadedCount) cached workouts."
+            }
         } catch {
             if let tracker {
                 await tracker.syncFailed(error: error)
@@ -115,9 +114,10 @@ final class Concept2SyncController: ObservableObject {
                 cache: cache
             )
             let result = try await coordinator.syncAll()
-            let details = try await loadDetails(from: cache)
 
-            library.replaceWithSyncedDetails(details)
+            // Syncing real Concept2 data replaces demo mode.
+            library.disableDemoModeIfNeeded()
+            try await library.loadFromSource(cache: cache, demoModeEnabled: false)
             await tracker.syncCompleted()
             syncState = tracker.state
             statusMessage = syncSummary(for: result)
@@ -212,22 +212,6 @@ final class Concept2SyncController: ObservableObject {
         let tracker = SyncStateTracker(cache: cache)
         self.tracker = tracker
         return tracker
-    }
-
-    private func loadDetails(from cache: any WorkoutCache) async throws -> [WorkoutDetail] {
-        let workouts = try await cache.listWorkouts()
-        var details: [WorkoutDetail] = []
-        details.reserveCapacity(workouts.count)
-
-        for workout in workouts {
-            if let detail = try await cache.detail(id: workout.id) {
-                details.append(detail)
-            } else {
-                details.append(WorkoutDetail(workout: workout, strokes: [], splits: []))
-            }
-        }
-
-        return details
     }
 
     private func syncSummary(for result: WorkoutSyncResult) -> String {

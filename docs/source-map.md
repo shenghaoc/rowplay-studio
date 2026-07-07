@@ -15,6 +15,9 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/mockData.ts` | `Sources/RowPlayCore/Fixtures/DemoWorkoutLibrary.swift` | Phase 0 ports deterministic demo workouts to keep the native app explorable without Concept2 credentials. |
 | `src/routes/dashboard` and dashboard components | `Sources/RowPlayStudio/Views/DashboardView.swift` | Phase 0 creates a native dashboard shell; Phase 2 adds PB highlights, sport summaries, and query-driven filtering. |
 | `src/lib/workoutQuery.ts` | `Sources/RowPlayCore/Library/WorkoutQuery.swift` | Phase 2 ports filter, sort, search, distance/duration chip toggling, PB-only filtering, and average power. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Library/WorkoutLibrarySource.swift` | Cache-backed library: enum tracking which data source (cache/demo/empty) the library loaded from. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Library/WorkoutLibrarySnapshot.swift` | Cache-backed library: immutable snapshot of loaded workout details and their source. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Library/WorkoutLibraryLoader.swift` | Cache-backed library: loads workouts from cache with demo-mode fallback; cache errors propagate without silent fallback. |
 | `src/components/WorkoutListFilters.svelte` | `Sources/RowPlayStudio/Views/SidebarView.swift` + toolbar | Phase 2 adds sort menu and sport segmented picker to native sidebar/toolbar. |
 | `src/lib/replay/engine.ts` | `Sources/RowPlayCore/Replay/ReplaySample.swift` + `ReplayState.swift` | Phase 3 ports `sampleAt`/`sampleIndexAt` interpolation and the `ReplayEngine` playback state machine. |
 | `src/lib/replay/motion.ts` | `Sources/RowPlayCore/Replay/ReplayMotion.swift` | Phase 3 ports animation timing helpers: clampDt, dampFactor, warpStrokePhase, strokeSurge, catchEvents. |
