@@ -92,7 +92,8 @@ public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Senda
     /// Build a request for the given endpoint with auth and accept headers.
     private func buildRequest(endpoint: Concept2Endpoint) throws -> URLRequest {
         let url = try endpoint.url(from: baseURL)
-        guard url.scheme?.lowercased() == "https" else {
+        let isLocalhost = url.host == "localhost" || url.host == "127.0.0.1"
+        guard url.scheme?.lowercased() == "https" || isLocalhost else {
             throw Concept2Error.insecureConnection
         }
         var request = URLRequest(url: url)

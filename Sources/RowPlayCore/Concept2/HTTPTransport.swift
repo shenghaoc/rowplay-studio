@@ -16,19 +16,51 @@ public protocol HTTPTransport: Sendable {
 
 /// URLSession-backed transport for production use.
 ///
-/// Wraps `URLSession.shared` by default. The session can be injected for
-/// custom configuration (e.g., ephemeral sessions, delegate-based auth).
+/// By default, creates a session with redirect protection that rejects
+/// HTTPS-to-HTTP downgrade redirects to prevent token leakage. A custom
+/// `URLSession` can be injected for testing or special configurations.
 public struct URLSessionHTTPTransport: HTTPTransport {
     private let session: URLSession
 
+    /// Create a transport with built-in HTTPS redirect protection.
+    public init() {
+        let delegate = HTTPSRedirectDelegate()
+        self.session = URLSession(
+            configuration: .default,
+            delegate: delegate,
+            delegateQueue: nil
+        )
+    }
+
     /// Create a transport wrapping the given URL session.
     ///
-    /// - Parameter session: The URL session to use. Defaults to `.shared`.
-    public init(session: URLSession = .shared) {
+    /// - Parameter session: The URL session to use.
+    public init(session: URLSession) {
         self.session = session
     }
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await session.data(for: request)
+    }
+}
+
+/// URLSession task delegate that rejects HTTP downgrade redirects.
+///
+/// Prevents the `Authorization` header from being sent over unencrypted
+/// connections when a server responds with a redirect to `http://`.
+private final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        if request.url?.scheme?.lowercased() == "https" {
+            completionHandler(request)
+        } else {
+            // Block redirect to non-HTTPS URL.
+            completionHandler(nil)
+        }
     }
 }

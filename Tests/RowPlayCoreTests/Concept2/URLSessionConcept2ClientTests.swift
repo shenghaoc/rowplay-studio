@@ -421,6 +421,59 @@ final class URLSessionConcept2ClientTests: XCTestCase {
         // which is tested in testAuthorizationHeaderUsesInjectedToken.
     }
 
+    // MARK: - Insecure Connection
+
+    func testHTTPTargetThrowsInsecureConnection() async {
+        let httpBaseURL = URL(string: "http://log.concept2.com")!
+        let transport = FakeHTTPTransport()
+        let client = URLSessionConcept2Client(
+            baseURL: httpBaseURL,
+            token: testToken,
+            transport: transport
+        )
+
+        do {
+            _ = try await client.fetchWorkouts(page: 1, perPage: 10)
+            XCTFail("Expected error")
+        } catch let error as Concept2Error {
+            XCTAssertEqual(error, .insecureConnection)
+        } catch {
+            XCTFail("Expected Concept2Error.insecureConnection, got \(error)")
+        }
+    }
+
+    func testLocalhostHTTPIsAllowed() async throws {
+        let localhostURL = URL(string: "http://localhost:8080")!
+        let transport = FakeHTTPTransport()
+        let data = sampleSummaryJSON.data(using: .utf8)!
+        transport.result = .success((data, httpResponse(statusCode: 200, url: localhostURL)))
+        let client = URLSessionConcept2Client(
+            baseURL: localhostURL,
+            token: testToken,
+            transport: transport
+        )
+
+        // Should not throw .insecureConnection for localhost.
+        let page = try await client.fetchWorkouts(page: 1, perPage: 10)
+        XCTAssertEqual(page.workouts.count, 2)
+    }
+
+    func testLoopbackHTTPIsAllowed() async throws {
+        let loopbackURL = URL(string: "http://127.0.0.1:8080")!
+        let transport = FakeHTTPTransport()
+        let data = sampleSummaryJSON.data(using: .utf8)!
+        transport.result = .success((data, httpResponse(statusCode: 200, url: loopbackURL)))
+        let client = URLSessionConcept2Client(
+            baseURL: loopbackURL,
+            token: testToken,
+            transport: transport
+        )
+
+        // Should not throw .insecureConnection for 127.0.0.1.
+        let page = try await client.fetchWorkouts(page: 1, perPage: 10)
+        XCTAssertEqual(page.workouts.count, 2)
+    }
+
     // MARK: - Concept2Error Descriptions
 
     func testErrorDescriptionsDoNotContainSensitiveData() {
@@ -431,6 +484,7 @@ final class URLSessionConcept2ClientTests: XCTestCase {
             .httpError(statusCode: 500),
             .invalidURL("/test"),
             .decodingFailed,
+            .insecureConnection,
         ]
 
         for error in errors {
