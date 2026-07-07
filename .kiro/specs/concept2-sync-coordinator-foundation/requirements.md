@@ -24,7 +24,8 @@ Add a sync coordinator that bridges `Concept2APIClient` and `WorkoutCache`, then
 16. **Persistent cache**: Production sync uses `SQLiteWorkoutCache` under Application Support, not an in-memory or mock cache.
 17. **State tracking**: App sync uses `SyncStateTracker` to report in-progress, success, failure, and cached workout count.
 18. **Material UX**: A successful sync replaces demo data with cached Concept2 workouts and disables demo mode so the main library reflects real user data.
-19. **Disconnect**: Disconnect deletes the token, clears the local workout cache, and clears the in-memory library.
+19. **Launch cache hydration**: On app launch, if a saved token exists and the in-memory library is empty, cached `WorkoutDetail` records are loaded from `SQLiteWorkoutCache` without a network sync.
+20. **Disconnect**: Disconnect deletes the token, migrates/opens the local workout cache if needed, clears cached rows, and clears the in-memory library.
 
 ## Non-Goals (this PR)
 

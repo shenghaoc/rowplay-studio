@@ -42,6 +42,38 @@ final class Concept2SyncController: ObservableObject {
         isConnected && !syncState.inProgress
     }
 
+    func loadCachedWorkouts(into library: WorkoutLibrary) async {
+        guard isConnected, !syncState.inProgress, library.isEmpty else { return }
+
+        do {
+            let cache = try resolvedCache()
+            try cache.migrate()
+            let details = try await loadDetails(from: cache)
+
+            guard !details.isEmpty else { return }
+
+            // Re-check after suspension points — disconnect or syncNow may have
+            // interleaved during the await above, or demo data may have loaded.
+            guard isConnected, !syncState.inProgress, library.isEmpty else { return }
+
+            let tracker = resolvedTracker(cache: cache)
+            await tracker.refreshWorkoutCount()
+            syncState = tracker.state
+
+            library.replaceWithSyncedDetails(details)
+            statusMessage = "Loaded \(details.count) cached workouts."
+        } catch {
+            if let tracker {
+                await tracker.syncFailed(error: error)
+                syncState = tracker.state
+            } else {
+                syncState.lastError = redact(error)
+                syncState.lastErrorDate = Date()
+            }
+            statusMessage = "Could not load cached Concept2 workouts."
+        }
+    }
+
     func saveToken(_ token: String) {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -116,10 +148,26 @@ final class Concept2SyncController: ObservableObject {
         }
 
         var cacheCleanupFailed = false
-        if let cache = try? resolvedCache() {
+        var cacheForCleanup: (any WorkoutCache)?
+        do {
+            let cache = try resolvedCache()
+            cacheForCleanup = cache
+            // Migrate so a fresh SQLite cache instance can open the DB.
+            try cache.migrate()
+        } catch {
+            cacheCleanupFailed = true
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
+        }
+
+        if let cache = cacheForCleanup {
             do {
                 try await cache.deleteAll()
-                if let tracker {
+                if cacheCleanupFailed {
+                    syncState.totalWorkouts = 0
+                    syncState.inProgress = false
+                } else {
+                    let tracker = resolvedTracker(cache: cache)
                     await tracker.refreshWorkoutCount()
                     syncState = tracker.state
                 }

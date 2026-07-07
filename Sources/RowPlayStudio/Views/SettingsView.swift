@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var library: WorkoutLibrary
     @EnvironmentObject private var syncController: Concept2SyncController
     @State private var concept2Token = ""
+    @State private var isConfirmingDisconnect = false
 
     var body: some View {
         Form {
@@ -62,9 +63,7 @@ struct SettingsView: View {
                     Spacer()
 
                     Button(role: .destructive) {
-                        Task {
-                            await syncController.disconnect(library: library)
-                        }
+                        isConfirmingDisconnect = true
                     } label: {
                         Label("Disconnect", systemImage: "xmark.circle")
                     }
@@ -96,5 +95,18 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(width: 420)
+        .confirmationDialog(
+            "Disconnect Concept2?",
+            isPresented: $isConfirmingDisconnect
+        ) {
+            Button("Disconnect", role: .destructive) {
+                Task {
+                    await syncController.disconnect(library: library)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes the saved token and clears cached Concept2 workouts from this Mac.")
+        }
     }
 }
