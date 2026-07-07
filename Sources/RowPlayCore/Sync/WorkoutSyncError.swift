@@ -18,11 +18,11 @@ extension WorkoutSyncError: CustomStringConvertible {
     public var description: String {
         switch self {
         case let .clientFailed(detail):
-            "Sync client failed: \(detail)"
+            "Sync client failed: \(redact(detail))"
         case let .cacheFailed(detail):
-            "Sync cache failed: \(detail)"
+            "Sync cache failed: \(redact(detail))"
         case let .mappingFailed(detail):
-            "Sync mapping failed: \(detail)"
+            "Sync mapping failed: \(redact(detail))"
         }
     }
 }

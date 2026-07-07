@@ -70,6 +70,22 @@ private final class FailingWorkoutCache: WorkoutCache, @unchecked Sendable {
     func deleteAll() async throws {}
 }
 
+/// A WorkoutCache that tracks whether migrate() was called.
+private final class MigrateTrackingCache: WorkoutCache, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _migrateCallCount = 0
+    var migrateCallCount: Int { lock.withLock { _migrateCallCount } }
+
+    func migrate() throws { lock.withLock { _migrateCallCount += 1 } }
+    func save(detail: WorkoutDetail) async throws {}
+    func save(details: [WorkoutDetail]) async throws {}
+    func saveWorkouts(_ workouts: [Workout]) async throws {}
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? { nil }
+    func listWorkouts() async throws -> [Workout] { [] }
+    func delete(id: Workout.ID) async throws {}
+    func deleteAll() async throws {}
+}
+
 // MARK: - Tests
 
 final class WorkoutSyncCoordinatorTests: XCTestCase {
@@ -513,5 +529,124 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.failedCount, 0)
         // Should have fetched 2 pages.
         XCTAssertEqual(client.fetchWorkoutsCalls.count, 2)
+    }
+
+    // MARK: - testCancellationPropagatesFromDetailFetch
+
+    func testCancellationPropagatesFromDetailFetch() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail1.workout, detail2.workout], totalPages: 1)
+        }
+        client.fetchDetailHandler = { id in
+            if id == 1 { throw CancellationError() }
+            return detail2
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected CancellationError to propagate")
+        } catch is CancellationError {
+            // Expected — cancellation should propagate, not be swallowed.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    // MARK: - testCancellationPropagatesFromCacheSave
+
+    func testCancellationPropagatesFromCacheSave() async throws {
+        let detail = makeDetail(id: 1)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail.workout], totalPages: 1)
+        }
+        client.fetchDetailHandler = { _ in detail }
+
+        let cache = FailingWorkoutCache()
+        cache.saveHandler = { _ in throw CancellationError() }
+
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected CancellationError to propagate")
+        } catch is CancellationError {
+            // Expected
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    // MARK: - testHTTP401ViaClientErrorAbortsSync
+
+    func testHTTP401ViaClientErrorAbortsSync() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [detail1.workout, detail2.workout], totalPages: 1)
+        }
+        // Concept2ClientError.httpError(statusCode: 401) should also trigger abort.
+        client.fetchDetailHandler = { id in
+            if id == 1 { throw Concept2ClientError.httpError(statusCode: 401) }
+            return detail2
+        }
+
+        let cache = InMemoryWorkoutCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected WorkoutSyncError.clientFailed for HTTP 401")
+        } catch let error as WorkoutSyncError {
+            if case .clientFailed = error {
+                // Expected
+            } else {
+                XCTFail("Expected clientFailed, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(client.fetchDetailIDs, [1])
+    }
+
+    // MARK: - testSyncErrorDescriptionRedactsDetails
+
+    func testSyncErrorDescriptionRedactsDetails() async throws {
+        let secretToken = "abcdef0123456789abcdef0123456789abcdef01" // 40-char hex, matches token regex
+
+        // Construct an error whose detail string contains a token-like value.
+        let error = WorkoutSyncError.clientFailed("Got token=\(secretToken)")
+        let description = error.description
+
+        XCTAssertFalse(description.contains(secretToken),
+            "WorkoutSyncError.description must redact sensitive details")
+        XCTAssertTrue(description.contains("[REDACTED]"),
+            "Redacted content should be replaced with [REDACTED]")
+    }
+
+    // MARK: - testMigrateCalledBeforeSync
+
+    func testMigrateCalledBeforeSync() async throws {
+        let client = FakeConcept2Client()
+        client.fetchWorkoutsHandler = { _, _ in
+            Concept2Page(workouts: [], totalPages: 1)
+        }
+
+        let cache = MigrateTrackingCache()
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
+
+        _ = try await coordinator.syncAll()
+
+        XCTAssertEqual(cache.migrateCallCount, 1,
+            "migrate() should be called once at the start of syncAll()")
     }
 }

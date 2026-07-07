@@ -53,6 +53,9 @@ public final class WorkoutSyncCoordinator: Sendable {
     public func syncAll() async throws -> WorkoutSyncResult {
         let startedAt = Date()
 
+        // 0. Ensure the cache schema is ready before doing any work.
+        try cache.migrate()
+
         // 1. Fetch all workout summaries across pages.
         let workouts: [Workout]
         do {
@@ -75,11 +78,15 @@ public final class WorkoutSyncCoordinator: Sendable {
                 do {
                     try await cache.save(detail: detail)
                     savedCount += 1
+                } catch is CancellationError {
+                    throw CancellationError()
                 } catch {
                     let message = redact(error)
                     logger.warn("Cache save failed for workout \(workout.id): \(message)")
                     failedCount += 1
                 }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 let message = redact(error)
                 logger.warn("Detail fetch failed for workout \(workout.id): \(message)")
@@ -125,7 +132,14 @@ public final class WorkoutSyncCoordinator: Sendable {
     /// or rate-limiting that should abort the sync loop.
     private func shouldAbortSync(_ error: Error) -> Bool {
         if let clientError = error as? Concept2ClientError {
-            return clientError == .notAuthenticated
+            switch clientError {
+            case .notAuthenticated:
+                return true
+            case let .httpError(statusCode):
+                return statusCode == 401 || statusCode == 403 || statusCode == 429
+            default:
+                return false
+            }
         }
         if let concept2Error = error as? Concept2Error {
             return concept2Error == .unauthorized
