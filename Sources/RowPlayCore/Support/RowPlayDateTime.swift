@@ -154,9 +154,17 @@ public enum RowPlayDateTime {
 
     // MARK: - ISO Helpers
 
+    // ⚡ Bolt: Cache ISO8601DateFormatter
+    // Reusing the static formatter avoids the expensive repeated object
+    // instantiations caused by `Date().formatted(.iso8601)`.
+    private static let iso8601FormatterLock = NSLock()
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {
-        Date().formatted(.iso8601)
+        iso8601FormatterLock.lock()
+        defer { iso8601FormatterLock.unlock() }
+        return iso8601Formatter.string(from: Date())
     }
 
     // MARK: - Private
