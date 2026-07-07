@@ -421,6 +421,105 @@ final class URLSessionConcept2ClientTests: XCTestCase {
         // which is tested in testAuthorizationHeaderUsesInjectedToken.
     }
 
+    // MARK: - Insecure Connection
+
+    func testHTTPTargetThrowsInsecureConnection() async {
+        let httpBaseURL = URL(string: "http://log.concept2.com")!
+        let transport = FakeHTTPTransport()
+        let client = URLSessionConcept2Client(
+            baseURL: httpBaseURL,
+            token: testToken,
+            transport: transport
+        )
+
+        do {
+            _ = try await client.fetchWorkouts(page: 1, perPage: 10)
+            XCTFail("Expected error")
+        } catch let error as Concept2Error {
+            XCTAssertEqual(error, .insecureConnection)
+        } catch {
+            XCTFail("Expected Concept2Error.insecureConnection, got \(error)")
+        }
+    }
+
+    func testLocalhostHTTPIsAllowed() async throws {
+        let localhostURL = URL(string: "http://localhost:8080")!
+        let transport = FakeHTTPTransport()
+        let data = sampleSummaryJSON.data(using: .utf8)!
+        transport.result = .success((data, httpResponse(statusCode: 200, url: localhostURL)))
+        let client = URLSessionConcept2Client(
+            baseURL: localhostURL,
+            token: testToken,
+            transport: transport
+        )
+
+        // Should not throw .insecureConnection for localhost.
+        let page = try await client.fetchWorkouts(page: 1, perPage: 10)
+        XCTAssertEqual(page.workouts.count, 2)
+    }
+
+    func testLoopbackHTTPIsAllowed() async throws {
+        let loopbackURL = URL(string: "http://127.0.0.1:8080")!
+        let transport = FakeHTTPTransport()
+        let data = sampleSummaryJSON.data(using: .utf8)!
+        transport.result = .success((data, httpResponse(statusCode: 200, url: loopbackURL)))
+        let client = URLSessionConcept2Client(
+            baseURL: loopbackURL,
+            token: testToken,
+            transport: transport
+        )
+
+        // Should not throw .insecureConnection for 127.0.0.1.
+        let page = try await client.fetchWorkouts(page: 1, perPage: 10)
+        XCTAssertEqual(page.workouts.count, 2)
+    }
+
+    func testIPv6LoopbackHTTPIsAllowed() async throws {
+        let ipv6URL = URL(string: "http://[::1]:8080")!
+        let transport = FakeHTTPTransport()
+        let data = sampleSummaryJSON.data(using: .utf8)!
+        transport.result = .success((data, httpResponse(statusCode: 200, url: ipv6URL)))
+        let client = URLSessionConcept2Client(
+            baseURL: ipv6URL,
+            token: testToken,
+            transport: transport
+        )
+
+        // Should not throw .insecureConnection for [::1].
+        let page = try await client.fetchWorkouts(page: 1, perPage: 10)
+        XCTAssertEqual(page.workouts.count, 2)
+    }
+
+    // MARK: - Redirect Downgrade Protection
+
+    func testHTTPRedirectIsBlockedByDelegate() {
+        let delegate = HTTPSRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: URL(string: "https://log.concept2.com/api/test")!)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://log.concept2.com/api/test")!,
+            statusCode: 302,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": "http://attacker.example.com/stolen"]
+        )!
+        let redirectedRequest = URLRequest(url: URL(string: "http://attacker.example.com/stolen")!)
+
+        var allowedRequest: URLRequest?
+        delegate.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: redirectedRequest
+        ) { request in
+            allowedRequest = request
+        }
+
+        XCTAssertNil(allowedRequest)
+        XCTAssertTrue(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        XCTAssertFalse(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        session.invalidateAndCancel()
+    }
+
     // MARK: - Concept2Error Descriptions
 
     func testErrorDescriptionsDoNotContainSensitiveData() {
@@ -431,6 +530,8 @@ final class URLSessionConcept2ClientTests: XCTestCase {
             .httpError(statusCode: 500),
             .invalidURL("/test"),
             .decodingFailed,
+            .insecureConnection,
+            .insecureRedirectBlocked,
         ]
 
         for error in errors {
