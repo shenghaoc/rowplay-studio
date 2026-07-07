@@ -24,7 +24,7 @@ App-shell bridge (`@MainActor ObservableObject`) owning UI-facing state:
 - `syncState: SyncState` — in-progress, last sync date, total workouts, last error
 - `isConnected: Bool` — whether a token is saved
 - `statusMessage: String?` — user-facing status text
-- `canSync: Bool` — computed: connected AND not already syncing
+- `canSync: Bool` — computed from cached `isConnected` and `syncState.inProgress`; `syncNow` re-validates the token as a safety net
 
 Dependencies are injected via closures:
 - `tokenStore: TokenStore` — defaults to `KeychainTokenStore`
@@ -35,7 +35,7 @@ Dependencies are injected via closures:
 
 - Connection status indicator (checkmark or person icon).
 - `SecureField` for token entry (local `@State`).
-- Save Token button — trims, validates, saves via controller, clears field.
+- Save Token button — trims, validates non-empty and length <= 4096, saves via controller, clears field.
 - Sync Now button — disabled when `canSync` is false.
 - Disconnect button — destructive, disabled when not connected or syncing.
 - Progress indicator during sync.
@@ -51,7 +51,7 @@ Dependencies are injected via closures:
 
 - `replaceWithSyncedDetails(_:)` replaces the entire `details` array with synced data.
 - Clears demo detail IDs.
-- Disables demo mode via UserDefaults so the sidebar reflects real data.
+- Sets demo mode off on the library and persists the state to UserDefaults so the sidebar reflects real data.
 - `clearData()` empties the library for disconnect.
 
 ## Sync Flow
@@ -70,7 +70,7 @@ Dependencies are injected via closures:
 - No token → statusMessage: "Add a Concept2 token before syncing."
 - Token save failure → statusMessage: "Could not save Concept2 token."
 - Sync failure → statusMessage: "Concept2 sync failed." (generic, no details)
-- `SyncStateTracker.syncFailed` stores redacted error in `syncState.lastError`.
+- `SyncStateTracker.syncFailed` stores redacted error in `syncState.lastError` (with a fallback if tracker is nil).
 - `WorkoutSyncError.description` applies `redact()` to associated strings.
 
 ## Web Reference

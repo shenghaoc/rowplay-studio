@@ -9,14 +9,13 @@ Document and verify the manual BYOT (bring-your-own-token) sync wiring that conn
 1. **Token entry**: Settings exposes a `SecureField` for pasting a Concept2 BYOT token.
 2. **Token persistence**: Saved tokens persist through the `TokenStore` protocol; production uses `KeychainTokenStore`. Tokens are never written to UserDefaults, plain files, logs, SQLite, or test assertions.
 3. **Token deletion**: Disconnect removes the token from Keychain and clears cached data.
-5. **Manual sync trigger**: A "Sync Now" button and `Workout > Sync Concept2 Logbook` menu command trigger sync.
-6. **Sync guard**: Sync Now is disabled if no token is saved or if a sync is already in progress.
-7. **Sync orchestration**: Sync creates `URLSessionConcept2Client` from the saved token, uses `SQLiteWorkoutCache`, and runs `WorkoutSyncCoordinator.syncAll()`.
-8. **Result display**: Sync result (saved count, failure count) is shown in the UI status message.
-9. **Cache-backed loading**: After successful sync, `WorkoutLibrary.replaceWithSyncedDetails` loads cached workouts and disables demo mode.
-10. **Demo mode interaction**: Demo mode ON shows demo workouts; demo mode OFF with no synced workouts shows empty state.
-11. **Privacy**: Error messages shown to users are short and non-sensitive. Tokens, Authorization headers, raw payloads, and cookie values are never exposed.
-12. **Disconnect cleanup**: Disconnect deletes the token, clears the SQLite cache, and clears the in-memory library.
+4. **Manual sync trigger**: A "Sync Now" button and `Workout > Sync Concept2 Logbook` menu command trigger sync.
+5. **Sync guard**: Sync Now is disabled if no token is saved or if a sync is already in progress.
+6. **Sync orchestration**: Sync creates `URLSessionConcept2Client` from the saved token, uses the workout cache, and runs `WorkoutSyncCoordinator.syncAll()`.
+7. **Result display**: Sync result (saved count, failure count) is shown in the UI status message.
+8. **Cache-backed loading**: After successful sync, `WorkoutLibrary.replaceWithSyncedDetails` loads cached workouts and disables demo mode so the sidebar shows real Concept2 data.
+9. **Privacy**: Error messages shown to users are short and non-sensitive. Tokens, Authorization headers, and raw payloads are never exposed.
+10. **Disconnect cleanup**: Disconnect deletes the token, clears the workout cache, and clears the in-memory library.
 
 ## Non-Goals (this PR)
 
@@ -33,6 +32,5 @@ User-facing error messages must not contain:
 - BYOT tokens.
 - Authorization header values.
 - Full raw workout payloads.
-- Cookie values.
 
 `redact()` and `PrivacySafeLogger` provide defense-in-depth.

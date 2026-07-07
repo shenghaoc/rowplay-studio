@@ -114,9 +114,17 @@ final class Concept2SyncControllerTests: XCTestCase {
         let secretToken = "abcdef0123456789abcdef0123456789"
         let tokenStore = FakeTokenStore(storedToken: secretToken)
 
-        // Use a client that fails on fetchWorkouts so the sync throws.
+        // Use a custom error whose description embeds the token,
+        // so we can verify that redact() strips it before it reaches
+        // the user-facing error state. This mirrors the pattern in
+        // WorkoutSyncCoordinatorTests.testErrorsDoNotExposeToken.
+        struct LeakyClientError: Error, CustomStringConvertible {
+            let token: String
+            var description: String { "Auth failed with token=\(token)" }
+        }
+
         let failingClient = FailingConcept2Client { _, _ in
-            throw Concept2ClientError.httpError(statusCode: 401)
+            throw LeakyClientError(token: secretToken)
         }
 
         let controller = Concept2SyncController(

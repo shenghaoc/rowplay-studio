@@ -26,10 +26,10 @@
 
 ## Validation
 
-- [ ] `swift test` passes
-- [ ] `swift build` passes
-- [ ] `git diff --check` clean
-- [ ] No token in source except harmless fake test strings
-- [ ] No token persistence outside Keychain
-- [ ] No background sync
-- [ ] No Bluetooth changes
+- [x] `swift test` passes (633 tests, 0 failures)
+- [x] `swift build` passes
+- [x] `git diff --check` clean
+- [x] No token in source except harmless fake test strings
+- [x] No token persistence outside Keychain
+- [x] No background sync
+- [x] No Bluetooth changes
