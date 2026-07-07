@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Add a sync coordinator that bridges `Concept2APIClient` and `WorkoutCache`, fetching workout summaries and details from the Concept2 logbook API and persisting them into the local cache.
+Add a sync coordinator that bridges `Concept2APIClient` and `WorkoutCache`, then wire it into the macOS app so a user can save a Concept2 BYOT token, sync the logbook into the local cache, and load synced workouts into the native library.
 
 ## Requirements
 
@@ -17,16 +17,21 @@ Add a sync coordinator that bridges `Concept2APIClient` and `WorkoutCache`, fetc
 9. **Privacy**: Error descriptions must not include tokens, Authorization headers, or full raw workout payloads. `redact()` must use `String(describing:)` to respect privacy-safe `CustomStringConvertible` implementations.
 10. **Idempotency**: Running `syncAll()` twice with the same data produces stable cache state (no duplicate rows).
 11. **Auth/rate-limit abort**: Detail fetch loops must abort early on authentication (401/403) or rate-limiting (429) errors to avoid amplified API pressure.
+12. **Cancellation**: Cancellation from detail fetches or cache saves must propagate instead of being counted as a per-workout failure.
+13. **Cache setup**: `syncAll()` must call `WorkoutCache.migrate()` before performing network work.
+14. **App wiring**: Settings must expose Concept2 token save, sync, and disconnect actions backed by `Concept2SyncController`.
+15. **Keychain only**: The Settings token flow must persist tokens only through `TokenStore`; production uses `KeychainTokenStore`.
+16. **Persistent cache**: Production sync uses `SQLiteWorkoutCache` under Application Support, not an in-memory or mock cache.
+17. **State tracking**: App sync uses `SyncStateTracker` to report in-progress, success, failure, and cached workout count.
+18. **Material UX**: A successful sync replaces demo data with cached Concept2 workouts and disables demo mode so the main library reflects real user data.
+19. **Disconnect**: Disconnect deletes the token, clears the local workout cache, and clears the in-memory library.
 
 ## Non-Goals (this PR)
 
-- No user-facing sync UI.
 - No background sync scheduling.
 - No real network calls in tests.
-- No token persistence.
 - No Bluetooth or hardware work.
 - No new storage schema (uses existing `WorkoutCache` protocol).
-- No `SyncStateTracker` integration (future work).
 - No PB detection or analytics enrichment during sync.
 
 ## Privacy Invariant
