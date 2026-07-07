@@ -19,6 +19,8 @@ public enum Concept2Error: Error, Equatable {
     case decodingFailed
     /// Attempted to connect over unencrypted HTTP.
     case insecureConnection
+    /// A redirect to a non-HTTPS URL was blocked to prevent token leakage.
+    case insecureRedirectBlocked
 }
 
 extension Concept2Error: CustomStringConvertible {
@@ -38,6 +40,8 @@ extension Concept2Error: CustomStringConvertible {
             "Concept2 API response decoding failed"
         case .insecureConnection:
             "Concept2 API connection must use HTTPS"
+        case .insecureRedirectBlocked:
+            "Concept2 API redirect to non-HTTPS URL blocked"
         }
     }
 }
