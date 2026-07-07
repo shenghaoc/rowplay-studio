@@ -73,13 +73,13 @@ Status: merged to `main`.
 
 ## Phase 4 - Concept2 Sync, Privacy, And Local Storage
 
-Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; URLSession Concept2 client foundation added; full production sync workflow remains in progress.
+Status: foundation slice merged to `main` (PR #7); SQLite workout cache foundation added; URLSession Concept2 client foundation added; sync coordinator and app-shell sync wiring added.
 
 Scope:
 
 - Foundation PR: add a Keychain-backed token store boundary, injectable Concept2 API client protocol, async workout cache abstraction, privacy-safe logging, and sync state tracking.
 - SQLite cache PR: add `SQLiteWorkoutCache` with v1 schema, idempotent migrations, and round-trip tests. Stores `WorkoutDetail` JSON for dashboard/replay cache foundation.
-- Follow-up PRs: wire BYOT token entry UI, implement the URLSession Concept2 client, and connect the sync workflow to the app shell.
+- Sync coordinator/app wiring PR: add `WorkoutSyncCoordinator` that bridges `Concept2APIClient` to `WorkoutCache` with paging, detail fetch, partial failure handling, cancellation propagation, auth/rate-limit aborts, and privacy-safe error reporting. Wire Settings token save/sync/disconnect and `Workout > Sync Concept2 Logbook` through `Concept2SyncController`, `KeychainTokenStore`, `URLSessionConcept2Client`, `SQLiteWorkoutCache`, and `SyncStateTracker`.
 - Preserve rowplay's privacy invariant: tokens do not enter UserDefaults, plain files, logs, exported fixtures, or analytics payloads.
 - Keep Cloudflare-specific KV/D1 assumptions out of native core.
 
@@ -87,7 +87,7 @@ Exit criteria:
 
 - Foundation PR has tested safe boundaries for tokens, client injection, local cache, sync state, and redaction.
 - SQLite cache foundation provides persistent `WorkoutDetail` storage with tested migrations.
-- Full phase completion requires a user to sync Concept2 workouts into a persistent native local cache via a real URLSession client.
+- A user can sync Concept2 workouts into a persistent native local cache via a real URLSession client.
 - Disconnect/delete purges local cached data and Keychain token state.
 - Privacy-sensitive logs are redacted and covered by tests.
 

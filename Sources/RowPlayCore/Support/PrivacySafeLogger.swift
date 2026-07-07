@@ -49,7 +49,7 @@ public func redact(_ value: Any) -> String {
     if let string = value as? String {
         input = string
     } else if let error = value as? Error {
-        input = error.localizedDescription
+        input = String(describing: error)
     } else {
         input = String(describing: value)
     }
@@ -81,7 +81,7 @@ func formatPrivacySafeLogMessage(_ message: String, args: [Any]) -> String {
 /// Redacts the main message and all arguments before emitting to the system log.
 ///
 /// Mirrors the web app's `createLogger(console)` pattern.
-public struct PrivacySafeLogger {
+public struct PrivacySafeLogger: Sendable {
     private let logger: os.Logger
 
     /// Create a logger for the specified subsystem and category.

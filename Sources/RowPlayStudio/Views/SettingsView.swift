@@ -1,8 +1,12 @@
+import Foundation
 import RowPlayCore
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var preferences: AppPreferences
+    @EnvironmentObject private var library: WorkoutLibrary
+    @EnvironmentObject private var syncController: Concept2SyncController
+    @State private var concept2Token = ""
 
     var body: some View {
         Form {
@@ -24,6 +28,61 @@ struct SettingsView: View {
                 Text("Bluetooth devices are not available in this build.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Concept2") {
+                HStack(alignment: .firstTextBaseline) {
+                    Label("Logbook", systemImage: syncController.isConnected ? "checkmark.circle" : "person.crop.circle.badge.plus")
+                    Spacer()
+                    Text(syncController.isConnected ? "Connected" : "Not connected")
+                        .foregroundStyle(.secondary)
+                }
+
+                SecureField("Access token", text: $concept2Token)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Button {
+                        syncController.saveToken(concept2Token)
+                        concept2Token = ""
+                    } label: {
+                        Label("Save Token", systemImage: "key")
+                    }
+                    .disabled(concept2Token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button {
+                        Task {
+                            await syncController.syncNow(into: library)
+                        }
+                    } label: {
+                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled(!syncController.canSync)
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        Task {
+                            await syncController.disconnect(library: library)
+                        }
+                    } label: {
+                        Label("Disconnect", systemImage: "xmark.circle")
+                    }
+                    .disabled(!syncController.isConnected || syncController.syncState.inProgress)
+                }
+
+                if syncController.syncState.inProgress {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Syncing")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let statusMessage = syncController.statusMessage {
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Units") {

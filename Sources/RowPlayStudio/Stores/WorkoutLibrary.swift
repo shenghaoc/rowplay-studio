@@ -133,6 +133,16 @@ final class WorkoutLibrary: ObservableObject {
         query = WorkoutQuery.defaultQuery
     }
 
+    func replaceWithSyncedDetails(_ syncedDetails: [WorkoutDetail]) {
+        details = syncedDetails
+        demoDetailIDs = []
+        if demoModeEnabled {
+            demoModeEnabled = false
+            defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        }
+        query = WorkoutQuery.defaultQuery
+    }
+
     // MARK: - Demo Mode Observation
 
     private func observeDemoModeChanges() {

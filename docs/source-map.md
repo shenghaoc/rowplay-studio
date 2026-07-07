@@ -25,7 +25,7 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/analytics.ts` (durationBand) | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 3 adds `durationBand(for:)` for comparability guard. |
 | `src/routes/replay/[id]` (UI) | `Sources/RowPlayStudio/Views/ReplayView.swift` | Phase 3 adds SwiftUI Canvas replay surface with playback controls. |
 | `src/lib/server/session.ts` (token handling) | `Sources/RowPlayCore/Sync/TokenStore.swift` | Phase 4 ports BYOT token storage to Keychain via `TokenStore` protocol (KeychainTokenStore + FakeTokenStore). |
-| `src/lib/server/concept2.ts` (API client) | `Sources/RowPlayCore/Sync/Concept2Client.swift` | Phase 4 defines `Concept2APIClient` protocol and `MockConcept2Client`; real URLSession client deferred to follow-up. |
+| `src/lib/server/concept2.ts` (API client protocol) | `Sources/RowPlayCore/Sync/Concept2Client.swift` | Phase 4 defines `Concept2APIClient` protocol and `MockConcept2Client`; production URLSession implementation lives under `Sources/RowPlayCore/Concept2`. |
 | `src/lib/server/db.ts` (workout cache) | `Sources/RowPlayCore/Sync/WorkoutCache.swift` | Phase 4 ports workout cache as async `WorkoutCache` protocol + `InMemoryWorkoutCache`; SQLite foundation lives under `Sources/RowPlayCore/Storage`. |
 | `src/lib/server/logger.ts` | `Sources/RowPlayCore/Support/PrivacySafeLogger.swift` | Phase 4 ports privacy-safe logging with `redact()` and `PrivacySafeLogger`. |
 | `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/SyncStateTracker.swift` | Phase 4 ports sync state tracking as `SyncState` + `SyncStateTracker` observable. |
@@ -52,7 +52,7 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgTelemetrySample.swift` | Phase 7 defines the live hardware telemetry sample model, field-compatible with Stroke and LiveWorkoutSample. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/ErgConnection.swift` | Phase 7 defines the injectable ergometer connection protocol boundary. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Connectivity/MockErgConnection.swift` | Phase 7 provides a deterministic mock hardware connection for testing and UI development. |
-| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row; settings-wiring PR connects controls to shared `AppPreferences`. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/SettingsView.swift` | Phase 7 shows a mock-only hardware status row; settings-wiring PR connects controls to shared `AppPreferences`; sync coordinator PR adds Concept2 token save/sync/disconnect controls. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/App/RowPlayStudioApp.swift` | Phase 0 creates the `@main` app entry point with `WindowGroup`, `Settings` scene, and app delegate. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Stores/WorkoutLibrary.swift` | Phase 0 creates the central `@MainActor ObservableObject` app state store; settings-wiring PR adds `isEmpty` and `clearData()`. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/ContentView.swift` | Phase 0 creates the root `NavigationSplitView` container with toolbar sport picker and searchable modifier. |
@@ -70,3 +70,8 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/lib/server/concept2.ts` (models) | `Sources/RowPlayCore/Concept2/Concept2Models.swift` | Minimal Codable response models for the Concept2 logbook API: workout summaries, detail, strokes, and splits. |
 | `src/lib/server/concept2.ts` (mapping) | `Sources/RowPlayCore/Concept2/Concept2Mapper.swift` | Maps raw Concept2 API responses to domain types with unit normalization (tenths → seconds, decimetres → metres, bike pace divisor). |
 | `src/lib/server/concept2.ts` (client) | `Sources/RowPlayCore/Concept2/URLSessionConcept2Client.swift` | URLSession-backed `Concept2APIClient` with BYOT token injection. Token is held in memory only, never persisted or logged. |
+| `src/lib/server/data.ts` (sync) | `Sources/RowPlayCore/Sync/WorkoutSyncCoordinator.swift` | Sync coordinator foundation: pages through Concept2 summaries, fetches detail for each, and saves into `WorkoutCache`. Depends on protocols only, not concrete implementations. |
+| `src/lib/server/data.ts` (sync result) | `Sources/RowPlayCore/Sync/WorkoutSyncResult.swift` | Value type reporting fetched/saved/failed counts and timestamps from a sync run. |
+| `src/lib/server/data.ts` (sync errors) | `Sources/RowPlayCore/Sync/WorkoutSyncError.swift` | Typed sync errors with privacy-safe descriptions: client, cache, and mapping failures. |
+| `src/lib/server/data.ts` + `src/lib/server/session.ts` (app sync flow) | `Sources/RowPlayStudio/Stores/Concept2SyncController.swift` | App-shell bridge that loads/saves BYOT tokens through `TokenStore`, creates `URLSessionConcept2Client`, syncs into `SQLiteWorkoutCache`, tracks `SyncStateTracker`, and loads cached details into `WorkoutLibrary`. |
+| `src/routes/settings` / account controls | `Sources/RowPlayStudio/Views/SettingsView.swift` + `Sources/RowPlayStudio/App/RowPlayStudioApp.swift` | Native Settings Concept2 section and Workout menu command for token save, sync, and disconnect. |
