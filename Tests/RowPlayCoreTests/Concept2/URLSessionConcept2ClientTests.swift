@@ -492,53 +492,32 @@ final class URLSessionConcept2ClientTests: XCTestCase {
 
     // MARK: - Redirect Downgrade Protection
 
-    func testHTTPRedirectIsBlockedByTransport() async throws {
-        // Use a custom URLProtocol to simulate an HTTPS→HTTP redirect.
-        class RedirectStub: URLProtocol {
-            override class func canInit(with request: URLRequest) -> Bool { true }
-            override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    func testHTTPRedirectIsBlockedByDelegate() {
+        let delegate = HTTPSRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: URL(string: "https://log.concept2.com/api/test")!)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://log.concept2.com/api/test")!,
+            statusCode: 302,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": "http://attacker.example.com/stolen"]
+        )!
+        let redirectedRequest = URLRequest(url: URL(string: "http://attacker.example.com/stolen")!)
 
-            override func startLoading() {
-                let redirectURL = URL(string: "http://attacker.example.com/stolen")!
-                let response = HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 302,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: ["Location": redirectURL.absoluteString]
-                )!
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocolDidFinishLoading(self)
-            }
-
-            override func stopLoading() {}
+        var allowedRequest: URLRequest?
+        delegate.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: redirectedRequest
+        ) { request in
+            allowedRequest = request
         }
 
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [RedirectStub.self]
-        let session = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
-        // Use the custom session directly to bypass the built-in redirect delegate,
-        // but wrap it in a transport that checks for blocked redirects.
-        // Note: This test verifies the transport layer rejects 3xx responses
-        // when the redirect target is non-HTTPS. The production HTTPSRedirectDelegate
-        // handles this at the URLSession level; here we test the transport fallback.
-        let transport = URLSessionHTTPTransport(session: session)
-        let request = URLRequest(url: URL(string: "https://log.concept2.com/api/test")!)
-
-        do {
-            _ = try await transport.data(for: request)
-            // The redirect stub returns a 302. Without a redirect delegate,
-            // URLSession follows the redirect to http://attacker.example.com.
-            // The transport should reject this.
-        } catch let error as Concept2Error {
-            XCTAssertEqual(error, .insecureRedirectBlocked,
-                "Expected .insecureRedirectBlocked, got \(error)")
-            return
-        } catch {
-            // URLSession may also throw a transport error when the redirect
-            // target is unreachable — either outcome is acceptable as long
-            // as we don't get a successful2xx response.
-            return
-        }
+        XCTAssertNil(allowedRequest)
+        XCTAssertTrue(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        XCTAssertFalse(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        session.invalidateAndCancel()
     }
 
     // MARK: - Concept2Error Descriptions

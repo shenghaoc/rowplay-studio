@@ -18,35 +18,39 @@ public protocol HTTPTransport: Sendable {
 ///
 /// By default, creates a session with redirect protection that rejects
 /// HTTPS-to-HTTP downgrade redirects to prevent token leakage. A custom
-/// `URLSession` can be injected for testing or special configurations.
+/// `URLSessionConfiguration` can be injected for testing or special
+/// configurations while keeping that protection installed.
 public final class URLSessionHTTPTransport: HTTPTransport {
     private let session: URLSession
-    private let redirectDelegate: HTTPSRedirectDelegate?
+    private let redirectDelegate: HTTPSRedirectDelegate
 
     /// Create a transport with built-in HTTPS redirect protection.
-    public init() {
+    ///
+    /// - Parameter configuration: The URL session configuration to use.
+    public init(configuration: URLSessionConfiguration = .default) {
         let delegate = HTTPSRedirectDelegate()
         self.redirectDelegate = delegate
         self.session = URLSession(
-            configuration: .default,
+            configuration: configuration,
             delegate: delegate,
             delegateQueue: nil
         )
     }
 
-    /// Create a transport wrapping the given URL session.
-    ///
-    /// No redirect protection is applied to custom sessions.
-    /// - Parameter session: The URL session to use.
+    @available(*, unavailable, message: "Use init(configuration:) so HTTPS downgrade redirect protection is installed.")
     public init(session: URLSession) {
-        self.redirectDelegate = nil
-        self.session = session
+        fatalError("Unavailable")
     }
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await withCheckedThrowingContinuation { [session, redirectDelegate] continuation in
             var taskRef: URLSessionDataTask?
             let task = session.dataTask(with: request) { data, response, error in
+                if let taskID = taskRef?.taskIdentifier,
+                   redirectDelegate.consumeBlockedRedirect(for: taskID) {
+                    continuation.resume(throwing: Concept2Error.insecureRedirectBlocked)
+                    return
+                }
                 if let error {
                     continuation.resume(throwing: error)
                     return
@@ -55,13 +59,7 @@ public final class URLSessionHTTPTransport: HTTPTransport {
                     continuation.resume(throwing: URLError(.badServerResponse))
                     return
                 }
-                if let delegate = redirectDelegate,
-                   let taskID = taskRef?.taskIdentifier,
-                   delegate.consumeBlockedRedirect(for: taskID) {
-                    continuation.resume(throwing: Concept2Error.insecureRedirectBlocked)
-                } else {
-                    continuation.resume(returning: (data, response))
-                }
+                continuation.resume(returning: (data, response))
             }
             taskRef = task
             task.resume()
