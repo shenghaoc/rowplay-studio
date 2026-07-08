@@ -21,6 +21,32 @@ private final class FailingConcept2Client: Concept2APIClient, @unchecked Sendabl
     }
 }
 
+/// A Concept2APIClient that fails `fetchWorkoutDetail` for specific workout IDs.
+private final class SelectiveFailureClient: Concept2APIClient, @unchecked Sendable {
+    private let details: [WorkoutDetail]
+    private let failingIDs: Set<Int>
+
+    init(details: [WorkoutDetail], failingIDs: Set<Int>) {
+        self.details = details
+        self.failingIDs = failingIDs
+    }
+
+    func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
+        let workouts = details.map(\.workout)
+        return Concept2Page(workouts: workouts, totalPages: 1)
+    }
+
+    func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
+        if failingIDs.contains(id) {
+            throw Concept2ClientError.workoutNotFound(id)
+        }
+        guard let detail = details.first(where: { $0.workout.id == id }) else {
+            throw Concept2ClientError.workoutNotFound(id)
+        }
+        return detail
+    }
+}
+
 // MARK: - Tests
 
 final class SyncPipelineIntegrationTests: XCTestCase {
@@ -67,9 +93,9 @@ final class SyncPipelineIntegrationTests: XCTestCase {
 
     func testSyncPipelineWritesCacheAndLibraryLoadsCache() async throws {
         let (cache, _) = try makeTempCache()
-        let detail1 = makeTestDetail(id: 5001)
-        let detail2 = makeTestDetail(id: 5002, sport: .skierg)
-        let client = MockConcept2Client(details: [detail1, detail2])
+        // Use real demo details so stroke/split data round-trips through SQLite.
+        let demoDetails = Array(DemoWorkoutLibrary.details.prefix(2))
+        let client = MockConcept2Client(details: demoDetails)
         let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
 
         let result = try await coordinator.syncAll()
@@ -85,9 +111,20 @@ final class SyncPipelineIntegrationTests: XCTestCase {
 
         XCTAssertEqual(snapshot.source, .cache)
         XCTAssertEqual(snapshot.details.count, 2)
-        let ids = Set(snapshot.details.map(\.workout.id))
-        XCTAssertTrue(ids.contains(5001))
-        XCTAssertTrue(ids.contains(5002))
+
+        // Verify stroke and split data survived the JSON→SQLite→JSON round-trip.
+        for original in demoDetails {
+            let loaded = try XCTUnwrap(
+                snapshot.details.first(where: { $0.workout.id == original.workout.id })
+            )
+            XCTAssertEqual(loaded.strokes.count, original.strokes.count)
+            XCTAssertEqual(loaded.splits.count, original.splits.count)
+            if let firstStroke = loaded.strokes.first,
+               let originalStroke = original.strokes.first {
+                XCTAssertEqual(firstStroke.t, originalStroke.t, accuracy: 0.001)
+                XCTAssertEqual(firstStroke.pace, originalStroke.pace, accuracy: 0.001)
+            }
+        }
     }
 
     // MARK: - 2. Pipeline works with demo mode disabled
@@ -226,32 +263,50 @@ final class SyncPipelineIntegrationTests: XCTestCase {
         XCTAssertEqual(snapshot.details.first?.workout.id, 9001)
     }
 
-    // MARK: - 8. Pipeline errors do not expose token
+    // MARK: - 9. Partial failure continues with real SQLite cache
 
-    func testPipelineErrorsDoNotExposeToken() async throws {
+    func testPartialFailureContinuesSyncWithRealSQLite() async throws {
         let (cache, _) = try makeTempCache()
+        let detail1 = makeTestDetail(id: 10_001)
+        let detail2 = makeTestDetail(id: 10_002)
+        let detail3 = makeTestDetail(id: 10_003)
 
-        struct SecretError: Error, CustomStringConvertible {
-            let message: String
-            var description: String { message }
-        }
-
-        // Use a 64-char hex secret that matches the redact() hex pattern.
-        let secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
-        let failingClient = FailingConcept2Client(
-            error: SecretError(message: "Unauthorized access with token: \(secret)")
+        // Client fails detail fetch for workout 2 only.
+        let client = SelectiveFailureClient(
+            details: [detail1, detail2, detail3],
+            failingIDs: [10_002]
         )
-        let coordinator = WorkoutSyncCoordinator(client: failingClient, cache: cache)
+        let coordinator = WorkoutSyncCoordinator(client: client, cache: cache)
 
-        do {
-            _ = try await coordinator.syncAll()
-            XCTFail("Expected syncAll to throw")
-        } catch let syncError as WorkoutSyncError {
-            let description = syncError.description
-            XCTAssertFalse(
-                description.contains(secret),
-                "Sync error must not expose the secret token"
-            )
-        }
+        let result = try await coordinator.syncAll()
+
+        XCTAssertEqual(result.fetchedCount, 3)
+        XCTAssertEqual(result.savedCount, 2)
+        XCTAssertEqual(result.failedCount, 1)
+
+        // Verify only the successful workouts are in the SQLite cache.
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+
+        XCTAssertEqual(snapshot.source, .cache)
+        XCTAssertEqual(snapshot.details.count, 2)
+        let ids = Set(snapshot.details.map(\.workout.id))
+        XCTAssertTrue(ids.contains(10_001))
+        XCTAssertTrue(ids.contains(10_003))
+        XCTAssertFalse(ids.contains(10_002))
+    }
+
+    // MARK: - 10. WorkoutSyncError.description redacts secrets
+
+    func testWorkoutSyncErrorDescriptionRedactsSecrets() {
+        let secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+        let error = WorkoutSyncError.clientFailed("token: \(secret)")
+        let description = error.description
+        XCTAssertFalse(
+            description.contains(secret),
+            "WorkoutSyncError.description must redact secrets independently"
+        )
     }
 }
