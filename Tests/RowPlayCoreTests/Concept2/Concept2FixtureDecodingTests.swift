@@ -24,34 +24,36 @@ final class Concept2FixtureDecodingTests: XCTestCase {
     func testDecodesRowerSteadyFixture() throws {
         let fixture = try loadFixture("rower-steady")
         let detail = mapDetail(from: fixture)
+        let exp = fixture.expected
 
-        // Summary parity
-        XCTAssertEqual(detail.workout.id, 9001)
-        XCTAssertEqual(detail.workout.sport, .rower)
-        XCTAssertEqual(detail.workout.distance, 2000)
-        XCTAssertEqual(detail.workout.time, 450, accuracy: 0.001)
-        XCTAssertEqual(detail.workout.pace, 112.5, accuracy: 0.001)
+        // Summary parity (fixture-driven)
+        XCTAssertEqual(detail.workout.id, fixture.rawResult.id)
+        XCTAssertEqual(detail.workout.sport, Sport.fromConcept2Type(exp.result.sport))
+        XCTAssertEqual(detail.workout.distance, try XCTUnwrap(exp.result.distance))
+        XCTAssertEqual(detail.workout.time, try XCTUnwrap(exp.result.time), accuracy: 0.001)
+        XCTAssertEqual(detail.workout.pace, try XCTUnwrap(exp.result.pace), accuracy: 0.001)
+        XCTAssertFalse(detail.workout.isInterval)
 
         // Strokes present
         XCTAssertFalse(detail.strokes.isEmpty)
         XCTAssertEqual(detail.strokes.count, fixture.rawStrokes.count)
 
-        // First stroke
-        XCTAssertEqual(detail.strokes[0].t, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].d, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].pace, 108, accuracy: 0.001)
+        // Expected strokes by index (fixture-driven)
+        for expected in exp.strokes {
+            let stroke = detail.strokes[expected.index]
+            if let t = expected.t { XCTAssertEqual(stroke.t, t, accuracy: 0.001, "stroke[\(expected.index)].t") }
+            if let d = expected.d { XCTAssertEqual(stroke.d, d, accuracy: 0.001, "stroke[\(expected.index)].d") }
+            if let pace = expected.pace { XCTAssertEqual(stroke.pace, pace, accuracy: 0.001, "stroke[\(expected.index)].pace") }
+        }
 
-        // Last stroke
-        let last = detail.strokes.count - 1
-        XCTAssertEqual(detail.strokes[last].t, 6, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].d, 42.5, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].pace, 108.5, accuracy: 0.001)
-
-        // Splits
-        XCTAssertEqual(detail.splits.count, 1)
-        XCTAssertEqual(detail.splits[0].time, 112.5, accuracy: 0.001)
-        XCTAssertEqual(detail.splits[0].distance, 500)
-        XCTAssertEqual(detail.splits[0].pace, 112.5, accuracy: 0.001)
+        // Expected splits by index (fixture-driven)
+        XCTAssertEqual(detail.splits.count, exp.splits.count)
+        for expected in exp.splits {
+            let split = detail.splits[expected.index]
+            if let time = expected.time { XCTAssertEqual(split.time, time, accuracy: 0.001, "split[\(expected.index)].time") }
+            if let distance = expected.distance { XCTAssertEqual(split.distance, distance, accuracy: 0.001, "split[\(expected.index)].distance") }
+            if let pace = expected.pace { XCTAssertEqual(split.pace, pace, accuracy: 0.001, "split[\(expected.index)].pace") }
+        }
     }
 
     // MARK: - 2. Rower Interval
@@ -59,20 +61,20 @@ final class Concept2FixtureDecodingTests: XCTestCase {
     func testDecodesRowerIntervalFixture() throws {
         let fixture = try loadFixture("rower-interval")
         let detail = mapDetail(from: fixture)
+        let exp = fixture.expected
 
-        // Interval detection (fixture has workout.intervals)
+        // Interval detection
         XCTAssertTrue(detail.workout.isInterval)
 
-        // Summary parity
-        XCTAssertEqual(detail.workout.id, 9004)
-        XCTAssertEqual(detail.workout.sport, .rower)
-        XCTAssertEqual(detail.workout.distance, 1000)
-        XCTAssertEqual(detail.workout.time, 225, accuracy: 0.001)
-        XCTAssertEqual(detail.workout.pace, 112.5, accuracy: 0.001)
+        // Summary parity (fixture-driven)
+        XCTAssertEqual(detail.workout.id, fixture.rawResult.id)
+        XCTAssertEqual(detail.workout.sport, Sport.fromConcept2Type(exp.result.sport))
+        XCTAssertEqual(detail.workout.distance, try XCTUnwrap(exp.result.distance))
+        XCTAssertEqual(detail.workout.time, try XCTUnwrap(exp.result.time), accuracy: 0.001)
+        XCTAssertEqual(detail.workout.pace, try XCTUnwrap(exp.result.pace), accuracy: 0.001)
 
         // All strokes present
         XCTAssertEqual(detail.strokes.count, fixture.rawStrokes.count)
-        XCTAssertEqual(detail.strokes.count, 10)
 
         // Interval metadata from fixture
         let rep2First = try XCTUnwrap(fixture.rep2FirstIndex)
@@ -88,17 +90,22 @@ final class Concept2FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(detail.strokes[rep2First].t, rep1FinalT, accuracy: 0.001)
         XCTAssertEqual(detail.strokes[rep2First].d, rep1FinalD, accuracy: 0.001)
 
-        // Last stroke cumulative
-        let last = detail.strokes.count - 1
-        XCTAssertEqual(detail.strokes[last].t, 6.4, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].d, 32, accuracy: 0.001)
+        // Expected strokes by index (fixture-driven, includes pace at boundaries)
+        for expected in exp.strokes {
+            let stroke = detail.strokes[expected.index]
+            if let t = expected.t { XCTAssertEqual(stroke.t, t, accuracy: 0.001, "stroke[\(expected.index)].t") }
+            if let d = expected.d { XCTAssertEqual(stroke.d, d, accuracy: 0.001, "stroke[\(expected.index)].d") }
+            if let pace = expected.pace { XCTAssertEqual(stroke.pace, pace, accuracy: 0.001, "stroke[\(expected.index)].pace") }
+        }
 
-        // Interval splits
-        XCTAssertEqual(detail.splits.count, 2)
-        XCTAssertEqual(detail.splits[0].time, 112.5, accuracy: 0.001)
-        XCTAssertEqual(detail.splits[0].distance, 500)
-        XCTAssertEqual(detail.splits[1].time, 112.5, accuracy: 0.001)
-        XCTAssertEqual(detail.splits[1].distance, 500)
+        // Interval splits (fixture-driven)
+        XCTAssertEqual(detail.splits.count, exp.splits.count)
+        for expected in exp.splits {
+            let split = detail.splits[expected.index]
+            if let time = expected.time { XCTAssertEqual(split.time, time, accuracy: 0.001, "split[\(expected.index)].time") }
+            if let distance = expected.distance { XCTAssertEqual(split.distance, distance, accuracy: 0.001, "split[\(expected.index)].distance") }
+            if let pace = expected.pace { XCTAssertEqual(split.pace, pace, accuracy: 0.001, "split[\(expected.index)].pace") }
+        }
     }
 
     // MARK: - 3. SkiErg
@@ -106,26 +113,25 @@ final class Concept2FixtureDecodingTests: XCTestCase {
     func testDecodesSkiErgFixture() throws {
         let fixture = try loadFixture("ski-steady")
         let detail = mapDetail(from: fixture)
+        let exp = fixture.expected
 
-        XCTAssertEqual(detail.workout.id, 9003)
-        XCTAssertEqual(detail.workout.sport, .skierg)
-        XCTAssertEqual(detail.workout.distance, 6000)
-        XCTAssertEqual(detail.workout.time, 1440, accuracy: 0.001)
-        XCTAssertEqual(detail.workout.pace, 120, accuracy: 0.001)
+        XCTAssertEqual(detail.workout.id, fixture.rawResult.id)
+        XCTAssertEqual(detail.workout.sport, Sport.fromConcept2Type(exp.result.sport))
+        XCTAssertEqual(detail.workout.distance, try XCTUnwrap(exp.result.distance))
+        XCTAssertEqual(detail.workout.time, try XCTUnwrap(exp.result.time), accuracy: 0.001)
+        XCTAssertEqual(detail.workout.pace, try XCTUnwrap(exp.result.pace), accuracy: 0.001)
+        XCTAssertFalse(detail.workout.isInterval)
 
         XCTAssertFalse(detail.strokes.isEmpty)
         XCTAssertEqual(detail.strokes.count, fixture.rawStrokes.count)
 
-        // First stroke (paceDiv=1, same as rower)
-        XCTAssertEqual(detail.strokes[0].t, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].d, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].pace, 144, accuracy: 0.001)
-
-        // Last stroke
-        let last = detail.strokes.count - 1
-        XCTAssertEqual(detail.strokes[last].t, 9, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].d, 47.5, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].pace, 145, accuracy: 0.001)
+        // Expected strokes by index (fixture-driven)
+        for expected in exp.strokes {
+            let stroke = detail.strokes[expected.index]
+            if let t = expected.t { XCTAssertEqual(stroke.t, t, accuracy: 0.001, "stroke[\(expected.index)].t") }
+            if let d = expected.d { XCTAssertEqual(stroke.d, d, accuracy: 0.001, "stroke[\(expected.index)].d") }
+            if let pace = expected.pace { XCTAssertEqual(stroke.pace, pace, accuracy: 0.001, "stroke[\(expected.index)].pace") }
+        }
     }
 
     // MARK: - 4. BikeErg
@@ -133,29 +139,30 @@ final class Concept2FixtureDecodingTests: XCTestCase {
     func testDecodesBikeErgFixture() throws {
         let fixture = try loadFixture("bike-steady")
         let detail = mapDetail(from: fixture)
+        let exp = fixture.expected
 
-        XCTAssertEqual(detail.workout.id, 9002)
-        XCTAssertEqual(detail.workout.sport, .bike)
-        XCTAssertEqual(detail.workout.distance, 4000)
-        XCTAssertEqual(detail.workout.time, 960, accuracy: 0.001)
-        XCTAssertEqual(detail.workout.pace, 120, accuracy: 0.001)
+        XCTAssertEqual(detail.workout.id, fixture.rawResult.id)
+        XCTAssertEqual(detail.workout.sport, Sport.fromConcept2Type(exp.result.sport))
+        XCTAssertEqual(detail.workout.distance, try XCTUnwrap(exp.result.distance))
+        XCTAssertEqual(detail.workout.time, try XCTUnwrap(exp.result.time), accuracy: 0.001)
+        XCTAssertEqual(detail.workout.pace, try XCTUnwrap(exp.result.pace), accuracy: 0.001)
+        XCTAssertFalse(detail.workout.isInterval)
 
         XCTAssertFalse(detail.strokes.isEmpty)
         XCTAssertEqual(detail.strokes.count, fixture.rawStrokes.count)
 
-        // First stroke — pace halved from per-1000m to per-500m
-        XCTAssertEqual(detail.strokes[0].t, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].d, 0, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[0].pace, 100, accuracy: 0.001)
-
-        // Last stroke
-        let last = detail.strokes.count - 1
-        XCTAssertEqual(detail.strokes[last].t, 7.5, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].d, 60, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[last].pace, 90, accuracy: 0.001)
+        // Expected strokes by index (fixture-driven, includes pace)
+        for expected in exp.strokes {
+            let stroke = detail.strokes[expected.index]
+            if let t = expected.t { XCTAssertEqual(stroke.t, t, accuracy: 0.001, "stroke[\(expected.index)].t") }
+            if let d = expected.d { XCTAssertEqual(stroke.d, d, accuracy: 0.001, "stroke[\(expected.index)].d") }
+            if let pace = expected.pace { XCTAssertEqual(stroke.pace, pace, accuracy: 0.001, "stroke[\(expected.index)].pace") }
+        }
 
         // BikeErg watts use divisor: pace 100 → 44W, pace 90 → 60W
+        // (hardcoded — watts not in fixture expected strokes)
         XCTAssertEqual(detail.strokes[0].watts, 44)
+        let last = detail.strokes.count - 1
         XCTAssertEqual(detail.strokes[last].watts, 60)
     }
 
