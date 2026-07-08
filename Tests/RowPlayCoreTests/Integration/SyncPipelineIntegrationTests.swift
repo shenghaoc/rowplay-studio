@@ -263,7 +263,7 @@ final class SyncPipelineIntegrationTests: XCTestCase {
         XCTAssertEqual(snapshot.details.first?.workout.id, 9001)
     }
 
-    // MARK: - 9. Partial failure continues with real SQLite cache
+    // MARK: - 8. Partial failure continues with real SQLite cache
 
     func testPartialFailureContinuesSyncWithRealSQLite() async throws {
         let (cache, _) = try makeTempCache()
@@ -298,7 +298,7 @@ final class SyncPipelineIntegrationTests: XCTestCase {
         XCTAssertFalse(ids.contains(10_002))
     }
 
-    // MARK: - 10. WorkoutSyncError.description redacts secrets
+    // MARK: - 9. WorkoutSyncError.description redacts secrets
 
     func testWorkoutSyncErrorDescriptionRedactsSecrets() {
         let secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"

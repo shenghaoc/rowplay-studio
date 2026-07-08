@@ -11,6 +11,7 @@ Add integration tests that validate the native sync pipeline end-to-end using fa
 - Repeated syncs do not duplicate cached workouts.
 - Cache data persists across `SQLiteWorkoutCache` instances (same temp DB file).
 - Client failures do not corrupt or replace existing cached data with demo data.
+- Partial detail-fetch failures continue syncing successful workouts and do not cache the failed workout.
 - Sync error messages do not expose secrets or tokens.
 
 ## Non-Goals
