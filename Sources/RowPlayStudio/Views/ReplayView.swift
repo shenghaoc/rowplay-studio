@@ -54,6 +54,7 @@ struct ReplayView: View {
             drawStrokePath(in: &context, size: size)
             drawPlayhead(in: &context, size: size)
         }
+        .accessibilityLabel("Workout replay timeline")
     }
 
     private func drawStrokePath(in context: inout GraphicsContext, size: CGSize) {
@@ -140,11 +141,15 @@ struct ReplayView: View {
     // MARK: - Playback Controls
 
     private var playbackControls: some View {
-        HStack(spacing: 16) {
+        let playPauseLabel: LocalizedStringKey = state.playing ? "Pause replay" : "Play replay"
+
+        return HStack(spacing: 16) {
             Button(action: { state.toggle() }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
+            .accessibilityLabel(playPauseLabel)
+            .help(playPauseLabel)
             .keyboardShortcut(.space, modifiers: [])
 
             Slider(
@@ -157,6 +162,8 @@ struct ReplayView: View {
                     if isEditing { state.pause() }
                 }
             )
+            .accessibilityLabel("Replay progress")
+            .accessibilityValue("\(RowPlayFormatting.time(state.time, tenths: true)) of \(RowPlayFormatting.time(state.duration, tenths: true))")
 
             Picker("Speed", selection: Binding(
                 get: { state.speed },
