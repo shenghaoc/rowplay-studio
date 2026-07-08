@@ -6,11 +6,13 @@ import RowPlayCore
 final class WorkoutLibrary: ObservableObject {
     @Published var details: [WorkoutDetail] {
         didSet {
+            guard !suppressDerivedUpdates else { return }
             updateAllDerivedData()
         }
     }
     @Published var query: WorkoutListQuery {
         didSet {
+            guard !suppressDerivedUpdates else { return }
             let sportChanged = query.sport != oldValue.sport
             updateQueryDerivedData(sportChanged: sportChanged)
         }
@@ -33,6 +35,10 @@ final class WorkoutLibrary: ObservableObject {
     private(set) var filteredSummary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
     private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
     private(set) var filteredRecentPaceWorkouts: [Workout] = []
+
+    /// When true, `didSet` observers skip derived-data recomputation.
+    /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.
+    private var suppressDerivedUpdates = false
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
@@ -155,6 +161,7 @@ final class WorkoutLibrary: ObservableObject {
             demoModeEnabled: demoModeEnabled
         )
         let sourceChanged = snapshot.source != librarySource
+        suppressDerivedUpdates = true
         details = snapshot.details
         librarySource = snapshot.source
         if snapshot.source == .demo {
@@ -165,6 +172,8 @@ final class WorkoutLibrary: ObservableObject {
         if sourceChanged {
             query = WorkoutQuery.defaultQuery
         }
+        suppressDerivedUpdates = false
+        updateAllDerivedData()
     }
 
     // MARK: - Demo Mode Observation
@@ -201,6 +210,9 @@ final class WorkoutLibrary: ObservableObject {
             let previousCount = details.count
             details.removeAll(where: { demoDetailIDs.contains($0.id) })
             demoDetailIDs = []
+            if details.isEmpty && librarySource == .demo {
+                librarySource = .empty
+            }
             if details.count != previousCount {
                 query = WorkoutQuery.defaultQuery
             }

@@ -168,6 +168,7 @@ final class Concept2SyncController: ObservableObject {
             }
         }
 
+        library.disableDemoModeIfNeeded()
         library.clearData()
         statusMessage = cacheCleanupFailed
             ? "Concept2 token deleted; cache cleanup failed."
