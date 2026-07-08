@@ -153,6 +153,21 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         }
     }
 
+    func testUsesBatchDetailLookup() async throws {
+        let detail1 = makeDetail(id: 1)
+        let detail2 = makeDetail(id: 2)
+        let cache = BatchOnlyCache(details: [detail1, detail2])
+
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+
+        XCTAssertEqual(snapshot.source, .cache)
+        XCTAssertEqual(snapshot.details, [detail2, detail1])
+        XCTAssertEqual(cache.batchLookupCount, 1)
+    }
+
     // MARK: - Helpers
 
     private func makeDetail(id: Int) -> WorkoutDetail {
@@ -218,10 +233,48 @@ private final class SummaryOnlyCache: WorkoutCache, @unchecked Sendable {
     }
 
     func delete(id: Workout.ID) async throws {
-        lock.withLock { workouts.removeValue(forKey: id) }
+        lock.withLock { workouts[id] = nil }
     }
 
     func deleteAll() async throws {
         lock.withLock { workouts.removeAll() }
     }
+}
+
+private final class BatchOnlyCache: WorkoutCache, @unchecked Sendable {
+    private let storedDetails: [Workout.ID: WorkoutDetail]
+    private let lock = NSLock()
+    private var _batchLookupCount = 0
+
+    init(details: [WorkoutDetail]) {
+        storedDetails = Dictionary(uniqueKeysWithValues: details.map { ($0.workout.id, $0) })
+    }
+
+    var batchLookupCount: Int {
+        lock.withLock { _batchLookupCount }
+    }
+
+    func migrate() throws {}
+    func save(detail: WorkoutDetail) async throws {}
+    func save(details: [WorkoutDetail]) async throws {}
+    func saveWorkouts(_ workouts: [Workout]) async throws {}
+
+    func listWorkouts() async throws -> [Workout] {
+        storedDetails.values.map(\.workout).sorted { $0.date > $1.date }
+    }
+
+    func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        lock.withLock { _batchLookupCount += 1 }
+        return Dictionary(uniqueKeysWithValues: ids.compactMap { id in
+            storedDetails[id].map { (id, $0) }
+        })
+    }
+
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? {
+        XCTFail("WorkoutLibraryLoader should use details(for:) instead of detail(id:)")
+        return storedDetails[id]
+    }
+
+    func delete(id: Workout.ID) async throws {}
+    func deleteAll() async throws {}
 }

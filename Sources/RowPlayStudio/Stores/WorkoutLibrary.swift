@@ -160,6 +160,21 @@ final class WorkoutLibrary: ObservableObject {
             cache: cache,
             demoModeEnabled: demoModeEnabled
         )
+        applySnapshot(snapshot)
+    }
+
+    /// Reload from cache without demo fallback, then disable demo mode after the
+    /// cache result has been applied successfully.
+    func loadSyncedSource(cache: WorkoutCache) async throws {
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+        applySnapshot(snapshot)
+        disableDemoModeIfNeeded()
+    }
+
+    private func applySnapshot(_ snapshot: WorkoutLibrarySnapshot) {
         let sourceChanged = snapshot.source != librarySource
         suppressDerivedUpdates = true
         details = snapshot.details

@@ -21,6 +21,11 @@ public protocol WorkoutCache: Sendable {
     /// If a workout was saved via ``saveWorkouts(_:)`` without a prior
     /// ``save(detail:)``, this returns a placeholder with empty strokes/splits.
     func detail(id: Workout.ID) async throws -> WorkoutDetail?
+    /// Load full details for specific workout IDs.
+    ///
+    /// The returned dictionary omits IDs that are not cached. Implementations
+    /// may override this to avoid one query per workout.
+    func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail]
     /// Load all cached workout summaries, newest first.
     func listWorkouts() async throws -> [Workout]
     /// Delete a single workout by ID. No-op if the ID does not exist.
@@ -43,6 +48,17 @@ public extension WorkoutCache {
     /// Legacy Phase 4 name for `detail(id:)`.
     func loadWorkout(id: Workout.ID) async throws -> WorkoutDetail? {
         try await detail(id: id)
+    }
+
+    func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        var result: [Workout.ID: WorkoutDetail] = [:]
+        result.reserveCapacity(ids.count)
+        for id in ids {
+            if let detail = try await detail(id: id) {
+                result[id] = detail
+            }
+        }
+        return result
     }
 }
 
@@ -103,6 +119,19 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
     public func detail(id: Workout.ID) async throws -> WorkoutDetail? {
         lock.withLock {
             details[id]
+        }
+    }
+
+    public func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        lock.withLock {
+            var result: [Workout.ID: WorkoutDetail] = [:]
+            result.reserveCapacity(ids.count)
+            for id in ids {
+                if let detail = details[id] {
+                    result[id] = detail
+                }
+            }
+            return result
         }
     }
 

@@ -39,27 +39,16 @@ public enum WorkoutLibraryLoader {
 
     /// Load full details for each workout summary from the cache.
     ///
-    /// If `detail(id:)` returns nil for a workout that exists in `listWorkouts()`,
+    /// If `details(for:)` omits a workout that exists in `listWorkouts()`,
     /// a placeholder with empty strokes and splits is returned instead of failing.
-    ///
-    /// - TODO: This performs one async query per workout (N+1 pattern). For large
-    ///   workout histories, consider adding a batch retrieval method to `WorkoutCache`
-    ///   (e.g. `details(for ids:)`) so `SQLiteWorkoutCache` can use a single query.
     private static func loadDetails(
         workouts: [Workout],
         from cache: WorkoutCache
     ) async throws -> [WorkoutDetail] {
-        var details: [WorkoutDetail] = []
-        details.reserveCapacity(workouts.count)
+        let detailByID = try await cache.details(for: workouts.map(\.id))
 
-        for workout in workouts {
-            if let detail = try await cache.detail(id: workout.id) {
-                details.append(detail)
-            } else {
-                details.append(WorkoutDetail(workout: workout, strokes: [], splits: []))
-            }
+        return workouts.map { workout in
+            detailByID[workout.id] ?? WorkoutDetail(workout: workout, strokes: [], splits: [])
         }
-
-        return details
     }
 }

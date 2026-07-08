@@ -45,20 +45,18 @@ final class Concept2SyncController: ObservableObject {
     }
 
     func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard isConnected, !syncState.inProgress else { return }
+        guard !syncState.inProgress else { return }
 
         do {
             let cache = try resolvedCache()
-            let previousCount = library.details.count
             try await library.loadFromSource(cache: cache)
 
             let tracker = resolvedTracker(cache: cache)
             await tracker.refreshWorkoutCount()
             syncState = tracker.state
 
-            let loadedCount = library.details.count
-            if loadedCount > previousCount {
-                statusMessage = "Loaded \(loadedCount) cached workouts."
+            if library.librarySource == .cache {
+                statusMessage = "Loaded \(library.details.count) cached workouts."
             }
         } catch {
             await handleSyncError(error)
@@ -110,9 +108,7 @@ final class Concept2SyncController: ObservableObject {
             )
             let result = try await coordinator.syncAll()
 
-            // Syncing real Concept2 data replaces demo mode.
-            library.disableDemoModeIfNeeded()
-            try await library.loadFromSource(cache: cache)
+            try await library.loadSyncedSource(cache: cache)
             await tracker.syncCompleted()
             syncState = tracker.state
             statusMessage = syncSummary(for: result)

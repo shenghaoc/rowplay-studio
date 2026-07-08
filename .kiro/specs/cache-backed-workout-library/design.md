@@ -2,7 +2,7 @@
 
 ## Overview
 
-Introduce a `WorkoutLibraryLoader` in `RowPlayCore` that encapsulates the cache → demo → empty fallback logic. Wire `WorkoutLibrary` to use this loader on initial load and after sync.
+Introduce a `WorkoutLibraryLoader` in `RowPlayCore` that encapsulates the cache → demo → empty fallback logic. Wire `WorkoutLibrary` to use this loader on initial load and after sync, with launch hydration independent of Concept2 token state.
 
 ## New Types
 
@@ -54,19 +54,35 @@ Logic:
 5. If cache is empty and not `demoModeEnabled` → return `.empty` snapshot.
 6. Cache errors propagate as thrown exceptions.
 
+### `WorkoutCache.details(for:)`
+
+Located in `Sources/RowPlayCore/Sync/WorkoutCache.swift`.
+
+```swift
+func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail]
+```
+
+The protocol extension supplies a compatibility fallback that loops through
+`detail(id:)`. `InMemoryWorkoutCache` and `SQLiteWorkoutCache` override it.
+`SQLiteWorkoutCache` performs batch `SELECT id, detail_json ... WHERE id IN (...)`
+queries inside one serialized database operation, chunked to stay below SQLite
+parameter limits.
+
 ## Modified Types
 
 ### `WorkoutLibrary`
 
 - Add `private(set) var librarySource: WorkoutLibrarySource` property.
-- Add `func loadFromSource(cache: WorkoutCache, demoModeEnabled: Bool) async throws` that calls the loader and applies the snapshot.
+- Add `func loadFromSource(cache: WorkoutCache) async throws` that calls the loader using the library's persisted demo-mode state and applies the snapshot.
+- Add `func loadSyncedSource(cache: WorkoutCache) async throws` for manual sync completion. It loads with demo fallback disabled, applies the cache/empty snapshot, then persists demo mode off only after the reload succeeds.
 - Keep `WorkoutLibrary.demo()` factory for backward compatibility.
 - Keep existing demo mode notification handler unchanged (it manages the demo overlay on top of existing data).
 
 ### `Concept2SyncController`
 
-- `loadCachedWorkouts(into:)`: replace internal logic with `library.loadFromSource(cache:demoModeEnabled:)`.
-- `syncNow(into:)`: after sync completes, call `library.loadFromSource(cache:demoModeEnabled:)` instead of `library.replaceWithSyncedDetails(details)`.
+- `loadCachedWorkouts(into:)`: call `library.loadFromSource(cache:)` even when no token is stored, because local cache/demo loading does not need network auth.
+- `loadCachedWorkouts(into:)`: set the "Loaded N cached workouts" status only when `library.librarySource == .cache`.
+- `syncNow(into:)`: after sync completes, call `library.loadSyncedSource(cache:)` instead of `library.replaceWithSyncedDetails(details)`.
 - Remove private `loadDetails(from:)` helper (logic moved to loader).
 
 ### `RowPlayStudioApp`
@@ -82,11 +98,12 @@ Logic:
 RowPlayStudioApp.init
   → WorkoutLibrary(details: [])
   → .task { syncController.loadCachedWorkouts(into: library) }
-    → library.loadFromSource(cache, demoModeEnabled)
-      → WorkoutLibraryLoader.load(cache, demoModeEnabled)
+    → resolved SQLite cache (no token required)
+    → library.loadFromSource(cache)
+      → WorkoutLibraryLoader.load(cache, library.demoModeEnabled)
         → cache.migrate()
         → cache.listWorkouts()
-        → if has workouts: return .cache snapshot
+        → if has workouts: cache.details(for: ids), then return .cache snapshot
         → if empty + demo: return .demo snapshot
         → if empty + !demo: return .empty snapshot
       → library.details = snapshot.details
@@ -99,8 +116,10 @@ RowPlayStudioApp.init
 User triggers sync
   → syncController.syncNow(into: library)
     → coordinator.syncAll() → saves to cache
-    → library.loadFromSource(cache, demoModeEnabled)
-      → loads from cache (now has synced data)
+    → library.loadSyncedSource(cache)
+      → loads from cache without demo fallback
+      → applies cache/empty snapshot
+      → disables demo mode only after successful reload
 ```
 
 ### Demo Mode Toggle
@@ -123,3 +142,8 @@ User toggles demoModeEnabled in Settings
 4. Cache has data + demo enabled → cache takes priority.
 5. Cache throws → error propagates, no silent demo fallback.
 6. Source enum values are stable.
+7. Loader uses `details(for:)` batch lookup.
+8. Startup loads demo fallback without a token when demo mode is enabled.
+9. Startup remains empty without a token when demo mode is disabled.
+10. Demo fallback does not show a misleading "cached workouts" status.
+11. Post-sync cache reload failure preserves the user's demo-mode preference.

@@ -113,13 +113,9 @@ final class WorkoutLibrarySourceTests: XCTestCase {
 
     func testLoadFromSourceThrowsOnCacheError() async {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
-        let cache = InMemoryWorkoutCache()
-        // Make the cache throw by closing it (simulate open failure).
-        // We use a dedicated throwing cache for this test.
         let library = WorkoutLibrary(details: [], defaults: defaults)
-
-        // Use a cache that throws on listWorkouts.
         let throwingCache = ThrowingListCache()
+
         do {
             try await library.loadFromSource(cache: throwingCache)
             XCTFail("Expected error to be thrown")
