@@ -156,6 +156,7 @@ public enum RowPlayDateTime {
 
     // ⚡ Bolt: Cache ISO8601DateFormatter to avoid expensive instantiation on every call.
     // Date().formatted(.iso8601) creates a new formatter implicitly, which causes performance issues.
+    // Default options [.withInternetDateTime] + GMT timezone matches .formatted(.iso8601) output.
     private static let iso8601Formatter = ISO8601DateFormatter()
     /// Guards `iso8601Formatter` — `ISO8601DateFormatter` is not thread-safe.
     private static let iso8601FormatterLock = NSLock()
