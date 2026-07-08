@@ -8,13 +8,8 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func loadFixture(_ name: String) -> Concept2GoldenFixture {
-        do {
-            return try Concept2FixtureLoader.loadFixture(named: name)
-        } catch {
-            XCTFail("Failed to load fixture '\(name)': \(error)")
-            fatalError("Unreachable — XCTFail above")
-        }
+    private func loadFixture(_ name: String) throws -> Concept2GoldenFixture {
+        try Concept2FixtureLoader.loadFixture(named: name)
     }
 
     private func mapDetail(from fixture: Concept2GoldenFixture) -> WorkoutDetail {
@@ -26,8 +21,8 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 1. Rower Steady
 
-    func testDecodesRowerSteadyFixture() {
-        let fixture = loadFixture("rower-steady")
+    func testDecodesRowerSteadyFixture() throws {
+        let fixture = try loadFixture("rower-steady")
         let detail = mapDetail(from: fixture)
 
         // Summary parity
@@ -61,8 +56,8 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 2. Rower Interval
 
-    func testDecodesRowerIntervalFixture() {
-        let fixture = loadFixture("rower-interval")
+    func testDecodesRowerIntervalFixture() throws {
+        let fixture = try loadFixture("rower-interval")
         let detail = mapDetail(from: fixture)
 
         // Interval detection (fixture has workout.intervals)
@@ -79,15 +74,19 @@ final class Concept2FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(detail.strokes.count, fixture.rawStrokes.count)
         XCTAssertEqual(detail.strokes.count, 10)
 
+        // Interval metadata from fixture
+        let rep2First = try XCTUnwrap(fixture.rep2FirstIndex)
+        let rep1FinalT = try XCTUnwrap(fixture.rep1FinalT)
+        let rep1FinalD = try XCTUnwrap(fixture.rep1FinalD)
+
         // Rep 1 final stroke
-        let rep1Final = fixture.rep2FirstIndex! - 1
-        XCTAssertEqual(detail.strokes[rep1Final].t, fixture.rep1FinalT!, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[rep1Final].d, fixture.rep1FinalD!, accuracy: 0.001)
+        let rep1Final = rep2First - 1
+        XCTAssertEqual(detail.strokes[rep1Final].t, rep1FinalT, accuracy: 0.001)
+        XCTAssertEqual(detail.strokes[rep1Final].d, rep1FinalD, accuracy: 0.001)
 
         // Rep 2 first stroke — cumulative offset from rep 1
-        let rep2First = fixture.rep2FirstIndex!
-        XCTAssertEqual(detail.strokes[rep2First].t, fixture.rep1FinalT!, accuracy: 0.001)
-        XCTAssertEqual(detail.strokes[rep2First].d, fixture.rep1FinalD!, accuracy: 0.001)
+        XCTAssertEqual(detail.strokes[rep2First].t, rep1FinalT, accuracy: 0.001)
+        XCTAssertEqual(detail.strokes[rep2First].d, rep1FinalD, accuracy: 0.001)
 
         // Last stroke cumulative
         let last = detail.strokes.count - 1
@@ -104,8 +103,8 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 3. SkiErg
 
-    func testDecodesSkiErgFixture() {
-        let fixture = loadFixture("ski-steady")
+    func testDecodesSkiErgFixture() throws {
+        let fixture = try loadFixture("ski-steady")
         let detail = mapDetail(from: fixture)
 
         XCTAssertEqual(detail.workout.id, 9003)
@@ -131,8 +130,8 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 4. BikeErg
 
-    func testDecodesBikeErgFixture() {
-        let fixture = loadFixture("bike-steady")
+    func testDecodesBikeErgFixture() throws {
+        let fixture = try loadFixture("bike-steady")
         let detail = mapDetail(from: fixture)
 
         XCTAssertEqual(detail.workout.id, 9002)
@@ -162,11 +161,11 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 5. Stroke Monotonicity
 
-    func testMappedStrokesAreMonotonic() {
+    func testMappedStrokesAreMonotonic() throws {
         let fixtureNames = ["rower-steady", "rower-interval", "ski-steady", "bike-steady"]
 
         for name in fixtureNames {
-            let fixture = loadFixture(name)
+            let fixture = try loadFixture(name)
             let sport = Sport.fromConcept2Type(fixture.rawResult.type)
             let strokes = Concept2Mapper.mapStrokes(fixture.rawStrokes, sport: sport)
 
@@ -196,7 +195,7 @@ final class Concept2FixtureDecodingTests: XCTestCase {
 
     // MARK: - 6. No Secrets
 
-    func testFixturesDoNotContainSecrets() {
+    func testFixturesDoNotContainSecrets() throws {
         let secretMarkers = [
             "Authorization",
             "Bearer ",
@@ -209,14 +208,7 @@ final class Concept2FixtureDecodingTests: XCTestCase {
         let fixtureNames = ["rower-steady", "rower-interval", "ski-steady", "bike-steady"]
 
         for name in fixtureNames {
-            let data: Data
-            do {
-                data = try Concept2FixtureLoader.loadRawData(named: name)
-            } catch {
-                XCTFail("Failed to load fixture '\(name)' for secret scan: \(error)")
-                continue
-            }
-
+            let data = try Concept2FixtureLoader.loadRawData(named: name)
             let text = String(data: data, encoding: .utf8) ?? ""
 
             for marker in secretMarkers {

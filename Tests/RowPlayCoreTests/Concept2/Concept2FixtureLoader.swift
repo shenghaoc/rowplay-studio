@@ -1,6 +1,5 @@
 import Foundation
 @testable import RowPlayCore
-import XCTest
 
 // MARK: - Fixture wrapper
 
@@ -77,19 +76,16 @@ enum Concept2FixtureLoader {
     static func loadFixture(named name: String) throws -> Concept2GoldenFixture {
         let filename = "\(name).fixture"
         guard let url = Bundle.module.url(forResource: filename, withExtension: "json") else {
-            XCTFail("Fixture not found in bundle: \(filename).json")
             throw ParityFixtureError.fileNotFound(filename)
         }
         let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        return try decoder.decode(Concept2GoldenFixture.self, from: data)
+        return try JSONDecoder().decode(Concept2GoldenFixture.self, from: data)
     }
 
     /// Load raw fixture Data for secret-scanning tests.
     static func loadRawData(named name: String) throws -> Data {
         let filename = "\(name).fixture"
         guard let url = Bundle.module.url(forResource: filename, withExtension: "json") else {
-            XCTFail("Fixture not found in bundle: \(filename).json")
             throw ParityFixtureError.fileNotFound(filename)
         }
         return try Data(contentsOf: url)
