@@ -157,10 +157,14 @@ public enum RowPlayDateTime {
     // ⚡ Bolt: Cache ISO8601DateFormatter to avoid expensive instantiation on every call.
     // Date().formatted(.iso8601) creates a new formatter implicitly, which causes performance issues.
     private static let iso8601Formatter = ISO8601DateFormatter()
+    /// Guards `iso8601Formatter` — `ISO8601DateFormatter` is not thread-safe.
+    private static let iso8601FormatterLock = NSLock()
 
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {
-        iso8601Formatter.string(from: Date())
+        iso8601FormatterLock.lock()
+        defer { iso8601FormatterLock.unlock() }
+        return iso8601Formatter.string(from: Date())
     }
 
     // MARK: - Private
