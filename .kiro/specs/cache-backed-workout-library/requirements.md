@@ -24,6 +24,7 @@ Make the native workout library load workouts from `WorkoutCache` (SQLite), with
 - When the cache is empty AND `demoModeEnabled` is true, the library MUST load demo workouts from `DemoWorkoutLibrary`.
 - When the cache is empty AND `demoModeEnabled` is false, the library MUST show an empty state.
 - Demo data MUST NOT be shown silently when `demoModeEnabled` is false.
+- Demo data MUST NOT be appended on top of cached or real workouts; it is a fallback, not an overlay.
 
 ### R3: Error Handling
 
@@ -35,6 +36,7 @@ Make the native workout library load workouts from `WorkoutCache` (SQLite), with
 
 - Calling reload MUST re-evaluate the cache → demo → empty rules.
 - Reloading MUST replace existing library data with the fresh load result.
+- User-facing reload controls MUST call the cache → demo → empty loader rather than forcing demo fixtures.
 - Manual Concept2 sync MUST trigger a library reload from cache.
 - Manual Concept2 sync MUST NOT persist demo mode as disabled until the post-sync cache reload succeeds.
 

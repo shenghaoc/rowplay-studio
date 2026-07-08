@@ -76,7 +76,7 @@ parameter limits.
 - Add `func loadFromSource(cache: WorkoutCache) async throws` that calls the loader using the library's persisted demo-mode state and applies the snapshot.
 - Add `func loadSyncedSource(cache: WorkoutCache) async throws` for manual sync completion. It loads with demo fallback disabled, applies the cache/empty snapshot, then persists demo mode off only after the reload succeeds.
 - Keep `WorkoutLibrary.demo()` factory for backward compatibility.
-- Keep existing demo mode notification handler unchanged (it manages the demo overlay on top of existing data).
+- Demo mode notifications only seed demo details when the current library is empty. Cached or real workouts are never mixed with demo fixtures.
 
 ### `Concept2SyncController`
 
@@ -89,6 +89,7 @@ parameter limits.
 
 - Change `WorkoutLibrary.demo()` to `WorkoutLibrary(details: [])` since `loadFromSource` handles the demo fallback.
 - Keep the `.task` that calls `loadCachedWorkouts`.
+- Change the reload menu/toolbar action to "Reload Workout Library" and route it through `loadCachedWorkouts(into:)`, so reload re-evaluates cache → demo → empty rules.
 
 ## Data Flow
 
@@ -128,7 +129,8 @@ User triggers sync
 User toggles demoModeEnabled in Settings
   → UserDefaults.didChangeNotification
   → library.updateDemoModeState()
-    → if enabled: append missing demo details
+    → if enabled and library is empty: seed demo details
+    → if enabled and library has cached/real data: leave existing data intact
     → if disabled: remove demo details by ID
 ```
 
@@ -147,3 +149,4 @@ User toggles demoModeEnabled in Settings
 9. Startup remains empty without a token when demo mode is disabled.
 10. Demo fallback does not show a misleading "cached workouts" status.
 11. Post-sync cache reload failure preserves the user's demo-mode preference.
+12. Demo-mode toggle does not append fixtures on top of existing cached/real workouts.

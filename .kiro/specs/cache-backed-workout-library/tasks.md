@@ -9,8 +9,10 @@
 - [x] Update `WorkoutLibrary` to add `librarySource`, `loadFromSource`, and post-sync `loadSyncedSource`.
 - [x] Update `Concept2SyncController` to use `library.loadFromSource` for startup hydration and `library.loadSyncedSource` for post-sync reload.
 - [x] Update `RowPlayStudioApp` to start with empty library and rely on `loadFromSource`.
+- [x] Update reload menu/toolbar actions to re-run cache/demo/empty loading instead of forcing demo fixtures.
 - [x] Create `WorkoutLibraryLoaderTests` with cache/demo/empty/error/source/batch coverage.
 - [x] Update `Concept2SyncControllerTests` to reflect cache-priority behavior, no-token startup fallback, status messaging, and post-sync failure behavior.
+- [x] Update `WorkoutLibraryDemoModeTests` so demo-mode changes are fallback-only and do not overlay fixtures on existing data.
 - [x] Update `SQLiteWorkoutCacheTests` with batch detail coverage.
 - [x] Update `docs/source-map.md` with new library loader entries.
 - [x] Update `docs/beta-readiness.md` to reflect cache-backed library state.

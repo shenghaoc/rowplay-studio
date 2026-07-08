@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
+    @EnvironmentObject private var syncController: Concept2SyncController
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
 
     var body: some View {
@@ -48,13 +49,11 @@ struct ContentView: View {
                 .frame(width: 280)
 
                 Button {
-                    guard preferences.demoModeEnabled else { return }
-                    library.reloadDemoData()
-                    storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+                    reloadLibrary()
                 } label: {
-                    Label("Reload Demo Library", systemImage: "arrow.clockwise")
+                    Label("Reload Workout Library", systemImage: "arrow.clockwise")
                 }
-                .disabled(!preferences.demoModeEnabled)
+                .disabled(syncController.syncState.inProgress)
             }
         }
     }
@@ -69,6 +68,17 @@ struct ContentView: View {
 
     private var selectedWorkoutID: Int? {
         storedSelectedWorkoutID == Self.dashboardSelectionID ? nil : storedSelectedWorkoutID
+    }
+
+    private func reloadLibrary() {
+        Task {
+            await syncController.loadCachedWorkouts(into: library)
+            if library.librarySource == .demo {
+                storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+            } else if let selectedWorkoutID, library.detail(id: selectedWorkoutID) == nil {
+                storedSelectedWorkoutID = Self.dashboardSelectionID
+            }
+        }
     }
 
     private var selectionBinding: Binding<Int?> {

@@ -30,11 +30,13 @@ struct RowPlayStudioApp: App {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(!syncController.canSync)
 
-                Button("Reload Demo Library") {
-                    library.reloadDemoData()
+                Button("Reload Workout Library") {
+                    Task {
+                        await syncController.loadCachedWorkouts(into: library)
+                    }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(!preferences.demoModeEnabled)
+                .disabled(syncController.syncState.inProgress)
             }
         }
 

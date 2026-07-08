@@ -40,6 +40,7 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         library.reloadDemoData()
 
         XCTAssertFalse(library.isEmpty)
+        XCTAssertEqual(library.librarySource, .demo)
         XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
         XCTAssertEqual(library.details.first?.id, DemoWorkoutLibrary.defaultWorkoutID)
     }
@@ -49,6 +50,7 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         let library = WorkoutLibrary.demo(defaults: defaults)
 
         XCTAssertFalse(library.isEmpty)
+        XCTAssertEqual(library.librarySource, .demo)
     }
 
     func testDemoLibraryStartsEmptyWhenDemoModeDisabled() {
@@ -56,6 +58,7 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         let library = WorkoutLibrary.demo(defaults: defaults)
 
         XCTAssertTrue(library.isEmpty)
+        XCTAssertEqual(library.librarySource, .empty)
     }
 
     func testDemoModeNotificationReloadsDemoDataWhenEnabled() async {
@@ -66,10 +69,11 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         await waitForDemoModeNotification()
 
         XCTAssertFalse(library.isEmpty)
+        XCTAssertEqual(library.librarySource, .demo)
         XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
     }
 
-    func testDemoModeNotificationAppendsDemoDataWhenEnabledWithoutRemovingExistingWorkouts() async {
+    func testDemoModeNotificationDoesNotAppendDemoDataWhenExistingWorkoutsPresent() async {
         defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
         let realWorkout = makeRealWorkoutDetail()
         let library = WorkoutLibrary(details: [realWorkout], defaults: defaults)
@@ -77,12 +81,8 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
         await waitForDemoModeNotification()
 
-        XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count + 1)
-        XCTAssertTrue(library.details.contains(realWorkout))
-        XCTAssertEqual(
-            Set(library.details.map(\.id)).count,
-            DemoWorkoutLibrary.details.count + 1
-        )
+        XCTAssertEqual(library.details, [realWorkout])
+        XCTAssertEqual(library.librarySource, .cache)
     }
 
     func testDemoModeNotificationClearsDemoDataWhenDisabled() async {
@@ -93,6 +93,7 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         await waitForDemoModeNotification()
 
         XCTAssertTrue(library.isEmpty)
+        XCTAssertEqual(library.librarySource, .empty)
     }
 
     func testDemoModeNotificationPreservesNonDemoWorkoutsWhenDisabled() async {

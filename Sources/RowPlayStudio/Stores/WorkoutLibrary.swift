@@ -61,6 +61,9 @@ final class WorkoutLibrary: ObservableObject {
         self.defaults = defaults
         demoModeEnabled = Self.persistedDemoModeEnabled(in: defaults)
         demoDetailIDs = Self.demoIDs(in: details)
+        if !details.isEmpty {
+            librarySource = demoDetailIDs.count == details.count ? .demo : .cache
+        }
         updateAllDerivedData()
         observeDemoModeChanges()
     }
@@ -128,6 +131,7 @@ final class WorkoutLibrary: ObservableObject {
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
         demoDetailIDs = Set(DemoWorkoutLibrary.details.map(\.id))
+        librarySource = .demo
         query = WorkoutQuery.defaultQuery
     }
 
@@ -214,21 +218,22 @@ final class WorkoutLibrary: ObservableObject {
         demoModeEnabled = demoEnabled
 
         if demoEnabled {
-            let existingIDs = Set(details.map(\.id))
-            let missingDemoDetails = DemoWorkoutLibrary.details.filter { !existingIDs.contains($0.id) }
-            if !missingDemoDetails.isEmpty {
-                details.append(contentsOf: missingDemoDetails)
-                demoDetailIDs.formUnion(missingDemoDetails.map(\.id))
-                query = WorkoutQuery.defaultQuery
-            }
+            guard details.isEmpty else { return }
+            details = DemoWorkoutLibrary.details
+            demoDetailIDs = Self.demoIDs(in: details)
+            librarySource = .demo
+            query = WorkoutQuery.defaultQuery
         } else if !details.isEmpty {
             let previousCount = details.count
-            details.removeAll(where: { demoDetailIDs.contains($0.id) })
-            demoDetailIDs = []
-            if details.isEmpty && librarySource == .demo {
+            let previousSource = librarySource
+            if !demoDetailIDs.isEmpty {
+                details.removeAll(where: { demoDetailIDs.contains($0.id) })
+                demoDetailIDs = []
+            }
+            if librarySource == .demo {
                 librarySource = .empty
             }
-            if details.count != previousCount {
+            if details.count != previousCount || librarySource != previousSource {
                 query = WorkoutQuery.defaultQuery
             }
         }
