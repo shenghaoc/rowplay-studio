@@ -12,7 +12,7 @@ public enum WorkoutLibraryLoader {
     ///   - demoModeEnabled: Whether demo mode is enabled; if true and the cache is
     ///     empty, demo workouts are returned.
     /// - Returns: A snapshot containing the loaded details and their source.
-    /// - Throws: Propagates cache errors (open, migration, query, decoding).
+    /// - Throws: Propagates `WorkoutCacheError` cases (open, migration, query, decoding).
     ///   Cache failures never silently fall back to demo data.
     public static func load(
         cache: WorkoutCache,
@@ -38,6 +38,9 @@ public enum WorkoutLibraryLoader {
     }
 
     /// Load full details for each workout summary from the cache.
+    ///
+    /// If `detail(id:)` returns nil for a workout that exists in `listWorkouts()`,
+    /// a placeholder with empty strokes and splits is returned instead of failing.
     ///
     /// - TODO: This performs one async query per workout (N+1 pattern). For large
     ///   workout histories, consider adding a batch retrieval method to `WorkoutCache`

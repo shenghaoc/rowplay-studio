@@ -2,7 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 final class WorkoutLibraryLoaderTests: XCTestCase {
-    // MARK: - testLoadsCachedWorkoutsWhenCacheHasData
+    // MARK: - Cache → Demo → Empty Fallback
 
     func testLoadsCachedWorkoutsWhenCacheHasData() async throws {
         let cachedDetail = makeDetail(id: 42)
@@ -19,8 +19,6 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         XCTAssertEqual(snapshot.details.first?.workout.id, 42)
     }
 
-    // MARK: - testLoadsDemoWhenCacheEmptyAndDemoEnabled
-
     func testLoadsDemoWhenCacheEmptyAndDemoEnabled() async throws {
         let cache = InMemoryWorkoutCache()
 
@@ -33,8 +31,6 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         XCTAssertEqual(snapshot.details.count, DemoWorkoutLibrary.details.count)
     }
 
-    // MARK: - testReturnsEmptyWhenCacheEmptyAndDemoDisabled
-
     func testReturnsEmptyWhenCacheEmptyAndDemoDisabled() async throws {
         let cache = InMemoryWorkoutCache()
 
@@ -46,8 +42,6 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         XCTAssertEqual(snapshot.source, .empty)
         XCTAssertTrue(snapshot.details.isEmpty)
     }
-
-    // MARK: - testCacheTakesPriorityOverDemo
 
     func testCacheTakesPriorityOverDemo() async throws {
         let cachedDetail = makeDetail(id: 99)
@@ -64,7 +58,7 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         XCTAssertEqual(snapshot.details.first?.workout.id, 99)
     }
 
-    // MARK: - testCacheFailureDoesNotSilentlyShowDemo
+    // MARK: - Error Propagation
 
     func testCacheFailureDoesNotSilentlyShowDemo() async {
         let cache = ThrowingWorkoutCache()
@@ -76,12 +70,25 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
             )
             XCTFail("Expected error to be thrown")
         } catch {
-            // Error propagated — no silent fallback to demo data.
             XCTAssertTrue(error is TestCacheError)
         }
     }
 
-    // MARK: - testSnapshotSourceIsStable
+    func testCacheFailureLeavesSourceUnchanged() async {
+        let cache = ThrowingWorkoutCache()
+
+        do {
+            _ = try await WorkoutLibraryLoader.load(
+                cache: cache,
+                demoModeEnabled: false
+            )
+            XCTFail("Expected error to be thrown")
+        } catch {
+            XCTAssertTrue(error is TestCacheError)
+        }
+    }
+
+    // MARK: - Source Stability
 
     func testSnapshotSourceIsStable() async throws {
         let cache = InMemoryWorkoutCache()
@@ -106,6 +113,46 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
         XCTAssertEqual(cacheSnapshot.source, .cache)
     }
 
+    // MARK: - Placeholder Detail Fallback
+
+    func testMissingDetailProducesPlaceholderWithEmptyStrokesAndSplits() async throws {
+        // Use a cache where listWorkouts() returns a workout but detail(id:) returns nil.
+        // InMemoryWorkoutCache.saveWorkouts creates placeholder details, so we use a
+        // custom cache that only stores summaries.
+        let cache = SummaryOnlyCache()
+        let workout = makeDetail(id: 55).workout
+        try await cache.saveWorkouts([workout])
+
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+
+        XCTAssertEqual(snapshot.source, .cache)
+        XCTAssertEqual(snapshot.details.count, 1)
+        XCTAssertEqual(snapshot.details.first?.workout.id, 55)
+        XCTAssertTrue(snapshot.details.first?.strokes.isEmpty ?? false)
+        XCTAssertTrue(snapshot.details.first?.splits.isEmpty ?? false)
+    }
+
+    func testMultipleWorkoutsSomeWithMissingDetails() async throws {
+        let cache = SummaryOnlyCache()
+        let workout1 = makeDetail(id: 1).workout
+        let workout2 = makeDetail(id: 2).workout
+        try await cache.saveWorkouts([workout1, workout2])
+
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+
+        XCTAssertEqual(snapshot.details.count, 2)
+        for detail in snapshot.details {
+            XCTAssertTrue(detail.strokes.isEmpty)
+            XCTAssertTrue(detail.splits.isEmpty)
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeDetail(id: Int) -> WorkoutDetail {
@@ -128,18 +175,53 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
 
 // MARK: - Test Helpers
 
-private enum TestCacheError: Error {
-    case intentional
-}
+/// A WorkoutCache that stores only summaries (no detail JSON), so `detail(id:)` always
+/// returns nil for workouts saved via `saveWorkouts`. Used to test the loader's
+/// placeholder fallback path.
+private final class SummaryOnlyCache: WorkoutCache, @unchecked Sendable {
+    private var workouts: [Int: Workout] = [:]
+    private let lock = NSLock()
 
-/// A WorkoutCache that throws on every operation for error-propagation testing.
-private final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
-    func migrate() throws { throw TestCacheError.intentional }
-    func save(detail: WorkoutDetail) async throws { throw TestCacheError.intentional }
-    func save(details: [WorkoutDetail]) async throws { throw TestCacheError.intentional }
-    func saveWorkouts(_ workouts: [Workout]) async throws { throw TestCacheError.intentional }
-    func detail(id: Workout.ID) async throws -> WorkoutDetail? { throw TestCacheError.intentional }
-    func listWorkouts() async throws -> [Workout] { throw TestCacheError.intentional }
-    func delete(id: Workout.ID) async throws { throw TestCacheError.intentional }
-    func deleteAll() async throws { throw TestCacheError.intentional }
+    func migrate() throws {}
+
+    func save(detail: WorkoutDetail) async throws {
+        lock.withLock {
+            workouts[detail.workout.id] = detail.workout
+        }
+    }
+
+    func save(details: [WorkoutDetail]) async throws {
+        lock.withLock {
+            for detail in details {
+                workouts[detail.workout.id] = detail.workout
+            }
+        }
+    }
+
+    func saveWorkouts(_ workouts: [Workout]) async throws {
+        lock.withLock {
+            for workout in workouts {
+                self.workouts[workout.id] = workout
+            }
+        }
+    }
+
+    func listWorkouts() async throws -> [Workout] {
+        lock.withLock {
+            workouts.values.sorted { $0.date > $1.date }
+        }
+    }
+
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? {
+        // Always return nil to simulate missing detail data.
+        nil
+    }
+
+    func delete(id: Workout.ID) async throws {
+        lock.withLock { workouts.removeValue(forKey: id) }
+    }
+
+    func deleteAll() async throws {
+        lock.withLock { workouts.removeAll() }
+    }
 }

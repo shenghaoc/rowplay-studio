@@ -136,23 +136,33 @@ public final class FakeTokenStore: TokenStore, @unchecked Sendable {
     private var storedToken: String?
     private let lock = NSLock()
 
+    /// If set, `saveToken` throws this error instead of storing the token.
+    public var saveError: Error?
+    /// If set, `loadToken` throws this error instead of returning the stored token.
+    public var loadError: Error?
+    /// If set, `deleteToken` throws this error instead of clearing the stored token.
+    public var deleteError: Error?
+
     public init(storedToken: String? = nil) {
         self.storedToken = storedToken
     }
 
     public func saveToken(_ token: String) throws {
+        if let saveError { throw saveError }
         lock.withLock {
             storedToken = token
         }
     }
 
     public func loadToken() throws -> String? {
-        lock.withLock {
+        if let loadError { throw loadError }
+        return lock.withLock {
             storedToken
         }
     }
 
     public func deleteToken() throws {
+        if let deleteError { throw deleteError }
         lock.withLock {
             storedToken = nil
         }

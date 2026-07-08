@@ -38,7 +38,7 @@ final class WorkoutLibrary: ObservableObject {
     private var detailByID: [Int: WorkoutDetail] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
-    private var demoDetailIDs: Set<Int>
+    private(set) var demoDetailIDs: Set<Int>
     private static let demoDetailsByID = Dictionary(
         uniqueKeysWithValues: DemoWorkoutLibrary.details.map { ($0.id, $0) }
     )
@@ -154,6 +154,7 @@ final class WorkoutLibrary: ObservableObject {
             cache: cache,
             demoModeEnabled: demoModeEnabled
         )
+        let sourceChanged = snapshot.source != librarySource
         details = snapshot.details
         librarySource = snapshot.source
         if snapshot.source == .demo {
@@ -161,17 +162,9 @@ final class WorkoutLibrary: ObservableObject {
         } else {
             demoDetailIDs = []
         }
-        query = WorkoutQuery.defaultQuery
-    }
-
-    func replaceWithSyncedDetails(_ syncedDetails: [WorkoutDetail]) {
-        details = syncedDetails
-        demoDetailIDs = []
-        if demoModeEnabled {
-            demoModeEnabled = false
-            defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        if sourceChanged {
+            query = WorkoutQuery.defaultQuery
         }
-        query = WorkoutQuery.defaultQuery
     }
 
     // MARK: - Demo Mode Observation
@@ -204,7 +197,7 @@ final class WorkoutLibrary: ObservableObject {
                 demoDetailIDs.formUnion(missingDemoDetails.map(\.id))
                 query = WorkoutQuery.defaultQuery
             }
-        } else if !demoEnabled && !details.isEmpty {
+        } else if !details.isEmpty {
             let previousCount = details.count
             details.removeAll(where: { demoDetailIDs.contains($0.id) })
             demoDetailIDs = []

@@ -1,18 +1,6 @@
 import XCTest
 @testable import RowPlayCore
 
-/// A WorkoutCache that throws on every operation, for testing error paths.
-private final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
-    func migrate() throws { throw NSError(domain: "test", code: 1) }
-    func save(detail: WorkoutDetail) async throws { throw NSError(domain: "test", code: 1) }
-    func save(details: [WorkoutDetail]) async throws { throw NSError(domain: "test", code: 1) }
-    func saveWorkouts(_ workouts: [Workout]) async throws { throw NSError(domain: "test", code: 1) }
-    func detail(id: Workout.ID) async throws -> WorkoutDetail? { throw NSError(domain: "test", code: 1) }
-    func listWorkouts() async throws -> [Workout] { throw NSError(domain: "test", code: 1) }
-    func delete(id: Workout.ID) async throws { throw NSError(domain: "test", code: 1) }
-    func deleteAll() async throws { throw NSError(domain: "test", code: 1) }
-}
-
 @available(macOS 14.0, *)
 @MainActor
 final class SyncStateTrackerTests: XCTestCase {

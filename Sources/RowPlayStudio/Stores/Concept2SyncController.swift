@@ -34,6 +34,8 @@ final class Concept2SyncController: ObservableObject {
             isConnected = try tokenStore.loadToken()?.isEmpty == false
         } catch {
             isConnected = false
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
             statusMessage = "Concept2 connection unavailable."
         }
     }
@@ -59,13 +61,7 @@ final class Concept2SyncController: ObservableObject {
                 statusMessage = "Loaded \(loadedCount) cached workouts."
             }
         } catch {
-            if let tracker {
-                await tracker.syncFailed(error: error)
-                syncState = tracker.state
-            } else {
-                syncState.lastError = redact(error)
-                syncState.lastErrorDate = Date()
-            }
+            await handleSyncError(error)
             statusMessage = "Could not load cached Concept2 workouts."
         }
     }
@@ -86,6 +82,8 @@ final class Concept2SyncController: ObservableObject {
             isConnected = true
             statusMessage = "Concept2 token saved."
         } catch {
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
             statusMessage = "Could not save Concept2 token."
         }
     }
@@ -123,14 +121,7 @@ final class Concept2SyncController: ObservableObject {
             syncState.inProgress = false
             statusMessage = "Concept2 sync cancelled."
         } catch {
-            if let tracker {
-                await tracker.syncFailed(error: error)
-                syncState = tracker.state
-            } else {
-                syncState.inProgress = false
-                syncState.lastError = redact(error)
-                syncState.lastErrorDate = Date()
-            }
+            await handleSyncError(error, resetInProgress: true)
             statusMessage = "Concept2 sync failed."
         }
     }
@@ -140,6 +131,8 @@ final class Concept2SyncController: ObservableObject {
             try tokenStore.deleteToken()
             isConnected = false
         } catch {
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
             statusMessage = "Could not delete Concept2 token."
             return
         }
@@ -200,6 +193,19 @@ final class Concept2SyncController: ObservableObject {
         let cache = try cacheFactory()
         self.cache = cache
         return cache
+    }
+
+    private func handleSyncError(_ error: Error, resetInProgress: Bool = false) async {
+        if let tracker {
+            await tracker.syncFailed(error: error)
+            syncState = tracker.state
+        } else {
+            if resetInProgress {
+                syncState.inProgress = false
+            }
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
+        }
     }
 
     private func resolvedTracker(cache: any WorkoutCache) -> SyncStateTracker {
