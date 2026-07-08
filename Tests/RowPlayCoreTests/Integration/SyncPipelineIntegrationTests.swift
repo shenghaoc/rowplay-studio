@@ -29,16 +29,16 @@ final class SyncPipelineIntegrationTests: XCTestCase {
 
     private var tempDir: URL!
 
-    override func setUp() {
-        super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("SyncPipelineIntegrationTests-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
-    override func tearDown() {
-        try? FileManager.default.removeItem(at: tempDir)
-        super.tearDown()
+    override func tearDownWithError() throws {
+        try FileManager.default.removeItem(at: tempDir)
+        try super.tearDownWithError()
     }
 
     private func makeTempCache() throws -> (SQLiteWorkoutCache, String) {
@@ -163,15 +163,18 @@ final class SyncPipelineIntegrationTests: XCTestCase {
     // MARK: - 6. Pipeline persists across cache instances
 
     func testPipelinePersistsAcrossCacheInstances() async throws {
-        let (cacheA, dbPath) = try makeTempCache()
-        let detail1 = makeTestDetail(id: 8001)
-        let detail2 = makeTestDetail(id: 8002)
-        let client = MockConcept2Client(details: [detail1, detail2])
-        let coordinator = WorkoutSyncCoordinator(client: client, cache: cacheA)
+        let dbPath: String
+        do {
+            let (cacheA, path) = try makeTempCache()
+            dbPath = path
+            let detail1 = makeTestDetail(id: 8001)
+            let detail2 = makeTestDetail(id: 8002)
+            let client = MockConcept2Client(details: [detail1, detail2])
+            let coordinator = WorkoutSyncCoordinator(client: client, cache: cacheA)
+            _ = try await coordinator.syncAll()
+        }
 
-        _ = try await coordinator.syncAll()
-
-        // Release instance A and open a new instance on the same DB file.
+        // Open a new instance on the same DB file after cacheA is deallocated.
         let cacheB = try SQLiteWorkoutCache(path: dbPath)
         try cacheB.migrate()
 
@@ -205,9 +208,11 @@ final class SyncPipelineIntegrationTests: XCTestCase {
         do {
             _ = try await coordinator.syncAll()
             XCTFail("Expected syncAll to throw")
-        } catch {
+        } catch let error as WorkoutSyncError {
             // Expected: the summary fetch fails.
-            XCTAssertTrue(error is WorkoutSyncError)
+            _ = error
+        } catch {
+            XCTFail("Expected WorkoutSyncError, but got: \(error)")
         }
 
         // Load library with demo mode enabled — cached data should still be returned.
@@ -226,10 +231,15 @@ final class SyncPipelineIntegrationTests: XCTestCase {
     func testPipelineErrorsDoNotExposeToken() async throws {
         let (cache, _) = try makeTempCache()
 
+        struct SecretError: Error, CustomStringConvertible {
+            let message: String
+            var description: String { message }
+        }
+
         // Use a 64-char hex secret that matches the redact() hex pattern.
         let secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         let failingClient = FailingConcept2Client(
-            error: Concept2ClientError.httpError(statusCode: 401)
+            error: SecretError(message: "Unauthorized access with token: \(secret)")
         )
         let coordinator = WorkoutSyncCoordinator(client: failingClient, cache: cache)
 
