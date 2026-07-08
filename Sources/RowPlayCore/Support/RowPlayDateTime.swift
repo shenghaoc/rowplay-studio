@@ -154,9 +154,13 @@ public enum RowPlayDateTime {
 
     // MARK: - ISO Helpers
 
+    // ⚡ Bolt: Cache ISO8601DateFormatter to avoid expensive instantiation on every call.
+    // Date().formatted(.iso8601) creates a new formatter implicitly, which causes performance issues.
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {
-        Date().formatted(.iso8601)
+        iso8601Formatter.string(from: Date())
     }
 
     // MARK: - Private
