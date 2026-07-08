@@ -30,6 +30,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - Privacy: `PrivacyRedaction` and `PrivacySafeLogger` are tested. No CoreBluetooth imports in `RowPlayCore`. Keychain uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
 - Hardware scope: mock-only implementation; Settings correctly shows "Mock only" without real pairing or scanning controls.
 - No stale test counts in task specs.
+- Sync pipeline integration: `SyncPipelineIntegrationTests` validates fake Concept2 data flows through `WorkoutSyncCoordinator` → `SQLiteWorkoutCache` → `WorkoutLibraryLoader`. Real network sync still needs separate validation.
 
 ## Gaps Before Beta
 
