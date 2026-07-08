@@ -141,13 +141,15 @@ struct ReplayView: View {
     // MARK: - Playback Controls
 
     private var playbackControls: some View {
-        HStack(spacing: 16) {
+        let playPauseLabel: LocalizedStringKey = state.playing ? "Pause replay" : "Play replay"
+
+        return HStack(spacing: 16) {
             Button(action: { state.toggle() }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
-            .accessibilityLabel(state.playing ? LocalizedStringKey("Pause replay") : LocalizedStringKey("Play replay"))
-            .help(state.playing ? LocalizedStringKey("Pause replay") : LocalizedStringKey("Play replay"))
+            .accessibilityLabel(playPauseLabel)
+            .help(playPauseLabel)
             .keyboardShortcut(.space, modifiers: [])
 
             Slider(
@@ -161,6 +163,7 @@ struct ReplayView: View {
                 }
             )
             .accessibilityLabel("Replay progress")
+            .accessibilityValue("\(RowPlayFormatting.time(state.time, tenths: true)) of \(RowPlayFormatting.time(state.duration, tenths: true))")
 
             Picker("Speed", selection: Binding(
                 get: { state.speed },
