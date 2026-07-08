@@ -27,11 +27,20 @@ public final class URLSessionHTTPTransport: HTTPTransport {
     /// Create a transport with built-in HTTPS redirect protection.
     ///
     /// - Parameter configuration: The URL session configuration to use.
-    public init(configuration: URLSessionConfiguration = .default) {
+    public init(configuration: URLSessionConfiguration? = nil) {
+        let finalConfiguration = configuration ?? {
+            let config = URLSessionConfiguration.default
+            // Security: Enforce strict timeouts to prevent resource exhaustion (DoS)
+            // from slow or unresponsive remote servers.
+            config.timeoutIntervalForRequest = 30.0
+            config.timeoutIntervalForResource = 300.0
+            return config
+        }()
+
         let delegate = HTTPSRedirectDelegate()
         self.redirectDelegate = delegate
         self.session = URLSession(
-            configuration: configuration,
+            configuration: finalConfiguration,
             delegate: delegate,
             delegateQueue: nil
         )

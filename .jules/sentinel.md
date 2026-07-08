@@ -12,3 +12,8 @@
 **Vulnerability:** The Concept2 client allowed configuring an arbitrary `baseURL` which could use the plain HTTP scheme. By doing so, the user's secret BYOT `Bearer` token could be sent over the network in cleartext without TLS encryption, leading to potential token interception and account takeover.
 **Learning:** Network clients appending Bearer tokens or sensitive headers shouldn't blindly trust that the base URL provides transport layer security.
 **Prevention:** Always assert or guard that the final URL scheme is `https` before attaching authentication headers to the `URLRequest`. Fail securely if the scheme is `http`.
+
+## 2026-07-06 - Uncontrolled Resource Consumption (DoS) via Default URLSessionConfiguration
+**Vulnerability:** The HTTP transport created for API calls relied on `URLSessionConfiguration.default`, which has a very high `timeoutIntervalForResource` (7 days) and a generic `timeoutIntervalForRequest` (60 seconds). This could lead to resource exhaustion if connecting to a slow or hanging server.
+**Learning:** Default configuration parameters may not be suited for robust network interactions where prompt failure is preferred over indefinitely tied-up resources.
+**Prevention:** Explicitly configure timeout limits on any `URLSessionConfiguration` that will be used to initialize a `URLSession`, setting strict thresholds for both `timeoutIntervalForRequest` and `timeoutIntervalForResource`.
