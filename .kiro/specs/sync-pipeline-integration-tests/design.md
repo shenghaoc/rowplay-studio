@@ -6,9 +6,9 @@ Tests exercise the real production types (`WorkoutSyncCoordinator`, `SQLiteWorko
 
 ## Test Fakes
 
-### FakeConcept2Client
+### MockConcept2Client
 
-A `Concept2APIClient` that holds a fixed array of `WorkoutDetail` values and returns them from `fetchWorkouts` / `fetchWorkoutDetail`. Uses `DemoWorkoutLibrary.details` subsets or hand-built minimal details. Tracks call counts for diagnostics. No URLSession, no network, no token.
+The reusable `MockConcept2Client` holds a fixed array of `WorkoutDetail` values and returns them from `fetchWorkouts` / `fetchWorkoutDetail`. Tests pass `DemoWorkoutLibrary.details` subsets or hand-built minimal details. The mock tracks call counts for diagnostics. No URLSession, no network, no token.
 
 ### FailingConcept2Client
 
@@ -36,7 +36,7 @@ A `Concept2APIClient` that returns a fixed summary list but throws from `fetchWo
 | 6 | Persists across cache instances | Empty | Returns 2 details | Second instance loads same data |
 | 7 | Client failure preserves cache | Seeded 1 detail | Throws | Source=cache, seeded detail intact |
 | 8 | Partial failure continues with real SQLite | Empty | Returns 3 summaries; one detail throws | 2 saved, 1 failed, failed ID absent |
-| 9 | Errors don't expose token | Empty | Throws with secret in message | Error string omits secret |
+| 9 | Pipeline errors don't expose token | Empty | Summary fetch throws with secret in message | Thrown sync error omits secret |
 
 ## Bug Fix Rules
 

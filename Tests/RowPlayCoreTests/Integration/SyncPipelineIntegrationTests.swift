@@ -47,6 +47,14 @@ private final class SelectiveFailureClient: Concept2APIClient, @unchecked Sendab
     }
 }
 
+private struct SecretSyncError: Error, CustomStringConvertible {
+    let message: String
+
+    var description: String {
+        message
+    }
+}
+
 // MARK: - Tests
 
 final class SyncPipelineIntegrationTests: XCTestCase {
@@ -298,15 +306,28 @@ final class SyncPipelineIntegrationTests: XCTestCase {
         XCTAssertFalse(ids.contains(10_002))
     }
 
-    // MARK: - 9. WorkoutSyncError.description redacts secrets
+    // MARK: - 9. Pipeline errors do not expose secrets
 
-    func testWorkoutSyncErrorDescriptionRedactsSecrets() {
-        let secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
-        let error = WorkoutSyncError.clientFailed("token: \(secret)")
-        let description = error.description
-        XCTAssertFalse(
-            description.contains(secret),
-            "WorkoutSyncError.description must redact secrets independently"
+    func testPipelineErrorsDoNotExposeToken() async throws {
+        let (cache, _) = try makeTempCache()
+        let secret = "test-secret-token"
+        let failingClient = FailingConcept2Client(
+            error: SecretSyncError(message: "summary failed token=\(secret)")
         )
+        let coordinator = WorkoutSyncCoordinator(client: failingClient, cache: cache)
+
+        do {
+            _ = try await coordinator.syncAll()
+            XCTFail("Expected syncAll to throw")
+        } catch let error as WorkoutSyncError {
+            let description = error.description
+            XCTAssertFalse(
+                description.contains(secret),
+                "Sync pipeline error must not expose the secret token"
+            )
+            XCTAssertTrue(description.contains(redactedPlaceholder))
+        } catch {
+            XCTFail("Expected WorkoutSyncError, but got: \(error)")
+        }
     }
 }
