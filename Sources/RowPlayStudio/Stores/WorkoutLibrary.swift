@@ -146,9 +146,10 @@ final class WorkoutLibrary: ObservableObject {
 
     /// Reload the library from the cache, falling back to demo data or empty as appropriate.
     ///
-    /// This replaces all existing details with the fresh load result.
+    /// Uses the library's internal ``demoModeEnabled`` state (persisted in UserDefaults)
+    /// to decide the fallback. This replaces all existing details with the fresh load result.
     /// Cache errors propagate to the caller and do not silently fall back to demo data.
-    func loadFromSource(cache: WorkoutCache, demoModeEnabled: Bool) async throws {
+    func loadFromSource(cache: WorkoutCache) async throws {
         let snapshot = try await WorkoutLibraryLoader.load(
             cache: cache,
             demoModeEnabled: demoModeEnabled

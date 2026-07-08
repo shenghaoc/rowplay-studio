@@ -37,6 +37,11 @@ public enum WorkoutLibraryLoader {
         return WorkoutLibrarySnapshot(details: [], source: .empty)
     }
 
+    /// Load full details for each workout summary from the cache.
+    ///
+    /// - TODO: This performs one async query per workout (N+1 pattern). For large
+    ///   workout histories, consider adding a batch retrieval method to `WorkoutCache`
+    ///   (e.g. `details(for ids:)`) so `SQLiteWorkoutCache` can use a single query.
     private static func loadDetails(
         workouts: [Workout],
         from cache: WorkoutCache

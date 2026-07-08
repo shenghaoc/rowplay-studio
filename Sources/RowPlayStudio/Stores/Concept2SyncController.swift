@@ -48,10 +48,7 @@ final class Concept2SyncController: ObservableObject {
         do {
             let cache = try resolvedCache()
             let previousCount = library.details.count
-            try await library.loadFromSource(
-                cache: cache,
-                demoModeEnabled: library.librarySource == .demo || library.isEmpty
-            )
+            try await library.loadFromSource(cache: cache)
 
             let tracker = resolvedTracker(cache: cache)
             await tracker.refreshWorkoutCount()
@@ -117,7 +114,7 @@ final class Concept2SyncController: ObservableObject {
 
             // Syncing real Concept2 data replaces demo mode.
             library.disableDemoModeIfNeeded()
-            try await library.loadFromSource(cache: cache, demoModeEnabled: false)
+            try await library.loadFromSource(cache: cache)
             await tracker.syncCompleted()
             syncState = tracker.state
             statusMessage = syncSummary(for: result)
