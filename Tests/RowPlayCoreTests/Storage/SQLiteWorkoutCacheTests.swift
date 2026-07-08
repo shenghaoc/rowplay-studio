@@ -123,6 +123,19 @@ final class SQLiteWorkoutCacheTests: XCTestCase {
         }
     }
 
+    func testDetailsForIDsLoadsMultipleDetailsInOneCall() async throws {
+        try cache.migrate()
+        let details = Array(DemoWorkoutLibrary.details.prefix(3))
+        try await cache.save(details: details)
+
+        let loaded = try await cache.details(for: details.map(\.id))
+
+        XCTAssertEqual(Set(loaded.keys), Set(details.map(\.id)))
+        for detail in details {
+            XCTAssertEqual(loaded[detail.id], detail)
+        }
+    }
+
     func testSaveWorkoutsPersistsSummaries() async throws {
         try cache.migrate()
 

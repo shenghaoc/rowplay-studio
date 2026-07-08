@@ -24,6 +24,7 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
+    private static let detailsBatchSize = 500
 
     /// Column indices for the summary SELECT in `listWorkouts()`.
     private enum Column {
@@ -263,6 +264,49 @@ public final class SQLiteWorkoutCache: WorkoutCache, @unchecked Sendable {
                 throw WorkoutCacheError.queryFailed("step loadWorkout \(id): \(errmsg)")
             }
             return try decodeDetail(from: stmt, column: 0, context: "workout \(id)")
+        }
+    }
+
+    public func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        try await withDatabase { [self] in
+            try ensureMigrated()
+            guard !ids.isEmpty else { return [:] }
+
+            var results: [Workout.ID: WorkoutDetail] = [:]
+            results.reserveCapacity(ids.count)
+
+            for batchStart in stride(from: 0, to: ids.count, by: Self.detailsBatchSize) {
+                let batchEnd = min(batchStart + Self.detailsBatchSize, ids.count)
+                let batch = Array(ids[batchStart..<batchEnd])
+                let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                let sql = "SELECT id, detail_json FROM workouts WHERE id IN (\(placeholders));"
+                var stmt: OpaquePointer?
+                defer { sqlite3_finalize(stmt) }
+
+                guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                    throw WorkoutCacheError.queryFailed("prepare loadWorkout details batch: \(errmsg)")
+                }
+
+                for (offset, id) in batch.enumerated() {
+                    guard sqlite3_bind_int64(stmt, Int32(offset + 1), sqlite3_int64(id)) == SQLITE_OK else {
+                        throw WorkoutCacheError.queryFailed("bind details batch id \(id): \(errmsg)")
+                    }
+                }
+
+                while true {
+                    let rc = sqlite3_step(stmt)
+                    if rc == SQLITE_DONE {
+                        break
+                    }
+                    guard rc == SQLITE_ROW else {
+                        throw WorkoutCacheError.queryFailed("step loadWorkout details batch: \(errmsg)")
+                    }
+                    let id = Int(sqlite3_column_int64(stmt, 0))
+                    results[id] = try decodeDetail(from: stmt, column: 1, context: "workout \(id)")
+                }
+            }
+
+            return results
         }
     }
 

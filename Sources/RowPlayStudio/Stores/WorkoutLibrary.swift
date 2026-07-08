@@ -6,11 +6,13 @@ import RowPlayCore
 final class WorkoutLibrary: ObservableObject {
     @Published var details: [WorkoutDetail] {
         didSet {
+            guard !suppressDerivedUpdates else { return }
             updateAllDerivedData()
         }
     }
     @Published var query: WorkoutListQuery {
         didSet {
+            guard !suppressDerivedUpdates else { return }
             let sportChanged = query.sport != oldValue.sport
             updateQueryDerivedData(sportChanged: sportChanged)
         }
@@ -18,6 +20,8 @@ final class WorkoutLibrary: ObservableObject {
     @Published private(set) var pbIds: Set<Int> = []
     @Published var liveState: LiveModeState = LiveModeState()
     @Published private(set) var liveSample: LiveWorkoutSample?
+    /// Which data source the library last loaded from.
+    private(set) var librarySource: WorkoutLibrarySource = .empty
     let annotationStore: any AnnotationStore
 
     private(set) var liveSource: any LiveSource = MockLiveSource()
@@ -32,11 +36,15 @@ final class WorkoutLibrary: ObservableObject {
     private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
     private(set) var filteredRecentPaceWorkouts: [Workout] = []
 
+    /// When true, `didSet` observers skip derived-data recomputation.
+    /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.
+    private var suppressDerivedUpdates = false
+
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
-    private var demoDetailIDs: Set<Int>
+    private(set) var demoDetailIDs: Set<Int>
     private static let demoDetailsByID = Dictionary(
         uniqueKeysWithValues: DemoWorkoutLibrary.details.map { ($0.id, $0) }
     )
@@ -53,6 +61,9 @@ final class WorkoutLibrary: ObservableObject {
         self.defaults = defaults
         demoModeEnabled = Self.persistedDemoModeEnabled(in: defaults)
         demoDetailIDs = Self.demoIDs(in: details)
+        if !details.isEmpty {
+            librarySource = demoDetailIDs.count == details.count ? .demo : .cache
+        }
         updateAllDerivedData()
         observeDemoModeChanges()
     }
@@ -120,6 +131,7 @@ final class WorkoutLibrary: ObservableObject {
     func reloadDemoData() {
         details = DemoWorkoutLibrary.details
         demoDetailIDs = Set(DemoWorkoutLibrary.details.map(\.id))
+        librarySource = .demo
         query = WorkoutQuery.defaultQuery
     }
 
@@ -130,17 +142,57 @@ final class WorkoutLibrary: ObservableObject {
     func clearData() {
         details = []
         demoDetailIDs = []
+        librarySource = .empty
         query = WorkoutQuery.defaultQuery
     }
 
-    func replaceWithSyncedDetails(_ syncedDetails: [WorkoutDetail]) {
-        details = syncedDetails
-        demoDetailIDs = []
+    /// Disable demo mode if currently enabled (e.g. after syncing real Concept2 data).
+    func disableDemoModeIfNeeded() {
         if demoModeEnabled {
             demoModeEnabled = false
             defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
         }
-        query = WorkoutQuery.defaultQuery
+    }
+
+    /// Reload the library from the cache, falling back to demo data or empty as appropriate.
+    ///
+    /// Uses the library's internal ``demoModeEnabled`` state (persisted in UserDefaults)
+    /// to decide the fallback. This replaces all existing details with the fresh load result.
+    /// Cache errors propagate to the caller and do not silently fall back to demo data.
+    func loadFromSource(cache: WorkoutCache) async throws {
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: demoModeEnabled
+        )
+        applySnapshot(snapshot)
+    }
+
+    /// Reload from cache without demo fallback, then disable demo mode after the
+    /// cache result has been applied successfully.
+    func loadSyncedSource(cache: WorkoutCache) async throws {
+        let snapshot = try await WorkoutLibraryLoader.load(
+            cache: cache,
+            demoModeEnabled: false
+        )
+        applySnapshot(snapshot)
+        disableDemoModeIfNeeded()
+    }
+
+    private func applySnapshot(_ snapshot: WorkoutLibrarySnapshot) {
+        let sourceChanged = snapshot.source != librarySource
+        suppressDerivedUpdates = true
+        details = snapshot.details
+        librarySource = snapshot.source
+        if snapshot.source == .demo {
+            demoDetailIDs = Self.demoIDs(in: snapshot.details)
+        } else {
+            demoDetailIDs = []
+        }
+        if sourceChanged {
+            query = WorkoutQuery.defaultQuery
+        }
+        suppressDerivedUpdates = false
+        updateAllDerivedData()
     }
 
     // MARK: - Demo Mode Observation
@@ -166,18 +218,22 @@ final class WorkoutLibrary: ObservableObject {
         demoModeEnabled = demoEnabled
 
         if demoEnabled {
-            let existingIDs = Set(details.map(\.id))
-            let missingDemoDetails = DemoWorkoutLibrary.details.filter { !existingIDs.contains($0.id) }
-            if !missingDemoDetails.isEmpty {
-                details.append(contentsOf: missingDemoDetails)
-                demoDetailIDs.formUnion(missingDemoDetails.map(\.id))
-                query = WorkoutQuery.defaultQuery
-            }
-        } else if !demoEnabled && !details.isEmpty {
+            guard details.isEmpty else { return }
+            details = DemoWorkoutLibrary.details
+            demoDetailIDs = Self.demoIDs(in: details)
+            librarySource = .demo
+            query = WorkoutQuery.defaultQuery
+        } else if !details.isEmpty {
             let previousCount = details.count
-            details.removeAll(where: { demoDetailIDs.contains($0.id) })
-            demoDetailIDs = []
-            if details.count != previousCount {
+            let previousSource = librarySource
+            if !demoDetailIDs.isEmpty {
+                details.removeAll(where: { demoDetailIDs.contains($0.id) })
+                demoDetailIDs = []
+            }
+            if librarySource == .demo {
+                librarySource = .empty
+            }
+            if details.count != previousCount || librarySource != previousSource {
                 query = WorkoutQuery.defaultQuery
             }
         }

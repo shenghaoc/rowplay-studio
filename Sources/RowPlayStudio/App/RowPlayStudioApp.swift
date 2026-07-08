@@ -6,7 +6,7 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    @StateObject private var library = WorkoutLibrary.demo()
+    @StateObject private var library = WorkoutLibrary(details: [])
     @StateObject private var syncController = Concept2SyncController()
 
     var body: some Scene {
@@ -30,11 +30,13 @@ struct RowPlayStudioApp: App {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(!syncController.canSync)
 
-                Button("Reload Demo Library") {
-                    library.reloadDemoData()
+                Button("Reload Workout Library") {
+                    Task {
+                        await syncController.loadCachedWorkouts(into: library)
+                    }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(!preferences.demoModeEnabled)
+                .disabled(syncController.syncState.inProgress)
             }
         }
 

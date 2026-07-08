@@ -195,7 +195,41 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Loaded 1 cached workouts.")
     }
 
-    func testLoadCachedWorkoutsPreservesDemoDataWhenDemoModeIsOn() async throws {
+    func testLoadCachedWorkoutsLoadsDemoFallbackWithoutToken() async {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(),
+            cacheFactory: { InMemoryWorkoutCache() },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertEqual(library.librarySource, .demo)
+        XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
+        XCTAssertNil(controller.statusMessage)
+    }
+
+    func testLoadCachedWorkoutsHonorsDisabledDemoModeWithoutToken() async {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(),
+            cacheFactory: { InMemoryWorkoutCache() },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertEqual(library.librarySource, .empty)
+        XCTAssertTrue(library.details.isEmpty)
+        XCTAssertNil(controller.statusMessage)
+    }
+
+    func testLoadCachedWorkoutsUsesCacheWhenDemoModeIsOn() async throws {
         defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
         let detail = makeDetail(id: 77)
         let cachePath = temporarySQLitePath()
@@ -212,11 +246,25 @@ final class Concept2SyncControllerTests: XCTestCase {
         )
         let library = WorkoutLibrary.demo(defaults: defaults)
         XCTAssertFalse(library.isEmpty, "Demo mode populates library with demo data")
-        let demoDetails = library.details
 
         await controller.loadCachedWorkouts(into: library)
 
-        XCTAssertEqual(library.details, demoDetails, "Launch cache hydration must not replace active demo data")
+        XCTAssertEqual(library.details, [detail], "Cache data must take priority over demo data")
+        XCTAssertEqual(controller.syncState.totalWorkouts, 1)
+    }
+
+    func testLoadCachedWorkoutsDoesNotReportDemoFallbackAsCached() async {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { InMemoryWorkoutCache() },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertEqual(library.librarySource, .demo)
         XCTAssertEqual(controller.syncState.totalWorkouts, 0)
         XCTAssertNil(controller.statusMessage)
     }
@@ -336,6 +384,111 @@ final class Concept2SyncControllerTests: XCTestCase {
                         "syncState.lastError must not contain the raw token on disconnect")
     }
 
+    // MARK: - Silent Failure Fixes
+
+    func testInitStoresErrorWhenTokenLoadFails() {
+        struct TokenLoadError: Error {}
+        let tokenStore = FakeTokenStore()
+        tokenStore.loadError = TokenLoadError()
+
+        let controller = Concept2SyncController(tokenStore: tokenStore)
+
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertNotNil(controller.syncState.lastError)
+        XCTAssertEqual(controller.statusMessage, "Concept2 connection unavailable.")
+    }
+
+    func testSaveTokenStoresErrorOnFailure() {
+        struct TokenSaveError: Error {}
+        let tokenStore = FakeTokenStore()
+        tokenStore.saveError = TokenSaveError()
+
+        let controller = Concept2SyncController(tokenStore: tokenStore)
+        controller.saveToken("test-token")
+
+        XCTAssertNotNil(controller.syncState.lastError)
+        XCTAssertEqual(controller.statusMessage, "Could not save Concept2 token.")
+    }
+
+    func testDisconnectStoresErrorWhenTokenDeleteFails() async {
+        struct TokenDeleteError: Error {}
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        tokenStore.deleteError = TokenDeleteError()
+
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { InMemoryWorkoutCache() },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        await controller.disconnect(library: library)
+
+        XCTAssertNotNil(controller.syncState.lastError)
+        XCTAssertEqual(controller.statusMessage, "Could not delete Concept2 token.")
+    }
+
+    func testLoadCachedWorkoutsStoresErrorWhenCacheFactoryThrows() async {
+        struct CacheOpenError: Error {}
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { throw CacheOpenError() },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        await controller.loadCachedWorkouts(into: library)
+
+        XCTAssertNotNil(controller.syncState.lastError)
+        XCTAssertEqual(controller.statusMessage, "Could not load cached Concept2 workouts.")
+    }
+
+    func testLoadCachedWorkoutsReportsCacheWhenReplacingDemoWithFewerRows() async throws {
+        // Library starts with demo data (17 items), cache has fewer.
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let detail = makeDetail(id: 42)
+        let cachePath = temporarySQLitePath()
+        defer { try? FileManager.default.removeItem(atPath: cachePath) }
+
+        let seedCache = try SQLiteWorkoutCache(path: cachePath)
+        try seedCache.migrate()
+        try await seedCache.save(detail: detail)
+
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { try SQLiteWorkoutCache(path: cachePath) },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary.demo(defaults: defaults)
+        let demoCount = library.details.count
+        XCTAssertGreaterThan(demoCount, 1, "Demo library should have multiple workouts")
+
+        await controller.loadCachedWorkouts(into: library)
+
+        // Cache has 1 workout, demo had 17. loadedCount (1) < previousCount (17).
+        XCTAssertEqual(library.details.count, 1)
+        XCTAssertEqual(controller.statusMessage, "Loaded 1 cached workouts.")
+    }
+
+    func testSyncNowLeavesDemoModeEnabledWhenPostSyncCacheReloadFails() async throws {
+        defaults.set(true, forKey: AppPreferences.demoModeEnabledKey)
+        let detail = makeDetail(id: 12_345)
+        let cache = ListFailingWorkoutCache()
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { cache },
+            clientFactory: { _ in MockConcept2Client(details: [detail]) }
+        )
+        let library = WorkoutLibrary.demo(defaults: defaults)
+
+        await controller.syncNow(into: library)
+
+        XCTAssertEqual(library.details.count, DemoWorkoutLibrary.details.count)
+        XCTAssertTrue(defaults.bool(forKey: AppPreferences.demoModeEnabledKey))
+        XCTAssertEqual(controller.statusMessage, "Concept2 sync failed.")
+    }
+
     private func temporarySQLitePath() -> String {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("RowPlayStudioTests-\(UUID().uuidString).sqlite")
@@ -358,4 +511,22 @@ final class Concept2SyncControllerTests: XCTestCase {
             splits: []
         )
     }
+}
+
+private final class ListFailingWorkoutCache: WorkoutCache, @unchecked Sendable {
+    private enum ListError: Error { case intentional }
+
+    private let wrapped = InMemoryWorkoutCache()
+
+    func migrate() throws {}
+    func save(detail: WorkoutDetail) async throws { try await wrapped.save(detail: detail) }
+    func save(details: [WorkoutDetail]) async throws { try await wrapped.save(details: details) }
+    func saveWorkouts(_ workouts: [Workout]) async throws { try await wrapped.saveWorkouts(workouts) }
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? { try await wrapped.detail(id: id) }
+    func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        try await wrapped.details(for: ids)
+    }
+    func listWorkouts() async throws -> [Workout] { throw ListError.intentional }
+    func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
+    func deleteAll() async throws { try await wrapped.deleteAll() }
 }

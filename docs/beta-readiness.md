@@ -11,7 +11,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - **Query/filter/sort**: `WorkoutQuery` engine with sport, date, distance/duration chips, search, PB-only filtering, and multi-field sorting.
 - **Replay engine**: Sampling (`sampleAt`/`sampleIndexAt`), motion timing, comparability guard, ghost selection, sport themes, inspector helpers, and a `ReplayState` playback state machine.
 - **Replay renderer**: SwiftUI Canvas 2D replay surface with playback controls, scrubber, speed picker, and telemetry overlay.
-- **Concept2 sync**: Settings saves a BYOT token through Keychain, `Workout > Sync Concept2 Logbook` and Settings run `WorkoutSyncCoordinator`, synced workouts persist through `SQLiteWorkoutCache`, app launch hydrates an empty library from the persisted cache, `SyncStateTracker` reports status, and disconnect clears token/cache/library data.
+- **Concept2 sync**: Settings saves a BYOT token through Keychain, `Workout > Sync Concept2 Logbook` and Settings run `WorkoutSyncCoordinator`, synced workouts persist through `SQLiteWorkoutCache`, the workout library loads cache/demo/empty state on launch without requiring a token, `SyncStateTracker` reports status, and disconnect clears token/cache/library data.
 - **Workout tools**: Comparison (verdict, side stats, interval reps, distance overlay), rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package.
 - **Live mode**: State machine, polling cadence with backoff, `LiveSource` protocol, `MockLiveSource`, `DemoLiveSampleGenerator`, and a native live-mode panel.
 - **Hardware connectivity**: `ErgDevice`, `ErgConnectionState`, `ErgTelemetrySample`, `ErgConnection` protocol, and `MockErgConnection` with deterministic telemetry.
