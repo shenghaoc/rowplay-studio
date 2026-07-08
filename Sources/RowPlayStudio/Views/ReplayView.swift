@@ -146,8 +146,8 @@ struct ReplayView: View {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
             }
-            .accessibilityLabel(state.playing ? "Pause replay" : "Play replay")
-            .help(state.playing ? "Pause replay" : "Play replay")
+            .accessibilityLabel(state.playing ? LocalizedStringKey("Pause replay") : LocalizedStringKey("Play replay"))
+            .help(state.playing ? LocalizedStringKey("Pause replay") : LocalizedStringKey("Play replay"))
             .keyboardShortcut(.space, modifiers: [])
 
             Slider(
