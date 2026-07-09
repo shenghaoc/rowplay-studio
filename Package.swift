@@ -25,7 +25,14 @@ let package = Package(
         .testTarget(
             name: "RowPlayCoreTests",
             dependencies: ["RowPlayCore"],
-            resources: [.copy("Fixtures/performance-predictor-parity.json")]
+            resources: [
+                .copy("Fixtures/performance-predictor-parity.json"),
+                .copy("Fixtures/Concept2/rower-steady.fixture.json"),
+                .copy("Fixtures/Concept2/rower-interval.fixture.json"),
+                .copy("Fixtures/Concept2/ski-steady.fixture.json"),
+                .copy("Fixtures/Concept2/bike-steady.fixture.json"),
+                .copy("Fixtures/Concept2/REDACTION.md"),
+            ]
         ),
         .testTarget(
             name: "RowPlayStudioTests",
