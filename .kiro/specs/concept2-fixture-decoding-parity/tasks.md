@@ -10,4 +10,4 @@
 - [x] 8. `swift test` passes
 - [x] 9. `swift build` passes
 - [x] 10. `git diff --check` passes
-- [ ] 11. Commit and push the PR update
+- [x] 11. Commit and push the PR update
