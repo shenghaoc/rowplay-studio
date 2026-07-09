@@ -22,7 +22,7 @@ Validate native Concept2 decoding/mapping against sanitized golden fixtures from
    - SkiErg workout decoding and mapping
    - BikeErg workout decoding and mapping (pace halving, watts divisor)
    - Stroke monotonicity across all fixtures with strokes
-   - Fixture secret scanning (no tokens, credentials, or PII)
+   - Fixture redaction scanning across every bundled `.fixture.json`, rejecting tokens, credentials, PII fields, email-like values, and unredacted comments
 4. Assert exact fixture-derived parity values where available (id, sport, distance, time, pace, stroke count, split count, first/last stroke t/d).
 5. Fix decoder/mapping bugs exposed by fixture coverage.
 6. Update `docs/source-map.md` and `docs/beta-readiness.md`.

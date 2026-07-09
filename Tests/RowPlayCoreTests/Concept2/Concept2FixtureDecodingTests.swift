@@ -5,6 +5,33 @@ import XCTest
 /// Validates native Concept2 decoding/mapping against sanitized golden fixtures
 /// from the web repo. These tests do NOT call the real Concept2 API.
 final class Concept2FixtureDecodingTests: XCTestCase {
+    private static let prohibitedFixtureKeys: Set<String> = [
+        "access_token",
+        "api_key",
+        "apikey",
+        "authorization",
+        "client_secret",
+        "cookie",
+        "device",
+        "email",
+        "first_name",
+        "last_name",
+        "password",
+        "refresh_token",
+        "serial_number",
+        "session_secret",
+        "set_cookie",
+        "token",
+        "username",
+    ]
+
+    private static let secretValueMarkers = [
+        "bearer ",
+        "github_pat_",
+        "gho_",
+        "ghp_",
+        "rp_tok",
+    ]
 
     // MARK: - Helpers
 
@@ -169,9 +196,7 @@ final class Concept2FixtureDecodingTests: XCTestCase {
     // MARK: - 5. Stroke Monotonicity
 
     func testMappedStrokesAreMonotonic() throws {
-        let fixtureNames = ["rower-steady", "rower-interval", "ski-steady", "bike-steady"]
-
-        for name in fixtureNames {
+        for name in try Concept2FixtureLoader.fixtureNames() {
             let fixture = try loadFixture(name)
             let sport = Sport.fromConcept2Type(fixture.rawResult.type)
             let strokes = Concept2Mapper.mapStrokes(fixture.rawStrokes, sport: sport)
@@ -200,30 +225,78 @@ final class Concept2FixtureDecodingTests: XCTestCase {
         }
     }
 
-    // MARK: - 6. No Secrets
+    // MARK: - 6. Fixture Redaction
 
-    func testFixturesDoNotContainSecrets() throws {
-        let secretMarkers = [
-            "Authorization",
-            "Bearer ",
-            "rp_tok",
-            "SESSION_SECRET",
-            "access_token",
-            "refresh_token",
+    func testFixturesDoNotContainSecretsOrPII() throws {
+        for name in try Concept2FixtureLoader.fixtureNames() {
+            let data = try Concept2FixtureLoader.loadRawData(named: name)
+            let object = try JSONSerialization.jsonObject(with: data)
+            let violations = fixtureRedactionViolations(in: object)
+
+            XCTAssertTrue(
+                violations.isEmpty,
+                "[\(name)] fixture violates the redaction policy: \(violations.joined(separator: "; "))"
+            )
+        }
+    }
+
+    // MARK: - 7. Fixture Redaction Scanner
+
+    func testFixtureRedactionScannerRejectsSensitiveKeysAndValues() {
+        let unsafeFixture: [String: Any] = [
+            "rawResult": [
+                "client_secret": "not-a-real-secret",
+                "comments": "Alice Example",
+                "email": "athlete@example.com",
+            ],
+            "note": "Bearer rp_tok_not-a-real-token",
         ]
 
-        let fixtureNames = ["rower-steady", "rower-interval", "ski-steady", "bike-steady"]
+        let violations = fixtureRedactionViolations(in: unsafeFixture)
 
-        for name in fixtureNames {
-            let data = try Concept2FixtureLoader.loadRawData(named: name)
-            let text = String(data: data, encoding: .utf8) ?? ""
+        XCTAssertTrue(violations.contains { $0.contains("client_secret") })
+        XCTAssertTrue(violations.contains { $0.contains("comments") })
+        XCTAssertTrue(violations.contains { $0.contains("email") })
+        XCTAssertTrue(violations.contains { $0.contains("secret-like value") })
+    }
 
-            for marker in secretMarkers {
-                XCTAssertFalse(
-                    text.contains(marker),
-                    "[\(name)] fixture contains secret marker: '\(marker)'"
-                )
+    private func fixtureRedactionViolations(in value: Any, path: String = "$") -> [String] {
+        if let dictionary = value as? [String: Any] {
+            return dictionary.flatMap { key, child in
+                let childPath = "\(path).\(key)"
+                let normalizedKey = key
+                    .lowercased()
+                    .replacingOccurrences(of: "-", with: "_")
+
+                var violations: [String] = []
+                if Self.prohibitedFixtureKeys.contains(normalizedKey) {
+                    violations.append("\(childPath) contains prohibited field '\(key)'")
+                }
+                if normalizedKey == "comments", let comment = child as? String, comment != "REDACTED" {
+                    violations.append("\(childPath) must be omitted or exactly 'REDACTED'")
+                }
+                return violations + fixtureRedactionViolations(in: child, path: childPath)
             }
         }
+
+        if let array = value as? [Any] {
+            return array.enumerated().flatMap { index, child in
+                fixtureRedactionViolations(in: child, path: "\(path)[\(index)]")
+            }
+        }
+
+        guard let text = value as? String else { return [] }
+        let lowercased = text.lowercased()
+        var violations: [String] = []
+        if Self.secretValueMarkers.contains(where: lowercased.contains) {
+            violations.append("\(path) contains a secret-like value")
+        }
+        if text.range(
+            of: #"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            violations.append("\(path) contains an email-like value")
+        }
+        return violations
     }
 }

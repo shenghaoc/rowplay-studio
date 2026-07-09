@@ -31,6 +31,7 @@ Fixtures are sanitized: no real user IDs, names, emails, tokens, or device seria
 4. **Map to Strokes** → `Concept2Mapper.mapStrokes(_:sport:)`
 5. **Map to Splits** → `Concept2Mapper.mapSplits(_:)`
 6. **Assert parity** against `expected.*` values from the fixture
+7. **Scan every bundled fixture** → recursively reject redaction-policy PII/credential keys, token-like or email-like values, and comments not exactly `REDACTED`
 
 ## Parity Assertions
 
@@ -42,6 +43,7 @@ For each fixture, assert:
 - `workout.pace` ≈ expected pace
 - First/last mapped stroke `t` and `d` match expected
 - Split count, time, distance, pace match expected
+- Every bundled `.fixture.json` conforms to the documented redaction policy
 
 ## Decoder/Mapping Fix Scope
 

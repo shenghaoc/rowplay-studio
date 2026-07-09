@@ -72,6 +72,23 @@ struct Concept2GoldenExpectedSplit: Decodable {
 
 /// Loads Concept2 golden fixture JSON files from the test bundle.
 enum Concept2FixtureLoader {
+    private static let filenameSuffix = ".fixture.json"
+
+    /// Return every Concept2 fixture bundled with this test target.
+    static func fixtureNames() throws -> [String] {
+        let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
+        let names = urls.compactMap { url -> String? in
+            let filename = url.lastPathComponent
+            guard filename.hasSuffix(filenameSuffix) else { return nil }
+            return String(filename.dropLast(filenameSuffix.count))
+        }.sorted()
+
+        guard !names.isEmpty else {
+            throw ParityFixtureError.fileNotFound("Concept2 fixtures")
+        }
+        return names
+    }
+
     /// Load and decode a golden fixture by filename (without `.fixture.json`).
     static func loadFixture(named name: String) throws -> Concept2GoldenFixture {
         let filename = "\(name).fixture"

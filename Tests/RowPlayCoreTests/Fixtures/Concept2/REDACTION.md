@@ -13,6 +13,10 @@ data, credentials, or device identifiers.
 | `serial_number`, `device` (in `metadata`) | Omit entirely — not replaced with placeholders |
 | Tokens, cookies, Authorization headers | Never included — fixtures are response bodies only |
 
+`Concept2FixtureDecodingTests` discovers every bundled `.fixture.json` and rejects
+these fields, unredacted comments, email-like values, and token-like values. Keep
+fixture comments absent or exactly `"REDACTED"`.
+
 ## Realistic performance values
 
 Use plausible workout numbers (e.g. 2000 m RowErg at 7:30 → `time = 4500`
