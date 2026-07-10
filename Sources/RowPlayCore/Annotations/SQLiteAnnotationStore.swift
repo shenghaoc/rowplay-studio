@@ -114,7 +114,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     // MARK: - AnnotationStore
 
     public func loadAnnotations(workoutId: Int) async throws -> [Annotation] {
-        try await withDatabase {
+        try await withDatabase { [self] in
             let sql = """
                 SELECT id, timestamp, text, created_at
                 FROM annotations
@@ -127,7 +127,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("prepare loadAnnotations failed")
             }
-            sqlite3_bind_int(stmt, 1, Int32(workoutId))
+            sqlite3_bind_int64(stmt, 1, Int64(workoutId))
 
             var results: [Annotation] = []
             while true {
@@ -136,7 +136,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
                 guard rc == SQLITE_ROW else {
                     throw AnnotationError.storageFailed("step loadAnnotations failed")
                 }
-                let id = Int(sqlite3_column_int(stmt, 0))
+                let id = Int(sqlite3_column_int64(stmt, 0))
                 let timestamp = sqlite3_column_double(stmt, 1)
                 let text = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
                 let createdAt = Int64(sqlite3_column_int64(stmt, 3))
@@ -154,7 +154,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             throw AnnotationError.validationFailed(error)
         }
 
-        return try await withDatabase {
+        return try await withDatabase { [self] in
             if normalized.id == 0 {
                 return try insert(workoutId: workoutId, annotation: normalized)
             } else {
@@ -164,7 +164,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     }
 
     public func deleteAnnotation(workoutId: Int, id: Int) async throws {
-        try await withDatabase {
+        try await withDatabase { [self] in
             let sql = "DELETE FROM annotations WHERE workout_id = ? AND id = ?;"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
@@ -172,8 +172,8 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("prepare deleteAnnotation failed")
             }
-            sqlite3_bind_int(stmt, 1, Int32(workoutId))
-            sqlite3_bind_int(stmt, 2, Int32(id))
+            sqlite3_bind_int64(stmt, 1, Int64(workoutId))
+            sqlite3_bind_int64(stmt, 2, Int64(id))
 
             let rc = sqlite3_step(stmt)
             guard rc == SQLITE_DONE else {
@@ -183,7 +183,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     }
 
     public func deleteAll() async throws {
-        try await withDatabase {
+        try await withDatabase { [self] in
             guard sqlite3_exec(db, "DELETE FROM annotations;", nil, nil, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("deleteAll: DELETE failed")
             }
@@ -206,7 +206,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw AnnotationError.storageFailed("prepare insert failed")
         }
-        sqlite3_bind_int(stmt, 1, Int32(workoutId))
+        sqlite3_bind_int64(stmt, 1, Int64(workoutId))
         sqlite3_bind_double(stmt, 2, annotation.timestamp)
         sqlite3_bind_text(stmt, 3, annotation.text, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int64(stmt, 4, annotation.createdAt)
@@ -233,12 +233,15 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_prepare_v2(db, selectSQL, -1, &selectStmt, nil) == SQLITE_OK else {
             throw AnnotationError.storageFailed("prepare update select failed")
         }
-        sqlite3_bind_int(selectStmt, 1, Int32(workoutId))
-        sqlite3_bind_int(selectStmt, 2, Int32(annotation.id))
+        sqlite3_bind_int64(selectStmt, 1, Int64(workoutId))
+        sqlite3_bind_int64(selectStmt, 2, Int64(annotation.id))
 
         let rc = sqlite3_step(selectStmt)
-        guard rc == SQLITE_ROW else {
+        if rc == SQLITE_DONE {
             throw AnnotationError.notFound
+        }
+        guard rc == SQLITE_ROW else {
+            throw AnnotationError.storageFailed("step update select failed (\(rc))")
         }
         let originalCreatedAt = Int64(sqlite3_column_int64(selectStmt, 0))
 
@@ -255,8 +258,8 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         }
         sqlite3_bind_double(updateStmt, 1, annotation.timestamp)
         sqlite3_bind_text(updateStmt, 2, annotation.text, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int(updateStmt, 3, Int32(workoutId))
-        sqlite3_bind_int(updateStmt, 4, Int32(annotation.id))
+        sqlite3_bind_int64(updateStmt, 3, Int64(workoutId))
+        sqlite3_bind_int64(updateStmt, 4, Int64(annotation.id))
 
         guard sqlite3_step(updateStmt) == SQLITE_DONE else {
             throw AnnotationError.storageFailed("step update failed")
@@ -271,9 +274,9 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     }
 
     /// Execute a synchronous database operation on the serial queue.
-    private func withDatabase<T>(_ body: () throws -> T) async throws -> T {
+    private func withDatabase<T>(_ body: @escaping @Sendable () throws -> T) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
-            queue.sync {
+            queue.async {
                 do {
                     let result = try body()
                     continuation.resume(returning: result)
