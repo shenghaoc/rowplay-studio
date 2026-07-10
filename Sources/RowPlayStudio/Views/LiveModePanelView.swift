@@ -18,6 +18,7 @@ struct LiveModePanelView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .help("\(library.liveState.consecutiveFailures) consecutive failures")
+                        .accessibilityLabel("\(library.liveState.consecutiveFailures) consecutive failures")
                 }
                 Toggle("Enable Live Mode", isOn: Binding(
                     get: { library.liveState.enabled },
@@ -70,6 +71,7 @@ struct LiveModePanelView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Refresh demo sample")
+                    .accessibilityLabel("Refresh demo sample")
                 }
 
                 HStack(spacing: 16) {
