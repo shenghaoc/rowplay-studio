@@ -14,13 +14,13 @@ import SQLite3
 public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     private var db: OpaquePointer?
     private let queue = DispatchQueue(label: "com.rowplay-studio.sqlite-annotation-store")
-    private let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_destructor_type.self)
+    private static let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_destructor_type.self)
 
     /// Open (or create) the annotation database at the given path and run
     /// migrations automatically.
     ///
     /// - Parameter path: File path for the SQLite database.
-    /// - Throws: ``AnnotationError/storageUnavailable`` if the database cannot
+    /// - Throws: ``AnnotationError/storageFailed`` if the database cannot
     ///   be opened or migrated.
     public init(path: String) throws {
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
@@ -108,6 +108,9 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         if rc == SQLITE_ROW {
             return sqlite3_column_int(stmt, 0)
         }
+        guard rc == SQLITE_DONE else {
+            throw AnnotationError.storageFailed("step user_version failed (\(rc))")
+        }
         return 0
     }
 
@@ -127,7 +130,9 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("prepare loadAnnotations failed")
             }
-            sqlite3_bind_int64(stmt, 1, Int64(workoutId))
+            guard sqlite3_bind_int64(stmt, 1, Int64(workoutId)) == SQLITE_OK else {
+                throw AnnotationError.storageFailed("bind loadAnnotations workout_id")
+            }
 
             var results: [Annotation] = []
             while true {
@@ -147,12 +152,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
     }
 
     public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
-        var normalized = annotation
-        normalized.text = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let error = normalized.validate() {
-            throw AnnotationError.validationFailed(error)
-        }
+        let normalized = try annotation.normalizedForSave()
 
         return try await withDatabase { [self] in
             if normalized.id == 0 {
@@ -172,8 +172,12 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("prepare deleteAnnotation failed")
             }
-            sqlite3_bind_int64(stmt, 1, Int64(workoutId))
-            sqlite3_bind_int64(stmt, 2, Int64(id))
+            guard sqlite3_bind_int64(stmt, 1, Int64(workoutId)) == SQLITE_OK else {
+                throw AnnotationError.storageFailed("bind deleteAnnotation workout_id")
+            }
+            guard sqlite3_bind_int64(stmt, 2, Int64(id)) == SQLITE_OK else {
+                throw AnnotationError.storageFailed("bind deleteAnnotation id")
+            }
 
             let rc = sqlite3_step(stmt)
             guard rc == SQLITE_DONE else {
@@ -184,12 +188,23 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
 
     public func deleteAll() async throws {
         try await withDatabase { [self] in
+            guard sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil) == SQLITE_OK else {
+                throw AnnotationError.storageFailed("deleteAll: BEGIN failed")
+            }
+            var committed = false
+            defer {
+                if !committed { sqlite3_exec(db, "ROLLBACK;", nil, nil, nil) }
+            }
             guard sqlite3_exec(db, "DELETE FROM annotations;", nil, nil, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("deleteAll: DELETE failed")
             }
             guard sqlite3_exec(db, "DELETE FROM sqlite_sequence WHERE name='annotations';", nil, nil, nil) == SQLITE_OK else {
                 throw AnnotationError.storageFailed("deleteAll: reset sequence failed")
             }
+            guard sqlite3_exec(db, "COMMIT;", nil, nil, nil) == SQLITE_OK else {
+                throw AnnotationError.storageFailed("deleteAll: COMMIT failed")
+            }
+            committed = true
         }
     }
 
@@ -206,10 +221,18 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw AnnotationError.storageFailed("prepare insert failed")
         }
-        sqlite3_bind_int64(stmt, 1, Int64(workoutId))
-        sqlite3_bind_double(stmt, 2, annotation.timestamp)
-        sqlite3_bind_text(stmt, 3, annotation.text, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int64(stmt, 4, annotation.createdAt)
+        guard sqlite3_bind_int64(stmt, 1, Int64(workoutId)) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind insert workout_id")
+        }
+        guard sqlite3_bind_double(stmt, 2, annotation.timestamp) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind insert timestamp")
+        }
+        guard sqlite3_bind_text(stmt, 3, annotation.text, -1, Self.SQLITE_TRANSIENT) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind insert text")
+        }
+        guard sqlite3_bind_int64(stmt, 4, annotation.createdAt) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind insert created_at")
+        }
 
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw AnnotationError.storageFailed("step insert failed")
@@ -233,8 +256,12 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_prepare_v2(db, selectSQL, -1, &selectStmt, nil) == SQLITE_OK else {
             throw AnnotationError.storageFailed("prepare update select failed")
         }
-        sqlite3_bind_int64(selectStmt, 1, Int64(workoutId))
-        sqlite3_bind_int64(selectStmt, 2, Int64(annotation.id))
+        guard sqlite3_bind_int64(selectStmt, 1, Int64(workoutId)) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update select workout_id")
+        }
+        guard sqlite3_bind_int64(selectStmt, 2, Int64(annotation.id)) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update select id")
+        }
 
         let rc = sqlite3_step(selectStmt)
         if rc == SQLITE_DONE {
@@ -256,10 +283,18 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_prepare_v2(db, updateSQL, -1, &updateStmt, nil) == SQLITE_OK else {
             throw AnnotationError.storageFailed("prepare update failed")
         }
-        sqlite3_bind_double(updateStmt, 1, annotation.timestamp)
-        sqlite3_bind_text(updateStmt, 2, annotation.text, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int64(updateStmt, 3, Int64(workoutId))
-        sqlite3_bind_int64(updateStmt, 4, Int64(annotation.id))
+        guard sqlite3_bind_double(updateStmt, 1, annotation.timestamp) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update timestamp")
+        }
+        guard sqlite3_bind_text(updateStmt, 2, annotation.text, -1, Self.SQLITE_TRANSIENT) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update text")
+        }
+        guard sqlite3_bind_int64(updateStmt, 3, Int64(workoutId)) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update workout_id")
+        }
+        guard sqlite3_bind_int64(updateStmt, 4, Int64(annotation.id)) == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind update id")
+        }
 
         guard sqlite3_step(updateStmt) == SQLITE_DONE else {
             throw AnnotationError.storageFailed("step update failed")

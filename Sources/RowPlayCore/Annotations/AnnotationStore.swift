@@ -34,13 +34,7 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
     }
 
     public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
-        var normalized = annotation
-        normalized.text = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Validate before saving
-        if let error = normalized.validate() {
-            throw AnnotationError.validationFailed(error)
-        }
+        let normalized = try annotation.normalizedForSave()
 
         return try lock.withLock {
             var annotations = storage[workoutId] ?? []
@@ -106,7 +100,7 @@ public enum AnnotationError: Error, Equatable {
 ///
 /// Use this as the fallback when the real annotation database cannot be opened.
 /// It does **not** silently fall back to in-memory storage.
-public final class UnavailableAnnotationStore: AnnotationStore, @unchecked Sendable {
+public final class UnavailableAnnotationStore: AnnotationStore, Sendable {
     public init() {}
 
     public func loadAnnotations(workoutId: Int) async throws -> [Annotation] {

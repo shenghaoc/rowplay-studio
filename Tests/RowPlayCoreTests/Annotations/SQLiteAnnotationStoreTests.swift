@@ -22,6 +22,87 @@ final class SQLiteAnnotationStoreTests: XCTestCase {
         super.tearDown()
     }
 
+    // MARK: - Init Failure
+
+    func testInitFailsOnInvalidPath() {
+        let badPath = "/nonexistent/\(UUID().uuidString)/db.sqlite"
+        XCTAssertThrowsError(try SQLiteAnnotationStore(path: badPath)) { error in
+            guard let annotationError = error as? AnnotationError else {
+                XCTFail("Expected AnnotationError, got \(error)")
+                return
+            }
+            if case .storageFailed = annotationError { /* expected */ } else {
+                XCTFail("Expected storageFailed, got \(annotationError)")
+            }
+        }
+    }
+
+    // MARK: - Timestamp Validation
+
+    func testNegativeTimestampThrows() async {
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: -1, text: "Valid", createdAt: 100))
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testNaNTimestampThrows() async {
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: .nan, text: "Valid", createdAt: 100))
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testInfinityTimestampThrows() async {
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: .infinity, text: "Valid", createdAt: 100))
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    // MARK: - Unicode / Emoji Round-Trip
+
+    func testUnicodeEmojiRoundTrip() async throws {
+        let emojiText = "💪 Row faster! 🚣 Excellent technique 中文测试"
+        let saved = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: emojiText, createdAt: 100))
+        XCTAssertEqual(saved.text, emojiText)
+
+        store = try SQLiteAnnotationStore(path: dbPath)
+        let loaded = try await store.loadAnnotations(workoutId: 1)
+        XCTAssertEqual(loaded.count, 1)
+        XCTAssertEqual(loaded[0].text, emojiText)
+    }
+
+    // MARK: - 1000-Character Boundary Through SQLite
+
+    func testMaxLengthTextSucceedsThroughSQLite() async throws {
+        let maxText = String(repeating: "a", count: 1000)
+        let saved = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: maxText, createdAt: 100))
+        XCTAssertEqual(saved.text.count, 1000)
+    }
+
+    func testTooLongTextThrowsThroughSQLite() async {
+        let longText = String(repeating: "a", count: 1001)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: longText, createdAt: 100))
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testMaxLengthTextWithWhitespaceTrimsBelow() async throws {
+        let paddedText = " " + String(repeating: "b", count: 998) + " "
+        let saved = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: paddedText, createdAt: 100))
+        XCTAssertEqual(saved.text.count, 998)
+    }
+
     // MARK: - Migration / Schema
 
     func testMigrationCreatesSchemaAndIndex() throws {

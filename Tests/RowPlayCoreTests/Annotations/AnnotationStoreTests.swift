@@ -124,6 +124,46 @@ final class AnnotationStoreTests: XCTestCase {
 
     // MARK: - Validation
 
+    func testSaveNegativeTimestampThrows() async {
+        let annotation = Annotation(id: 0, timestamp: -1, text: "Valid text", createdAt: 1_000_000)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, annotation)
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testSaveNaNTimestampThrows() async {
+        let annotation = Annotation(id: 0, timestamp: .nan, text: "Valid text", createdAt: 1_000_000)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, annotation)
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testSaveInfinityTimestampThrows() async {
+        let annotation = Annotation(id: 0, timestamp: .infinity, text: "Valid text", createdAt: 1_000_000)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, annotation)
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testSaveNegativeInfinityTimestampThrows() async {
+        let annotation = Annotation(id: 0, timestamp: -.infinity, text: "Valid text", createdAt: 1_000_000)
+        do {
+            _ = try await store.saveAnnotation(workoutId: 1, annotation)
+            XCTFail("Expected validation error")
+        } catch let error as AnnotationError {
+            if case .validationFailed = error { /* expected */ } else { XCTFail("Unexpected: \(error)") }
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
     func testSaveEmptyTextThrows() async {
         let annotation = Annotation(id: 0, timestamp: 30, text: "", createdAt: 1_000_000)
         do {

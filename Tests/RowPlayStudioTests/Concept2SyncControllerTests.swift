@@ -431,7 +431,7 @@ final class Concept2SyncControllerTests: XCTestCase {
 
         await controller.disconnect(library: library)
 
-        XCTAssertTrue(controller.isConnected == false || controller.isConnected == true)
+        XCTAssertTrue(controller.isConnected == false)
         XCTAssertTrue(controller.statusMessage?.contains("cleanup failed") ?? false,
                        "Expected cleanup failure message, got: \(controller.statusMessage ?? "nil")")
     }
