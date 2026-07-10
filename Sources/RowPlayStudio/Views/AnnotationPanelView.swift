@@ -146,6 +146,8 @@ private struct AnnotationRowView: View {
     var annotation: Annotation
     var onDelete: () -> Void
 
+    @State private var showDeleteConfirmation = false
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(RowPlayFormatting.time(annotation.timestamp, tenths: true))
@@ -165,11 +167,19 @@ private struct AnnotationRowView: View {
 
             Spacer()
 
-            Button(role: .destructive, action: onDelete) {
+            Button(role: .destructive, action: { showDeleteConfirmation = true }) {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("Delete annotation")
+            .accessibilityValue("at \(RowPlayFormatting.time(annotation.timestamp, tenths: true))")
             .help("Delete annotation")
+            .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive, action: onDelete)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to delete this annotation? This action cannot be undone.")
+            }
         }
         .padding(.vertical, 4)
     }
