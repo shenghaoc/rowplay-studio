@@ -16,6 +16,10 @@ import XCTest
 /// Privacy: the token is never printed, logged, committed, or included in
 /// error descriptions.
 final class Concept2AuthenticatedSmokeTests: XCTestCase {
+    private enum ConfigurationError: Error, Equatable {
+        case baseURLMustUseHTTPS
+    }
+
     // MARK: - Environment
 
     private static var hasToken: Bool {
@@ -30,13 +34,24 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
         ProcessInfo.processInfo.environment["ROWPLAY_CONCEPT2_TOKEN"]
     }
 
-    private static var baseURL: URL {
-        if let override = ProcessInfo.processInfo.environment["ROWPLAY_CONCEPT2_BASE_URL"],
-           !override.isEmpty,
-           let url = URL(string: override) {
-            return url
+    private static func configuredBaseURL() throws -> URL {
+        try resolveBaseURL(
+            from: ProcessInfo.processInfo.environment["ROWPLAY_CONCEPT2_BASE_URL"]
+        )
+    }
+
+    private static func resolveBaseURL(from override: String?) throws -> URL {
+        guard let override, !override.isEmpty else {
+            return URLSessionConcept2Client.defaultBaseURL
         }
-        return URLSessionConcept2Client.defaultBaseURL
+
+        guard let url = URL(string: override),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else {
+            throw ConfigurationError.baseURLMustUseHTTPS
+        }
+
+        return url
     }
 
     private func requireToken() throws -> String {
@@ -51,7 +66,7 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
     func testAuthenticatedFetchWorkoutSummariesSmoke() async throws {
         let token = try requireToken()
         let client = URLSessionConcept2Client(
-            baseURL: Self.baseURL,
+            baseURL: try Self.configuredBaseURL(),
             token: token
         )
 
@@ -74,7 +89,7 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
     func testAuthenticatedFetchWorkoutDetailSmoke() async throws {
         let token = try requireToken()
         let client = URLSessionConcept2Client(
-            baseURL: Self.baseURL,
+            baseURL: try Self.configuredBaseURL(),
             token: token
         )
 
@@ -93,6 +108,14 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
     }
 
     // MARK: - 3. Error Redaction
+
+    func testAuthenticatedSmokeRejectsInsecureBaseURLOverride() {
+        XCTAssertThrowsError(
+            try Self.resolveBaseURL(from: "http://localhost:8080")
+        ) { error in
+            XCTAssertEqual(error as? ConfigurationError, .baseURLMustUseHTTPS)
+        }
+    }
 
     func testAuthenticatedSmokeErrorRedactsToken() async throws {
         // This test runs without network access — it verifies that error

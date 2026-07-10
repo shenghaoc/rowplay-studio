@@ -10,13 +10,15 @@ Add opt-in local authenticated smoke validation for the native Concept2 client. 
 
 - The smoke tests MUST skip unless the developer explicitly provides a token through the `ROWPLAY_CONCEPT2_TOKEN` environment variable.
 - CI MUST pass without the environment variable — tests are skipped, not failed.
-- An optional `ROWPLAY_CONCEPT2_BASE_URL` environment variable MAY override the API base URL for testing against staging or local servers.
+- An optional `ROWPLAY_CONCEPT2_BASE_URL` environment variable MAY override the API base URL for testing against an HTTPS staging server.
+- The override MUST use HTTPS and include a host. HTTP overrides, including `localhost` and loopback URLs, MUST be rejected before an authenticated request is built.
 
 ### R2: Token Privacy
 
 - No token value MUST appear in XCTAssert messages, thrown error descriptions, or logged output.
 - The token MUST NOT be committed to the repository, stored in files, stored in SQLite, stored in UserDefaults, or printed to stdout/stderr.
 - Error descriptions MUST NOT contain "Bearer", "Authorization", or the token value.
+- The smoke-test helper MUST NOT send a real token over cleartext HTTP, even when the underlying client permits loopback HTTP for fake-transport tests.
 
 ### R3: Authenticated Fetch Smoke
 
@@ -40,11 +42,11 @@ Add opt-in local authenticated smoke validation for the native Concept2 client. 
 - It must assert the error description does not contain the fake token, "Authorization", or "Bearer ".
 - This test runs in CI without real network access.
 
-### R6: Authorization Header Fix
+### R6: Authorization Header
 
-- The `URLSessionConcept2Client` MUST inject the real BYOT token into the `Authorization: Bearer <token>` header on every request.
-- The current "******" masking prevents real API calls from succeeding and must be corrected.
-- HTTPS enforcement (scheme validation, redirect protection) remains in place to prevent token leakage over unencrypted connections.
+- The `URLSessionConcept2Client` MUST continue to inject the real BYOT token into the `Authorization: Bearer <token>` header on every request.
+- The smoke-test suite MUST exercise that authenticated client path without masking the header or exposing the token in diagnostics.
+- HTTPS enforcement (scheme validation, redirect protection, and smoke-test override validation) remains in place to prevent token leakage over unencrypted connections.
 
 ## Non-Goals
 

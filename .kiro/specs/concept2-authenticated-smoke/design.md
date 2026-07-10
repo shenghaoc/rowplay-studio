@@ -2,31 +2,32 @@
 
 ## Overview
 
-This PR adds opt-in authenticated smoke tests that validate the native Concept2 client against the real logbook API. Tests are skipped in CI unless `ROWPLAY_CONCEPT2_TOKEN` is set.
+This PR adds opt-in authenticated smoke tests that validate the native Concept2 client against the real logbook API. Tests are skipped in CI unless `ROWPLAY_CONCEPT2_TOKEN` is set. An optional base-URL override is restricted to HTTPS so a real token is never sent over cleartext HTTP.
 
 ## Implementation Shape
 
-### Token Injection Fix
+### Token Authentication
 
-The `URLSessionConcept2Client.buildRequest()` currently sets `Authorization: ******` instead of `Authorization: Bearer <token>`. This prevents real API calls from succeeding. Fix: inject `"Bearer \(token)"` into the Authorization header. HTTPS enforcement (scheme validation + redirect protection) already prevents token leakage over unencrypted connections.
+`URLSessionConcept2Client.buildRequest()` injects `"Bearer \(token)"` into the Authorization header. The smoke tests exercise that existing authenticated-client path without exposing the token in test messages or error descriptions.
 
 ### Smoke Test File
 
 `Tests/RowPlayCoreTests/Concept2/Concept2AuthenticatedSmokeTests.swift`
 
-Three test methods:
+Four test methods:
 1. `testAuthenticatedFetchWorkoutSummariesSmoke()` — skips if no token, fetches page 1 with perPage 5, asserts valid response.
 2. `testAuthenticatedFetchWorkoutDetailSmoke()` — skips if no token or no workouts, fetches detail for first workout, asserts valid WorkoutDetail.
-3. `testAuthenticatedSmokeErrorRedactsToken()` — no network, uses fake token, forces failure, asserts no token/Authorization/Bearer in error.
+3. `testAuthenticatedSmokeRejectsInsecureBaseURLOverride()` — no network, rejects an HTTP loopback override before a real token can be attached to a request.
+4. `testAuthenticatedSmokeErrorRedactsToken()` — no network, uses fake token, forces failure, asserts no token/Authorization/Bearer in error.
 
 ### Environment Variables
 
 - `ROWPLAY_CONCEPT2_TOKEN` — required for authenticated tests. Tests skip if unset or empty.
-- `ROWPLAY_CONCEPT2_BASE_URL` — optional override for API base URL. Defaults to `https://log.concept2.com`.
+- `ROWPLAY_CONCEPT2_BASE_URL` — optional HTTPS override for an API base URL. Defaults to `https://log.concept2.com`; HTTP overrides, including loopback URLs, are rejected.
 
 ### Token Privacy
 
-All error paths in `Concept2Error` and `Concept2TransportError` already produce privacy-safe descriptions (no tokens, headers, or payloads). The smoke tests additionally verify this invariant with a dedicated redaction test.
+All error paths in `Concept2Error` and `Concept2TransportError` already produce privacy-safe descriptions (no tokens, headers, or payloads). The smoke-test configuration rejects non-HTTPS overrides before the client builds an authenticated request, and the test suite additionally verifies error redaction with a dedicated test.
 
 ## Non-Goals
 
