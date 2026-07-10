@@ -8,6 +8,7 @@
 - [x] Update `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` to display generic error for storage failures.
 - [x] Update `Sources/RowPlayStudio/Stores/Concept2SyncController.swift` disconnect to purge annotations.
 - [x] Create `Tests/RowPlayCoreTests/Annotations/SQLiteAnnotationStoreTests.swift`.
+- [x] Cover embedded-NUL annotation text round-tripping through SQLite.
 - [x] Extend `Tests/RowPlayStudioTests/Concept2SyncControllerTests.swift` for annotation purge and cleanup failure.
 - [x] Update `docs/roadmap.md` to mark persistent annotation storage complete.
 - [x] Update `docs/source-map.md` with `SQLiteAnnotationStore` mapping.
@@ -17,8 +18,8 @@
 - [x] Run `swift test --filter AnnotationStoreTests` — all tests pass.
 - [x] Run `swift test --filter SQLiteAnnotationStoreTests` — all tests pass.
 - [x] Run `swift test --filter Concept2SyncControllerTests` — all tests pass.
-- [x] Run `swift test` — all 658 tests pass.
+- [x] Run `swift test` — all 719 tests pass (2 skipped).
 - [x] Run `swift build` — clean build.
 - [x] Run `git diff --check` — no whitespace errors.
 - [x] Run `./script/build_and_run.sh --verify` — launches successfully.
-- [ ] Commit, push, and open draft PR.
+- [x] Commit, push, and open pull request.

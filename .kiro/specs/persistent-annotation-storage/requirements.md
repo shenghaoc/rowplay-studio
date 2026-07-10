@@ -42,7 +42,9 @@ survive restarts.
   (which requires an explicit `migrate()` call) so `AnnotationStore` callers
   need no migration method.
 - **R1.7** `id == 0` inserts and returns the SQLite-generated ID.
-- **R1.8** `text` is trimmed before validation and persistence.
+- **R1.8** `text` is trimmed before validation and persistence, and is bound
+  and decoded using its exact UTF-8 byte length so valid embedded NUL characters
+  round-trip without truncation.
 - **R1.9** Updates preserve the original `createdAt`.
 - **R1.10** Updating an ID not belonging to that workout throws
   `AnnotationError.notFound`.
@@ -96,10 +98,10 @@ survive restarts.
 
 - **R7.1** `SQLiteAnnotationStoreTests` cover migration/version/index,
   idempotent reopen, insert-generated IDs, persistence after closing/reopening,
-  trimming, validation, deterministic ordering, update with preserved createdAt,
-  cross-workout update rejection, delete, deleteAll with sequence reset,
-  apostrophes/SQL-like text round-trip, and concurrent writes without lost rows
-  or duplicate IDs.
+  trimming, validation, Unicode and embedded-NUL text round-trips, deterministic
+  ordering, update with preserved createdAt, cross-workout update rejection,
+  delete, deleteAll with sequence reset, apostrophes/SQL-like text round-trip,
+  and concurrent writes without lost rows or duplicate IDs.
 - **R7.2** `Concept2SyncControllerTests` prove disconnect purges annotations
   and reports a cleanup failure when annotation deletion throws. Existing
   token/cache/privacy assertions are not weakened.

@@ -49,7 +49,9 @@ calling thread. All protocol methods dispatch to the serial queue.
 The SQLite implementation preserves `InMemoryAnnotationStore` semantics exactly:
 
 - `id == 0` → INSERT, return the auto-generated rowid
-- `text` → trimmed before validation and persistence
+- `text` → trimmed before validation and persistence; SQLite uses exact UTF-8
+  byte lengths when binding and reading so embedded NUL characters round-trip
+  without truncation
 - Update → preserves original `createdAt` from the existing row
 - Update with wrong `workoutId` → `AnnotationError.notFound`
 - Load → `ORDER BY timestamp ASC, id ASC`

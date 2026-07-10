@@ -79,6 +79,15 @@ final class SQLiteAnnotationStoreTests: XCTestCase {
         XCTAssertEqual(loaded[0].text, emojiText)
     }
 
+    func testEmbeddedNullTextRoundTrips() async throws {
+        let text = "Start\u{0000}finish"
+        _ = try await store.saveAnnotation(workoutId: 1, Annotation(id: 0, timestamp: 30, text: text, createdAt: 100))
+
+        store = try SQLiteAnnotationStore(path: dbPath)
+        let loaded = try await store.loadAnnotations(workoutId: 1)
+        XCTAssertEqual(loaded[0].text, text)
+    }
+
     // MARK: - 1000-Character Boundary Through SQLite
 
     func testMaxLengthTextSucceedsThroughSQLite() async throws {

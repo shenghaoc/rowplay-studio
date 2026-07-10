@@ -143,7 +143,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
                 }
                 let id = Int(sqlite3_column_int64(stmt, 0))
                 let timestamp = sqlite3_column_double(stmt, 1)
-                let text = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
+                let text = try textColumn(stmt, 2, context: "loadAnnotations text")
                 let createdAt = Int64(sqlite3_column_int64(stmt, 3))
                 results.append(Annotation(id: id, timestamp: timestamp, text: text, createdAt: createdAt))
             }
@@ -227,9 +227,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_bind_double(stmt, 2, annotation.timestamp) == SQLITE_OK else {
             throw AnnotationError.storageFailed("bind insert timestamp")
         }
-        guard sqlite3_bind_text(stmt, 3, annotation.text, -1, Self.SQLITE_TRANSIENT) == SQLITE_OK else {
-            throw AnnotationError.storageFailed("bind insert text")
-        }
+        try bindText(annotation.text, to: stmt, index: 3, context: "insert text")
         guard sqlite3_bind_int64(stmt, 4, annotation.createdAt) == SQLITE_OK else {
             throw AnnotationError.storageFailed("bind insert created_at")
         }
@@ -286,9 +284,7 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
         guard sqlite3_bind_double(updateStmt, 1, annotation.timestamp) == SQLITE_OK else {
             throw AnnotationError.storageFailed("bind update timestamp")
         }
-        guard sqlite3_bind_text(updateStmt, 2, annotation.text, -1, Self.SQLITE_TRANSIENT) == SQLITE_OK else {
-            throw AnnotationError.storageFailed("bind update text")
-        }
+        try bindText(annotation.text, to: updateStmt, index: 2, context: "update text")
         guard sqlite3_bind_int64(updateStmt, 3, Int64(workoutId)) == SQLITE_OK else {
             throw AnnotationError.storageFailed("bind update workout_id")
         }
@@ -306,6 +302,26 @@ public final class SQLiteAnnotationStore: AnnotationStore, @unchecked Sendable {
             text: annotation.text,
             createdAt: originalCreatedAt
         )
+    }
+
+    private func bindText(_ text: String, to statement: OpaquePointer?, index: Int32, context: String) throws {
+        guard let byteCount = Int32(exactly: text.utf8.count) else {
+            throw AnnotationError.storageFailed("bind \(context) text is too large")
+        }
+        let rc = text.withCString { cString in
+            sqlite3_bind_text(statement, index, cString, byteCount, Self.SQLITE_TRANSIENT)
+        }
+        guard rc == SQLITE_OK else {
+            throw AnnotationError.storageFailed("bind \(context) failed")
+        }
+    }
+
+    private func textColumn(_ statement: OpaquePointer?, _ column: Int32, context: String) throws -> String {
+        guard let bytes = sqlite3_column_text(statement, column) else {
+            throw AnnotationError.storageFailed("NULL \(context)")
+        }
+        let byteCount = sqlite3_column_bytes(statement, column)
+        return String(decoding: UnsafeBufferPointer(start: bytes, count: Int(byteCount)), as: UTF8.self)
     }
 
     /// Execute a synchronous database operation on the serial queue.
