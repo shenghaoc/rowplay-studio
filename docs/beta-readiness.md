@@ -31,7 +31,8 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - Hardware scope: mock-only implementation; Settings correctly shows "Mock only" without real pairing or scanning controls.
 - No stale test counts in task specs.
 - Sync pipeline integration: `SyncPipelineIntegrationTests` validates fake Concept2 data flows through `WorkoutSyncCoordinator` → `SQLiteWorkoutCache` → `WorkoutLibraryLoader`. Real network sync still needs separate validation.
-- Concept2 fixture decoding parity: `Concept2FixtureDecodingTests` validates native decoding/mapping against sanitized golden fixtures from the web repo (rower steady, rower interval, SkiErg, BikeErg) and redaction-scans every bundled fixture for credentials and PII. No real network calls. Real API smoke testing remains future work.
+- Concept2 fixture decoding parity: `Concept2FixtureDecodingTests` validates native decoding/mapping against sanitized golden fixtures from the web repo (rower steady, rower interval, SkiErg, BikeErg) and redaction-scans every bundled fixture for credentials and PII. No real network calls.
+- Authenticated Concept2 smoke tests: `Concept2AuthenticatedSmokeTests` validates real API request/response integration when `ROWPLAY_CONCEPT2_TOKEN` is set locally. Tests are skipped in CI. Token-redaction coverage ensures no credentials leak into error descriptions. Full production sync UX still needs separate QA.
 
 ## Gaps Before Beta
 
