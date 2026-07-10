@@ -2,7 +2,9 @@
 
 ## R1: Workout Comparison
 
-The native app must compare two workouts side-by-side with parity to the web compare page.
+The native app must compare two workouts side-by-side as a native-only
+capability. The web compare page was retired in rowplay PR #166, so comparison
+is not a current web-parity target.
 
 - **R1.1** `CompareVerdict` struct records `winner` (a/b/tie), `timeDeltaSec`, and `paceDelta`.
 - **R1.2** `WorkoutComparison.compareVerdict(_:_:)` decides which workout was "better" for like-for-like fixed-distance pieces (same distance band) by time, and uses average pace for fixed-time/JustRow pieces or other non-distance-race comparisons.
@@ -50,7 +52,8 @@ The native app must support importing external HR data and merging it into worko
 
 ## R5: Annotation Model
 
-The native app must support timestamped coaching annotations on workouts.
+The native app must support timestamped coaching annotations on workouts as a
+native-only feature. The web annotation API was retired in rowplay PR #166.
 
 - **R5.1** `Annotation` struct records `id`, `timestamp` (seconds since workout start), `text`, and `createdAt` (epoch ms).
 - **R5.2** `AnnotationStore` protocol defines `loadAnnotations(workoutId:)`, `saveAnnotation(workoutId:_:)`, `deleteAnnotation(workoutId:id:)`, and `deleteAll()` operations.
@@ -68,7 +71,7 @@ The native app must define a local replay package format for sharing without a c
 - **R6.2** `SharePackageBuilder.build(from:)` creates a `SharePackage` from a `WorkoutDetail`, stripping hardware-identifying metadata (serialNumber, device, deviceOs, deviceOsVersion).
 - **R6.3** `SharePackage.encode()` produces JSON data suitable for file export.
 - **R6.4** `SharePackage.decode(_:)` round-trips from JSON data.
-- **R6.5** Public share URL generation through a companion web service is deferred; this PR only defines the local package format.
+- **R6.5** Public share URL generation and companion web-service integration are out of scope: web public sharing was retired in rowplay PR #166, and this PR defines only the local package format.
 - **R6.6** The native workout detail surface exposes a local share package save action and must not create public URLs or include hardware-identifying metadata.
 
 ## R7: Native UX, HIG, and Module Boundaries
@@ -99,4 +102,4 @@ The native additions must materially improve the workout detail workflow without
 - No 3D/Metal replay rendering.
 - No public sharing that leaks private workout fields.
 - No TCX export (deferred to follow-up).
-- No companion web share service integration.
+- No companion web share service integration; web public sharing was retired in rowplay PR #166.

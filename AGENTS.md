@@ -68,8 +68,8 @@ External boundaries are defined as protocols in `RowPlayCore` with production an
 | Protocol | Production | Mock/Test |
 |---|---|---|
 | `TokenStore` | `KeychainTokenStore` | `FakeTokenStore` |
-| `Concept2APIClient` | (deferred) | `MockConcept2Client` |
-| `WorkoutCache` | (deferred SQLite) | `InMemoryWorkoutCache` |
+| `Concept2APIClient` | `URLSessionConcept2Client` | `MockConcept2Client` |
+| `WorkoutCache` | `SQLiteWorkoutCache` | `InMemoryWorkoutCache` |
 | `AnnotationStore` | (deferred) | `InMemoryAnnotationStore` |
 | `LiveSource` | (deferred) | `MockLiveSource` |
 | `ErgConnection` | (deferred) | `MockErgConnection` |

@@ -2,6 +2,10 @@
 
 This file records the first mapping from the existing rowplay web repository to the native app.
 
+**Web architecture baseline**: As of rowplay PR #166, the web app is
+stateless with no KV/D1 storage. See web `.kiro/specs/remove-kv-d1/` for the
+authoritative spec. Retired web surfaces are listed at the end of this file.
+
 | Web Source | Native Target | Notes |
 | --- | --- | --- |
 | `src/lib/types.ts` | `Sources/RowPlayCore/Models` | Core Concept2 domain models are being ported as Swift value types. |
@@ -29,21 +33,21 @@ This file records the first mapping from the existing rowplay web repository to 
 | `src/routes/replay/[id]` (UI) | `Sources/RowPlayStudio/Views/ReplayView.swift` | Phase 3 adds SwiftUI Canvas replay surface with playback controls. |
 | `src/lib/server/session.ts` (token handling) | `Sources/RowPlayCore/Sync/TokenStore.swift` | Phase 4 ports BYOT token storage to Keychain via `TokenStore` protocol (KeychainTokenStore + FakeTokenStore). |
 | `src/lib/server/concept2.ts` (API client protocol) | `Sources/RowPlayCore/Sync/Concept2Client.swift` | Phase 4 defines `Concept2APIClient` protocol and `MockConcept2Client`; production URLSession implementation lives under `Sources/RowPlayCore/Concept2`. |
-| `src/lib/server/db.ts` (workout cache) | `Sources/RowPlayCore/Sync/WorkoutCache.swift` | Phase 4 ports workout cache as async `WorkoutCache` protocol + `InMemoryWorkoutCache`; cache-backed library work adds `details(for:)` batch retrieval; SQLite foundation lives under `Sources/RowPlayCore/Storage`. |
+| `src/lib/server/db.ts` (workout cache) | `Sources/RowPlayCore/Sync/WorkoutCache.swift` | Phase 4 ports workout cache as async `WorkoutCache` protocol + `InMemoryWorkoutCache`; cache-backed library work adds `details(for:)` batch retrieval; SQLite foundation lives under `Sources/RowPlayCore/Storage`. **Note**: web `db.ts` was removed in PR #166. Native SQLite cache is a native-only local cache, not web D1 parity. |
 | `src/lib/server/logger.ts` | `Sources/RowPlayCore/Support/PrivacySafeLogger.swift` | Phase 4 ports privacy-safe logging with `redact()` and `PrivacySafeLogger`. |
-| `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/SyncStateTracker.swift` | Phase 4 ports sync state tracking as `SyncState` + `SyncStateTracker` observable. |
+| `src/lib/server/data.ts` (sync state) | `Sources/RowPlayCore/Sync/SyncStateTracker.swift` | Phase 4 ports sync state tracking as `SyncState` + `SyncStateTracker` observable. **Note**: sync state logic was removed from web `data.ts` in PR #166. Native `SyncStateTracker` remains as native-local sync tracking. |
 | `src/lib/analytics.ts` (comparison) | `Sources/RowPlayCore/Compare/WorkoutComparison.swift` | Phase 5 ports compareVerdict, sideStats, compareIntervalReps, and buildDistanceOverlay. |
 | `src/lib/repComparison.ts` | `Sources/RowPlayCore/Compare/RepDetection.swift` | Phase 5 ports detectReps, repAvgPace, repsHaveHr, and rep series alignment. |
 | `src/lib/server/export.ts` | `Sources/RowPlayCore/Export/WorkoutExport.swift` | Phase 5 ports CSV and JSON export formatting (TCX deferred). |
 | `src/lib/hrImport.ts` | `Sources/RowPlayCore/Import/HrImport.swift` | Phase 5 ports HR interpolation, merge, and summarize logic. |
 | `src/lib/types.ts` (Annotation) | `Sources/RowPlayCore/Annotations/Annotation.swift` | Phase 5 ports the Annotation model. |
-| `src/routes/api/workouts/[id]/annotations` | `Sources/RowPlayCore/Annotations/AnnotationStore.swift` | Phase 5 ports annotation store as async `AnnotationStore` protocol + `InMemoryAnnotationStore`. |
-| `src/lib/server/share.ts` (redaction) | `Sources/RowPlayCore/Share/SharePackage.swift` | Phase 5 ports share package format with hardware metadata redaction. |
-| `src/routes/compare/+page.svelte` | `Sources/RowPlayStudio/Views/WorkoutComparisonPanel.swift` | Phase 5 wires native compare selection, verdict, side stats, interval rows, and pace overlay on the workout detail surface. |
+| `src/routes/api/workouts/[id]/annotations` | `Sources/RowPlayCore/Annotations/AnnotationStore.swift` | Phase 5 ports annotation store as async `AnnotationStore` protocol + `InMemoryAnnotationStore`. **Note**: web annotation API was retired in PR #166. Native annotations are a native-only feature. |
+| `src/lib/server/share.ts` (redaction) | `Sources/RowPlayCore/Share/SharePackage.swift` | Phase 5 ports share package format with hardware metadata redaction. **Note**: web share API was removed in PR #166. Native share is a native-only local feature, not web parity. |
+| `src/routes/compare/+page.svelte` | `Sources/RowPlayStudio/Views/WorkoutComparisonPanel.swift` | Phase 5 wires native compare selection, verdict, side stats, interval rows, and pace overlay on the workout detail surface. **Note**: web compare page was removed in PR #166. Native comparison is a native-only feature. |
 | `src/routes/api/export` and `src/routes/api/export/[id]` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires current-workout CSV/JSON export through the native save panel. |
-| `src/routes/api/workouts/[id]/hr-import` | `Sources/RowPlayStudio/Views/HrImportPanelView.swift` | Phase 5 wires offline HR sample-series import to the native detail view using the core merge engine. |
-| `src/components/AnnotationPanel.svelte` | `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` | Phase 5 wires local annotation add/delete behavior to the native detail view. |
-| `src/routes/api/workouts/[id]/share` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires local share package save behavior without public URL generation. |
+| `src/routes/api/workouts/[id]/hr-import` | `Sources/RowPlayStudio/Views/HrImportPanelView.swift` | Phase 5 wires offline HR sample-series import to the native detail view using the core merge engine. **Note**: web HR import API was retired (410) in PR #166. Native HR import is a native-only feature. |
+| `src/components/AnnotationPanel.svelte` | `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` | Phase 5 wires local annotation add/delete behavior to the native detail view. **Note**: web `AnnotationPanel.svelte` was deleted in PR #166. Native annotations are a native-only feature. |
+| `src/routes/api/workouts/[id]/share` | `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift` | Phase 5 wires local share package save behavior without public URL generation. **Note**: web share API was retired (410) in PR #166. Native share is a native-only local feature. |
 | `src/lib/liveMode.ts` (interval, backoff, stale) | `Sources/RowPlayCore/Live/LivePollingCadence.swift` | Phase 6 ports polling interval presets, effective interval, backoff computation, and staleness threshold. |
 | `src/lib/liveMode.ts` + `liveMode.svelte.ts` (state) | `Sources/RowPlayCore/Live/LiveModeState.swift` | Phase 6 ports the live-mode state machine as a pure value type with explicit transition events. |
 | `src/lib/liveMode.svelte.ts` (polling) | `Sources/RowPlayCore/Live/LiveSource.swift` | Phase 6 defines the injectable `LiveSource` protocol and `LivePollResult` model. |
@@ -64,9 +68,9 @@ This file records the first mapping from the existing rowplay web repository to 
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolsView.swift` | Phase 5 creates the composition surface for workout tools (compare, export, HR import, annotations). |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Stores/AppPreferences.swift` | Settings wiring PR centralizes `demoModeEnabled`, `reduceReplayMotion`, and `preferredDistanceUnit` as a shared observable. |
 | (new — no web equivalent) | `Sources/RowPlayCore/Models/DistanceUnit.swift` | Settings wiring PR adds `DistanceUnit` enum (`metric`/`imperial`) for distance formatting. |
-| `src/lib/server/db.ts` (SQLite cache) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCache.swift` | SQLite workout cache foundation: stores `WorkoutDetail` JSON in a v1 schema with migration support and batch `details(for:)` reads. Full normalized stroke/split schema is future work. |
-| `src/lib/server/db.ts` (errors) | `Sources/RowPlayCore/Storage/WorkoutCacheError.swift` | Typed errors for SQLite cache operations: open, migration, query, encoding, decoding. |
-| `src/lib/server/db.ts` (migrations) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCacheMigration.swift` | Idempotent schema migration using `PRAGMA user_version` for version tracking. |
+| `src/lib/server/db.ts` (SQLite cache) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCache.swift` | Native-only local cache, not web D1 parity. Stores `WorkoutDetail` JSON in a v1 schema with migration support and batch `details(for:)` reads. Web `db.ts` was removed in PR #166. |
+| `src/lib/server/db.ts` (errors) | `Sources/RowPlayCore/Storage/WorkoutCacheError.swift` | Native-only cache errors: open, migration, query, encoding, decoding. |
+| `src/lib/server/db.ts` (migrations) | `Sources/RowPlayCore/Storage/SQLiteWorkoutCacheMigration.swift` | Native-only schema migration using `PRAGMA user_version`. Web D1 migrations were removed in PR #166. |
 | `src/lib/server/concept2.ts` (transport) | `Sources/RowPlayCore/Concept2/HTTPTransport.swift` | Injectable HTTP transport protocol + URLSession implementation. Tests use a fake transport; production uses `URLSessionHTTPTransport`. |
 | `src/lib/server/concept2.ts` (endpoints) | `Sources/RowPlayCore/Concept2/Concept2Endpoint.swift` | Concept2 logbook API endpoint enum with deterministic URL construction matching web app routes. |
 | `src/lib/server/concept2.ts` (errors) | `Sources/RowPlayCore/Concept2/Concept2Error.swift` | Typed Concept2 API errors with privacy-safe descriptions (no tokens, headers, or payloads in error text). |
@@ -82,3 +86,31 @@ This file records the first mapping from the existing rowplay web repository to 
 | `tests/fixtures/golden/*.fixture.json` | `Tests/RowPlayCoreTests/Fixtures/Concept2/` | Sanitized Concept2 golden fixtures copied from the web repo. Used by `Concept2FixtureDecodingTests` to validate native decoding/mapping parity and dynamically redaction-scan every bundled fixture. No real network calls or tokens. |
 | `src/lib/server/concept2.golden.test.ts` | `Tests/RowPlayCoreTests/Concept2/Concept2FixtureDecodingTests.swift` | Native parity tests for Concept2 decoding/mapping against golden fixtures. Covers rower steady, rower interval, SkiErg, BikeErg, stroke monotonicity, and fixture redaction scanning. |
 | (new — no web equivalent) | `Tests/RowPlayCoreTests/Concept2/Concept2AuthenticatedSmokeTests.swift` | Opt-in authenticated smoke tests for real Concept2 API validation. Skipped unless `ROWPLAY_CONCEPT2_TOKEN` is set. CI does not require credentials. Covers summary fetch, detail fetch, and token-redaction in errors. |
+
+## Retired Web Surfaces
+
+The following web files were removed or retired by rowplay PR #166. Native
+equivalents (where they exist) are native-only features, not web parity
+targets.
+
+| Retired Web File | Reason |
+| --- | --- |
+| `src/lib/server/db.ts` | D1 workout cache removed; web is stateless. |
+| `src/lib/server/detailCache.ts` | D1 detail cache removed. |
+| `src/lib/server/historyWindow.ts` | Server history window removed. |
+| `src/lib/server/share.ts` | Public share API removed. |
+| `src/lib/server/leaderboard.ts` | Leaderboard logic removed. |
+| `src/lib/server/rivalGhost.ts` | Server rival ghost removed. |
+| `src/lib/server/hrImport.ts` | Server-persisted HR import removed. |
+| `src/lib/server/syncState.test.ts` | Sync state tests removed with sync state. |
+| `src/lib/leaderboard.ts` | Leaderboard helper removed. |
+| `src/lib/mockLeaderboard.ts` | Mock leaderboard removed. |
+| `src/lib/historyBackfill.ts` | History backfill removed. |
+| `src/lib/replay/rivalGhost.ts` | Client rival ghost removed. |
+| `src/routes/compare/+page.svelte` | Compare page removed. |
+| `src/routes/leaderboard/+page.svelte` | Leaderboard page removed. |
+| `src/routes/r/[token]/+page.svelte` | Public share page removed. |
+| `src/components/AnnotationPanel.svelte` | Annotation panel removed. |
+| `src/components/WorkoutTagBadge.svelte` | Workout tag badge removed. |
+| `migrations/` (all files) | D1 migrations removed. |
+| `wrangler.jsonc` (KV/D1 bindings) | KV/D1 bindings removed. |

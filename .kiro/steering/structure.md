@@ -24,5 +24,5 @@ Tests/
 - Keep SwiftUI, AppKit, and macOS process behavior out of `RowPlayCore`.
 - Prefer native macOS affordances: split views, sidebars, settings scene, toolbar buttons, command menus, keyboard shortcuts.
 - Add tests with each new pure helper or storage/sync behavior.
-- Do not import Cloudflare assumptions into the native app. KV/D1 concepts from the web app should become local storage abstractions where needed.
+- Do not import Cloudflare assumptions into the native app. The web app itself no longer uses KV/D1 (removed in PR #166); native storage abstractions are native-local capabilities, not web parity.
 

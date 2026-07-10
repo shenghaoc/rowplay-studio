@@ -85,13 +85,16 @@ Dependencies are injected via closures:
 - `SyncStateTracker.syncFailed` stores redacted error in `syncState.lastError` (with a fallback if tracker is nil).
 - `WorkoutSyncError.description` applies `redact()` to associated strings.
 
-## Web Reference
+## Web Architecture Context
 
-From `src/routes/auth/token/+page.svelte` and `src/routes/api/sync/+server.ts`:
+Before rowplay PR #166, the web app accepted BYOT tokens and performed
+server-side sync into persistent KV/D1 storage. That architecture has been
+retired: the current web app seals a personal token in the httpOnly `rp_tok`
+cookie and reads workout data live from Concept2; it has no web sync endpoint
+or server-side workout cache.
 
-- Web uses a form to accept BYOT tokens and stores them in encrypted KV.
-- Web sync is server-side via `syncWorkouts()` in `+server.ts`.
-- Native replaces KV with Keychain, server sync with client-side `WorkoutSyncCoordinator`, and cookie sessions with direct token injection.
+The native `WorkoutSyncCoordinator`, Keychain token store, and SQLite cache are
+therefore native-local capabilities, not ports of a current web backend.
 
 ## Test Strategy
 
