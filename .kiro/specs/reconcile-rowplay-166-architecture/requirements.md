@@ -13,9 +13,9 @@ features (leaderboards, public shares, coaching annotations, server-persisted
 HR imports, manual tags, sync/backfill, comparison, and account-data deletion)
 have been removed or retired.
 
-RowPlay Studio's roadmap, source-map, beta-readiness notes, and steering docs
-were written against the pre-PR-166 web architecture. They must be reconciled
-so that:
+RowPlay Studio's roadmap, source-map, beta-readiness notes, steering docs, and
+historical Kiro phase specs were written against the pre-PR-166 web
+architecture. They must be reconciled so that:
 
 1. No documentation tells agents to port KV/D1 behavior from the web app.
 2. Removed web features are not presented as current parity targets.
@@ -71,7 +71,16 @@ so that:
 3. `AGENTS.md` SHALL accurately reflect the current state of the
    `WorkoutCache` production implementation.
 
-### 6. Spec
+### 6. Historical Kiro phase specs
+
+1. Historical phase specs SHALL NOT direct agents to port KV/D1 storage or
+   other retired web behavior as current architecture.
+2. Where a historical web reference remains useful, it SHALL identify the
+   pre-PR-166 context and state the current native-local or retired boundary.
+3. Native comparison, annotations, HR import, and local sharing SHALL NOT be
+   presented as current parity targets for web surfaces retired in PR #166.
+
+### 7. Spec
 
 1. A new `.kiro/specs/reconcile-rowplay-166-architecture/` spec SHALL be
    created with requirements, design, and tasks files.
@@ -82,4 +91,5 @@ so that:
 - `swift test` passes.
 - `swift build` passes.
 - `git diff --check` passes.
-- No UI or source code files are changed beyond the spec directory and docs.
+- No UI, production, or test source files are changed; the scope is
+  documentation and Kiro specs.

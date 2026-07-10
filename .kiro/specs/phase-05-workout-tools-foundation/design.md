@@ -20,7 +20,7 @@ Native workflow wiring lives in `RowPlayStudio/Views` as small feature views:
 
 ## Comparison
 
-`WorkoutComparison` is a stateless enum (namespace) with static methods, matching the pattern used by `WorkoutAnalytics`. It depends on existing `WorkoutAnalytics.distanceBand`/`durationBand` and `ComparabilityGuard`. Fixed-distance pieces in the same distance band compare by elapsed time; fixed-time/JustRow pieces compare by average pace so equal-duration rows do not tie just because their elapsed time matches.
+`WorkoutComparison` is a stateless enum (namespace) with static methods, matching the pattern used by `WorkoutAnalytics`. It depends on existing `WorkoutAnalytics.distanceBand`/`durationBand` and `ComparabilityGuard`. Fixed-distance pieces in the same distance band compare by elapsed time; fixed-time/JustRow pieces compare by average pace so equal-duration rows do not tie just because their elapsed time matches. Comparison is a native-only capability because rowplay PR #166 retired the web compare page.
 
 Side stats prefer stroke-derived values, but pace consistency falls back to non-rest split paces when a detail has no stroke stream. Power fallbacks guard non-positive pace and use sport-aware watts conversion.
 
@@ -40,11 +40,16 @@ The native detail surface includes an offline sample-series import action using 
 
 ## Annotations
 
-`AnnotationStore` protocol mirrors the web's D1-backed annotation API but uses the Phase 4 `WorkoutCache`-style async protocol pattern. `InMemoryAnnotationStore` is the test/demo implementation and removes empty workout buckets after the last annotation is deleted.
+`AnnotationStore` is a native-only async protocol following the Phase 4
+`WorkoutCache`-style pattern. The web's D1-backed annotation API was retired
+in rowplay PR #166. `InMemoryAnnotationStore` is the test/demo implementation
+and removes empty workout buckets after the last annotation is deleted.
 
 ## Share Package
 
-`SharePackage` is a Codable struct that captures a `WorkoutDetail` plus export metadata. `SharePackageBuilder` applies the same redaction as the web's `redactForPublic` — stripping serialNumber, device, deviceOs, deviceOsVersion from metadata.
+`SharePackage` is a Codable struct that captures a `WorkoutDetail` plus export
+metadata. `SharePackageBuilder` enforces the native privacy invariant by
+stripping serialNumber, device, deviceOs, and deviceOsVersion from metadata.
 
 The native share action saves this local package through `NSSavePanel`. It does not call a companion web service, mint a public URL, or add any public-sharing surface.
 

@@ -96,16 +96,16 @@ Fundamental failures (e.g., the initial `fetchWorkouts` call fails entirely) thr
 6. On later app launches, `RowPlayStudioApp` asks the controller to hydrate an empty library from the persisted cache.
 7. Disconnect deletes the token, migrates and clears the local workout cache, and clears the in-memory library.
 
-## Web Reference
+## Web Architecture Context
 
-From `src/lib/server/data.ts` `syncWorkouts()`:
+Before rowplay PR #166, the web `syncWorkouts()` flow paged summaries and
+upserted them into D1. That persistent sync flow was removed with KV/D1: the
+current web app reads workouts live from Concept2 and has no web-side sync or
+workout cache.
 
-- Pages through `c.listWorkoutsPage(page, from)` with `number=250`.
-- Upserts summaries into D1 via `upsertWorkouts()`.
-- Tracks `added` count and `newestDate`.
-- Does NOT fetch detail during sync — detail is fetched on-demand via `loadWorkoutDetail()`.
-
-The native coordinator differs: it fetches detail eagerly during sync so the cache is fully populated for offline replay.
+The native coordinator fetches detail eagerly during sync so its SQLite cache
+is fully populated for offline replay. It is a native-local capability, not a
+port of a current web sync path.
 
 ## Test Strategy
 

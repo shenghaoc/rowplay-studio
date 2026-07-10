@@ -3,9 +3,9 @@
 ## Summary
 
 This is a docs/specs-only PR. It reconciles RowPlay Studio's roadmap,
-source-map, beta-readiness notes, and steering docs with the post-PR-166
-stateless web architecture. No product features, UI, network behavior, or
-SQLite changes are introduced.
+source-map, beta-readiness notes, steering docs, and historical Kiro phase
+specs with the post-PR-166 stateless web architecture. No product features,
+UI, network behavior, or SQLite changes are introduced.
 
 ## Web architecture change
 
@@ -74,6 +74,13 @@ architecture.
 ### .kiro/steering/tech.md
 
 - No changes needed unless stale language is found.
+
+### Historical `.kiro/specs/` phase specs
+
+- Mark pre-PR-166 KV/D1 web references as historical and describe the current
+  stateless web architecture alongside the native-local replacement.
+- Mark native comparison, annotations, HR import, and local sharing as
+  native-only where their former web surfaces were retired.
 
 ### AGENTS.md
 

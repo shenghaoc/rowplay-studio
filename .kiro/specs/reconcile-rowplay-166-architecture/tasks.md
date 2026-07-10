@@ -12,4 +12,7 @@
 - [x] Update `.kiro/steering/structure.md`: remove stale KV/D1 porting
   guidance.
 - [x] Update `AGENTS.md`: verify WorkoutCache production status.
+- [x] Update historical Kiro phase specs: mark pre-PR-166 KV/D1 references as
+  historical and retire comparison, annotations, and sharing as web-parity
+  targets.
 - [x] Validate: `swift test`, `swift build`, `git diff --check`.
