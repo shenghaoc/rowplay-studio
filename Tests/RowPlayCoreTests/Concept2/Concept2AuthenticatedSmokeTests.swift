@@ -59,15 +59,12 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(page.totalPages, 1,
             "totalPages should be >= 1")
-        // An empty workouts list is valid — the account may have no workouts.
-        XCTAssertFalse(page.totalPages < 1,
-            "totalPages must not be negative")
 
         // Verify workouts decode to valid domain types.
         for workout in page.workouts {
             XCTAssertGreaterThan(workout.id, 0,
                 "Workout ID should be positive")
-            XCTAssertFalse(workout.sport == .rower && workout.distance < 0,
+            XCTAssertGreaterThanOrEqual(workout.distance, 0,
                 "Workout distance should not be negative")
         }
     }
@@ -93,10 +90,6 @@ final class Concept2AuthenticatedSmokeTests: XCTestCase {
         // Verify the detail maps to valid domain types.
         XCTAssertEqual(detail.workout.id, firstWorkout.id,
             "Detail workout ID should match the requested ID")
-        XCTAssertGreaterThanOrEqual(detail.strokes.count, 0,
-            "Strokes array should be present (may be empty)")
-        XCTAssertGreaterThanOrEqual(detail.splits.count, 0,
-            "Splits array should be present (may be empty)")
     }
 
     // MARK: - 3. Error Redaction
