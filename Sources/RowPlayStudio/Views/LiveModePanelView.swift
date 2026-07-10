@@ -11,6 +11,7 @@ struct LiveModePanelView: View {
             HStack {
                 Image(systemName: "dot.radiows.left.and.right")
                     .foregroundStyle(library.liveState.status == .polling ? .green : .secondary)
+                    .accessibilityHidden(true)
                 Text("Live Mode")
                     .font(.headline)
                 Spacer()
@@ -18,6 +19,7 @@ struct LiveModePanelView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .help("\(library.liveState.consecutiveFailures) consecutive failures")
+                        .accessibilityLabel("\(library.liveState.consecutiveFailures) consecutive failures")
                 }
                 Toggle("Enable Live Mode", isOn: Binding(
                     get: { library.liveState.enabled },
@@ -55,6 +57,7 @@ struct LiveModePanelView: View {
                 HStack(spacing: 8) {
                     Image(systemName: sample.sport.iconName)
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(sample.sport.displayName)
                             .font(.subheadline.weight(.medium))
@@ -69,8 +72,8 @@ struct LiveModePanelView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Refresh demo sample")
                     .help("Refresh demo sample")
+                    .accessibilityLabel("Refresh demo sample")
                 }
 
                 HStack(spacing: 16) {
