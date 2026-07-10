@@ -69,6 +69,7 @@ struct LiveModePanelView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel("Refresh demo sample")
                     .help("Refresh demo sample")
                 }
 
