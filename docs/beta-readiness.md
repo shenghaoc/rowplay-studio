@@ -20,6 +20,25 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
 - **Test suite**: all tests pass with no failures.
 
+## rowplay PR #166 Impact
+
+rowplay PR #166 (`refactor: remove all KV and D1 dependencies`) removed
+Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
+
+- **Web is stateless**: the web app no longer has server-side workout
+  storage. Authenticated data is fetched live from Concept2 API per request.
+- **Removed web features**: leaderboards, public shares, coaching
+  annotations, server-persisted HR imports, manual tags, sync/backfill,
+  comparison, and account-data deletion were removed from the web app.
+- **Native SQLite is native-only**: `SQLiteWorkoutCache` remains a valid
+  native-local/offline capability. It is not web D1 parity because D1 no
+  longer exists in the web architecture.
+- **Future sync must be careful**: native sync roadmap work should frame
+  itself as native-local cache behavior, not as chasing removed web D1/KV
+  architecture.
+- **API validation**: future real API validation should test against the
+  stateless Concept2 fetch behavior (live reads, no server cache).
+
 ## Verified
 
 - `swift test` — all tests pass with no failures.
@@ -46,7 +65,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7. Th
 1. **`WorkoutAnalytics.durationBand` has no direct tests**: Tested only indirectly through `ComparabilityGuard`.
 2. **No TCX export**: Deferred from Phase 5; needed for round-trip with Concept2 ecosystem tools.
 3. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
-4. **No companion web share service**: Share packages are local-only; no public URL generation.
+4. **No companion web share service**: Share packages are local-only. Note: public sharing was removed from the web app (PR #166); native share is a native-only local feature.
 
 ## Must Not Ship Yet
 

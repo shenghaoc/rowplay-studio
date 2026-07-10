@@ -2,6 +2,24 @@
 
 This roadmap ports rowplay from SvelteKit/Cloudflare to native macOS first while keeping the core library usable for a future iOS target. Phase 0 is committed directly to `main` to establish the scaffold. Phase 1 onward should use separate branches and pull requests.
 
+## Web Architecture Baseline
+
+As of rowplay PR #166 (`refactor: remove all KV and D1 dependencies`), the
+web app is stateless with no KV/D1 workout cache:
+
+- Authenticated web data is fetched directly from the Concept2 Logbook API
+  per request.
+- Session identity is sealed in AES-GCM httpOnly cookies (`rp_session`,
+  `rp_tok`).
+- Native local SQLite cache is a RowPlay Studio-specific capability for
+  offline/native use, not web parity.
+- Removed web features (leaderboards, public shares, coaching annotations,
+  server-persisted HR imports, manual tags, sync/backfill, comparison, and
+  account-data deletion) should not be presented as current parity targets.
+
+See web `.kiro/specs/remove-kv-d1/` for the authoritative web architecture
+spec.
+
 ## Phase 0 - Native Bootstrap
 
 Status: merged to `main`.
@@ -81,7 +99,9 @@ Scope:
 - SQLite cache PR: add `SQLiteWorkoutCache` with v1 schema, idempotent migrations, and round-trip tests. Stores `WorkoutDetail` JSON for dashboard/replay cache foundation.
 - Sync coordinator/app wiring PR: add `WorkoutSyncCoordinator` that bridges `Concept2APIClient` to `WorkoutCache` with paging, detail fetch, partial failure handling, cancellation propagation, auth/rate-limit aborts, and privacy-safe error reporting. Wire Settings token save/sync/disconnect and `Workout > Sync Concept2 Logbook` through `Concept2SyncController`, `KeychainTokenStore`, `URLSessionConcept2Client`, `SQLiteWorkoutCache`, and `SyncStateTracker`.
 - Preserve rowplay's privacy invariant: tokens do not enter UserDefaults, plain files, logs, exported fixtures, or analytics payloads.
-- Keep Cloudflare-specific KV/D1 assumptions out of native core.
+- Keep Cloudflare-specific KV/D1 assumptions out of native core. Note: the
+  web app itself no longer uses KV/D1 (see Web Architecture Baseline above);
+  native SQLite cache is a native-local/offline capability, not web parity.
 
 Exit criteria:
 
@@ -99,7 +119,8 @@ Scope:
 
 - Foundation PR: port compare verdict, side stats, interval comparison, distance overlay, rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package format.
 - Native wiring in this PR: add workout detail tools for comparison, CSV/JSON export, offline HR sample-series import, local annotations, and local share package save.
-- Follow-up PRs: connect annotation storage to a persistent backend, add TCX export, add full FIT/TCX/GPX HR file parsing if needed, and implement companion web share service integration.
+- Follow-up PRs: connect annotation storage to a persistent backend, add TCX export, add full FIT/TCX/GPX HR file parsing if needed.
+- Note: comparison, leaderboards, public shares, coaching annotations, and server-persisted HR imports have been removed from the web app (PR #166). Native implementations of these features are native-only capabilities, not web parity targets.
 - Preserve rowplay's privacy invariant: share packages strip hardware-identifying metadata.
 
 Exit criteria:
