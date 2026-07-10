@@ -6,6 +6,7 @@
 - [x] Create `Sources/RowPlayCore/Import/HrImport.swift` with HrSample, interpolation, merge, and summarize logic.
 - [x] Create `Sources/RowPlayCore/Annotations/Annotation.swift` with Annotation model.
 - [x] Create `Sources/RowPlayCore/Annotations/AnnotationStore.swift` with AnnotationStore protocol and InMemoryAnnotationStore.
+- [x] Create `Sources/RowPlayCore/Annotations/SQLiteAnnotationStore.swift` with persistent SQLite-backed annotation store and `Sources/RowPlayStudio/Stores/AnnotationStoreFactory.swift`.
 - [x] Create `Sources/RowPlayCore/Share/SharePackage.swift` with SharePackage model, builder, and encode/decode.
 - [x] Add `WorkoutToolsView` composition on the native workout detail surface.
 - [x] Add `WorkoutFileActionsView` with CSV, JSON, and local share package save actions.
@@ -17,6 +18,7 @@
 - [x] Create `Tests/RowPlayCoreTests/Export/WorkoutExportTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Import/HrImportTests.swift`.
 - [x] Create `Tests/RowPlayCoreTests/Annotations/AnnotationStoreTests.swift`.
+- [x] Create `Tests/RowPlayCoreTests/Annotations/SQLiteAnnotationStoreTests.swift` covering migration, idempotent reopen, persistence, trimming, ordering, update semantics, cross-workout rejection, deleteAll sequence reset, apostrophe round-trip, and concurrent writes.
 - [x] Create `Tests/RowPlayCoreTests/Share/SharePackageTests.swift`.
 - [x] Add pre-merge hardening for logbook date export parity, time-axis comparison, interval-only rep detection, sport-aware rep fallback watts, split consistency fallback, annotation delete cleanup, and HR import preservation.
 - [x] Create `.kiro/specs/phase-05-workout-tools-foundation` spec documents.

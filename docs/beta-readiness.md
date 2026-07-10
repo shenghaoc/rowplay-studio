@@ -59,7 +59,6 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 ### Must-Fix
 
 1. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
-2. **No persistent annotation storage**: `InMemoryAnnotationStore` loses data on restart. SQLite or Core Data backing is needed for annotations. (Workout cache now has a SQLite foundation via `SQLiteWorkoutCache`.)
 
 ### Should-Fix
 

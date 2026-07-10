@@ -165,10 +165,23 @@ final class Concept2SyncController: ObservableObject {
         }
 
         library.disableDemoModeIfNeeded()
+
+        var annotationCleanupFailed = false
+        do {
+            try await library.annotationStore.deleteAll()
+        } catch {
+            annotationCleanupFailed = true
+            syncState.lastError = redact(error)
+            syncState.lastErrorDate = Date()
+        }
+
         library.clearData()
-        statusMessage = cacheCleanupFailed
-            ? "Concept2 token deleted; cache cleanup failed."
-            : "Concept2 disconnected."
+
+        if cacheCleanupFailed || annotationCleanupFailed {
+            statusMessage = "Concept2 token deleted; local data cleanup failed."
+        } else {
+            statusMessage = "Concept2 disconnected."
+        }
     }
 
     nonisolated static func defaultCachePath(fileManager: FileManager = .default) throws -> String {

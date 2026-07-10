@@ -6,7 +6,10 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    @StateObject private var library = WorkoutLibrary(details: [])
+    @StateObject private var library = WorkoutLibrary(
+        details: [],
+        annotationStore: AnnotationStoreFactory.makeDefault()
+    )
     @StateObject private var syncController = Concept2SyncController()
 
     var body: some Scene {

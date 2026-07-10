@@ -135,10 +135,15 @@ struct AnnotationPanelView: View {
         if case let AnnotationError.validationFailed(message) = error {
             return message
         }
-        if error is AnnotationError {
-            return "Annotation could not be updated."
+        if let annotationError = error as? AnnotationError {
+            switch annotationError {
+            case .storageUnavailable, .storageFailed:
+                return "Annotation storage is unavailable."
+            default:
+                return "Annotation could not be updated."
+            }
         }
-        return error.localizedDescription
+        return "Annotation storage is unavailable."
     }
 }
 

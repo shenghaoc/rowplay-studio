@@ -1,0 +1,24 @@
+# Persistent Annotation Storage Tasks
+
+- [x] Add `storageUnavailable` and `storageFailed` cases to `AnnotationError` in `Sources/RowPlayCore/Annotations/AnnotationStore.swift`.
+- [x] Add `UnavailableAnnotationStore` in `Sources/RowPlayCore/Annotations/AnnotationStore.swift`.
+- [x] Create `Sources/RowPlayCore/Annotations/SQLiteAnnotationStore.swift` with full SQLite backing.
+- [x] Create `Sources/RowPlayStudio/Stores/AnnotationStoreFactory.swift`.
+- [x] Update `Sources/RowPlayStudio/App/RowPlayStudioApp.swift` to use `AnnotationStoreFactory.makeDefault()`.
+- [x] Update `Sources/RowPlayStudio/Views/AnnotationPanelView.swift` to display generic error for storage failures.
+- [x] Update `Sources/RowPlayStudio/Stores/Concept2SyncController.swift` disconnect to purge annotations.
+- [x] Create `Tests/RowPlayCoreTests/Annotations/SQLiteAnnotationStoreTests.swift`.
+- [x] Extend `Tests/RowPlayStudioTests/Concept2SyncControllerTests.swift` for annotation purge and cleanup failure.
+- [x] Update `docs/roadmap.md` to mark persistent annotation storage complete.
+- [x] Update `docs/source-map.md` with `SQLiteAnnotationStore` mapping.
+- [x] Update `docs/beta-readiness.md` to remove annotation storage from beta blockers.
+- [x] Update `.kiro/specs/phase-05-workout-tools-foundation/tasks.md`.
+- [x] Create `.kiro/specs/persistent-annotation-storage/` spec documents.
+- [x] Run `swift test --filter AnnotationStoreTests` — all tests pass.
+- [x] Run `swift test --filter SQLiteAnnotationStoreTests` — all tests pass.
+- [x] Run `swift test --filter Concept2SyncControllerTests` — all tests pass.
+- [x] Run `swift test` — all 658 tests pass.
+- [x] Run `swift build` — clean build.
+- [x] Run `git diff --check` — no whitespace errors.
+- [x] Run `./script/build_and_run.sh --verify` — launches successfully.
+- [ ] Commit, push, and open draft PR.
