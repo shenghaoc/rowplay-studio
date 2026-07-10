@@ -173,7 +173,7 @@ private struct AnnotationRowView: View {
             .buttonStyle(.borderless)
             .accessibilityLabel("Delete annotation")
             .help("Delete annotation")
-            .alert("Delete Annotation?", isPresented: $showDeleteConfirmation) {
+            .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
                 Button("Delete", role: .destructive, action: onDelete)
                 Button("Cancel", role: .cancel) {}
             } message: {
