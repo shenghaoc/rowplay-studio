@@ -26,7 +26,8 @@ rowplay PR #166 (`refactor: remove all KV and D1 dependencies`) removed
 Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 
 - **Web is stateless**: the web app no longer has server-side workout
-  storage. Authenticated data is fetched live from Concept2 API per request.
+  storage. Authenticated workout summaries and details are fetched live from
+  Concept2 API per request.
 - **Removed web features**: leaderboards, public shares, coaching
   annotations, server-persisted HR imports, manual tags, sync/backfill,
   comparison, and account-data deletion were removed from the web app.
@@ -65,7 +66,6 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 1. **`WorkoutAnalytics.durationBand` has no direct tests**: Tested only indirectly through `ComparabilityGuard`.
 2. **No TCX export**: Deferred from Phase 5; needed for round-trip with Concept2 ecosystem tools.
 3. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
-4. **No companion web share service**: Share packages are local-only. Note: public sharing was removed from the web app (PR #166); native share is a native-only local feature.
 
 ## Must Not Ship Yet
 

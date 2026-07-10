@@ -4,9 +4,11 @@
 
 rowplay PR #166 (`refactor: remove all KV and D1 dependencies`) merged to
 `main` on 2026-07-10. It removes Cloudflare KV session storage and D1 workout
-caching from the web app. The web app is now fully stateless: authenticated
-data is fetched live from the Concept2 Logbook API per request, session
-identity is sealed in AES-GCM httpOnly cookies, and server-persistence-era
+caching from the web app. The web app is now stateless for server-managed
+storage: authenticated workout summaries and details are fetched live from the
+Concept2 Logbook API per request, identity and optional OAuth tokens are sealed
+in the AES-GCM httpOnly `rp_session` cookie, and a personal Concept2 token is
+sealed separately in the httpOnly `rp_tok` cookie. Server-persistence-era
 features (leaderboards, public shares, coaching annotations, server-persisted
 HR imports, manual tags, sync/backfill, comparison, and account-data deletion)
 have been removed or retired.

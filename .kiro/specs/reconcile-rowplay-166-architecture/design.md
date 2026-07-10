@@ -22,9 +22,11 @@ flowchart LR
   end
 ```
 
-The web app no longer has server-side workout storage. All authenticated data
-is fetched live from Concept2 per request. Session identity is sealed in
-AES-GCM httpOnly cookies (`rp_session`, `rp_tok`).
+The web app no longer has server-side workout storage. Authenticated workout
+summaries and details are fetched live from Concept2 per request. Session
+identity, optional OAuth tokens, and home timezone are sealed in the AES-GCM
+httpOnly `rp_session` cookie; a personal Concept2 token is sealed separately
+in the httpOnly `rp_tok` cookie.
 
 ## Native architecture (unchanged)
 

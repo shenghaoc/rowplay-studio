@@ -7,10 +7,11 @@ This roadmap ports rowplay from SvelteKit/Cloudflare to native macOS first while
 As of rowplay PR #166 (`refactor: remove all KV and D1 dependencies`), the
 web app is stateless with no KV/D1 workout cache:
 
-- Authenticated web data is fetched directly from the Concept2 Logbook API
-  per request.
-- Session identity is sealed in AES-GCM httpOnly cookies (`rp_session`,
-  `rp_tok`).
+- Authenticated workout summaries and details are fetched directly from the
+  Concept2 Logbook API per request.
+- Session identity, optional OAuth tokens, and home timezone are sealed in the
+  AES-GCM httpOnly `rp_session` cookie; a personal Concept2 token is sealed
+  separately in the httpOnly `rp_tok` cookie.
 - Native local SQLite cache is a RowPlay Studio-specific capability for
   offline/native use, not web parity.
 - Removed web features (leaderboards, public shares, coaching annotations,
@@ -113,7 +114,7 @@ Exit criteria:
 
 ## Phase 5 - Compare, Export, Share, And Annotations
 
-Status: foundation slice merged to `main` (PR #8); persistent annotations, TCX export, full HR file parsing, and public sharing remain in progress.
+Status: foundation slice merged to `main` (PR #8); persistent annotations, TCX export, and full HR file parsing remain in progress. Local share packages are a native-only capability; public sharing is not a current web-parity target.
 
 Scope:
 
@@ -127,7 +128,7 @@ Exit criteria:
 
 - Foundation PR has tested domain models for comparison, export, HR import, annotations, and share packages, plus native detail wiring for the safe local workflow slice.
 - Full phase completion requires exported data to round-trip with the web app where formats overlap.
-- Share behavior is explicit about which data becomes public.
+- Local share-package behavior is explicit about the included and redacted data.
 - Annotation, comparison, export, local share, and HR sample import flows work offline.
 
 ## Phase 6 - Live Mode
