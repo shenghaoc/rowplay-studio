@@ -172,8 +172,9 @@ private struct AnnotationRowView: View {
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Delete annotation")
+            .accessibilityValue("at \(RowPlayFormatting.time(annotation.timestamp, tenths: true))")
             .help("Delete annotation")
-            .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive, action: onDelete)
                 Button("Cancel", role: .cancel) {}
             } message: {
