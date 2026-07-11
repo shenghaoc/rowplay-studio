@@ -18,7 +18,7 @@ struct WorkoutDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
                 header
                 metricStrip
                 replayButton
@@ -32,24 +32,24 @@ struct WorkoutDetailView: View {
                 strokeChart
                 splitTable
             }
-            .padding(28)
+            .padding(AppDesign.Spacing.xxxLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
             HStack(alignment: .firstTextBaseline) {
                 Text(detail.workout.workoutType)
                     .font(.largeTitle.weight(.semibold))
                 Spacer()
                 Text(detail.workout.sport.displayName)
-                    .font(.headline)
+                    .font(AppDesign.Typography.sectionHeadline)
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: AppDesign.Spacing.medium) {
                 Text(detail.workout.date, style: .date)
                 Text(detail.workout.date, style: .time)
                 if let source = detail.workout.source {
@@ -71,12 +71,12 @@ struct WorkoutDetailView: View {
     }
 
     private var metricStrip: some View {
-        HStack(spacing: 12) {
-            MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance, unit: unit), systemImage: "ruler")
-            MetricTile(title: "Time", value: RowPlayFormatting.time(detail.workout.time, tenths: true), systemImage: "timer")
-            MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer")
-            MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome")
-            MetricTile(title: "Watts", value: wattsText, systemImage: "bolt")
+        HStack(spacing: AppDesign.Spacing.large) {
+            MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance, unit: unit), systemImage: "ruler", color: AppDesign.MetricColor.distance)
+            MetricTile(title: "Time", value: RowPlayFormatting.time(detail.workout.time, tenths: true), systemImage: "timer", color: AppDesign.MetricColor.duration)
+            MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer", color: AppDesign.MetricColor.pace)
+            MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome", color: AppDesign.MetricColor.cadence)
+            MetricTile(title: "Watts", value: wattsText, systemImage: "bolt", color: AppDesign.MetricColor.watts)
         }
     }
 
@@ -98,22 +98,22 @@ struct WorkoutDetailView: View {
         if detail.strokes.isEmpty {
             ContentUnavailableView("No Stroke Detail", systemImage: "waveform.path.ecg", description: Text("This workout only has summary and split data."))
         } else {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
                 Text("Stroke Timeline")
-                    .font(.title3.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
                 Chart(detail.strokes) { stroke in
                     LineMark(
                         x: .value("Time", stroke.t),
                         y: .value("Pace", stroke.pace)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppDesign.MetricColor.pace)
 
                     LineMark(
                         x: .value("Time", stroke.t),
                         y: .value("Watts", Double(stroke.watts))
                     )
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppDesign.MetricColor.watts)
                 }
                 .chartXAxisLabel("seconds")
                 .frame(height: 260)
@@ -121,6 +121,9 @@ struct WorkoutDetailView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Stroke Timeline chart")
             .accessibilityValue(strokeTimelineAccessibilityValue)
+            .padding(AppDesign.Spacing.xLarge)
+            .background(AppDesign.panelBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
         }
     }
 
@@ -129,11 +132,11 @@ struct WorkoutDetailView: View {
     }
 
     private var splitTable: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text(detail.workout.isInterval ? "Intervals" : "Splits")
-                .font(.title3.weight(.semibold))
+                .font(AppDesign.Typography.sectionHeadline)
 
-            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.medium) {
                 GridRow {
                     Text("#").foregroundStyle(.secondary)
                     Text("Distance").foregroundStyle(.secondary)
@@ -142,7 +145,7 @@ struct WorkoutDetailView: View {
                     Text(detail.workout.sport.cadenceUnit).foregroundStyle(.secondary)
                     Text("HR").foregroundStyle(.secondary)
                 }
-                .font(.caption.weight(.semibold))
+                .font(AppDesign.Typography.compactLabel)
 
                 ForEach(detail.splits) { split in
                     GridRow {
@@ -159,6 +162,9 @@ struct WorkoutDetailView: View {
             }
             .font(.callout)
         }
+        .padding(AppDesign.Spacing.xLarge)
+        .background(AppDesign.panelBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
     }
 
     private var cadenceText: String {

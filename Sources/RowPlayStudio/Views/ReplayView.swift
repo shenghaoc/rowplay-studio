@@ -172,17 +172,17 @@ struct ReplayView: View {
     // MARK: - Telemetry
 
     private var telemetryBar: some View {
-        HStack(spacing: 16) {
-            TelemetryItem(label: "Time", value: RowPlayFormatting.time(state.currentFrame.t, tenths: true))
-            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d, unit: unit))
-            TelemetryItem(label: "Pace", value: RowPlayFormatting.pace(state.currentFrame.pace))
-            TelemetryItem(label: detail.workout.sport.cadenceUnit, value: cadenceText)
-            TelemetryItem(label: "Watts", value: "\(state.currentFrame.watts)")
+        HStack(spacing: AppDesign.Spacing.xLarge) {
+            TelemetryItem(label: "Time", value: RowPlayFormatting.time(state.currentFrame.t, tenths: true), color: AppDesign.MetricColor.duration)
+            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d, unit: unit), color: AppDesign.MetricColor.distance)
+            TelemetryItem(label: "Pace", value: RowPlayFormatting.pace(state.currentFrame.pace), color: AppDesign.MetricColor.pace)
+            TelemetryItem(label: detail.workout.sport.cadenceUnit, value: cadenceText, color: AppDesign.MetricColor.cadence)
+            TelemetryItem(label: "Watts", value: "\(state.currentFrame.watts)", color: AppDesign.MetricColor.watts)
             if let hr = state.currentFrame.heartRate {
-                TelemetryItem(label: "HR", value: "\(hr)")
+                TelemetryItem(label: "HR", value: "\(hr)", color: AppDesign.MetricColor.heartRate)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, AppDesign.Spacing.medium)
         .padding(.horizontal)
         .background(.ultraThinMaterial)
     }
@@ -202,10 +202,12 @@ struct ReplayView: View {
     private var playbackControls: some View {
         let playPauseLabel: LocalizedStringKey = state.playing ? "Pause replay" : "Play replay"
 
-        return HStack(spacing: 16) {
+        return HStack(spacing: AppDesign.Spacing.xLarge) {
             Button(action: { state.toggle() }) {
                 Image(systemName: state.playing ? "pause.fill" : "play.fill")
                     .font(.title2)
+                    .frame(width: 36, height: 36)
+                    .background(AppDesign.activeCardBackground, in: Circle())
             }
             .accessibilityLabel(playPauseLabel)
             .help(playPauseLabel)
@@ -221,6 +223,7 @@ struct ReplayView: View {
                     if isEditing { state.pause() }
                 }
             )
+            .tint(AppDesign.MetricColor.pace)
             .accessibilityLabel("Replay progress")
             .accessibilityValue("\(RowPlayFormatting.time(state.time, tenths: true)) of \(RowPlayFormatting.time(state.duration, tenths: true))")
 
@@ -256,14 +259,16 @@ enum ReplayPlaybackClock {
 private struct TelemetryItem: View {
     let label: String
     let value: String
+    var color: Color = .primary
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: AppDesign.Spacing.xxSmall) {
             Text(value)
-                .font(.system(.body, design: .monospaced).weight(.medium))
+                .font(AppDesign.Typography.metricValue.monospacedDigit())
+                .foregroundStyle(color)
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(AppDesign.Typography.compactLabel)
+                .foregroundStyle(.tertiary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)

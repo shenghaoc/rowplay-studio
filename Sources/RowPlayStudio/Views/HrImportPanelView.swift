@@ -14,8 +14,8 @@ struct HrImportPanelView: View {
 
     var body: some View {
         WorkoutToolSection("Heart Rate Import") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
+                HStack(spacing: AppDesign.Spacing.large) {
                     Stepper(value: $offsetSec, in: -600...600, step: 0.5) {
                         LabeledContent("Offset", value: "\(formatSigned(offsetSec)) s")
                             .monospacedDigit()

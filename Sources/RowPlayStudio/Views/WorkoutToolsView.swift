@@ -9,9 +9,9 @@ struct WorkoutToolsView: View {
     var onUpdateDetail: (WorkoutDetail) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.xLarge) {
             Text("Workout Tools")
-                .font(.title3.weight(.semibold))
+                .font(AppDesign.Typography.sectionHeadline)
 
             WorkoutFileActionsView(detail: detail)
 

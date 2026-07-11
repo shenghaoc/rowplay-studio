@@ -17,7 +17,7 @@ struct WorkoutComparisonPanel: View {
                 ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: AppDesign.Spacing.xLarge) {
                     Picker("Compare With", selection: candidateSelection) {
                         ForEach(candidates) { candidate in
                             candidateLabel(candidate)
@@ -30,7 +30,8 @@ struct WorkoutComparisonPanel: View {
                     if let candidate = selectedCandidate {
                         let verdict = WorkoutComparison.compareVerdict(detail, candidate)
                         Label(verdictText(verdict), systemImage: verdictIcon(verdict))
-                            .font(.headline)
+                            .font(AppDesign.Typography.sectionHeadline)
+                            .foregroundStyle(verdictColor(verdict))
 
                         statsGrid(candidate: candidate)
 
@@ -156,13 +157,13 @@ struct WorkoutComparisonPanel: View {
         let current = WorkoutComparison.sideStats(detail)
         let comparison = WorkoutComparison.sideStats(candidate)
 
-        return Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 8) {
+        return Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.medium) {
             GridRow {
                 Text("Metric")
                 Text("Current")
                 Text("Comparison")
             }
-            .font(.caption.weight(.semibold))
+            .font(AppDesign.Typography.compactLabel)
             .foregroundStyle(.secondary)
 
             metricRow("Time", RowPlayFormatting.time(current.time, tenths: true), RowPlayFormatting.time(comparison.time, tenths: true))
@@ -191,18 +192,18 @@ struct WorkoutComparisonPanel: View {
     @ViewBuilder
     private func intervalRows(candidate: WorkoutDetail) -> some View {
         if let rows = WorkoutComparison.compareIntervalReps(detail, candidate), !rows.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                 Text("Intervals")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
-                Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.small) {
                     GridRow {
                         Text("#")
                         Text("Current")
                         Text("Comparison")
                         Text("Delta")
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(AppDesign.Typography.compactLabel)
                     .foregroundStyle(.secondary)
 
                     ForEach(rows.prefix(8), id: \.index) { row in
@@ -211,11 +212,12 @@ struct WorkoutComparisonPanel: View {
                             Text(RowPlayFormatting.pace(row.paceA))
                             Text(RowPlayFormatting.pace(row.paceB))
                             Text("\(formatSigned(row.paceDelta)) sec/500m")
+                                .foregroundStyle(AppDesign.deltaColor(row.paceDelta))
                         }
                         .monospacedDigit()
                     }
                 }
-                .font(.caption)
+                .font(AppDesign.Typography.compactLabel)
             }
         }
     }
@@ -223,9 +225,9 @@ struct WorkoutComparisonPanel: View {
     @ViewBuilder
     private func overlayChart(points: [CompareOverlayPoint]) -> some View {
         if !points.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                 Text("Pace Overlay")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
                 Chart(points) { point in
                     LineMark(
@@ -234,6 +236,10 @@ struct WorkoutComparisonPanel: View {
                     )
                     .foregroundStyle(by: .value("Workout", point.series))
                 }
+                .chartForegroundStyleScale([
+                    "Current": AppDesign.primaryBlue,
+                    "Comparison": AppDesign.comparisonOrange
+                ])
                 .chartXAxisLabel("metres")
                 .chartYAxisLabel("sec/500m")
                 .frame(height: 220)
@@ -252,6 +258,18 @@ struct WorkoutComparisonPanel: View {
             return []
         }
 
+        return overlayPoints(from: overlay)
+    }
+
+    private func verdictColor(_ verdict: CompareVerdict) -> Color {
+        switch verdict.winner {
+        case .a: return AppDesign.energeticGreen
+        case .b: return AppDesign.alertRed
+        case .tie: return .secondary
+        }
+    }
+
+    private func overlayPoints(from overlay: DistanceOverlay) -> [CompareOverlayPoint] {
         var points: [CompareOverlayPoint] = []
         for index in overlay.xs.indices {
             let distance = overlay.xs[index]

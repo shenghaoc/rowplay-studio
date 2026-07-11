@@ -12,8 +12,8 @@ struct WorkoutFileActionsView: View {
 
     var body: some View {
         WorkoutToolSection("Export and Share") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
+                HStack(spacing: AppDesign.Spacing.medium) {
                     Button(action: saveCSV) {
                         Label("Export CSV", systemImage: "tablecells")
                     }

@@ -14,7 +14,7 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
                 Text("Dashboard")
                     .font(.largeTitle.weight(.semibold))
 
@@ -22,12 +22,12 @@ struct DashboardView: View {
 
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 140, maximum: 220))
-                ], spacing: 12) {
+                ], spacing: AppDesign.Spacing.large) {
                     MetricTile(title: "Sessions", value: "\(summary.sessions)", systemImage: "calendar")
-                    MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance, unit: unit), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
-                    MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance, unit: unit), systemImage: "flag.checkered")
-                    MetricTile(title: "Time", value: RowPlayFormatting.time(summary.totalTime), systemImage: "clock")
-                    MetricTile(title: "Avg Pace", value: RowPlayFormatting.pace(summary.averagePace), systemImage: "speedometer")
+                    MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance, unit: unit), systemImage: "point.topleft.down.curvedto.point.bottomright.up", color: AppDesign.MetricColor.distance)
+                    MetricTile(title: "Challenge", value: RowPlayFormatting.distance(summary.challengeDistance, unit: unit), systemImage: "flag.checkered", color: AppDesign.MetricColor.distance)
+                    MetricTile(title: "Time", value: RowPlayFormatting.time(summary.totalTime), systemImage: "clock", color: AppDesign.MetricColor.duration)
+                    MetricTile(title: "Avg Pace", value: RowPlayFormatting.pace(summary.averagePace), systemImage: "speedometer", color: AppDesign.MetricColor.pace)
                 }
 
                 personalBestsSection
@@ -37,7 +37,7 @@ struct DashboardView: View {
                 distanceBySportChart
                 recentPaceChart
             }
-            .padding(28)
+            .padding(AppDesign.Spacing.xxxLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -45,9 +45,9 @@ struct DashboardView: View {
     // MARK: - Charts
 
     private var distanceBySportChart: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text("Distance by Sport")
-                .font(.title3.weight(.semibold))
+                .font(AppDesign.Typography.sectionHeadline)
 
             Chart(summary.bySport) { item in
                 BarMark(
@@ -62,6 +62,9 @@ struct DashboardView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Distance by Sport chart")
         .accessibilityValue(distanceBySportAccessibilityValue)
+        .padding(AppDesign.Spacing.xLarge)
+        .background(AppDesign.panelBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
     }
 
     private var distanceBySportAccessibilityValue: String {
@@ -71,9 +74,9 @@ struct DashboardView: View {
     }
 
     private var recentPaceChart: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text("Recent Pace")
-                .font(.title3.weight(.semibold))
+                .font(AppDesign.Typography.sectionHeadline)
 
             Chart(recentPaceWorkouts) { workout in
                 LineMark(
@@ -93,6 +96,9 @@ struct DashboardView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recent Pace chart")
         .accessibilityValue(recentPaceAccessibilityValue)
+        .padding(AppDesign.Spacing.xLarge)
+        .background(AppDesign.panelBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
     }
 
     private var recentPaceAccessibilityValue: String {
@@ -106,35 +112,36 @@ struct DashboardView: View {
     @ViewBuilder
     private var personalBestsSection: some View {
         if !personalBests.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
                 Text("Personal Bests")
-                    .font(.title3.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 180, maximum: 240))
-                ], spacing: 10) {
+                ], spacing: AppDesign.Spacing.medium) {
                     ForEach(personalBests) { pb in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: AppDesign.Spacing.xSmall) {
+                            HStack(spacing: AppDesign.Spacing.small) {
                                 Image(systemName: pb.sport.iconName)
                                     .foregroundStyle(.secondary)
                                 Text(pbLabel(pb.distance))
                                 Text(pb.sport.displayName)
                                     .foregroundStyle(.secondary)
                             }
-                            .font(.caption)
+                            .font(AppDesign.Typography.compactLabel)
                             Text(RowPlayFormatting.time(pb.time, tenths: true))
                                 .font(.title3.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(AppDesign.MetricColor.duration)
                             Text(RowPlayFormatting.pace(pb.pace))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(AppDesign.Typography.compactLabel)
+                                .foregroundStyle(AppDesign.MetricColor.pace)
                             Text(pb.date, format: .dateTime.year().month(.abbreviated).day())
-                                .font(.caption2)
+                                .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(.tertiary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .padding(AppDesign.Spacing.medium)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.small))
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(pbLabel(pb.distance) == "Half" ? "Half Marathon" : (pbLabel(pb.distance) == "Marathon" ? "Marathon" : Measurement(value: pb.distance, unit: UnitLength.meters).formatted(.measurement(width: .wide)))) \(pb.sport.displayName) Personal Best")
                         .accessibilityValue("\(Duration.seconds(pb.time).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))), \(Duration.seconds(pb.pace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters, \(pb.date, format: .dateTime.year().month(.abbreviated).day())")
@@ -162,33 +169,34 @@ struct DashboardView: View {
     @ViewBuilder
     private var sportSummarySection: some View {
         if !summary.bySport.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
                 Text("By Sport")
-                    .font(.title3.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 180, maximum: 240))
-                ], spacing: 12) {
+                ], spacing: AppDesign.Spacing.large) {
                     ForEach(summary.bySport) { sport in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
+                            HStack(spacing: AppDesign.Spacing.small) {
                                 Image(systemName: sport.sport.iconName)
                                     .foregroundStyle(.secondary)
                                 Text(sport.sport.displayName)
                                     .font(.headline)
                             }
                             Text("\(sport.sessions) sessions")
-                                .font(.caption)
+                                .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(.secondary)
                             Text(RowPlayFormatting.distance(sport.distance, unit: unit))
-                                .font(.subheadline.monospacedDigit())
+                                .font(AppDesign.Typography.metricValue.monospacedDigit())
+                                .foregroundStyle(AppDesign.MetricColor.distance)
                             Text("Best: \(RowPlayFormatting.pace(sport.bestPace))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(AppDesign.Typography.compactLabel)
+                                .foregroundStyle(AppDesign.MetricColor.pace)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .padding(AppDesign.Spacing.large)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(sport.sport.displayName) Summary")
                         .accessibilityValue(Self.sportSummaryAccessibilityValue(sport, unit: unit))

@@ -14,8 +14,8 @@ struct AnnotationPanelView: View {
 
     var body: some View {
         WorkoutToolSection("Annotations") {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
+                VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                     HStack {
                         LabeledContent("Timestamp", value: RowPlayFormatting.time(draftTimestamp, tenths: true))
                             .monospacedDigit()
@@ -158,19 +158,19 @@ private struct AnnotationRowView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: AppDesign.Spacing.medium) {
             Text(RowPlayFormatting.time(annotation.timestamp, tenths: true))
-                .font(.caption.monospacedDigit().weight(.semibold))
+                .font(AppDesign.Typography.compactMetric.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 74, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
                 Text(annotation.text)
                     .font(.callout)
                     .textSelection(.enabled)
 
                 Text(createdAtText)
-                    .font(.caption2)
+                    .font(AppDesign.Typography.compactLabel)
                     .foregroundStyle(.tertiary)
             }
 

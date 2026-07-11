@@ -4,23 +4,25 @@ struct MetricTile: View {
     var title: String
     var value: String
     var systemImage: String
+    var color: Color = .primary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(color == .primary ? .secondary : color.opacity(0.7))
             Text(value)
-                .font(.title2.weight(.semibold))
+                .font(AppDesign.Typography.heroMetric)
+                .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(AppDesign.Typography.metricLabel)
+                .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .padding(AppDesign.Spacing.xLarge)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityValue(value)
