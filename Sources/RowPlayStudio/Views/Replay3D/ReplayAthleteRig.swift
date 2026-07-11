@@ -5,8 +5,9 @@ import SwiftUI
 
 /// Articulated athlete body hierarchy with named pivots.
 ///
-/// Builds a pelvis → torso → shoulders → arms → hands chain and
-/// pelvis → thighs → shins → feet chain. Joint rotations are applied
+/// Builds a pelvis → torso → shoulders → head chain,
+/// shoulders → arms → hands chains, and
+/// pelvis → thighs → shins → feet chains. Joint rotations are applied
 /// around anatomical pivots.
 @MainActor
 final class ReplayAthleteRig {
@@ -228,28 +229,29 @@ final class ReplayAthleteRig {
     // MARK: - Pose Application
 
     /// Apply a common athlete joint pose to the hierarchy.
+    /// All joint values pass through a finite guard before reaching RealityKit.
     func applyPose(_ pose: ReplayAthleteJointPose) {
         // Torso lean (rotate around X axis)
         torso.orientation = simd_quatf(
-            angle: Float(pose.torsoLean),
+            angle: ReplaySportRigFiniteGuard.finite(Float(pose.torsoLean), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
         // Torso tilt (rotate around Z axis)
         let tiltQuat = simd_quatf(
-            angle: Float(pose.torsoTilt),
+            angle: ReplaySportRigFiniteGuard.finite(Float(pose.torsoTilt), fallback: 0),
             axis: SIMD3(0, 0, 1)
         )
         torso.orientation = tiltQuat * torso.orientation
 
         // Head pitch
         head.orientation = simd_quatf(
-            angle: Float(pose.headPitch),
+            angle: ReplaySportRigFiniteGuard.finite(Float(pose.headPitch), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
 
-        // Shoulders (flex = rotation around Z axis)
+        // Shoulders (flex = rotation around X axis)
         shoulders.orientation = simd_quatf(
-            angle: Float((pose.shoulderFlexL + pose.shoulderFlexR) / 2),
+            angle: ReplaySportRigFiniteGuard.finite(Float((pose.shoulderFlexL + pose.shoulderFlexR) / 2), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
 
@@ -289,11 +291,11 @@ final class ReplayAthleteRig {
         elbowFlex: Double
     ) {
         upperArm.orientation = simd_quatf(
-            angle: Float(shoulderFlex),
+            angle: ReplaySportRigFiniteGuard.finite(Float(shoulderFlex), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
         forearm.orientation = simd_quatf(
-            angle: Float(-elbowFlex),
+            angle: ReplaySportRigFiniteGuard.finite(Float(-elbowFlex), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
     }
@@ -305,11 +307,11 @@ final class ReplayAthleteRig {
         kneeFlex: Double
     ) {
         thigh.orientation = simd_quatf(
-            angle: Float(hipFlex),
+            angle: ReplaySportRigFiniteGuard.finite(Float(hipFlex), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
         shin.orientation = simd_quatf(
-            angle: Float(-kneeFlex),
+            angle: ReplaySportRigFiniteGuard.finite(Float(-kneeFlex), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
     }

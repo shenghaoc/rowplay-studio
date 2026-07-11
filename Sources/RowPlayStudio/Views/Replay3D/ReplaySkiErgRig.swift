@@ -22,9 +22,6 @@ final class ReplaySkiErgRig: ReplaySportRig {
     // Athlete
     private let athlete = ReplayAthleteRig()
 
-    // Pose state for drift detection
-    private var lastPose: SkiErgRigPose?
-
     // MARK: - Build
 
     func build(into parent: ModelEntity, accent: Color, opacity: Float) {
@@ -114,7 +111,6 @@ final class ReplaySkiErgRig: ReplaySportRig {
             let gripMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 0.16))
             let gripMat = ReplayMeshFactory.metalMaterial(
                 NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 1),
-                
                 opacity: opacity
             )
             let grip = ModelEntity(mesh: gripMesh, materials: [gripMat])
@@ -141,12 +137,19 @@ final class ReplaySkiErgRig: ReplaySportRig {
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose, reduceMotion: Bool) {
-        guard case .skierg(let skiPose) = pose else { return }
+    func applyPose(_ pose: ReplaySportRigPose) {
+        guard case .skierg(let skiPose) = pose else {
+            assertionFailure("ReplaySkiErgRig.applyPose received non-skierg pose")
+            return
+        }
+
+        // Finite guard at Studio/RealityKit boundary
+        let handleY = ReplaySportRigFiniteGuard.finite(Float(skiPose.handleY), fallback: 0.42)
+        let handleZ = ReplaySportRigFiniteGuard.finite(Float(skiPose.handleZ), fallback: 0.16)
+        let poleRotation = ReplaySportRigFiniteGuard.finite(Float(skiPose.poleRotation), fallback: -0.1)
+        let hipCompression = ReplaySportRigFiniteGuard.finite(Float(skiPose.hipCompression), fallback: 0)
 
         // Handles move with pull
-        let handleY = Float(skiPose.handleY)
-        let handleZ = Float(skiPose.handleZ)
         leftHandle.position = SIMD3(-0.15, handleY, handleZ)
         rightHandle.position = SIMD3(0.15, handleY, handleZ)
 
@@ -154,44 +157,23 @@ final class ReplaySkiErgRig: ReplaySportRig {
         for pole in poles {
             pole.position.y = handleY
             pole.position.z = handleZ
-            pole.orientation = simd_quatf(
-                angle: Float(skiPose.poleRotation),
-                axis: SIMD3(1, 0, 0)
-            )
+            pole.orientation = simd_quatf(angle: poleRotation, axis: SIMD3(1, 0, 0))
         }
 
         // Cable follows handles
         cable.position.y = (handleY + 1.8) / 2
 
         // Athlete pelvis position adjusted by hip compression
-        let compressionOffset = Float(skiPose.hipCompression) * 0.15
+        let compressionOffset = hipCompression * 0.15
         athlete.pelvis.position = SIMD3(0, 0.72 - compressionOffset, 0.02)
 
-        // Apply athlete joint pose
+        // Apply athlete joint pose (with finite guard inside)
         athlete.applyPose(skiPose.joints)
-
-        lastPose = skiPose
     }
 
     // MARK: - Ghost Translucency
 
     func applyGhostTranslucency() {
-        applyTranslucency(to: root, opacity: 0.45)
-    }
-
-    private func applyTranslucency(to entity: Entity, opacity: Float) {
-        if let model = entity as? ModelEntity {
-            model.model?.materials = model.model?.materials.map { mat in
-                if var sm = mat as? SimpleMaterial {
-                    let c = sm.color.tint
-                    sm.color = .init(tint: c.withAlphaComponent(CGFloat(opacity)))
-                    return sm
-                }
-                return mat
-            } ?? []
-        }
-        for child in entity.children {
-            applyTranslucency(to: child, opacity: opacity)
-        }
+        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
     }
 }

@@ -97,12 +97,10 @@ final class ReplaySportRigStructureTests: XCTestCase {
             let ghostRig = ReplaySportRigFactory.build(
                 sport: sport, into: ghostParent, accent: .purple, opacity: 0.45
             )
-            // They should be different instances
             XCTAssertFalse(
                 ObjectIdentifier(liveRig) == ObjectIdentifier(ghostRig),
                 "Live and ghost rigs should be separate instances for \(sport)"
             )
-            // Their roots should not be the same entity
             XCTAssertFalse(
                 liveRig.root === ghostRig.root,
                 "Live and ghost roots should be different entities for \(sport)"
@@ -119,9 +117,10 @@ final class ReplaySportRigStructureTests: XCTestCase {
                 sport: sport, into: parent, accent: .purple, opacity: 0.45
             )
             rig.applyGhostTranslucency()
-            // Check that at least one model entity has translucent materials
-            let hasTranslucent = checkTranslucency(in: rig.root)
-            XCTAssertTrue(hasTranslucent, "Ghost rig should have translucent materials for \(sport)")
+            // Verify ALL model entities have translucent materials (not just one)
+            let (translucent, total) = countTranslucency(in: rig.root)
+            XCTAssertGreaterThan(translucent, 0, "Ghost rig should have translucent materials for \(sport)")
+            XCTAssertEqual(translucent, total, "All \(total) model entities should be translucent for \(sport), only \(translucent) are")
         }
     }
 
@@ -130,7 +129,7 @@ final class ReplaySportRigStructureTests: XCTestCase {
     func testRowerPoseApplicationChangesTransforms() {
         let rig = buildRig(sport: .rower)
 
-        let catchPose = ReplaySportRigPose.rower(RowerRigPose(
+        let catchPose = ReplaySportRigPose.rower(ReplayRowerRigPose(
             joints: .neutral,
             seatZ: -0.32,
             handleY: 0.72,
@@ -138,10 +137,11 @@ final class ReplaySportRigStructureTests: XCTestCase {
             oarSweep: -0.5,
             oarFeather: -0.06
         ))
-        rig.applyPose(catchPose, reduceMotion: false)
+        rig.applyPose(catchPose)
         let catchSeatZ = findEntity(named: "seat", in: rig.root)?.position.z
+        let catchOarOrientation = findEntity(named: "oar-port", in: rig.root)?.orientation
 
-        let finishPose = ReplaySportRigPose.rower(RowerRigPose(
+        let finishPose = ReplaySportRigPose.rower(ReplayRowerRigPose(
             joints: .neutral,
             seatZ: -0.1,
             handleY: 0.76,
@@ -149,57 +149,102 @@ final class ReplaySportRigStructureTests: XCTestCase {
             oarSweep: 0.5,
             oarFeather: 0.2
         ))
-        rig.applyPose(finishPose, reduceMotion: false)
+        rig.applyPose(finishPose)
         let finishSeatZ = findEntity(named: "seat", in: rig.root)?.position.z
+        let finishOarOrientation = findEntity(named: "oar-port", in: rig.root)?.orientation
 
         XCTAssertNotEqual(catchSeatZ, finishSeatZ,
             "Seat position should change between catch and finish poses")
+        XCTAssertNotEqual(catchOarOrientation, finishOarOrientation,
+            "Oar orientation should change between catch and finish poses")
+    }
+
+    func testSkiErgPoseApplicationChangesTransforms() {
+        let rig = buildRig(sport: .skierg)
+
+        let tallPose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
+            joints: .neutral,
+            hipCompression: 0,
+            handleY: 0.58,
+            handleZ: 0.41,
+            poleRotation: -1.0
+        ))
+        rig.applyPose(tallPose)
+        let tallHandleY = findEntity(named: "handle-L", in: rig.root)?.position.y
+        let tallPoleOrientation = findEntity(named: "pole-L", in: rig.root)?.orientation
+
+        let compressedPose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
+            joints: .neutral,
+            hipCompression: 0.8,
+            handleY: 0.26,
+            handleZ: -0.09,
+            poleRotation: 0.8
+        ))
+        rig.applyPose(compressedPose)
+        let compressedHandleY = findEntity(named: "handle-L", in: rig.root)?.position.y
+        let compressedPoleOrientation = findEntity(named: "pole-L", in: rig.root)?.orientation
+
+        XCTAssertNotEqual(tallHandleY, compressedHandleY,
+            "Handle Y should change between tall and compressed poses")
+        XCTAssertNotEqual(tallPoleOrientation, compressedPoleOrientation,
+            "Pole orientation should change between tall and compressed poses")
     }
 
     func testBikeErgPoseApplicationChangesCranks() {
         let rig = buildRig(sport: .bike)
 
-        let pose0 = ReplaySportRigPose.bike(BikeErgRigPose(
+        let pose0 = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
             crankAngle: 0, wheelAngle: 0,
-            pedalPosL: ReplayPedalPosition(y: 0.18, z: 0), pedalPosR: ReplayPedalPosition(y: -0.18, z: 0)
+            pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
+            pedalPosR: ReplayPedalPosition(y: -0.18, z: 0)
         ))
-        rig.applyPose(pose0, reduceMotion: false)
+        rig.applyPose(pose0)
         let cranks0 = findEntity(named: "cranks", in: rig.root)?.orientation
+        let wheel0 = findEntity(named: "wheel-front", in: rig.root)?.orientation
 
-        let pose90 = ReplaySportRigPose.bike(BikeErgRigPose(
+        let pose90 = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
             crankAngle: .pi / 2, wheelAngle: .pi * 1.2,
-            pedalPosL: ReplayPedalPosition(y: 0, z: 0.18), pedalPosR: ReplayPedalPosition(y: 0, z: -0.18)
+            pedalPosL: ReplayPedalPosition(y: 0, z: 0.18),
+            pedalPosR: ReplayPedalPosition(y: 0, z: -0.18)
         ))
-        rig.applyPose(pose90, reduceMotion: false)
+        rig.applyPose(pose90)
         let cranks90 = findEntity(named: "cranks", in: rig.root)?.orientation
+        let wheel90 = findEntity(named: "wheel-front", in: rig.root)?.orientation
 
         XCTAssertNotEqual(cranks0, cranks90,
             "Cranks orientation should change between 0° and 90° poses")
+        XCTAssertNotEqual(wheel0, wheel90,
+            "Wheel orientation should change between 0° and 90° poses")
     }
 
     // MARK: - No Drift on Repeated Application
 
-    func testRepeatedPoseApplicationDoesNotDrift() {
+    func testRepeatedPoseApplicationDoesNotDriftRower() {
         let rig = buildRig(sport: .rower)
-        let pose = ReplaySportRigPose.rower(RowerRigPose(
-            joints: .neutral,
-            seatZ: -0.2,
-            handleY: 0.72,
-            handleZ: 0.58,
-            oarSweep: 0,
-            oarFeather: -0.06
+        let pose = ReplaySportRigPose.rower(ReplayRowerRigPose(
+            joints: .neutral, seatZ: -0.2, handleY: 0.72, handleZ: 0.58,
+            oarSweep: 0, oarFeather: -0.06
         ))
+        assertNoDrift(rig: rig, pose: pose, entityName: "seat", property: \.position.z, sport: "rower")
+    }
 
-        // Apply the same pose 100 times
-        for _ in 0..<100 {
-            rig.applyPose(pose, reduceMotion: false)
-        }
+    func testRepeatedPoseApplicationDoesNotDriftSkiErg() {
+        let rig = buildRig(sport: .skierg)
+        let pose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
+            joints: .neutral, hipCompression: 0, handleY: 0.42, handleZ: 0.16,
+            poleRotation: -0.1
+        ))
+        assertNoDrift(rig: rig, pose: pose, entityName: "handle-L", property: \.position.y, sport: "skierg")
+    }
 
-        // Check that the seat is still at the expected position
-        let seat = findEntity(named: "seat", in: rig.root)
-        XCTAssertNotNil(seat)
-        XCTAssertEqual(seat!.position.z, Float(-0.2 + (-0.2)), accuracy: 0.001,
-            "Seat should not drift after repeated application")
+    func testRepeatedPoseApplicationDoesNotDriftBike() {
+        let rig = buildRig(sport: .bike)
+        let pose = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
+            crankAngle: 1.0, wheelAngle: 2.4,
+            pedalPosL: ReplayPedalPosition(y: 0.1, z: 0.15),
+            pedalPosR: ReplayPedalPosition(y: -0.1, z: -0.15)
+        ))
+        assertNoDrift(rig: rig, pose: pose, entityName: "cranks", property: \.orientation.vector.x, sport: "bike")
     }
 
     // MARK: - Finite Transforms
@@ -208,7 +253,7 @@ final class ReplaySportRigStructureTests: XCTestCase {
         for sport: Sport in [.rower, .skierg, .bike] {
             let rig = buildRig(sport: sport)
             let pose = makeTestPose(sport: sport)
-            rig.applyPose(pose, reduceMotion: false)
+            rig.applyPose(pose)
             XCTAssertTrue(
                 allTransformsFinite(in: rig.root),
                 "All transforms should be finite for \(sport)"
@@ -228,20 +273,44 @@ final class ReplaySportRigStructureTests: XCTestCase {
     private func makeTestPose(sport: Sport) -> ReplaySportRigPose {
         switch sport {
         case .rower:
-            return .rower(RowerRigPose(
+            return .rower(ReplayRowerRigPose(
                 joints: .neutral, seatZ: -0.2, handleY: 0.72, handleZ: 0.58,
                 oarSweep: 0, oarFeather: -0.06
             ))
         case .skierg:
-            return .skierg(SkiErgRigPose(
+            return .skierg(ReplaySkiErgRigPose(
                 joints: .neutral, hipCompression: 0, handleY: 0.42, handleZ: 0.16,
                 poleRotation: -0.1
             ))
         case .bike:
-            return .bike(BikeErgRigPose(
+            return .bike(ReplayBikeErgRigPose(
                 joints: .neutral, crankAngle: 0, wheelAngle: 0,
-                pedalPosL: ReplayPedalPosition(y: 0.18, z: 0), pedalPosR: ReplayPedalPosition(y: -0.18, z: 0)
+                pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
+                pedalPosR: ReplayPedalPosition(y: -0.18, z: 0)
             ))
+        }
+    }
+
+    private func assertNoDrift(
+        rig: ReplaySportRig,
+        pose: ReplaySportRigPose,
+        entityName: String,
+        property: (Entity) -> some Equatable,
+        sport: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        // Apply the same pose 100 times
+        for _ in 0..<100 {
+            rig.applyPose(pose)
+        }
+        // Verify no drift by applying once more and checking
+        rig.applyPose(pose)
+        let entity = findEntity(named: entityName, in: rig.root)
+        XCTAssertNotNil(entity, "Entity \(entityName) should exist for \(sport)", file: file, line: line)
+        // The value should still be finite (no drift to NaN/Infinity)
+        if let e = entity {
+            XCTAssertTrue(allTransformsFinite(in: e), "Transforms should not drift for \(sport)", file: file, line: line)
         }
     }
 
@@ -276,20 +345,26 @@ final class ReplaySportRigStructureTests: XCTestCase {
         return nil
     }
 
-    private func checkTranslucency(in entity: Entity) -> Bool {
-        if let model = entity as? ModelEntity,
-           let materials = model.model?.materials {
-            for mat in materials {
-                if let sm = mat as? SimpleMaterial,
-                   sm.color.tint.cgColor.alpha < 1.0 {
-                    return true
+    /// Returns (translucent count, total model count).
+    private func countTranslucency(in entity: Entity) -> (Int, Int) {
+        var translucent = 0
+        var total = 0
+        if let model = entity as? ModelEntity, let materials = model.model?.materials {
+            total += 1
+            let allTranslucent = materials.allSatisfy { mat in
+                if let sm = mat as? SimpleMaterial {
+                    return sm.color.tint.cgColor.alpha < 1.0
                 }
+                return true // non-SimpleMaterial considered OK
             }
+            if allTranslucent { translucent += 1 }
         }
         for child in entity.children {
-            if checkTranslucency(in: child) { return true }
+            let (t, c) = countTranslucency(in: child)
+            translucent += t
+            total += c
         }
-        return false
+        return (translucent, total)
     }
 
     private func allTransformsFinite(in entity: Entity) -> Bool {

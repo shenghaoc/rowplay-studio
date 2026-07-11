@@ -227,10 +227,12 @@ final class ReplayRigPoseTests: XCTestCase {
             recoveryProgress: .nan, strokeSeconds: .nan, strokeMeters: .nan,
             rate: .nan, watts: 0, intensity: .nan, amplitude: .nan, fatigue: .nan
         )
-        let result = ReplayRigPoseSolver.solve(
-            sport: .rower, strokePose: pose, distance: .nan, reduceMotion: false
-        )
-        assertAllFinite(result)
+        for sport: Sport in [.rower, .skierg, .bike] {
+            let result = ReplayRigPoseSolver.solve(
+                sport: sport, strokePose: pose, distance: .nan, reduceMotion: false
+            )
+            assertAllFinite(result)
+        }
     }
 
     func testInfinityInputsProduceFiniteOutputs() {

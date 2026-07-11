@@ -58,7 +58,7 @@ enum Replay3DSceneBuilder {
     static func buildScene(
         sport: Sport,
         colorScheme: ColorScheme
-    ) throws -> Replay3DSceneContainer {
+    ) -> Replay3DSceneContainer {
         let root = Entity()
         root.name = "scene-root"
 
@@ -175,7 +175,7 @@ enum Replay3DSceneBuilder {
         container.liveGroup.orientation = simd_quatf(angle: Float(liveHeading), axis: SIMD3(0, 1, 0))
 
         // Apply rig pose to live avatar
-        container.liveRig.applyPose(liveRigPose, reduceMotion: reduceMotion)
+        container.liveRig.applyPose(liveRigPose)
 
         // Ghost
         if ghostVisible, let ghostPose {
@@ -191,7 +191,7 @@ enum Replay3DSceneBuilder {
                 distance: ghostDistance,
                 reduceMotion: reduceMotion
             )
-            container.ghostRig.applyPose(ghostRigPose, reduceMotion: reduceMotion)
+            container.ghostRig.applyPose(ghostRigPose)
         } else {
             container.ghostGroup.isEnabled = false
         }

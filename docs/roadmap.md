@@ -215,7 +215,7 @@ Scope:
 - Add `ReplayRigPose.swift` in `RowPlayCore` with portable, deterministic rig-pose value types (`ReplayAthleteJointPose`, `RowerRigPose`, `SkiErgRigPose`, `BikeErgRigPose`, `ReplaySportRigPose`) and `ReplayRigPoseSolver`.
 - Split Phase 8A placeholder `ReplaySportModels.swift` into focused files: `ReplaySportRig.swift` (protocol + factory), `ReplayAthleteRig.swift` (articulated body hierarchy), `ReplayRowerRig.swift`, `ReplaySkiErgRig.swift`, `ReplayBikeErgRig.swift`, `ReplayMeshFactory.swift` (reusable mesh/material helpers).
 - Build articulated entity hierarchies with named pivots: pelvis → torso → shoulders → arms → hands; pelvis → thighs → shins → feet.
-- Translate web `renderer3d.ts` avatar animation formulas: rower seat/handle/oar sweep, SkiErg crunch/pull, BikeErg crank/pedal/leg IK.
+- Translate web `renderer3d.ts` avatar animation formulas: rower seat/handle/oar sweep, SkiErg crunch/pull, BikeErg crank/pedal/forward-kinesic leg tracking.
 - Contact invariants: hands on handle/handlebar, feet at footplate/platform/pedals, pelvis on seat/saddle, oars pivot from gates.
 - Ghost translucency applied recursively to every rig material.
 - Reduced motion returns stable neutral pose.

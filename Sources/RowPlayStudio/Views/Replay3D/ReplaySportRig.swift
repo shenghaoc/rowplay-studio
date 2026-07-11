@@ -12,7 +12,7 @@ protocol ReplaySportRig: AnyObject {
     /// The root entity of the rig hierarchy.
     var root: Entity { get }
     /// Apply a sport-specific rig pose.
-    func applyPose(_ pose: ReplaySportRigPose, reduceMotion: Bool)
+    func applyPose(_ pose: ReplaySportRigPose)
     /// Apply ghost translucency to all materials.
     func applyGhostTranslucency()
 }
@@ -47,6 +47,44 @@ enum ReplaySportRigFactory {
             let rig = ReplayBikeErgRig()
             rig.build(into: parent, accent: accent, opacity: opacity)
             return rig
+        }
+    }
+}
+
+// MARK: - Shared Utilities
+
+/// Finite guard for Studio/RealityKit boundary. Prevents NaN/Infinity from
+/// reaching `simd_quatf` or entity transforms.
+@MainActor
+enum ReplaySportRigFiniteGuard {
+    /// Returns `v` if finite, otherwise `fallback`.
+    static func finite(_ v: Float, fallback: Float) -> Float {
+        v.isFinite ? v : fallback
+    }
+
+    /// Returns `v` if finite, otherwise `fallback`.
+    static func finite(_ v: SIMD3<Float>, fallback: SIMD3<Float>) -> SIMD3<Float> {
+        (v.x.isFinite && v.y.isFinite && v.z.isFinite) ? v : fallback
+    }
+}
+
+/// Shared ghost translucency application for all sport rigs.
+@MainActor
+enum ReplaySportRigTranslucency {
+    /// Recursively apply opacity to all `SimpleMaterial` instances in the hierarchy.
+    static func apply(to entity: Entity, opacity: Float) {
+        if let model = entity as? ModelEntity {
+            model.model?.materials = model.model?.materials.map { mat in
+                if var sm = mat as? SimpleMaterial {
+                    let c = sm.color.tint
+                    sm.color = .init(tint: c.withAlphaComponent(CGFloat(opacity)))
+                    return sm
+                }
+                return mat
+            } ?? []
+        }
+        for child in entity.children {
+            apply(to: child, opacity: opacity)
         }
     }
 }

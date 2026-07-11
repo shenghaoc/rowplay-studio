@@ -71,7 +71,7 @@ public struct ReplayAthleteJointPose: Equatable, Sendable {
 
 /// RowErg-specific rig pose: seat travel, handle travel, oar sweep/feather,
 /// plus the common athlete joints.
-public struct RowerRigPose: Equatable, Sendable {
+public struct ReplayRowerRigPose: Equatable, Sendable {
     /// Common athlete joint angles.
     public var joints: ReplayAthleteJointPose
     /// Seat Z offset from neutral (negative = toward stern/catch).
@@ -108,7 +108,7 @@ public struct RowerRigPose: Equatable, Sendable {
 
 /// SkiErg-specific rig pose: hip compression, handle height, pole travel,
 /// plus the common athlete joints.
-public struct SkiErgRigPose: Equatable, Sendable {
+public struct ReplaySkiErgRigPose: Equatable, Sendable {
     /// Common athlete joint angles.
     public var joints: ReplayAthleteJointPose
     /// Hip compression amount (0 = tall, 1 = fully compressed).
@@ -148,7 +148,7 @@ public struct ReplayPedalPosition: Equatable, Sendable {
 
 /// BikeErg-specific rig pose: crank angle, wheel angle, pedal positions,
 /// plus the common athlete joints.
-public struct BikeErgRigPose: Equatable, Sendable {
+public struct ReplayBikeErgRigPose: Equatable, Sendable {
     /// Common athlete joint angles.
     public var joints: ReplayAthleteJointPose
     /// Crank angle in radians (continuous, drives pedal positions).
@@ -183,9 +183,9 @@ public struct BikeErgRigPose: Equatable, Sendable {
 
 /// Sport-specific rig pose, wrapping the three sport variants.
 public enum ReplaySportRigPose: Equatable, Sendable {
-    case rower(RowerRigPose)
-    case skierg(SkiErgRigPose)
-    case bike(BikeErgRigPose)
+    case rower(ReplayRowerRigPose)
+    case skierg(ReplaySkiErgRigPose)
+    case bike(ReplayBikeErgRigPose)
 }
 
 // MARK: - Rig Pose Solver
@@ -223,7 +223,7 @@ public enum ReplayRigPoseSolver {
 
     // MARK: - RowErg Solver
 
-    private static func solveRower(strokePose: ReplayStrokePose) -> RowerRigPose {
+    private static func solveRower(strokePose: ReplayStrokePose) -> ReplayRowerRigPose {
         let w = strokePose.warpedPhase
         let drive = cos(w)
         let recovery = max(0, -sin(w))
@@ -269,7 +269,7 @@ public enum ReplayRigPoseSolver {
             ankleDorsiR: finite(ankleDorsi, fallback: 0)
         )
 
-        return RowerRigPose(
+        return ReplayRowerRigPose(
             joints: joints,
             seatZ: finite(seatZ, fallback: -0.1),
             handleY: finite(handleY, fallback: 0.72),
@@ -282,7 +282,7 @@ public enum ReplayRigPoseSolver {
 
     // MARK: - SkiErg Solver
 
-    private static func solveSkiErg(strokePose: ReplayStrokePose) -> SkiErgRigPose {
+    private static func solveSkiErg(strokePose: ReplayStrokePose) -> ReplaySkiErgRigPose {
         let w = strokePose.warpedPhase
         let swing = cos(w)
         let crunch = max(0, -swing)
@@ -318,7 +318,7 @@ public enum ReplayRigPoseSolver {
             ankleDorsiR: 0
         )
 
-        return SkiErgRigPose(
+        return ReplaySkiErgRigPose(
             joints: joints,
             hipCompression: finite(hipCompression, fallback: 0),
             handleY: finite(handleY, fallback: 0.42),
@@ -329,12 +329,14 @@ public enum ReplayRigPoseSolver {
 
     // MARK: - BikeErg Solver
 
+    /// Simplified gear ratio: wheel rotation = crank angle × this factor.
+    /// Matches the web renderer3d.ts `phase * 2.4` wheel spin formula.
     private static let bikeWheelRatio: Double = 2.4
 
     private static func solveBikeErg(
         strokePose: ReplayStrokePose,
         distance: Double
-    ) -> BikeErgRigPose {
+    ) -> ReplayBikeErgRigPose {
         let phase = strokePose.phase
         let amp = strokePose.amplitude
 
@@ -372,7 +374,7 @@ public enum ReplayRigPoseSolver {
             ankleDorsiR: finite(sin(crankAngle + Double.pi) * 0.15, fallback: 0)
         )
 
-        return BikeErgRigPose(
+        return ReplayBikeErgRigPose(
             joints: joints,
             crankAngle: finite(crankAngle, fallback: 0),
             wheelAngle: finite(wheelAngle, fallback: 0),
@@ -387,7 +389,7 @@ public enum ReplayRigPoseSolver {
     private static func reducedPose(sport: Sport) -> ReplaySportRigPose {
         switch sport {
         case .rower:
-            return .rower(RowerRigPose(
+            return .rower(ReplayRowerRigPose(
                 joints: .neutral,
                 seatZ: -0.1,
                 handleY: 0.72,
@@ -397,7 +399,7 @@ public enum ReplayRigPoseSolver {
                 oarFeather: -0.06
             ))
         case .skierg:
-            return .skierg(SkiErgRigPose(
+            return .skierg(ReplaySkiErgRigPose(
                 joints: ReplayAthleteJointPose(
                     torsoLean: 0.2,
                     shoulderFlexL: 0,
@@ -413,7 +415,7 @@ public enum ReplayRigPoseSolver {
                 poleRotation: -0.2
             ))
         case .bike:
-            return .bike(BikeErgRigPose(
+            return .bike(ReplayBikeErgRigPose(
                 joints: ReplayAthleteJointPose(
                     torsoLean: 0.74,
                     shoulderFlexL: -0.3,

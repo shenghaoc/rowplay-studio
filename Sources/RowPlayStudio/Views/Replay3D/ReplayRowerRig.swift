@@ -23,8 +23,8 @@ final class ReplayRowerRig: ReplaySportRig {
     // Athlete
     private let athlete = ReplayAthleteRig()
 
-    // Pose state for drift detection
-    private var lastPose: RowerRigPose?
+    /// Build-time handle orientation (Z rotation to lay cylinder horizontal).
+    private let handleBaseOrientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
 
     // MARK: - Build
 
@@ -42,7 +42,7 @@ final class ReplayRowerRig: ReplaySportRig {
             opacity: opacity
         )
 
-        // Hull — narrow capsule shell
+        // Hull — narrow shell
         hull.name = "hull"
         let hullMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.2, 3.0))
         let hullModel = ModelEntity(mesh: hullMesh, materials: [accentMat])
@@ -81,7 +81,6 @@ final class ReplayRowerRig: ReplaySportRig {
         let seatMesh = MeshResource.generateBox(size: SIMD3(0.25, 0.06, 0.20))
         let seatMat = SimpleMaterial(
             color: NSColor.gray.withAlphaComponent(CGFloat(opacity)),
-            
             isMetallic: false
         )
         let seatModel = ModelEntity(mesh: seatMesh, materials: [seatMat])
@@ -90,14 +89,14 @@ final class ReplayRowerRig: ReplaySportRig {
         seat.position = SIMD3(0, 0.30, -0.2)
         root.addChild(seat)
 
-        // Handle
+        // Handle — cylinder laid horizontal via base orientation
         handle.name = "handle"
         let handleMesh = MeshResource.generateCylinder(height: 0.5, radius: 0.015)
         let handleModel = ModelEntity(mesh: handleMesh, materials: [metalMat])
         handleModel.name = "handle-model"
         handle.addChild(handleModel)
         handle.position = SIMD3(0, 0.55, 0.6)
-        handle.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+        handle.orientation = handleBaseOrientation
         root.addChild(handle)
 
         // Oars
@@ -140,63 +139,49 @@ final class ReplayRowerRig: ReplaySportRig {
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose, reduceMotion: Bool) {
-        guard case .rower(let rowerPose) = pose else { return }
+    func applyPose(_ pose: ReplaySportRigPose) {
+        guard case .rower(let rowerPose) = pose else {
+            assertionFailure("ReplayRowerRig.applyPose received non-rower pose")
+            return
+        }
+
+        // Finite guard at Studio/RealityKit boundary
+        let seatZ = ReplaySportRigFiniteGuard.finite(Float(rowerPose.seatZ), fallback: -0.1)
+        let handleY = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleY), fallback: 0.55)
+        let handleZ = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleZ), fallback: 0.6)
+        let handleRotX = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleRotX), fallback: 0)
+        let oarSweep = ReplaySportRigFiniteGuard.finite(Float(rowerPose.oarSweep), fallback: 0)
+        let oarFeather = ReplaySportRigFiniteGuard.finite(Float(rowerPose.oarFeather), fallback: -0.06)
 
         // Seat slides along rail
-        seat.position.z = Float(-0.2 + rowerPose.seatZ)
+        seat.position.z = Float(-0.2) + seatZ
 
-        // Handle moves with stroke
-        handle.position = SIMD3(
-            0,
-            Float(rowerPose.handleY),
-            Float(rowerPose.handleZ)
-        )
-        handle.orientation = simd_quatf(
-            angle: Float(rowerPose.handleRotX),
-            axis: SIMD3(1, 0, 0)
-        )
+        // Handle moves with stroke — compose feather rotation on top of base orientation
+        handle.position = SIMD3(0, handleY, handleZ)
+        handle.orientation = simd_quatf(angle: handleRotX, axis: SIMD3(1, 0, 0)) * handleBaseOrientation
 
         // Oars sweep and feather
         for (i, oar) in oars.enumerated() {
             let side: Float = i == 0 ? -1 : 1
             oar.orientation = simd_quatf(
-                angle: Float(rowerPose.oarSweep) * side,
+                angle: oarSweep * side,
                 axis: SIMD3(0, 1, 0)
             ) * simd_quatf(
-                angle: Float(rowerPose.oarFeather) * side,
+                angle: oarFeather * side,
                 axis: SIMD3(0, 0, 1)
             )
         }
 
         // Pelvis follows seat
-        athlete.pelvis.position = SIMD3(0, 0.30, Float(-0.1 + rowerPose.seatZ))
+        athlete.pelvis.position = SIMD3(0, 0.30, -0.1 + seatZ)
 
-        // Apply athlete joint pose
+        // Apply athlete joint pose (with finite guard inside)
         athlete.applyPose(rowerPose.joints)
-
-        lastPose = rowerPose
     }
 
     // MARK: - Ghost Translucency
 
     func applyGhostTranslucency() {
-        applyTranslucency(to: root, opacity: 0.45)
-    }
-
-    private func applyTranslucency(to entity: Entity, opacity: Float) {
-        if let model = entity as? ModelEntity {
-            model.model?.materials = model.model?.materials.map { mat in
-                if var sm = mat as? SimpleMaterial {
-                    let c = sm.color.tint
-                    sm.color = .init(tint: c.withAlphaComponent(CGFloat(opacity)))
-                    return sm
-                }
-                return mat
-            } ?? []
-        }
-        for child in entity.children {
-            applyTranslucency(to: child, opacity: opacity)
-        }
+        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
     }
 }

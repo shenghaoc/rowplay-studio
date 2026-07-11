@@ -43,24 +43,20 @@ struct RealityReplaySceneView: View {
     @ViewBuilder
     private func realityContent(timeline: TimelineViewDefaultContext) -> some View {
         RealityView { make in
-            do {
-                // Precompute immutable aggregates once.
-                sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
-                sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
-                if let ghost = ghostDetail {
-                    sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                    sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
-                }
-
-                let container = try Replay3DSceneBuilder.buildScene(
-                    sport: sport,
-                    colorScheme: colorScheme
-                )
-                make.add(container.root)
-                sceneState.container = container
-            } catch {
-                setupFailed = true
+            // Precompute immutable aggregates once.
+            sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
+            sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
+            if let ghost = ghostDetail {
+                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
             }
+
+            let container = Replay3DSceneBuilder.buildScene(
+                sport: sport,
+                colorScheme: colorScheme
+            )
+            make.add(container.root)
+            sceneState.container = container
         } update: { _ in
             guard let container = sceneState.container else { return }
             let pose = currentPose()

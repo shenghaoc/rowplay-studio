@@ -28,9 +28,6 @@ final class ReplayBikeErgRig: ReplaySportRig {
     private let pedalL = Entity()
     private let pedalR = Entity()
 
-    // Pose state for drift detection
-    private var lastPose: BikeErgRigPose?
-
     // MARK: - Build
 
     func build(into parent: ModelEntity, accent: Color, opacity: Float) {
@@ -41,24 +38,21 @@ final class ReplayBikeErgRig: ReplaySportRig {
         let frameMat = accentMat
         let tyreMat = ReplayMeshFactory.metalMaterial(
             NSColor(calibratedRed: 0.12, green: 0.13, blue: 0.15, alpha: 1),
-            
             opacity: opacity
         )
         let spokeMat = accentMat
         let metalMat = ReplayMeshFactory.metalMaterial(
             NSColor.gray,
-            
             opacity: opacity
         )
         let darkMat = ReplayMeshFactory.metalMaterial(
             NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 1),
-            
             opacity: opacity
         )
 
         let wheelR: Float = 0.45
 
-        // Wheels (proper torus + spokes)
+        // Wheels
         for z: Float in [0.85, -0.85] {
             let wheel = ReplayMeshFactory.wheelEntity(
                 radius: wheelR,
@@ -117,7 +111,7 @@ final class ReplayBikeErgRig: ReplaySportRig {
         let chainRingMesh = MeshResource.generateSphere(radius: 0.16)
         let chainRing = ModelEntity(mesh: chainRingMesh, materials: [metalMat])
         chainRing.name = "chainRing"
-        chainRing.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 1, 0))
+        chainRing.scale = SIMD3(1, 0.12, 1)
         cranks.addChild(chainRing)
 
         // Pedals
@@ -172,66 +166,41 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose, reduceMotion: Bool) {
-        guard case .bike(let bikePose) = pose else { return }
+    func applyPose(_ pose: ReplaySportRigPose) {
+        guard case .bike(let bikePose) = pose else {
+            assertionFailure("ReplayBikeErgRig.applyPose received non-bike pose")
+            return
+        }
+
+        // Finite guard at Studio/RealityKit boundary
+        let wheelAngle = ReplaySportRigFiniteGuard.finite(Float(bikePose.wheelAngle), fallback: 0)
+        let crankAngle = ReplaySportRigFiniteGuard.finite(Float(bikePose.crankAngle), fallback: 0)
+        let riderSway = ReplaySportRigFiniteGuard.finite(Float(bikePose.riderSway), fallback: 0)
 
         // Wheels roll
         for wheel in wheels {
-            wheel.orientation = simd_quatf(
-                angle: Float(bikePose.wheelAngle),
-                axis: SIMD3(1, 0, 0)
-            )
+            wheel.orientation = simd_quatf(angle: wheelAngle, axis: SIMD3(1, 0, 0))
         }
 
         // Cranks turn
-        cranks.orientation = simd_quatf(
-            angle: Float(bikePose.crankAngle),
-            axis: SIMD3(1, 0, 0)
-        )
+        cranks.orientation = simd_quatf(angle: crankAngle, axis: SIMD3(1, 0, 0))
 
         // Rider sway
-        rider.orientation = simd_quatf(
-            angle: Float(bikePose.riderSway),
-            axis: SIMD3(0, 0, 1)
-        )
+        rider.orientation = simd_quatf(angle: riderSway, axis: SIMD3(0, 0, 1))
 
         // Apply athlete joint pose (includes aero tuck and leg pedaling)
         athlete.applyPose(bikePose.joints)
 
-        // Feet stay on pedals: adjust ankle/foot orientation to match pedal angle
-        let footRotL = Float(bikePose.crankAngle)
-        let footRotR = Float(bikePose.crankAngle + Double.pi)
-        athlete.footL.orientation = simd_quatf(
-            angle: footRotL,
-            axis: SIMD3(1, 0, 0)
-        )
-        athlete.footR.orientation = simd_quatf(
-            angle: footRotR,
-            axis: SIMD3(1, 0, 0)
-        )
-
-        lastPose = bikePose
+        // Feet stay on pedals: adjust foot orientation to match crank angle
+        let footRotL = crankAngle
+        let footRotR = crankAngle + Float.pi
+        athlete.footL.orientation = simd_quatf(angle: footRotL, axis: SIMD3(1, 0, 0))
+        athlete.footR.orientation = simd_quatf(angle: footRotR, axis: SIMD3(1, 0, 0))
     }
 
     // MARK: - Ghost Translucency
 
     func applyGhostTranslucency() {
-        applyTranslucency(to: root, opacity: 0.45)
-    }
-
-    private func applyTranslucency(to entity: Entity, opacity: Float) {
-        if let model = entity as? ModelEntity {
-            model.model?.materials = model.model?.materials.map { mat in
-                if var sm = mat as? SimpleMaterial {
-                    let c = sm.color.tint
-                    sm.color = .init(tint: c.withAlphaComponent(CGFloat(opacity)))
-                    return sm
-                }
-                return mat
-            } ?? []
-        }
-        for child in entity.children {
-            applyTranslucency(to: child, opacity: opacity)
-        }
+        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
     }
 }
