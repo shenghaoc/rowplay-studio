@@ -368,8 +368,8 @@ public enum ReplayRigPoseSolver {
             elbowFlexR: 0.4,
             hipFlexL: finite(thighAngleL, fallback: 0),
             hipFlexR: finite(thighAngleR, fallback: 0),
-            kneeFlexL: finite(abs(sin(crankAngle)) * 0.8 * amp, fallback: 0),
-            kneeFlexR: finite(abs(sin(crankAngle + Double.pi)) * 0.8 * amp, fallback: 0),
+            kneeFlexL: finite(max(0, sin(crankAngle)) * 0.8 * amp, fallback: 0),
+            kneeFlexR: finite(max(0, -sin(crankAngle)) * 0.8 * amp, fallback: 0),
             ankleDorsiL: finite(sin(crankAngle) * 0.15, fallback: 0),
             ankleDorsiR: finite(sin(crankAngle + Double.pi) * 0.15, fallback: 0)
         )

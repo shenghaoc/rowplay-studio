@@ -249,13 +249,10 @@ final class ReplayAthleteRig {
             axis: SIMD3(1, 0, 0)
         )
 
-        // Shoulders (flex = rotation around X axis)
-        shoulders.orientation = simd_quatf(
-            angle: ReplaySportRigFiniteGuard.finite(Float((pose.shoulderFlexL + pose.shoulderFlexR) / 2), fallback: 0),
-            axis: SIMD3(1, 0, 0)
-        )
+        // Shoulders: no rotation here — upperArm is a child of shoulders,
+        // so applying shoulderFlex to both would double the rotation.
 
-        // Arms
+        // Arms: shoulder flex applied directly to each upperArm
         applyArmPose(
             upperArm: upperArmL,
             forearm: forearmL,

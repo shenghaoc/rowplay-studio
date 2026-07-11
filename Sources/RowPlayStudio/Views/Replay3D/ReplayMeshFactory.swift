@@ -22,35 +22,35 @@ enum ReplayMeshFactory {
         let color = opacity < 1
             ? humanSkin.withAlphaComponent(CGFloat(opacity))
             : humanSkin
-        return SimpleMaterial(color: color, isMetallic: false)
+        return SimpleMaterial(color: color, roughness: 0.74, isMetallic: false)
     }
 
     static func hairMaterial(opacity: Float = 1) -> SimpleMaterial {
         let color = opacity < 1
             ? humanHair.withAlphaComponent(CGFloat(opacity))
             : humanHair
-        return SimpleMaterial(color: color, isMetallic: false)
+        return SimpleMaterial(color: color, roughness: 0.8, isMetallic: false)
     }
 
     static func kitMaterial(opacity: Float = 1) -> SimpleMaterial {
         let color = opacity < 1
             ? humanKit.withAlphaComponent(CGFloat(opacity))
             : humanKit
-        return SimpleMaterial(color: color, isMetallic: false)
+        return SimpleMaterial(color: color, roughness: 0.7, isMetallic: false)
     }
 
     static func kitDarkMaterial(opacity: Float = 1) -> SimpleMaterial {
         let color = opacity < 1
             ? humanKitDark.withAlphaComponent(CGFloat(opacity))
             : humanKitDark
-        return SimpleMaterial(color: color, isMetallic: false)
+        return SimpleMaterial(color: color, roughness: 0.7, isMetallic: false)
     }
 
     static func shoeMaterial(opacity: Float = 1) -> SimpleMaterial {
         let color = opacity < 1
             ? humanShoe.withAlphaComponent(CGFloat(opacity))
             : humanShoe
-        return SimpleMaterial(color: color, isMetallic: false)
+        return SimpleMaterial(color: color, roughness: 0.8, isMetallic: false)
     }
 
     static func accentMaterial(_ color: Color, opacity: Float = 1) -> SimpleMaterial {
@@ -58,7 +58,7 @@ enum ReplayMeshFactory {
         let finalColor = opacity < 1
             ? nsColor.withAlphaComponent(CGFloat(opacity))
             : nsColor
-        return SimpleMaterial(color: finalColor, isMetallic: false)
+        return SimpleMaterial(color: finalColor, roughness: 0.56, isMetallic: false)
     }
 
     static func metalMaterial(

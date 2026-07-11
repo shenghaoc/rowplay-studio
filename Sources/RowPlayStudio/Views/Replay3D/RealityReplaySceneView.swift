@@ -17,20 +17,13 @@ struct RealityReplaySceneView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var sceneState = Replay3DSceneState()
-    @State private var setupFailed = false
     @State private var lastTickDate: Date?
 
     private var sport: Sport { detail.workout.sport }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing)) { timeline in
-            ZStack {
-                if setupFailed {
-                    fallbackView
-                } else {
-                    realityContent(timeline: timeline)
-                }
-            }
+            realityContent(timeline: timeline)
         }
         .frame(minHeight: 300)
         .accessibilityElement(children: .ignore)
@@ -239,22 +232,6 @@ struct RealityReplaySceneView: View {
         return "\(sportName) · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
     }
 
-    // MARK: - Fallback
-
-    private var fallbackView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("3D Replay Unavailable")
-                .font(.headline)
-            Text("RealityKit failed to initialize. Use the 2D view instead.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
 }
 
 enum Replay3DPlayback {
