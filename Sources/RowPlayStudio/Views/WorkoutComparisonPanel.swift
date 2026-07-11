@@ -18,7 +18,7 @@ struct WorkoutComparisonPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Picker("Compare With", selection: candidateSelection) {
                         ForEach(candidates) { candidate in
-                            Text(candidateLabel(candidate))
+                            candidateLabel(candidate)
                                 .tag(candidate.id)
                         }
                     }
@@ -76,16 +76,26 @@ struct WorkoutComparisonPanel: View {
     // No NSLock needed: SwiftUI evaluates body on the main thread.
     // Uses autoupdatingCurrent so month/day names translate on locale change;
     // component ordering is fixed at init time based on the initial locale.
+    // Explicit Gregorian calendar prevents Islamic/Buddhist/Persian calendar
+    // inheritance from locale (FormatStyle always uses Gregorian).
     private static let candidateDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = .autoupdatingCurrent
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.setLocalizedDateFormatFromTemplate("yMMMd")
         return formatter
     }()
 
-    private func candidateLabel(_ candidate: WorkoutDetail) -> String {
+    private func candidateLabel(_ candidate: WorkoutDetail) -> some View {
         let date = Self.candidateDateFormatter.string(from: candidate.workout.date)
-        return "\(date) · \(candidate.workout.workoutType) · \(RowPlayFormatting.pace(candidate.workout.pace))"
+        let pace = RowPlayFormatting.pace(candidate.workout.pace)
+        return HStack(spacing: 0) {
+            Text(date)
+            Text(" · ").accessibilityHidden(true)
+            Text(candidate.workout.workoutType)
+            Text(" · ").accessibilityHidden(true)
+            Text(pace)
+        }
     }
 
     private func verdictText(_ verdict: CompareVerdict) -> String {
