@@ -9,5 +9,4 @@
       sports, `ReplayView` construction, and `ReplayState` initialisation.
 - [x] 5. Run full validation: `swift test`, `swift build`, `git diff --check`,
       and `./script/build_and_run.sh --verify`.
-- [ ] 6. Sync the final PR metadata, push the branch, and verify live CI and
-      review-thread state.
+- [x] 6. Sync the final PR metadata and push the completed branch.
