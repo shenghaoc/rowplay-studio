@@ -78,8 +78,8 @@ enum Concept2FixtureLoader {
     static func fixtureNames() throws -> [String] {
         let urls = Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
         let names = urls.compactMap { url -> String? in
-            let filename = url.lastPathComponent
-            guard filename.hasSuffix(filenameSuffix) else { return nil }
+            guard let filename = url.pathComponents.last,
+                  filename.hasSuffix(filenameSuffix) else { return nil }
             return String(filename.dropLast(filenameSuffix.count))
         }.sorted()
 
