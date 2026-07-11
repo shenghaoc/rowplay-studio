@@ -1,6 +1,6 @@
 import Charts
 import RowPlayCore
-import RowPlayMacOS
+import RowPlayPlatform
 import SwiftUI
 
 struct WorkoutDetailView: View {

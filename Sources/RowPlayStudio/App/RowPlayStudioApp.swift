@@ -1,6 +1,6 @@
 import AppKit
 import RowPlayCore
-import RowPlayMacOS
+import RowPlayPlatform
 import SwiftUI
 
 @main

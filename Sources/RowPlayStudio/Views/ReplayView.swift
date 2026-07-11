@@ -1,6 +1,6 @@
 import Foundation
 import RowPlayCore
-import RowPlayMacOS
+import RowPlayPlatform
 import SwiftUI
 
 struct ReplayView: View {

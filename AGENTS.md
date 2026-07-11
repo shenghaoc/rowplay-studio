@@ -20,7 +20,7 @@ Sources/RowPlayCore/        # Pure domain logic library (no SwiftUI/AppKit)
   Support/                  # Formatting, date/time, pace parsing, privacy redaction, logging
   Fixtures/                 # DemoWorkoutLibrary with deterministic seeded data
 
-Sources/RowPlayMacOS/       # macOS non-UI layer (Foundation/Combine, no SwiftUI/AppKit)
+Sources/RowPlayPlatform/       # macOS non-UI layer (Foundation/Combine, no SwiftUI/AppKit)
   WorkoutLibrary.swift      # Central app state (@MainActor ObservableObject)
   Concept2SyncController.swift  # Sync orchestration
   AppPreferences.swift      # UserDefaults-backed preferences
@@ -62,10 +62,10 @@ Do not launch the raw SwiftPM executable for GUI checks; always use the staged `
 ### Three-Layer Architecture
 
 - **RowPlayCore** — Pure domain logic. No SwiftUI, AppKit, or macOS-specific imports. Must remain importable by a future iOS target.
-- **RowPlayMacOS** — macOS non-UI layer. Uses Foundation and Combine but no SwiftUI or AppKit. Contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), and factories (AnnotationStoreFactory). Depends on RowPlayCore.
-- **RowPlayStudio** — SwiftUI macOS UI layer. Contains `@main` entry and all Views. Depends on RowPlayMacOS and RowPlayCore.
+- **RowPlayPlatform** — macOS non-UI layer. Uses Foundation and Combine but no SwiftUI or AppKit. Contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), and factories (AnnotationStoreFactory). Depends on RowPlayCore.
+- **RowPlayStudio** — SwiftUI macOS UI layer. Contains `@main` entry and all Views. Depends on RowPlayPlatform and RowPlayCore.
 
-Keep reusable math and data in `RowPlayCore`. Keep macOS state management in `RowPlayMacOS`. Keep SwiftUI and AppKit in `RowPlayStudio`.
+Keep reusable math and data in `RowPlayCore`. Keep macOS state management in `RowPlayPlatform`. Keep SwiftUI and AppKit in `RowPlayStudio`.
 
 ### Dependency Injection via Protocols
 

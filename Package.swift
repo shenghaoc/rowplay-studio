@@ -10,7 +10,7 @@ let package = Package(
     products: [
         .executable(name: "RowPlayStudio", targets: ["RowPlayStudio"]),
         .library(name: "RowPlayCore", targets: ["RowPlayCore"]),
-        .library(name: "RowPlayMacOS", targets: ["RowPlayMacOS"])
+        .library(name: "RowPlayPlatform", targets: ["RowPlayPlatform"])
     ],
     targets: [
         .systemLibrary(
@@ -29,12 +29,12 @@ let package = Package(
             ]
         ),
         .target(
-            name: "RowPlayMacOS",
+            name: "RowPlayPlatform",
             dependencies: ["RowPlayCore"]
         ),
         .executableTarget(
             name: "RowPlayStudio",
-            dependencies: ["RowPlayMacOS", "RowPlayCore"]
+            dependencies: ["RowPlayPlatform", "RowPlayCore"]
         ),
         .testTarget(
             name: "RowPlayCoreTests",
@@ -51,7 +51,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RowPlayStudioTests",
-            dependencies: ["RowPlayStudio", "RowPlayMacOS", "RowPlayCore"]
+            dependencies: ["RowPlayStudio", "RowPlayPlatform", "RowPlayCore"]
         )
     ]
 )
