@@ -131,8 +131,9 @@ final class WorkoutExportTests: XCTestCase {
 
     func testCsvCellProtectsCRLFPrefix() {
         let result = WorkoutExport.csvCell("\r\n=cmd")
-        // CRLF is stripped by .whitespacesAndNewlines for detection; original s preserved with prefix
-        XCTAssertEqual(result, "'\r\n=cmd")
+        // CRLF triggers both formula prefix (') via .whitespacesAndNewlines trimming,
+        // and RFC 4180 quoting via unicodeScalars-level CR/LF detection
+        XCTAssertEqual(result, "\"'\r\n=cmd\"")
     }
 
     func testCsvCellProtectsDoubleNewlinePrefix() {

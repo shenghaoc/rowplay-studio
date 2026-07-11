@@ -104,16 +104,19 @@ public enum WorkoutExport: Sendable {
         guard let value else { return "" }
         var s = String(describing: value)
 
-        // Formula injection protection: strip leading whitespace that might bypass checks,
-        // then prefix formula-triggering characters with a single quote (OWASP recommendation).
+        // Formula injection protection: strip leading whitespace and newlines that might bypass
+        // checks, then prefix formula-triggering characters with a single quote (OWASP recommendation).
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
         let formulaChars: [Character] = ["=", "+", "-", "@"]
         if let first = trimmed.first, formulaChars.contains(first) {
             s = "'" + s
         }
 
-        // RFC 4180 escaping
-        if s.contains("\"") || s.contains(",") || s.contains("\n") || s.contains("\r") {
+        // RFC 4180 escaping. Use unicodeScalars to detect CR/LF because Swift treats
+        // CRLF (\r\n) as a single grapheme cluster, causing String.contains to miss them.
+        let needsQuoting = s.contains("\"") || s.contains(",")
+            || s.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" })
+        if needsQuoting {
             s = "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }
         return s
