@@ -13,8 +13,17 @@ let package = Package(
         .library(name: "RowPlayMacOS", targets: ["RowPlayMacOS"])
     ],
     targets: [
+        .systemLibrary(
+            name: "CSQLite3",
+            pkgConfig: "sqlite3",
+            providers: [
+                .brew(["sqlite3"]),
+                .apt(["libsqlite3-dev"])
+            ]
+        ),
         .target(
             name: "RowPlayCore",
+            dependencies: ["CSQLite3"],
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]
