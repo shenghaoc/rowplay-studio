@@ -11,6 +11,19 @@ private struct RedactionRule {
     let replacement: String
 }
 
+/// Return an NSError only when the original value is an NSError instance (or
+/// subclass), not merely a native Swift Error bridged to NSError on Darwin.
+private func foundationNSError(from value: Any) -> NSError? {
+    var mirror: Mirror? = Mirror(reflecting: value)
+    while let current = mirror {
+        if ObjectIdentifier(current.subjectType) == ObjectIdentifier(NSError.self) {
+            return value as? NSError
+        }
+        mirror = current.superclassMirror
+    }
+    return nil
+}
+
 /// Regex-based patterns that match personally sensitive data.
 ///
 /// Applied sequentially before logging. Mirrors the web app's `logger.ts`
@@ -50,7 +63,7 @@ public func redact(_ value: Any) -> String {
     let input: String
     if let string = value as? String {
         input = string
-    } else if let error = value as? NSError {
+    } else if let error = foundationNSError(from: value) {
         // `String(describing: NSError)` omits the localized description on
         // swift-corelibs-foundation, so use the portable Foundation API.
         input = error.localizedDescription
