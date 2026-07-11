@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 5.9, macOS 14.0+) with zero external dependencies. Swift 5.9 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
+RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 6.0, macOS 14.0+) with zero external dependencies. Swift 6.0 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
 
 ## Repository Structure
 
@@ -62,7 +62,7 @@ swift test --filter RowPlayStudioTests  # Run macOS UI tests
 ./script/build_and_run.sh --debug       # Launch under LLDB debugger
 ```
 
-Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 5.9-era toolchains.
+Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 6.x-era toolchains.
 
 ## Architecture Boundaries
 
