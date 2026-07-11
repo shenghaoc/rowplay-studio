@@ -4,18 +4,37 @@ import XCTest
 
 /// Regression tests for the "Replay Workout" navigation fix.
 ///
-/// These tests verify that ReplayView and ReplayState can be constructed from
-/// demo workout data for every sport — the precondition for the navigation
-/// push to succeed.
+/// These tests verify the production detail-navigation state plus ReplayView
+/// and ReplayState construction from demo workout data for every sport.
 ///
 /// **Boundary**: The actual fix is wrapping `NavigationSplitView`'s detail
 /// column in `NavigationStack` (`ContentView.swift`). SwiftUI push behaviour
 /// cannot be verified in SwiftPM XCTest without an external view-inspection
 /// library (e.g. ViewInspector), which this project does not use. The
-/// `NavigationStack` presence is a compile-time structural guarantee verified
-/// by `swift build` and manual testing.
+/// `NavigationStack` wiring remains a compile-time structural guarantee
+/// verified by `swift build`; route creation and sidebar-reset behavior are
+/// exercised directly through `DetailNavigationState`.
 @MainActor
 final class ReplayNavigationTests: XCTestCase {
+
+    // MARK: - Production Navigation State
+
+    func testReplayActionRoutesSelectedWorkout() {
+        var navigation = DetailNavigationState()
+
+        navigation.showReplay(workoutID: 42)
+
+        XCTAssertEqual(navigation.path, [.replay(workoutID: 42)])
+    }
+
+    func testSidebarSelectionClearsPresentedReplay() {
+        var navigation = DetailNavigationState()
+        navigation.showReplay(workoutID: 42)
+
+        navigation.resetForSelectionChange()
+
+        XCTAssertTrue(navigation.path.isEmpty)
+    }
 
     // MARK: - Demo Data Coverage
 

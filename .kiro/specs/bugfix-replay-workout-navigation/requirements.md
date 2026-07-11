@@ -28,8 +28,9 @@ column is no longer guaranteed.
    selected workout detail.
 5. All existing tests continue to pass (`swift test`).
 6. `swift build` succeeds with zero warnings related to navigation.
-7. Regression coverage constructs `ReplayView` and `ReplayState` from demo
-   workout data for every supported sport.
+7. Regression coverage exercises the production replay route, sidebar-reset
+   behavior, and `ReplayView`/`ReplayState` construction from demo workout data
+   for every supported sport.
 
 ## Non-Goals
 
