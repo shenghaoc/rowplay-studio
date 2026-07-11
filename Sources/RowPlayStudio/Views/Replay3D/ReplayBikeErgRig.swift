@@ -17,6 +17,8 @@ final class ReplayBikeErgRig: ReplaySportRig {
     private var wheels: [Entity] = []
     private let cranks = Entity()
     private let saddle = Entity()
+    private let handleGripL = Entity()
+    private let handleGripR = Entity()
 
     // Rider group (contains athlete body)
     private let rider = Entity()
@@ -151,6 +153,12 @@ final class ReplayBikeErgRig: ReplaySportRig {
             handlebar.addChild(grip)
         }
         handlebar.position = SIMD3(0, wheelR + 0.8, 0.35)
+        handleGripL.name = "handle-grip-anchor-L"
+        handleGripL.position = SIMD3(-0.28, -0.02, 0.04)
+        handlebar.addChild(handleGripL)
+        handleGripR.name = "handle-grip-anchor-R"
+        handleGripR.position = SIMD3(0.28, -0.02, 0.04)
+        handlebar.addChild(handleGripR)
         root.addChild(handlebar)
 
         // Rider group
@@ -190,6 +198,9 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
         // Apply athlete joint pose (includes aero tuck and leg pedaling)
         athlete.applyPose(bikePose.joints)
+
+        athlete.handL.setPosition(handleGripL.position(relativeTo: root), relativeTo: root)
+        athlete.handR.setPosition(handleGripR.position(relativeTo: root), relativeTo: root)
 
         // Keep the ankle pivots on the moving pedals. Positioning relative to
         // the rig root preserves contact even though feet remain in the leg hierarchy.

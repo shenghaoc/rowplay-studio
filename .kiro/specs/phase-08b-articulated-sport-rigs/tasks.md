@@ -24,6 +24,7 @@
 ## Tests
 - [x] Add `Tests/RowPlayCoreTests/Replay/ReplayRigPoseTests.swift`
 - [x] Add `Tests/RowPlayStudioTests/ReplaySportRigStructureTests.swift`
+- [x] Cover independent shoulders, ankle articulation, bike thigh bounds, and sport contact anchors
 
 ## Documentation
 - [x] Update `docs/roadmap.md`
@@ -31,6 +32,7 @@
 - [x] Update `docs/beta-readiness.md`
 
 ## Validation
-- [x] All test suites pass (802 tests, 0 failures)
+- [x] All test suites pass (803 Core tests and 27 Studio tests, 0 failures; 2 Core tests skipped)
 - [x] Architecture checks pass (no forbidden imports in Core/Platform)
 - [x] Build passes
+- [x] Staged app bundle launches and remains running via `./script/build_and_run.sh --verify`

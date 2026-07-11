@@ -5,9 +5,9 @@
 ```
 RowPlayCore/Replay/ReplayRigPose.swift
   ReplayAthleteJointPose     — common joint angles (torso, head, arms, legs)
-  RowerRigPose               — + seatZ, handleY/Z, oarSweep, oarFeather
-  SkiErgRigPose              — + hipCompression, handleHeight, poleTravel
-  BikeErgRigPose             — + crankAngle, wheelAngle, pedalPositions
+  ReplayRowerRigPose         — + seatZ, handleY/Z, oarSweep, oarFeather
+  ReplaySkiErgRigPose        — + hipCompression, handleHeight, poleTravel
+  ReplayBikeErgRigPose       — + crankAngle, wheelAngle, pedalPositions
   ReplaySportRigPose         — enum { .rower, .skierg, .bike }
   ReplayRigPoseSolver        — pure solve() function
 
@@ -72,8 +72,8 @@ The solver translates `ReplayStrokePose` fields into sport-specific joint angles
 - Oars sweep: `oarSweep = -side * drive * 0.5 * amplitude`
 - Oar feather: `oarFeather = side * (recovery * 0.26 - 0.06)`
 - Body lean: torso leans forward at catch, opens at finish
-- Arms: IK from shoulder to handle position
-- Legs: IK from hip to footplate, knee kinks up at catch
+- Arms: deterministic shoulder/elbow articulation; terminal hand pivots stay on handle anchors
+- Legs: deterministic hip/knee/ankle articulation; terminal foot pivots stay on footplate anchors
 
 ### SkiErg
 - `cos(warpedPhase)` → swing direction
@@ -81,12 +81,14 @@ The solver translates `ReplayStrokePose` fields into sport-specific joint angles
 - Handles: `handleY = base + swing * 0.16 - crunch * 0.16`, `handleZ = base + swing * 0.25`
 - Poles: `poleRotation = -swing * 0.9 - 0.1`
 - Legs flex with crunch
+- Terminal hand/foot pivots stay on handle and platform anchors; cable spans pulley-to-handle midpoint
 
 ### BikeErg
 - Crank angle = `phase` (continuous)
 - Wheel angle = `phase * 2.4` (faster)
 - Pedal positions: `pedalY = crankRadius * cos(crankAngle)`, `pedalZ = crankRadius * sin(crankAngle)`
-- Legs: IK from hip to pedal position, knee follows
+- Legs: deterministic hip/knee/ankle articulation; terminal foot pivots follow pedal anchors
+- Terminal hand pivots stay on handlebar grip anchors
 - Rider sway: `sin(phase) * 0.05`
 
 ## Mesh Strategy
@@ -110,6 +112,6 @@ When `reduceMotion` is true, the solver returns a stable neutral pose:
 
 Every solver input and output is sanitized:
 - `finite(v, fallback)` checks for NaN/Infinity
-- Phase wrapped to [0, 2π) range
-- Amplitude clamped to [0.72, 1.32]
-- All joint angles bounded to anatomically plausible ranges
+- Non-finite derived values fall back to stable neutral values
+- Upstream `ReplayStrokePose` construction clamps amplitude to [0.72, 1.32]
+- Studio applies a second finite guard before values reach RealityKit transforms

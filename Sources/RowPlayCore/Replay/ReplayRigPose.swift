@@ -199,7 +199,8 @@ public enum ReplayRigPoseSolver {
     /// - Parameters:
     ///   - sport: The workout sport.
     ///   - strokePose: The current stroke pose from the replay engine.
-    ///   - distance: Cumulative distance in metres (used for bike wheel rotation).
+    ///   - distance: Cumulative distance in metres, retained by the uniform
+    ///     public sport-solver signature; current articulation is phase-driven.
     ///   - reduceMotion: If true, returns a stable neutral pose.
     /// - Returns: A sport-specific rig pose with all values finite and bounded.
     public static func solve(
@@ -217,7 +218,7 @@ public enum ReplayRigPoseSolver {
         case .skierg:
             return .skierg(solveSkiErg(strokePose: strokePose))
         case .bike:
-            return .bike(solveBikeErg(strokePose: strokePose, distance: distance))
+            return .bike(solveBikeErg(strokePose: strokePose))
         }
     }
 
@@ -333,10 +334,7 @@ public enum ReplayRigPoseSolver {
     /// Matches the web renderer3d.ts `phase * 2.4` wheel spin formula.
     private static let bikeWheelRatio: Double = 2.4
 
-    private static func solveBikeErg(
-        strokePose: ReplayStrokePose,
-        distance: Double
-    ) -> ReplayBikeErgRigPose {
+    private static func solveBikeErg(strokePose: ReplayStrokePose) -> ReplayBikeErgRigPose {
         let phase = strokePose.phase
         let amp = strokePose.amplitude
 

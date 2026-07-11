@@ -243,6 +243,54 @@ final class ReplaySportRigStructureTests: XCTestCase {
         )
     }
 
+    func testRowerHandsAndFeetRemainOnEquipment() throws {
+        let rig = buildRig(sport: .rower)
+        rig.applyPose(.rower(ReplayRowerRigPose(
+            handleY: 0.76,
+            handleZ: 0.66,
+            handleRotX: 0.12
+        )))
+
+        try assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
+        try assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
+        try assertContact(named: "foot-L", with: "foot-anchor-L", in: rig)
+        try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
+    }
+
+    func testSkiErgHandsFeetAndCableFollowEquipment() throws {
+        let rig = buildRig(sport: .skierg)
+        rig.applyPose(.skierg(ReplaySkiErgRigPose(
+            hipCompression: 0.7,
+            handleY: 0.28,
+            handleZ: -0.06,
+            poleRotation: 0.7
+        )))
+
+        try assertContact(named: "hand-L", with: "handle-L", in: rig)
+        try assertContact(named: "hand-R", with: "handle-R", in: rig)
+        try assertContact(named: "foot-L", with: "foot-anchor-L", in: rig)
+        try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
+        let cable = try XCTUnwrap(findEntity(named: "cable", in: rig.root))
+        XCTAssertNotEqual(cable.orientation, simd_quatf(angle: 0, axis: SIMD3(1, 0, 0)))
+        XCTAssertGreaterThan(cable.scale.y, 0)
+    }
+
+    func testBikeErgHandsRemainOnHandlebar() throws {
+        let rig = buildRig(sport: .bike)
+        rig.applyPose(.bike(ReplayBikeErgRigPose(
+            joints: ReplayAthleteJointPose(
+                shoulderFlexL: -0.3,
+                shoulderFlexR: -0.3,
+                elbowFlexL: 0.4,
+                elbowFlexR: 0.4
+            ),
+            crankAngle: .pi / 3
+        )))
+
+        try assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
+        try assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
+    }
+
     func testAthleteAppliesIndependentShouldersAndAnkles() throws {
         let rig = buildRig(sport: .bike)
         let pose = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
@@ -379,6 +427,31 @@ final class ReplaySportRigStructureTests: XCTestCase {
         XCTAssertEqual(lhs.x, rhs.x, accuracy: accuracy, file: file, line: line)
         XCTAssertEqual(lhs.y, rhs.y, accuracy: accuracy, file: file, line: line)
         XCTAssertEqual(lhs.z, rhs.z, accuracy: accuracy, file: file, line: line)
+    }
+
+    private func assertContact(
+        named bodyPartName: String,
+        with anchorName: String,
+        in rig: ReplaySportRig,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let bodyPart = try XCTUnwrap(
+            findEntity(named: bodyPartName, in: rig.root),
+            file: file,
+            line: line
+        )
+        let anchor = try XCTUnwrap(
+            findEntity(named: anchorName, in: rig.root),
+            file: file,
+            line: line
+        )
+        assertPositionsEqual(
+            bodyPart.position(relativeTo: rig.root),
+            anchor.position(relativeTo: rig.root),
+            file: file,
+            line: line
+        )
     }
 
     private func collectNames(in entity: Entity, into names: inout Set<String>) {

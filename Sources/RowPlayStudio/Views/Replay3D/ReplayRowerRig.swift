@@ -18,6 +18,10 @@ final class ReplayRowerRig: ReplaySportRig {
     private let hull = Entity()
     private let seat = Entity()
     private let handle = Entity()
+    private let handleGripL = Entity()
+    private let handleGripR = Entity()
+    private let footAnchorL = Entity()
+    private let footAnchorR = Entity()
     private var oars: [Entity] = []
 
     // Athlete
@@ -67,6 +71,12 @@ final class ReplayRowerRig: ReplaySportRig {
         let footplate = ModelEntity(mesh: footplateMesh, materials: [metalMat])
         footplate.name = "footplate"
         footplate.position = SIMD3(0, 0.34, 0.72)
+        footAnchorL.name = "foot-anchor-L"
+        footAnchorL.position = SIMD3(-0.1, 0.03, 0)
+        footplate.addChild(footAnchorL)
+        footAnchorR.name = "foot-anchor-R"
+        footAnchorR.position = SIMD3(0.1, 0.03, 0)
+        footplate.addChild(footAnchorR)
         root.addChild(footplate)
 
         // Rail
@@ -95,6 +105,12 @@ final class ReplayRowerRig: ReplaySportRig {
         let handleModel = ModelEntity(mesh: handleMesh, materials: [metalMat])
         handleModel.name = "handle-model"
         handle.addChild(handleModel)
+        handleGripL.name = "handle-grip-anchor-L"
+        handleGripL.position = SIMD3(0, 0.18, 0)
+        handle.addChild(handleGripL)
+        handleGripR.name = "handle-grip-anchor-R"
+        handleGripR.position = SIMD3(0, -0.18, 0)
+        handle.addChild(handleGripR)
         handle.position = SIMD3(0, 0.55, 0.6)
         handle.orientation = handleBaseOrientation
         root.addChild(handle)
@@ -177,6 +193,12 @@ final class ReplayRowerRig: ReplaySportRig {
 
         // Apply athlete joint pose (with finite guard inside)
         athlete.applyPose(rowerPose.joints)
+
+        // Preserve equipment contact at the terminal joints.
+        athlete.handL.setPosition(handleGripL.position(relativeTo: root), relativeTo: root)
+        athlete.handR.setPosition(handleGripR.position(relativeTo: root), relativeTo: root)
+        athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
+        athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
     }
 
     // MARK: - Ghost Translucency

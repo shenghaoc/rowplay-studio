@@ -17,6 +17,8 @@ final class ReplaySkiErgRig: ReplaySportRig {
     private let cable = Entity()
     private let leftHandle = Entity()
     private let rightHandle = Entity()
+    private let footAnchorL = Entity()
+    private let footAnchorR = Entity()
     private var poles: [Entity] = []
 
     // Athlete
@@ -93,6 +95,12 @@ final class ReplaySkiErgRig: ReplaySportRig {
         let platform = ModelEntity(mesh: platformMesh, materials: [accentMat])
         platform.name = "platform"
         platform.position = SIMD3(0, 0.03, 0)
+        footAnchorL.name = "foot-anchor-L"
+        footAnchorL.position = SIMD3(-0.12, 0.03, 0)
+        platform.addChild(footAnchorL)
+        footAnchorR.name = "foot-anchor-R"
+        footAnchorR.position = SIMD3(0.12, 0.03, 0)
+        platform.addChild(footAnchorR)
         root.addChild(platform)
 
         // Poles
@@ -160,8 +168,16 @@ final class ReplaySkiErgRig: ReplaySportRig {
             pole.orientation = simd_quatf(angle: poleRotation, axis: SIMD3(1, 0, 0))
         }
 
-        // Cable follows handles
-        cable.position.y = (handleY + 1.8) / 2
+        // Cable spans from the top pulley to the moving handle midpoint.
+        let cableTop = SIMD3<Float>(0, 1.8, -0.5)
+        let cableBottom = SIMD3<Float>(0, handleY, handleZ)
+        let cableDelta = cableBottom - cableTop
+        cable.position = (cableTop + cableBottom) / 2
+        cable.scale.y = max(0.001, simd_length(cableDelta) / 1.2)
+        cable.orientation = simd_quatf(
+            angle: atan2(cableDelta.z, cableDelta.y),
+            axis: SIMD3(1, 0, 0)
+        )
 
         // Athlete pelvis position adjusted by hip compression
         let compressionOffset = hipCompression * 0.15
@@ -169,6 +185,11 @@ final class ReplaySkiErgRig: ReplaySportRig {
 
         // Apply athlete joint pose (with finite guard inside)
         athlete.applyPose(skiPose.joints)
+
+        athlete.handL.setPosition(leftHandle.position(relativeTo: root), relativeTo: root)
+        athlete.handR.setPosition(rightHandle.position(relativeTo: root), relativeTo: root)
+        athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
+        athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
     }
 
     // MARK: - Ghost Translucency

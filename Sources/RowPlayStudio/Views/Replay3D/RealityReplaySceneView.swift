@@ -26,6 +26,11 @@ struct RealityReplaySceneView: View {
             realityContent(timeline: timeline)
         }
         .frame(minHeight: 300)
+        .onChange(of: state.playing) { _, playing in
+            if playing {
+                lastTickDate = nil
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
         .accessibilityValue(accessibilityDescription)

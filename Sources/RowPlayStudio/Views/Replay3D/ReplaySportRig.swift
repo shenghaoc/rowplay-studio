@@ -76,8 +76,7 @@ enum ReplaySportRigTranslucency {
         if let model = entity as? ModelEntity {
             model.model?.materials = model.model?.materials.map { mat in
                 if var sm = mat as? SimpleMaterial {
-                    let c = sm.color.tint
-                    sm.color = .init(tint: c.withAlphaComponent(CGFloat(opacity)))
+                    sm.color.tint = sm.color.tint.withAlphaComponent(CGFloat(opacity))
                     return sm
                 }
                 return mat
