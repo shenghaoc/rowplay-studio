@@ -29,7 +29,7 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | `src/lib/replay/ghostPick.ts` | `Sources/RowPlayCore/Replay/GhostPick.swift` | Phase 3 ports ghost candidate selection logic. |
 | `src/lib/replay/sports.ts` | `Sources/RowPlayCore/Replay/ReplaySportTheme.swift` | Phase 3 ports sport labels and machine hex colors. |
 | `src/lib/replay/inspector.ts` | `Sources/RowPlayCore/Replay/ReplayInspector.swift` | Phase 3 ports distancePerStroke and splitIndexAt. |
-| `src/lib/analytics.ts` (durationBand) | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 3 adds `durationBand(for:)` for comparability guard. |
+| `src/lib/analytics.ts` (durationBand) | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 3 adds `durationBand(for:)` for comparability guard. Duration-band parity fixture and direct tests at `Tests/RowPlayCoreTests/DurationBandParityTests.swift` with golden fixture at `Tests/RowPlayCoreTests/Fixtures/duration-band-parity.json`. |
 | `src/routes/replay/[id]` (UI) | `Sources/RowPlayStudio/Views/ReplayView.swift` | Phase 3 adds SwiftUI Canvas replay surface with playback controls. |
 | `src/lib/server/session.ts` (token handling) | `Sources/RowPlayCore/Sync/TokenStore.swift` | Phase 4 ports BYOT token storage to Keychain via `TokenStore` protocol (KeychainTokenStore + FakeTokenStore). |
 | `src/lib/server/concept2.ts` (API client protocol) | `Sources/RowPlayCore/Sync/Concept2Client.swift` | Phase 4 defines `Concept2APIClient` protocol and `MockConcept2Client`; production URLSession implementation lives under `Sources/RowPlayCore/Concept2`. |
