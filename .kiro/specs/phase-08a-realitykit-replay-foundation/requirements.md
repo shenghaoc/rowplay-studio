@@ -5,7 +5,7 @@
 - **R1.1** `ReplayStrokePose` struct holds the per-frame pose state derived from a `ReplayFrame` and sport context. Fields: `index`, `phase`, `warpedPhase`, `cycleFrac`, `driveFrac`, `drive`, `driveProgress`, `recoveryProgress`, `strokeSeconds`, `strokeMeters`, `rate`, `watts`, `intensity`, `amplitude`, `fatigue`.
 - **R1.2** `ReplayStrokePose.compute(frame:context:)` builds a pose from a `ReplayFrame` and a `ReplayStrokePoseContext` containing sport, peak watts, median watts, median distance-per-stroke, and max heart rate.
 - **R1.3** All pose computation is pure, deterministic, and `Sendable`/`Equatable`. No RealityKit, SwiftUI, or platform imports.
-- **R1.4** Port the web `strokeModel.ts` formulas exactly: `driveFraction`, `secondsFromRate`, `metersFromPace`, intensity normalization (watts 55%, dps 30%, rate 15%), fatigue from HR/progress/intensity, amplitude from intensity/fatigue.
+- **R1.4** Port the web `strokeModel.ts` pose formulas: `driveFraction`, `secondsFromRate`, intensity normalization (watts 55%, dps 30%, rate 15%), fatigue from HR/progress/intensity, and amplitude from intensity/fatigue. Timeline normalization remains owned by the existing replay sampling path.
 - **R1.5** `ReplayStrokePose.fallback(sport:phase:rate:)` produces a synthetic pose for workouts without stroke data, matching `fallbackStrokePose()`.
 - **R1.6** All non-finite inputs (NaN, Infinity) are sanitized to safe defaults before reaching any computation.
 

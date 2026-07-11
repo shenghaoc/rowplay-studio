@@ -31,7 +31,7 @@ Ported from web `src/lib/replay/strokeModel.ts`. Pure data-derived pose model:
 
 A 400-metre circular loop (matching a standard rowing track):
 
-- `loopRadius` = 12.73m (gives circumference ≈ 80m per lane at center; the 400m is the center-line distance).
+- `loopRadius` = 63.66m, approximating a 400m center-line circumference.
 - `position(at:lane:)` returns `(x, y, z)` on the loop with lane offset.
 - `tangent(at:)` returns the unit direction of travel.
 - `headingAngle(at:)` returns the Y rotation for entity orientation.
@@ -52,7 +52,7 @@ A 400-metre circular loop (matching a standard rowing track):
 ### Course
 
 - Flat ground plane with sport-appropriate color (water blue for rower, snow white for SkiErg, asphalt grey for BikeErg).
-- Lane ring (torus) marking the course path.
+- Narrow segmented annular lane surface with separate lane markers.
 - Start/finish checkerboard marker.
 - Directional sunlight + ambient fill.
 
@@ -60,16 +60,16 @@ A 400-metre circular loop (matching a standard rowing track):
 
 Low-poly procedural meshes built from `MeshResource` primitives:
 
-- **RowErg**: elongated capsule hull, thin rail, seat block, handle cylinder, seated athlete (torso ellipsoid, head sphere, arm cylinders, leg cylinders). Oar groups animate with `warpedPhase`.
+- **RowErg**: elongated box hull, thin rail, seat block, handle cylinder, seated athlete (box torso, head sphere, arm cylinders, leg cylinders). Oar groups animate with `warpedPhase`.
 - **SkiErg**: vertical frame posts, cable/handle, platform block, standing athlete. Poles animate with `warpedPhase`.
-- **BikeErg**: diamond frame (boxes), two torus wheels, crank disc, pedals, seated athlete. Wheels and cranks animate with `phase`.
+- **BikeErg**: box frame, two flattened-sphere placeholder wheels, crank disc, pedals, and seated athlete. Wheels and cranks animate with `phase`.
 
 ### Camera
 
 - Fixed chase camera: positioned behind and above the live entity, looking ahead along the tangent.
-- Smooth interpolation using `dampFactor` from `ReplayMotion` (frame-rate independent).
+- Restrained fixed-factor interpolation on each RealityKit update.
 - Under reduced motion: camera snaps to position without smoothing.
-- Camera never produces non-finite transforms (all positions are bounded by the loop geometry).
+- Course-derived camera transforms remain finite for sanitized replay distances.
 
 ### Reduced Motion
 
