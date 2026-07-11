@@ -61,6 +61,162 @@ public enum WorkoutExport: Sendable {
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
+    // MARK: - TCX Export
+
+    private static let tcxXmlDecl = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    private static let tcxNS = "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+    private static let xsiNS = "http://www.w3.org/2001/XMLSchema-instance"
+    private static let tcxSchemaLocation =
+        "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 " +
+        "http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
+
+    private static func makeTCXISO8601Formatter(fractionalSeconds: Bool = false) -> ISO8601DateFormatter {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = fractionalSeconds
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f
+    }
+
+    /// Export a single workout detail as Garmin Training Center Database v2 XML.
+    public static func tcx(_ detail: WorkoutDetail) -> String {
+        let w = detail.workout
+        let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
+        let activityId = makeTCXISO8601Formatter().string(from: w.date)
+        let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
+
+        // Guard against non-finite workout summary values
+        let safeTime = w.time.isFinite && w.time >= 0 ? w.time : 0
+        let safeDistance = w.distance.isFinite && w.distance >= 0 ? w.distance : 0
+
+        var xml = [String]()
+        xml.append(tcxXmlDecl)
+        xml.append("<TrainingCenterDatabase xmlns=\"\(tcxNS)\" xmlns:xsi=\"\(xsiNS)\" xsi:schemaLocation=\"\(tcxSchemaLocation)\">")
+        xml.append("  <Activities>")
+        xml.append("    <Activity Sport=\"\(sportAttr)\">")
+        xml.append("      <Id>\(activityId)</Id>")
+
+        // Lap
+        xml.append("      <Lap StartTime=\"\(activityId)\">")
+        xml.append("        <TotalTimeSeconds>\(formatDecimal(safeTime))</TotalTimeSeconds>")
+        xml.append("        <DistanceMeters>\(formatDecimal(safeDistance))</DistanceMeters>")
+        xml.append("        <Calories>\(formatInt(calories))</Calories>")
+        if let avgHR = w.heartRateAvg, (1...255).contains(avgHR) {
+            xml.append("        <AverageHeartRateBpm><Value>\(formatInt(avgHR))</Value></AverageHeartRateBpm>")
+        }
+        xml.append("        <Intensity>Active</Intensity>")
+        xml.append("        <TriggerMethod>Manual</TriggerMethod>")
+
+        // Track (only when valid strokes exist)
+        let validStrokes = filterAndBuildTrackpoints(
+            detail: detail,
+            dateFormatter: makeTCXISO8601Formatter(fractionalSeconds: true)
+        )
+        if !validStrokes.isEmpty {
+            xml.append("        <Track>")
+            for tp in validStrokes {
+                xml.append("          <Trackpoint>")
+                xml.append("            <Time>\(tp.time)</Time>")
+                xml.append("            <DistanceMeters>\(tp.distance)</DistanceMeters>")
+                if let hr = tp.heartRate {
+                    xml.append("            <HeartRateBpm><Value>\(hr)</Value></HeartRateBpm>")
+                }
+                if let cadence = tp.cadence {
+                    xml.append("            <Cadence>\(cadence)</Cadence>")
+                }
+                xml.append("          </Trackpoint>")
+            }
+            xml.append("        </Track>")
+        }
+
+        xml.append("      </Lap>")
+        xml.append("    </Activity>")
+        xml.append("  </Activities>")
+        xml.append("</TrainingCenterDatabase>")
+
+        return xml.joined(separator: "\n") + "\n"
+    }
+
+    // MARK: - TCX Helpers
+
+    private struct TrackpointData {
+        let time: String
+        let distance: String
+        let heartRate: Int?
+        let cadence: Int?
+    }
+
+    /// Filter strokes for TCX export: validate, clamp, deduplicate, sort.
+    private static func filterAndBuildTrackpoints(
+        detail: WorkoutDetail,
+        dateFormatter: ISO8601DateFormatter
+    ) -> [TrackpointData] {
+        let w = detail.workout
+        let workoutDuration = w.time
+        let workoutDistance = w.distance
+        guard workoutDuration.isFinite, workoutDuration > 0,
+              workoutDistance.isFinite, workoutDistance > 0 else { return [] }
+
+        var seenOffsets = Set<TimeInterval>()
+        var result = [TrackpointData]()
+
+        let sortedStrokes = detail.strokes.sorted { $0.t < $1.t }
+
+        for stroke in sortedStrokes {
+            // Reject non-finite or negative timestamps
+            guard stroke.t.isFinite, stroke.t >= 0 else { continue }
+            // Reject non-finite or negative distances
+            guard stroke.d.isFinite, stroke.d >= 0 else { continue }
+
+            // Skip strokes beyond workout duration
+            guard stroke.t <= workoutDuration else { continue }
+
+            let absoluteDate = w.date.addingTimeInterval(stroke.t)
+            let timeString = dateFormatter.string(from: absoluteDate)
+
+            // Deduplicate identical source timestamps without collapsing distinct
+            // sub-second samples that happen within the same wall-clock second.
+            guard seenOffsets.insert(stroke.t).inserted else { continue }
+
+            // Clamp distance to workout distance
+            let clampedDistance = min(stroke.d, workoutDistance)
+            let distanceString = formatDecimal(clampedDistance)
+
+            // Heart rate: only 1...255
+            var hr: Int? = nil
+            if let rawHR = stroke.heartRate, rawHR >= 1, rawHR <= 255 {
+                hr = rawHR
+            }
+
+            // Cadence: finite, non-negative, rounded and clamped to the
+            // TCX CadenceValue_t range 0...254 before converting to Int.
+            var cadence: Int? = nil
+            if stroke.cadence.isFinite, stroke.cadence >= 0 {
+                cadence = Int(min(stroke.cadence.rounded(), 254))
+            }
+
+            result.append(TrackpointData(
+                time: timeString,
+                distance: distanceString,
+                heartRate: hr,
+                cadence: cadence
+            ))
+        }
+
+        return result
+    }
+
+    /// Locale-independent integer formatting.
+    private static func formatInt(_ value: Int) -> String {
+        String(format: "%d", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    /// Locale-independent decimal formatting (dot separator).
+    private static func formatDecimal(_ value: Double) -> String {
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
     // MARK: - Filenames
 
     // MARK: - Formatters (Performance Optimization)

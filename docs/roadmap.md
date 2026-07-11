@@ -122,13 +122,13 @@ Exit criteria:
 
 ## Phase 5 - Compare, Export, Share, And Annotations
 
-Status: foundation slice merged to `main` (PR #8); persistent annotations merged. TCX export and full HR file parsing remain in progress. Local share packages are a native-only capability; public sharing is not a current web-parity target.
+Status: foundation slice merged to `main` (PR #8); persistent annotations merged. TCX export merged. Full HR file parsing remains in progress. Local share packages are a native-only capability; public sharing is not a current web-parity target.
 
 Scope:
 
 - Foundation PR: port compare verdict, side stats, interval comparison, distance overlay, rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package format.
 - Native wiring in this PR: add workout detail tools for comparison, CSV/JSON export, offline HR sample-series import, local annotations, and local share package save.
-- Follow-up PRs: connect annotation storage to a persistent backend, add TCX export, add full FIT/TCX/GPX HR file parsing if needed.
+- Follow-up PRs: connect annotation storage to a persistent backend, add full FIT/TCX/GPX HR file parsing if needed.
 - Note: comparison, leaderboards, public shares, coaching annotations, and server-persisted HR imports have been removed from the web app (PR #166). Native implementations of these features are native-only capabilities, not web parity targets.
 - Preserve rowplay's privacy invariant: share packages strip hardware-identifying metadata.
 
