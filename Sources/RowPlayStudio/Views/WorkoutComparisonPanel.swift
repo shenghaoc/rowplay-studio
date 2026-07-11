@@ -18,7 +18,7 @@ struct WorkoutComparisonPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Picker("Compare With", selection: candidateSelection) {
                         ForEach(candidates) { candidate in
-                            Text(candidateLabel(candidate))
+                            candidateLabel(candidate)
                                 .tag(candidate.id)
                         }
                     }
@@ -71,9 +71,25 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    private func candidateLabel(_ candidate: WorkoutDetail) -> String {
-        let date = candidate.workout.date.formatted(.dateTime.year().month(.abbreviated).day())
-        return "\(date) · \(candidate.workout.workoutType) · \(RowPlayFormatting.pace(candidate.workout.pace))"
+    // Keep the original FormatStyle behavior while reusing its value-type configuration.
+    // FormatStyle resolves localized component ordering when it formats each date, so a
+    // system locale change updates both the names and order of the date components.
+    private static let candidateDateFormatStyle = Date.FormatStyle.dateTime
+        .year()
+        .month(.abbreviated)
+        .day()
+        .locale(.autoupdatingCurrent)
+
+    private func candidateLabel(_ candidate: WorkoutDetail) -> some View {
+        let date = candidate.workout.date.formatted(Self.candidateDateFormatStyle)
+        let pace = RowPlayFormatting.pace(candidate.workout.pace)
+        return HStack(spacing: 0) {
+            Text(date)
+            Text(" · ").accessibilityHidden(true)
+            Text(candidate.workout.workoutType)
+            Text(" · ").accessibilityHidden(true)
+            Text(pace)
+        }
     }
 
     private func verdictText(_ verdict: CompareVerdict) -> String {
