@@ -58,7 +58,7 @@ final class DurationBandParityTests: XCTestCase {
         }
     }
 
-    // MARK: - Non-finite direct tests
+    // MARK: - Degenerate input direct tests
 
     func testDurationBandNegativeInput() {
         let band = WorkoutAnalytics.durationBand(for: -1)

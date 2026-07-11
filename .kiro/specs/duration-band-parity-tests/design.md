@@ -54,7 +54,7 @@ identical logic.
 The new fixture is registered as `.copy("Fixtures/duration-band-parity.json")`
 in the `RowPlayCoreTests` target resources.
 
-## Non-finite handling
+## Degenerate input handling
 
 | Input | Expected key | Expected label | Nominal |
 |---|---|---|---|

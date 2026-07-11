@@ -69,7 +69,7 @@ native, so I know the implementations agree on real-world inputs.
    `comparabilityGuard.test.ts`: 1750, 600, 90, and 30 seconds.
 2. Each SHALL map to the expected key and nominal from the web implementation.
 
-### Requirement 5 — Non-finite value handling
+### Requirement 5 — Degenerate input handling
 
 **User story:** As a developer, I want negative, NaN, and infinity inputs
 tested, so degenerate inputs produce predictable output.
