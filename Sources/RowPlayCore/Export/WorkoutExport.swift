@@ -77,6 +77,13 @@ public enum WorkoutExport {
         return f
     }()
 
+    private static let tcxTrackpointISO8601Formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f
+    }()
+
     /// Export a single workout detail as Garmin Training Center Database v2 XML.
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
@@ -85,7 +92,7 @@ public enum WorkoutExport {
         let calories = w.caloriesTotal ?? 0
 
         // Guard against non-finite workout summary values
-        let safeTime = w.time.isFinite && w.time >= 0 ? Int(w.time) : 0
+        let safeTime = w.time.isFinite && w.time >= 0 ? w.time : 0
         let safeDistance = w.distance.isFinite && w.distance >= 0 ? w.distance : 0
 
         var xml = [String]()
@@ -97,10 +104,10 @@ public enum WorkoutExport {
 
         // Lap
         xml.append("      <Lap StartTime=\"\(activityId)\">")
-        xml.append("        <TotalTimeSeconds>\(formatInt(safeTime))</TotalTimeSeconds>")
+        xml.append("        <TotalTimeSeconds>\(formatDecimal(safeTime))</TotalTimeSeconds>")
         xml.append("        <DistanceMeters>\(formatDecimal(safeDistance))</DistanceMeters>")
         xml.append("        <Calories>\(formatInt(calories))</Calories>")
-        if let avgHR = w.heartRateAvg {
+        if let avgHR = w.heartRateAvg, (1...255).contains(avgHR) {
             xml.append("        <AverageHeartRateBpm><Value>\(formatInt(avgHR))</Value></AverageHeartRateBpm>")
         }
         xml.append("        <Intensity>Active</Intensity>")
@@ -147,9 +154,10 @@ public enum WorkoutExport {
         let w = detail.workout
         let workoutDuration = w.time
         let workoutDistance = w.distance
-        guard workoutDuration > 0, workoutDistance > 0 else { return [] }
+        guard workoutDuration.isFinite, workoutDuration > 0,
+              workoutDistance.isFinite, workoutDistance > 0 else { return [] }
 
-        var seen = Set<String>()
+        var seenOffsets = Set<TimeInterval>()
         var result = [TrackpointData]()
 
         let sortedStrokes = detail.strokes.sorted { $0.t < $1.t }
@@ -164,10 +172,11 @@ public enum WorkoutExport {
             guard stroke.t <= workoutDuration else { continue }
 
             let absoluteDate = w.date.addingTimeInterval(stroke.t)
-            let timeString = tcxISO8601Formatter.string(from: absoluteDate)
+            let timeString = tcxTrackpointISO8601Formatter.string(from: absoluteDate)
 
-            // Deduplicate identical timestamps
-            guard seen.insert(timeString).inserted else { continue }
+            // Deduplicate identical source timestamps without collapsing distinct
+            // sub-second samples that happen within the same wall-clock second.
+            guard seenOffsets.insert(stroke.t).inserted else { continue }
 
             // Clamp distance to workout distance
             let clampedDistance = min(stroke.d, workoutDistance)
@@ -199,22 +208,12 @@ public enum WorkoutExport {
 
     /// Locale-independent integer formatting.
     private static func formatInt(_ value: Int) -> String {
-        String(format: "%d", value)
+        String(format: "%d", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 
     /// Locale-independent decimal formatting (dot separator).
     private static func formatDecimal(_ value: Double) -> String {
-        String(format: "%.2f", value)
-    }
-
-    /// XML entity escaping for text content.
-    static func xmlEscape(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "'", with: "&apos;")
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 
     // MARK: - Filenames

@@ -152,7 +152,13 @@ final class TCXExportTests: XCTestCase {
     func testTCXTotalTimeSeconds() {
         let detail = makeDetail(workout: makeWorkout(time: 600))
         let xml = WorkoutExport.tcx(detail)
-        XCTAssertTrue(xml.contains("<TotalTimeSeconds>600</TotalTimeSeconds>"))
+        XCTAssertTrue(xml.contains("<TotalTimeSeconds>600.00</TotalTimeSeconds>"))
+    }
+
+    func testTCXTotalTimeSecondsPreservesFractionalDuration() {
+        let detail = makeDetail(workout: makeWorkout(time: 480.7))
+        let xml = WorkoutExport.tcx(detail)
+        XCTAssertTrue(xml.contains("<TotalTimeSeconds>480.70</TotalTimeSeconds>"))
     }
 
     func testTCXDistanceMeters() {
@@ -185,6 +191,14 @@ final class TCXExportTests: XCTestCase {
         XCTAssertFalse(xml.contains("AverageHeartRateBpm"))
     }
 
+    func testTCXOmitsAverageHeartRateOutsideValidRange() {
+        for heartRate in [0, 256] {
+            let detail = makeDetail(workout: makeWorkout(heartRateAvg: heartRate))
+            let xml = WorkoutExport.tcx(detail)
+            XCTAssertFalse(xml.contains("AverageHeartRateBpm"))
+        }
+    }
+
     func testTCXIntensityIsManual() {
         let xml = WorkoutExport.tcx(makeDetail())
         XCTAssertTrue(xml.contains("<Intensity>Active</Intensity>"))
@@ -202,9 +216,9 @@ final class TCXExportTests: XCTestCase {
         let detail = makeDetail(strokes: strokes)
         let xml = WorkoutExport.tcx(detail)
 
-        let time1 = "2023-11-14T22:13:21Z"
-        let time2 = "2023-11-14T22:13:22Z"
-        let time3 = "2023-11-14T22:13:23Z"
+        let time1 = "2023-11-14T22:13:21.000Z"
+        let time2 = "2023-11-14T22:13:22.000Z"
+        let time3 = "2023-11-14T22:13:23.000Z"
 
         let idx1 = xml.range(of: time1)!.lowerBound
         let idx2 = xml.range(of: time2)!.lowerBound
@@ -219,7 +233,19 @@ final class TCXExportTests: XCTestCase {
         let strokes = [makeStroke(t: 1, d: 4.2)]
         let detail = makeDetail(workout: makeWorkout(date: date), strokes: strokes)
         let xml = WorkoutExport.tcx(detail)
-        XCTAssertTrue(xml.contains("<Time>2023-11-14T22:13:21Z</Time>"))
+        XCTAssertTrue(xml.contains("<Time>2023-11-14T22:13:21.000Z</Time>"))
+    }
+
+    func testTCXPreservesDistinctSubSecondTrackpoints() {
+        let strokes = [
+            makeStroke(t: 1.1, d: 4.2),
+            makeStroke(t: 1.2, d: 4.6),
+        ]
+        let xml = WorkoutExport.tcx(makeDetail(strokes: strokes))
+
+        XCTAssertEqual(xml.components(separatedBy: "<Trackpoint>").count - 1, 2)
+        XCTAssertTrue(xml.contains("<Time>2023-11-14T22:13:21.100Z</Time>"))
+        XCTAssertTrue(xml.contains("<Time>2023-11-14T22:13:21.200Z</Time>"))
     }
 
     func testTCXTrackpointDistance() {
@@ -374,7 +400,7 @@ final class TCXExportTests: XCTestCase {
         let detail = makeDetail(workout: w)
         let xml = WorkoutExport.tcx(detail)
         XCTAssertTrue(parseXML(xml))
-        XCTAssertTrue(xml.contains("<TotalTimeSeconds>0</TotalTimeSeconds>"))
+        XCTAssertTrue(xml.contains("<TotalTimeSeconds>0.00</TotalTimeSeconds>"))
         XCTAssertFalse(xml.lowercased().contains("nan"))
     }
 
@@ -386,7 +412,7 @@ final class TCXExportTests: XCTestCase {
         let detail = makeDetail(workout: w)
         let xml = WorkoutExport.tcx(detail)
         XCTAssertTrue(parseXML(xml))
-        XCTAssertTrue(xml.contains("<TotalTimeSeconds>0</TotalTimeSeconds>"))
+        XCTAssertTrue(xml.contains("<TotalTimeSeconds>0.00</TotalTimeSeconds>"))
         XCTAssertFalse(xml.lowercased().contains("inf"))
     }
 
@@ -400,6 +426,19 @@ final class TCXExportTests: XCTestCase {
         XCTAssertTrue(parseXML(xml))
         XCTAssertTrue(xml.contains("<DistanceMeters>0.00</DistanceMeters>"))
         XCTAssertFalse(xml.lowercased().contains("nan"))
+    }
+
+    func testTCXOmitsTrackWhenWorkoutSummaryIsNonFinite() {
+        let strokes = [makeStroke(t: 1, d: 4.2)]
+        let invalidSummaries = [
+            makeWorkout(distance: .infinity),
+            makeWorkout(time: .infinity),
+        ]
+
+        for workout in invalidSummaries {
+            let xml = WorkoutExport.tcx(makeDetail(workout: workout, strokes: strokes))
+            XCTAssertFalse(xml.contains("<Track>"))
+        }
     }
 
     // MARK: - Duplicate Timestamp Handling

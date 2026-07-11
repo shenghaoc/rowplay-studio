@@ -16,7 +16,7 @@ The output follows the Garmin TrainingCenterDatabase v2 schema:
     <Activity Sport="Other|Biking">
       <Id>2023-11-14T22:13:20Z</Id>
       <Lap StartTime="2023-11-14T22:13:20Z">
-        <TotalTimeSeconds>480</TotalTimeSeconds>
+        <TotalTimeSeconds>480.70</TotalTimeSeconds>
         <DistanceMeters>2000</DistanceMeters>
         <Calories>150</Calories>
         <AverageHeartRateBpm><Value>145</Value></AverageHeartRateBpm>
@@ -24,7 +24,7 @@ The output follows the Garmin TrainingCenterDatabase v2 schema:
         <TriggerMethod>Manual</TriggerMethod>
         <Track>
           <Trackpoint>
-            <Time>2023-11-14T22:13:21Z</Time>
+            <Time>2023-11-14T22:13:21.100Z</Time>
             <DistanceMeters>5.2</DistanceMeters>
             <HeartRateBpm><Value>130</Value></HeartRateBpm>
             <Cadence>28</Cadence>
@@ -46,7 +46,7 @@ This matches the TCX v2 `Sport_t` enumeration which only supports Running, Bikin
 
 ## Date Handling
 
-All timestamps use UTC ISO-8601 format (`YYYY-MM-DDTHH:MM:SSZ`). The workout `date` field is already a UTC `Date` and is formatted using a cached `ISO8601DateFormatter`.
+All timestamps use UTC ISO-8601. Activity and lap timestamps use second precision (`YYYY-MM-DDTHH:MM:SSZ`), while trackpoints include fractional seconds so distinct high-resolution samples are preserved. Cached `ISO8601DateFormatter` instances keep both forms deterministic.
 
 ## Stroke Filtering and Validation
 
@@ -55,18 +55,18 @@ All timestamps use UTC ISO-8601 format (`YYYY-MM-DDTHH:MM:SSZ`). The workout `da
 3. Compute absolute stroke time as `workout.date + stroke.t`.
 4. Skip strokes whose absolute time exceeds workout end.
 5. Clamp stroke distance to `workout.distance`.
-6. Deduplicate by absolute timestamp (first occurrence wins).
+6. Deduplicate identical raw timestamp offsets (first occurrence wins) without collapsing distinct sub-second samples.
 7. Sort by absolute time.
 
 ## XML Construction
 
-The TCX is built using string interpolation with XML entity escaping. All numeric values use locale-independent `String(format:)` with `"%.Nf"` patterns. A small `xmlEscape` helper handles `&`, `<`, `>`, `"`, `'` in any text content.
+The TCX is built using fixed schema strings and numeric interpolation. No user-entered text is emitted. All numeric values use `String(format:locale:)` with the `en_US_POSIX` locale and `"%.Nf"` patterns.
 
 This avoids a dependency on `Foundation.XMLDocument` (which pulls in `libxml2` and behaves differently on Linux) and keeps the output deterministic.
 
 ## Heart Rate and Cadence
 
-- HeartRateBpm: included only when `stroke.heartRate` is in `1...255`.
+- AverageHeartRateBpm and trackpoint HeartRateBpm: included only when the value is in `1...255`.
 - Cadence: `stroke.cadence` is rounded to `Int`, clamped to `0...255`, and included when finite and non-negative.
 
 ## Calories
@@ -79,4 +79,4 @@ When a workout has no valid strokes, the `Track` element is omitted entirely. Th
 
 ## UI Integration
 
-A single `saveTCX()` method is added to `WorkoutFileActionsView`, following the same pattern as `saveCSV()` and `saveJSON()`. It uses `NSSavePanel` with `UTType(filenameExtension: "tcx") ?? .xml`.
+A single `saveTCX()` method is added to `WorkoutFileActionsView`, following the same pattern as `saveCSV()` and `saveJSON()`. It uses a dynamic XML-conforming `UTType` tagged with the `.tcx` filename extension so the save panel preserves that extension even when no installed app registers it.

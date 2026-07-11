@@ -73,7 +73,7 @@ struct WorkoutFileActionsView: View {
     private func saveTCX() {
         let filename = WorkoutExport.workoutExportFilename(id: detail.id, ext: "tcx")
         let data = Data(WorkoutExport.tcx(detail).utf8)
-        let tcxType = UTType(filenameExtension: "tcx") ?? .xml
+        let tcxType = UTType(tag: "tcx", tagClass: .filenameExtension, conformingTo: .xml) ?? .xml
         save(data: data, suggestedFilename: filename, contentTypes: [tcxType])
     }
 

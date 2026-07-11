@@ -20,23 +20,23 @@ The native app must export a single workout as a Garmin Training Center Database
 ## R3: Lap Summary
 
 - **R3.1** A single `Lap` element is emitted with `StartTime` matching the activity `Id`.
-- **R3.2** `TotalTimeSeconds` contains the workout summary duration.
+- **R3.2** `TotalTimeSeconds` contains the workout summary duration without truncating fractional seconds.
 - **R3.3** `DistanceMeters` contains the workout summary distance.
 - **R3.4** `Calories` contains `caloriesTotal` or `0` when absent (required by TCX structure).
-- **R3.5** `AverageHeartRateBpm` is emitted only when `heartRateAvg` is present.
+- **R3.5** `AverageHeartRateBpm` is emitted only when `heartRateAvg` is in the valid TCX range `1...255`.
 - **R3.6** `Intensity` is `"Active"`.
 - **R3.7** `TriggerMethod` is `"Manual"`.
 
 ## R4: Trackpoint Generation
 
 - **R4.1** `Trackpoint` elements are generated from valid strokes, ordered by stroke time.
-- **R4.2** Each trackpoint contains `Time` (absolute UTC ISO-8601) and `DistanceMeters` (absolute cumulative distance).
+- **R4.2** Each trackpoint contains `Time` (absolute UTC ISO-8601 with fractional seconds) and `DistanceMeters` (absolute cumulative distance).
 - **R4.3** `HeartRateBpm` is included only when the stroke's heart rate is in the range 1...255.
 - **R4.4** `Cadence` is included when the stroke's cadence is valid (finite, non-negative), rounded and clamped to 0...255.
 - **R4.5** Non-finite or negative stroke timestamps and distances are rejected/skipped.
 - **R4.6** Trackpoint distance is clamped to the workout summary distance.
 - **R4.7** Samples beyond the valid workout duration are skipped.
-- **R4.8** Identical trackpoint timestamps are deduplicated deterministically (first occurrence wins).
+- **R4.8** Identical raw trackpoint timestamp offsets are deduplicated deterministically (first occurrence wins); distinct sub-second offsets remain distinct.
 - **R4.9** No GPS `Position` or `AltitudeMeters` elements are emitted (indoor ergometer workouts).
 
 ## R5: Privacy and Metadata Exclusions
@@ -48,13 +48,13 @@ The native app must export a single workout as a Garmin Training Center Database
 ## R6: Formatting
 
 - **R6.1** Decimal values use locale-independent formatting (dot decimal separator).
-- **R6.2** XML special characters in any text content are escaped using XML entity encoding.
+- **R6.2** No user-entered text is emitted; XML content is limited to fixed schema strings and validated numeric values.
 - **R6.3** All export generation lives in `RowPlayCore` with no SwiftUI/AppKit imports.
 
 ## R7: Native UI Integration
 
 - **R7.1** An "Export TCX" button is added to `WorkoutFileActionsView`.
-- **R7.2** The file is saved as `rowplay-workout-<id>.tcx` using `UTType(filenameExtension: "tcx") ?? .xml`.
+- **R7.2** The file is saved as `rowplay-workout-<id>.tcx` using an XML-conforming dynamic `UTType` tagged with the `tcx` filename extension.
 - **R7.3** Existing CSV, JSON, and share-package behavior is preserved.
 
 ## R8: Test Coverage
