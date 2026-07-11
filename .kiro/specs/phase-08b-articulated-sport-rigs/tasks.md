@@ -32,7 +32,7 @@
 - [x] Update `docs/beta-readiness.md`
 
 ## Validation
-- [x] All test suites pass (803 Core tests and 30 Studio tests, 0 failures; 2 Core tests skipped)
+- [x] All test suites pass (803 Core tests and 31 Studio tests, 0 failures; 2 Core tests skipped)
 - [x] Architecture checks pass (no forbidden imports in Core/Platform)
 - [x] Build passes
 - [x] Staged app bundle launches and remains running via `./script/build_and_run.sh --verify`

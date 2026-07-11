@@ -79,13 +79,14 @@ struct RealityReplaySceneView: View {
                 lastTickDate = newDate
                 return
             }
-            let delta = lastTickDate.map {
-                ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
-            } ?? 0
-            lastTickDate = newDate
-            state.tick(deltaTime: delta)
+            let tick = ReplayPlaybackClock.tick(
+                lastTickDate: lastTickDate,
+                currentDate: newDate
+            )
+            lastTickDate = tick.lastTickDate
+            state.tick(deltaTime: tick.delta)
             if !reduceMotion {
-                sceneState.animPhase += (2.4 + state.currentFrame.cadence / 13) * delta
+                sceneState.animPhase += (2.4 + state.currentFrame.cadence / 13) * tick.delta
             }
         }
     }
