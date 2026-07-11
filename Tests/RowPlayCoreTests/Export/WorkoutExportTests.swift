@@ -129,6 +129,18 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertEqual(result, "'\t=cmd")
     }
 
+    func testCsvCellProtectsStandaloneTabPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\ttext"), "'\ttext")
+    }
+
+    func testCsvCellProtectsStandaloneCarriageReturnPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\rtext"), "\"'\rtext\"")
+    }
+
+    func testCsvCellProtectsStandaloneLineFeedPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\ntext"), "\"'\ntext\"")
+    }
+
     func testCsvCellProtectsCRLFPrefix() {
         let result = WorkoutExport.csvCell("\r\n=cmd")
         // CRLF triggers both formula prefix (') via .whitespacesAndNewlines trimming,

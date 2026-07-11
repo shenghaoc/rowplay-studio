@@ -108,7 +108,11 @@ public enum WorkoutExport: Sendable {
         // checks, then prefix formula-triggering characters with a single quote (OWASP recommendation).
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
         let formulaChars: [Character] = ["=", "+", "-", "@"]
-        if let first = trimmed.first, formulaChars.contains(first) {
+        let startsWithControlCharacter = s.unicodeScalars.first.map {
+            $0 == "\t" || $0 == "\r" || $0 == "\n"
+        } ?? false
+        let startsWithFormulaCharacter = trimmed.first.map(formulaChars.contains) ?? false
+        if startsWithControlCharacter || startsWithFormulaCharacter {
             s = "'" + s
         }
 
