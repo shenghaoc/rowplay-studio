@@ -10,3 +10,5 @@
       `./script/build_and_run.sh --verify`.
 - [x] 5. Commit, push, open draft PR with root cause, tests, and honestly
       unverified manual steps.
+- [x] 6. Replace the split Boolean/path navigation state with a typed replay
+      route owned by `ContentView`, and clear it on sidebar selection changes.

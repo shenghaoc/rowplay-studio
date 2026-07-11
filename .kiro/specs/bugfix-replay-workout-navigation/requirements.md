@@ -12,8 +12,9 @@ column is no longer guaranteed.
 
 ## Scope
 
-- **In scope**: Wrap the `NavigationSplitView` detail column content in
-  `NavigationStack` so `.navigationDestination(isPresented:)` works correctly.
+- **In scope**: Wrap the `NavigationSplitView` detail column content in a
+  path-bound `NavigationStack`, route Replay through that path, and clear it
+  when sidebar selection changes.
 - **Out of scope**: Phase 8B rig logic, `ReplayState` internals, sidebar
   changes, or any work beyond the minimal navigation fix.
 
@@ -23,10 +24,12 @@ column is no longer guaranteed.
    `ReplayView` onto the navigation stack.
 2. Pressing the back button returns to the workout detail view.
 3. RowErg, SkiErg, and BikeErg workouts all navigate to replay correctly.
-4. All existing tests continue to pass (`swift test`).
-5. `swift build` succeeds with zero warnings related to navigation.
-6. A regression test exercises the navigation-action state that enables
-   presentation.
+4. Selecting another sidebar workout while Replay is open returns to the newly
+   selected workout detail.
+5. All existing tests continue to pass (`swift test`).
+6. `swift build` succeeds with zero warnings related to navigation.
+7. Regression coverage constructs `ReplayView` and `ReplayState` from demo
+   workout data for every supported sport.
 
 ## Non-Goals
 

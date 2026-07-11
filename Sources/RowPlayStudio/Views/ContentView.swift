@@ -5,11 +5,15 @@ import SwiftUI
 struct ContentView: View {
     private static let dashboardSelectionID = -1
 
+    enum DetailRoute: Hashable {
+        case replay(workoutID: Int)
+    }
+
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
-    @State private var detailPath = NavigationPath()
+    @State private var detailPath: [DetailRoute] = []
 
     var body: some View {
         NavigationSplitView {
@@ -28,7 +32,10 @@ struct ContentView: View {
                         summary: library.summary,
                         comparisonCandidates: library.comparisonCandidates(for: detail.id),
                         annotationStore: library.annotationStore,
-                        onUpdateDetail: library.updateDetail
+                        onUpdateDetail: library.updateDetail,
+                        onReplay: {
+                            detailPath.append(.replay(workoutID: detail.id))
+                        }
                     )
                 } else {
                     DashboardView(
@@ -39,7 +46,21 @@ struct ContentView: View {
                     )
                 }
             }
-            .onChange(of: selectedWorkoutID) { detailPath = NavigationPath() }
+            .navigationDestination(for: DetailRoute.self) { route in
+                switch route {
+                case .replay(let workoutID):
+                    if let detail = library.detail(id: workoutID) {
+                        ReplayView(detail: detail)
+                    } else {
+                        ContentUnavailableView(
+                            "Workout Unavailable",
+                            systemImage: "exclamationmark.triangle",
+                            description: Text("Return to the workout library and select another workout.")
+                        )
+                    }
+                }
+            }
+            .onChange(of: selectedWorkoutID) { detailPath.removeAll() }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
         .toolbar {

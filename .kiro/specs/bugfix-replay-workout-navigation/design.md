@@ -18,34 +18,42 @@ detail column (the "Replay Workout" button), so the regression surfaces now.
 ## Chosen Fix
 
 Wrap the conditional content inside the `NavigationSplitView` `detail:` closure
-with a `NavigationStack`. This is the canonical SwiftUI pattern:
+with a path-bound `NavigationStack`. `ContentView` owns a typed replay route,
+and `WorkoutDetailView` invokes an `onReplay` callback that appends the selected
+workout ID to that path:
 
 ```swift
 } detail: {
-    NavigationStack {
+    NavigationStack(path: $detailPath) {
         if ... {
             emptyState
         } else if ... {
-            WorkoutDetailView(...)
+            WorkoutDetailView(onReplay: {
+                detailPath.append(.replay(workoutID: detail.id))
+            })
         } else {
             DashboardView(...)
         }
     }
+    .navigationDestination(for: DetailRoute.self) { ... }
+    .onChange(of: selectedWorkoutID) { detailPath.removeAll() }
 }
 ```
 
 **Why `NavigationStack` inside `detail:` and not on each sub-view:**
 Placing it at the `detail:` level ensures all content views can use
-`.navigationDestination` and `.navigationTitle` correctly. It also provides a
-single consistent navigation context for the entire detail column.
+`.navigationDestination` and `.navigationTitle` correctly. Owning the route in
+`ContentView` also gives sidebar selection and replay presentation one source
+of truth: selecting another workout clears the path and dismisses Replay.
 
 ## Affected Files
 
 | File | Change |
 |---|---|
-| `Sources/RowPlayStudio/Views/ContentView.swift` | Wrap `detail:` content in `NavigationStack` |
+| `Sources/RowPlayStudio/Views/ContentView.swift` | Own the typed replay path and destination |
+| `Sources/RowPlayStudio/Views/WorkoutDetailView.swift` | Request replay navigation through an injected callback |
 
-No changes to `WorkoutDetailView`, `ReplayView`, or `ReplayState`.
+No changes to `ReplayView` or `ReplayState`.
 
 ## Accessibility
 
@@ -63,11 +71,11 @@ operates at the boundary below the UI layer:
    any initialization issue that would silently fail a push.
 2. **ReplayState initialisation**: Verify that `ReplayState(strokes:)` can be
    constructed from demo workout strokes with valid duration and paused state.
-3. **NavigationStack presence**: `NavigationStack` is structurally present in
-   `ContentView`'s detail column (compile-time guarantee, no runtime test
-   needed — the view hierarchy is verified by `swift build`).
+3. **Navigation route ownership**: `ContentView` owns the typed path and
+   clears it when the selected workout changes (compile-time structure verified
+   by `swift build`).
 
-The boundary is: we test that the navigation-action state and view construction
-are correct, and that `NavigationStack` is structurally present. We cannot test
-that SwiftUI's runtime push actually fires — that requires UI-test or manual
-verification.
+The boundary is: tests cover replay view/state construction, while `swift build`
+verifies the typed navigation structure. SwiftPM XCTest cannot prove that
+SwiftUI's runtime push fires or that sidebar selection visibly pops Replay;
+those interactions still require UI-test or manual verification.
