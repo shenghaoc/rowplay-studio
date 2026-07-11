@@ -84,7 +84,7 @@ public enum WorkoutExport {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
         let activityId = makeTCXISO8601Formatter().string(from: w.date)
-        let calories = w.caloriesTotal ?? 0
+        let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
 
         // Guard against non-finite workout summary values
         let safeTime = w.time.isFinite && w.time >= 0 ? w.time : 0
@@ -189,11 +189,11 @@ public enum WorkoutExport {
                 hr = rawHR
             }
 
-            // Cadence: finite, non-negative, rounded and clamped to 0...255
+            // Cadence: finite, non-negative, rounded and clamped to the
+            // TCX CadenceValue_t range 0...254 before converting to Int.
             var cadence: Int? = nil
             if stroke.cadence.isFinite, stroke.cadence >= 0 {
-                let rounded = Int(stroke.cadence.rounded())
-                cadence = min(max(rounded, 0), 255)
+                cadence = Int(min(stroke.cadence.rounded(), 254))
             }
 
             result.append(TrackpointData(

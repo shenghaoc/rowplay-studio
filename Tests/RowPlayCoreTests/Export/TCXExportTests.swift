@@ -181,6 +181,14 @@ final class TCXExportTests: XCTestCase {
         XCTAssertTrue(xml.contains("<Calories>0</Calories>"))
     }
 
+    func testTCXCaloriesClampedToUnsignedShortRange() {
+        let negative = WorkoutExport.tcx(makeDetail(workout: makeWorkout(caloriesTotal: -1)))
+        let excessive = WorkoutExport.tcx(makeDetail(workout: makeWorkout(caloriesTotal: 70_000)))
+
+        XCTAssertTrue(negative.contains("<Calories>0</Calories>"))
+        XCTAssertTrue(excessive.contains("<Calories>65535</Calories>"))
+    }
+
     func testTCXAverageHeartRateBpmWhenPresent() {
         let detail = makeDetail(workout: makeWorkout(heartRateAvg: 145))
         let xml = WorkoutExport.tcx(detail)
@@ -512,11 +520,17 @@ final class TCXExportTests: XCTestCase {
 
     // MARK: - Cadence Clamping
 
-    func testTCXCadenceClampedToMax255() {
+    func testTCXCadenceClampedToSchemaMaximum254() {
         let strokes = [makeStroke(t: 1, d: 4.2, cadence: 300)]
         let detail = makeDetail(strokes: strokes)
         let xml = WorkoutExport.tcx(detail)
-        XCTAssertTrue(xml.contains("<Cadence>255</Cadence>"))
+        XCTAssertTrue(xml.contains("<Cadence>254</Cadence>"))
+    }
+
+    func testTCXHugeFiniteCadenceClampsWithoutOverflow() {
+        let strokes = [makeStroke(t: 1, d: 4.2, cadence: .greatestFiniteMagnitude)]
+        let xml = WorkoutExport.tcx(makeDetail(strokes: strokes))
+        XCTAssertTrue(xml.contains("<Cadence>254</Cadence>"))
     }
 
     func testTCXCadenceNegativeSkipped() {

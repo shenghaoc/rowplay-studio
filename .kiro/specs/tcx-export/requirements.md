@@ -22,7 +22,7 @@ The native app must export a single workout as a Garmin Training Center Database
 - **R3.1** A single `Lap` element is emitted with `StartTime` matching the activity `Id`.
 - **R3.2** `TotalTimeSeconds` contains the workout summary duration without truncating fractional seconds.
 - **R3.3** `DistanceMeters` contains the workout summary distance.
-- **R3.4** `Calories` contains `caloriesTotal` or `0` when absent (required by TCX structure).
+- **R3.4** `Calories` contains `caloriesTotal` clamped to the TCX `xsd:unsignedShort` range `0...65535`, or `0` when absent.
 - **R3.5** `AverageHeartRateBpm` is emitted only when `heartRateAvg` is in the valid TCX range `1...255`.
 - **R3.6** `Intensity` is `"Active"`.
 - **R3.7** `TriggerMethod` is `"Manual"`.
@@ -32,7 +32,7 @@ The native app must export a single workout as a Garmin Training Center Database
 - **R4.1** `Trackpoint` elements are generated from valid strokes, ordered by stroke time.
 - **R4.2** Each trackpoint contains `Time` (absolute UTC ISO-8601 with fractional seconds) and `DistanceMeters` (absolute cumulative distance).
 - **R4.3** `HeartRateBpm` is included only when the stroke's heart rate is in the range 1...255.
-- **R4.4** `Cadence` is included when the stroke's cadence is valid (finite, non-negative), rounded and clamped to 0...255.
+- **R4.4** `Cadence` is included when the stroke's cadence is valid (finite, non-negative), rounded and clamped to the TCX `CadenceValue_t` range `0...254` before integer conversion.
 - **R4.5** Non-finite or negative stroke timestamps and distances are rejected/skipped.
 - **R4.6** Trackpoint distance is clamped to the workout summary distance.
 - **R4.7** Samples beyond the valid workout duration are skipped.

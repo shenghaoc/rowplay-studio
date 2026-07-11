@@ -67,11 +67,11 @@ This avoids a dependency on `Foundation.XMLDocument` (which pulls in `libxml2` a
 ## Heart Rate and Cadence
 
 - AverageHeartRateBpm and trackpoint HeartRateBpm: included only when the value is in `1...255`.
-- Cadence: `stroke.cadence` is rounded to `Int`, clamped to `0...255`, and included when finite and non-negative.
+- Cadence: `stroke.cadence` is rounded, clamped to the TCX `CadenceValue_t` range `0...254` before integer conversion, and included when finite and non-negative.
 
 ## Calories
 
-When `workout.caloriesTotal` is nil, `0` is emitted because `Calories` is required by the TCX `ActivityLap_t` structure in practice (Garmin Connect rejects files without it).
+`Calories` is required by the TCX `ActivityLap_t` structure and uses `xsd:unsignedShort`. The exporter emits `0` when `workout.caloriesTotal` is nil and clamps present values to `0...65535`.
 
 ## No-Track Workouts
 
