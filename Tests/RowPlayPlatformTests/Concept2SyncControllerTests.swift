@@ -1,7 +1,6 @@
 import XCTest
 @testable import RowPlayCore
 @testable import RowPlayPlatform
-@testable import RowPlayStudio
 
 /// A Concept2APIClient that delegates fetchWorkouts to a caller-provided handler and throws on fetchWorkoutDetail.
 private final class FailingConcept2Client: Concept2APIClient, Sendable {

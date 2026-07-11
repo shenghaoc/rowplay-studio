@@ -18,7 +18,7 @@ func makeCoreTestTarget(dependencies: [Target.Dependency] = ["RowPlayCore"]) -> 
     )
 }
 
-#if os(Linux)
+#if !os(macOS)
 let products: [Product] = [
     .library(name: "RowPlayCore", targets: ["RowPlayCore"])
 ]
@@ -64,8 +64,12 @@ let targets: [Target] = [
     ),
     makeCoreTestTarget(),
     .testTarget(
+        name: "RowPlayPlatformTests",
+        dependencies: ["RowPlayPlatform", "RowPlayCore"]
+    ),
+    .testTarget(
         name: "RowPlayStudioTests",
-        dependencies: ["RowPlayStudio", "RowPlayPlatform", "RowPlayCore"]
+        dependencies: ["RowPlayStudio", "RowPlayCore"]
     ),
 ]
 #endif

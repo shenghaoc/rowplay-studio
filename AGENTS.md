@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
+RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 5.9, macOS 14.0+) with zero external dependencies. Swift 5.9 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
 
 ## Repository Structure
 
@@ -20,7 +20,7 @@ Sources/RowPlayCore/        # Pure domain logic library (no SwiftUI/AppKit)
   Support/                  # Formatting, date/time, pace parsing, privacy redaction, logging
   Fixtures/                 # DemoWorkoutLibrary with deterministic seeded data
 
-Sources/RowPlayPlatform/       # macOS non-UI layer (Foundation/Combine, no SwiftUI/AppKit)
+Sources/RowPlayPlatform/     # macOS-only non-UI layer (Foundation/Combine/Security)
   WorkoutLibrary.swift      # Central app state (@MainActor ObservableObject)
   Concept2SyncController.swift  # Sync orchestration
   AppPreferences.swift      # UserDefaults-backed preferences
@@ -32,6 +32,8 @@ Sources/RowPlayStudio/      # SwiftUI macOS UI layer
 
 Tests/RowPlayCoreTests/     # XCTest suite for RowPlayCore
   Fixtures/                 # Golden parity JSON fixtures for web-to-native comparison
+Tests/RowPlayPlatformTests/ # macOS-only non-UI tests
+Tests/RowPlayStudioTests/   # macOS-only UI tests
 
 docs/                       # roadmap.md, source-map.md
 .kiro/specs/                # Phase specs (requirements, design, tasks per phase)
@@ -48,6 +50,11 @@ This repo uses `AGENTS.md` as the single canonical guide for coding agents. `CLA
 swift test                              # Run all XCTest tests
 swift test --filter WorkoutAnalyticsTests  # Run a focused test class
 swift build                             # Build the package (mirrors CI)
+swift build --target RowPlayCore        # Build the cross-platform Core layer
+swift test --filter RowPlayCoreTests    # Run Core tests (the Linux CI scope)
+swift build --target RowPlayPlatform    # Build macOS non-UI APIs
+swift test --filter RowPlayPlatformTests  # Run macOS non-UI tests
+swift test --filter RowPlayStudioTests  # Run macOS UI tests
 ./script/build_and_run.sh               # Build, stage dist/RowPlayStudio.app, launch
 ./script/build_and_run.sh --verify      # Launch and confirm process is running
 ./script/build_and_run.sh --logs        # Launch with live os_log stream
@@ -55,17 +62,17 @@ swift build                             # Build the package (mirrors CI)
 ./script/build_and_run.sh --debug       # Launch under LLDB debugger
 ```
 
-Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs `swift test` then `swift build` on macOS.
+Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 5.9-era toolchains.
 
 ## Architecture Boundaries
 
 ### Three-Layer Architecture
 
-- **RowPlayCore** — Pure domain logic. No SwiftUI, AppKit, or macOS-specific imports. Must remain importable by a future iOS target.
-- **RowPlayPlatform** — macOS non-UI layer. Uses Foundation and Combine but no SwiftUI or AppKit. Contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), and factories (AnnotationStoreFactory). Depends on RowPlayCore.
-- **RowPlayStudio** — SwiftUI macOS UI layer. Contains `@main` entry and all Views. Depends on RowPlayPlatform and RowPlayCore.
+- **RowPlayCore** — Cross-platform Swift domain logic and external-boundary protocols. It may use portable Foundation APIs and SQLite, but no SwiftUI, AppKit, Combine, Security, or other macOS-only APIs. The manifest exposes only Core and its tests on Linux.
+- **RowPlayPlatform** — macOS-only non-UI APIs. It may use Foundation, Combine, Security, UserDefaults, Keychain, and macOS process/storage services, but no UI frameworks such as SwiftUI, AppKit, or Charts. It contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), Keychain storage, and production factories. Depends only on RowPlayCore.
+- **RowPlayStudio** — macOS-only UI APIs. It owns the `@main` entry point, SwiftUI views, Charts, AppKit presentation/file-panel integration, and UI-specific controllers. Depends on RowPlayPlatform and RowPlayCore.
 
-Keep reusable math and data in `RowPlayCore`. Keep macOS state management in `RowPlayPlatform`. Keep SwiftUI and AppKit in `RowPlayStudio`.
+Dependency direction is `RowPlayStudio → RowPlayPlatform → RowPlayCore`; Studio may also import Core value types directly. Keep reusable math and data in Core, macOS non-UI state/services in Platform, and every UI framework/API in Studio. Do not move macOS-only APIs into Core or UI APIs into Platform.
 
 ### Dependency Injection via Protocols
 
