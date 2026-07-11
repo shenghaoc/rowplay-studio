@@ -12,40 +12,25 @@ final class DurationBandParityTests: XCTestCase {
         let expectedNominalSeconds: Double
     }
 
-    #if compiler(>=5.10)
-    nonisolated(unsafe) private static var fixtures: [Fixture] = []
-    nonisolated(unsafe) private static var loadError: Error?
-    #else
-    private static var fixtures: [Fixture] = []
-    private static var loadError: Error?
-    #endif
-
-    override class func setUp() {
-        super.setUp()
-        do {
-            fixtures = try ParityFixtureLoader.loadJSON([Fixture].self, from: "duration-band-parity")
-        } catch {
-            loadError = error
-        }
+    private static let fixtureResult = Result {
+        try ParityFixtureLoader.loadJSON([Fixture].self, from: "duration-band-parity")
     }
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        if let error = Self.loadError {
-            throw error
-        }
+        _ = try Self.fixtureResult.get()
     }
 
     // MARK: - Fixture loading
 
-    func testFixturesLoaded() {
-        XCTAssertFalse(Self.fixtures.isEmpty, "Should load at least one duration-band fixture")
+    func testFixturesLoaded() throws {
+        XCTAssertFalse(try Self.fixtureResult.get().isEmpty, "Should load at least one duration-band fixture")
     }
 
     // MARK: - Fixture-driven parity
 
-    func testDurationBandParity() {
-        for fixture in Self.fixtures {
+    func testDurationBandParity() throws {
+        for fixture in try Self.fixtureResult.get() {
             let band = WorkoutAnalytics.durationBand(for: fixture.inputSeconds)
 
             XCTAssertEqual(

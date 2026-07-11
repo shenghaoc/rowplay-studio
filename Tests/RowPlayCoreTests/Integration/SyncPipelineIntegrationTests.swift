@@ -5,10 +5,10 @@ import XCTest
 // MARK: - Fakes
 
 /// A Concept2APIClient that always throws on fetchWorkouts.
-private final class FailingConcept2Client: Concept2APIClient, @unchecked Sendable {
-    let error: Error
+private final class FailingConcept2Client: Concept2APIClient {
+    let error: any Error
 
-    init(error: Error) {
+    init(error: any Error) {
         self.error = error
     }
 
@@ -22,7 +22,7 @@ private final class FailingConcept2Client: Concept2APIClient, @unchecked Sendabl
 }
 
 /// A Concept2APIClient that fails `fetchWorkoutDetail` for specific workout IDs.
-private final class SelectiveFailureClient: Concept2APIClient, @unchecked Sendable {
+private final class SelectiveFailureClient: Concept2APIClient {
     private let details: [WorkoutDetail]
     private let failingIDs: Set<Int>
 

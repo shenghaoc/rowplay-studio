@@ -11,7 +11,7 @@ import FoundationNetworking
 ///
 /// The transport is injectable via ``HTTPTransport`` for testability.
 /// Production code uses ``URLSessionHTTPTransport``; tests use a fake.
-public final class URLSessionConcept2Client: Concept2APIClient, @unchecked Sendable {
+public final class URLSessionConcept2Client: Concept2APIClient {
     private let baseURL: URL
     private let token: String
     private let transport: any HTTPTransport

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Replay inspector helpers for examining stroke data.
-public enum ReplayInspector {
+public enum ReplayInspector: Sendable {
     /// Metres per stroke at this instant; nil when pace or cadence is invalid.
     public static func distancePerStroke(pace: TimeInterval, cadence: Double) -> Double? {
         guard pace > 0, cadence > 0 else { return nil }

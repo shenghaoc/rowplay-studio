@@ -23,7 +23,7 @@ public struct MachineColor: Equatable, Sendable {
     }
 }
 
-public enum ReplaySportThemeLookup {
+public enum ReplaySportThemeLookup: Sendable {
     /// Returns the display theme for a sport.
     public static func theme(for sport: Sport) -> ReplaySportTheme {
         switch sport {

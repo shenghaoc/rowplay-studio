@@ -1,11 +1,12 @@
 import Foundation
+import Synchronization
 
 /// Calendar and date helpers for Concept2 logbook timestamps.
 ///
 /// Concept2 logbook dates are wall-clock strings in the format `YYYY-MM-DD HH:MM:SS`
 /// with no timezone offset. The web app interprets them as UTC (`LOGBOOK_ZONE = "UTC"`);
 /// this module does the same.
-public enum RowPlayDateTime {
+public enum RowPlayDateTime: Sendable {
     private struct LogbookParts {
         let year: Int
         let month: Int
@@ -30,17 +31,14 @@ public enum RowPlayDateTime {
 
     // MARK: - Formatters
 
-    private static let dayKeyFormatter: DateFormatter = {
+    private static let dayKeyFormatter = Mutex({
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = utc
         f.locale = Locale(identifier: "en_US_POSIX")
         f.isLenient = false
         return f
-    }()
-
-    /// Guards `dayKeyFormatter` — `DateFormatter` is not thread-safe.
-    private static let dayKeyFormatterLock = NSLock()
+    }())
 
     private static let gregorian: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
@@ -68,9 +66,7 @@ public enum RowPlayDateTime {
 
     /// Convert a `Date` to a `YYYY-MM-DD` string in UTC.
     public static func dayKeyFromDate(_ date: Date) -> String {
-        dayKeyFormatterLock.lock()
-        defer { dayKeyFormatterLock.unlock() }
-        return dayKeyFormatter.string(from: date)
+        dayKeyFormatter.withLock { $0.string(from: date) }
     }
 
     /// Today as `YYYY-MM-DD` in UTC.
@@ -89,9 +85,7 @@ public enum RowPlayDateTime {
     public static func dayKeyAddingDays(_ days: Int, to key: String) -> String {
         guard let date = parseDayKey(key) else { return key }
         guard let result = gregorian.date(byAdding: .day, value: days, to: date) else { return key }
-        dayKeyFormatterLock.lock()
-        defer { dayKeyFormatterLock.unlock() }
-        return dayKeyFormatter.string(from: result)
+        return dayKeyFormatter.withLock { $0.string(from: result) }
     }
 
     /// Non-negative calendar day count between two `YYYY-MM-DD` keys.
@@ -154,22 +148,12 @@ public enum RowPlayDateTime {
 
     // MARK: - ISO Helpers
 
-    // ⚡ Bolt: Cache ISO8601DateFormatter to avoid expensive instantiation on every call.
-    // Date().formatted(.iso8601) creates a new formatter implicitly, which causes performance issues.
-    // Default options [.withInternetDateTime] + GMT timezone matches .formatted(.iso8601) output.
-    #if compiler(>=5.10)
-    nonisolated(unsafe) private static let iso8601Formatter = ISO8601DateFormatter()
-    #else
-    private static let iso8601Formatter = ISO8601DateFormatter()
-    #endif
-    /// Guards `iso8601Formatter` — `ISO8601DateFormatter` is not thread-safe.
-    private static let iso8601FormatterLock = NSLock()
+    /// Value-typed, concurrency-safe ISO-8601 formatting style.
+    private static let iso8601Style = Date.ISO8601FormatStyle()
 
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {
-        iso8601FormatterLock.lock()
-        defer { iso8601FormatterLock.unlock() }
-        return iso8601Formatter.string(from: Date())
+        Date().formatted(iso8601Style)
     }
 
     // MARK: - Private

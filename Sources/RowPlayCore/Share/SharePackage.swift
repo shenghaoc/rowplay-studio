@@ -100,7 +100,7 @@ public struct SharePackage: Codable, Equatable, Sendable {
     }
 }
 
-public enum SharePackageBuilder {
+public enum SharePackageBuilder: Sendable {
     /// Build a SharePackage from a WorkoutDetail, stripping hardware-identifying metadata.
     public static func build(from detail: WorkoutDetail) -> SharePackage {
         let w = detail.workout
@@ -133,7 +133,7 @@ public enum SharePackageBuilder {
     }
 }
 
-public enum SharePackageCodec {
+public enum SharePackageCodec: Sendable {
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601

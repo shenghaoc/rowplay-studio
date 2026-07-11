@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Protocol for local annotation storage.
 ///
@@ -18,34 +19,37 @@ public protocol AnnotationStore: Sendable {
 
 /// In-memory annotation store for tests, previews, and early integration.
 ///
-/// Thread-safe via NSLock.
-public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable {
-    /// workoutId → annotations
-    private var storage: [Int: [Annotation]] = [:]
-    private var nextId: Int = 1
-    private let lock = NSLock()
+/// Thread-safe via ``Mutex``.
+public final class InMemoryAnnotationStore: AnnotationStore {
+    private struct State: Sendable {
+        /// workoutId → annotations
+        var storage: [Int: [Annotation]] = [:]
+        var nextID = 1
+    }
+
+    private let state = Mutex(State())
 
     public init() {}
 
     public func loadAnnotations(workoutId: Int) async throws -> [Annotation] {
-        lock.withLock {
-            (storage[workoutId] ?? []).sorted { $0.timestamp < $1.timestamp }
+        state.withLock {
+            ($0.storage[workoutId] ?? []).sorted { $0.timestamp < $1.timestamp }
         }
     }
 
     public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
         let normalized = try annotation.normalizedForSave()
 
-        return try lock.withLock {
-            var annotations = storage[workoutId] ?? []
+        return try state.withLock { state in
+            var annotations = state.storage[workoutId] ?? []
 
             if normalized.id == 0 {
                 // Create new
                 var newAnnotation = normalized
-                newAnnotation.id = nextId
-                nextId += 1
+                newAnnotation.id = state.nextID
+                state.nextID += 1
                 annotations.append(newAnnotation)
-                storage[workoutId] = annotations
+                state.storage[workoutId] = annotations
                 return newAnnotation
             } else {
                 // Update existing
@@ -53,7 +57,7 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
                     var updated = normalized
                     updated.createdAt = annotations[index].createdAt
                     annotations[index] = updated
-                    storage[workoutId] = annotations
+                    state.storage[workoutId] = annotations
                     return updated
                 }
                 throw AnnotationError.notFound
@@ -62,21 +66,21 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
     }
 
     public func deleteAnnotation(workoutId: Int, id: Int) async throws {
-        lock.withLock {
-            guard var annotations = storage[workoutId] else { return }
+        state.withLock { state in
+            guard var annotations = state.storage[workoutId] else { return }
             annotations.removeAll { $0.id == id }
             if annotations.isEmpty {
-                storage.removeValue(forKey: workoutId)
+                state.storage.removeValue(forKey: workoutId)
             } else {
-                storage[workoutId] = annotations
+                state.storage[workoutId] = annotations
             }
         }
     }
 
     public func deleteAll() async throws {
-        lock.withLock {
-            storage.removeAll()
-            nextId = 1
+        state.withLock {
+            $0.storage.removeAll()
+            $0.nextID = 1
         }
     }
 }
@@ -85,7 +89,7 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
 ///
 /// Diagnostic messages must not include annotation text, tokens, complete
 /// workout payloads, or SQL containing user content.
-public enum AnnotationError: Error, Equatable {
+public enum AnnotationError: Error, Equatable, Sendable {
     case validationFailed(String)
     case notFound
     /// The annotation database cannot be opened or is fundamentally unusable.

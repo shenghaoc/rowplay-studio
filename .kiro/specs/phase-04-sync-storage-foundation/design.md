@@ -86,7 +86,7 @@ public struct SyncState: Equatable, Sendable {
 }
 ```
 
-- `SyncStateTracker` is `@Observable` and `@MainActor` (macOS 14+).
+- `SyncStateTracker` is `@Observable` and `@MainActor` (macOS 26+).
 - Reads workout count asynchronously from the cache protocol.
 - Transitions: idle → syncing → complete/error.
 

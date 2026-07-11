@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Snapshot of a workout in progress for live-mode UI display.
 public struct LiveWorkoutSample: Equatable, Sendable, Identifiable {
@@ -36,18 +37,21 @@ public struct LiveWorkoutSample: Equatable, Sendable, Identifiable {
 ///
 /// Each call to `nextSample()` returns a sample with incrementally more distance
 /// and time, with slight pace variation. Seeded for deterministic test output.
-public final class DemoLiveSampleGenerator: @unchecked Sendable {
-    private let lock = NSLock()
+public final class DemoLiveSampleGenerator: Sendable {
+    private struct State: Sendable {
+        var elapsed: TimeInterval = 0
+        var distance: Double = 0
+        var rng: SeededGenerator
+        var tick = 0
+    }
+
+    private let state: Mutex<State>
     private let id: Int
     private let sport: Sport
     private let basePace: TimeInterval
     private let baseStrokeRate: Double
     private let baseHR: Int
     private let initialSeed: UInt64
-    private var elapsed: TimeInterval
-    private var distance: Double
-    private var rng: SeededGenerator
-    private var tick: Int
 
     public init(
         id: Int = 99_001,
@@ -63,54 +67,50 @@ public final class DemoLiveSampleGenerator: @unchecked Sendable {
         self.baseStrokeRate = baseStrokeRate
         self.baseHR = baseHR
         self.initialSeed = seed
-        self.elapsed = 0
-        self.distance = 0
-        self.rng = SeededGenerator(seed: seed)
-        self.tick = 0
+        self.state = Mutex(State(rng: SeededGenerator(seed: seed)))
     }
 
     /// Returns the next sample in the sequence, advancing the workout by one segment.
     public func nextSample(at date: Date = Date()) -> LiveWorkoutSample {
-        lock.lock()
-        defer { lock.unlock() }
+        state.withLock { state in
+            state.tick += 1
 
-        tick += 1
+            // Advance by 30 seconds per tick, matching a typical poll interval chunk
+            let segmentDuration: TimeInterval = 30
+            state.elapsed += segmentDuration
 
-        // Advance by 30 seconds per tick, matching a typical poll interval chunk
-        let segmentDuration: TimeInterval = 30
-        elapsed += segmentDuration
+            // Pace varies ±5 sec/500m around the base
+            let paceVariation = Double(Int.random(in: -5 ... 5, using: &state.rng))
+            let currentPace = basePace + paceVariation
 
-        // Pace varies ±5 sec/500m around the base
-        let paceVariation = Double(Int.random(in: -5 ... 5, using: &rng))
-        let currentPace = basePace + paceVariation
+            // Distance from pace: d = (segmentDuration / pace) * 500
+            let segmentDistance = (segmentDuration / currentPace) * 500
+            state.distance += segmentDistance
 
-        // Distance from pace: d = (segmentDuration / pace) * 500
-        let segmentDistance = (segmentDuration / currentPace) * 500
-        distance += segmentDistance
+            // HR varies ±3 bpm
+            let hrVariation = Int.random(in: -3 ... 3, using: &state.rng)
+            let currentHR = baseHR + hrVariation
 
-        // HR varies ±3 bpm
-        let hrVariation = Int.random(in: -3 ... 3, using: &rng)
-        let currentHR = baseHR + hrVariation
-
-        return LiveWorkoutSample(
-            id: id,
-            sport: sport,
-            distance: distance,
-            time: elapsed,
-            pace: currentPace,
-            strokeRate: baseStrokeRate + Double(Int.random(in: -2 ... 2, using: &rng)),
-            heartRateAvg: currentHR,
-            date: date
-        )
+            return LiveWorkoutSample(
+                id: id,
+                sport: sport,
+                distance: state.distance,
+                time: state.elapsed,
+                pace: currentPace,
+                strokeRate: baseStrokeRate + Double(Int.random(in: -2 ... 2, using: &state.rng)),
+                heartRateAvg: currentHR,
+                date: date
+            )
+        }
     }
 
     /// Resets the generator to its initial state.
     public func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-        elapsed = 0
-        distance = 0
-        tick = 0
-        rng = SeededGenerator(seed: initialSeed)
+        state.withLock {
+            $0.elapsed = 0
+            $0.distance = 0
+            $0.tick = 0
+            $0.rng = SeededGenerator(seed: initialSeed)
+        }
     }
 }

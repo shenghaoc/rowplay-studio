@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Protocol for local workout storage.
 ///
@@ -65,69 +66,72 @@ public extension WorkoutCache {
 /// In-memory workout cache for tests, previews, and early integration.
 ///
 /// Stores workouts and details in dictionaries keyed by workout ID.
-/// Thread-safe via NSLock.
-public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
-    private var workouts: [Int: Workout] = [:]
-    private var details: [Int: WorkoutDetail] = [:]
-    private let lock = NSLock()
+/// Thread-safe via ``Mutex``.
+public final class InMemoryWorkoutCache: WorkoutCache {
+    private struct State: Sendable {
+        var workouts: [Int: Workout] = [:]
+        var details: [Int: WorkoutDetail] = [:]
+    }
+
+    private let state = Mutex(State())
 
     public init() {}
 
     public func migrate() throws {}
 
     public func save(detail: WorkoutDetail) async throws {
-        lock.withLock {
-            details[detail.workout.id] = detail
+        state.withLock {
+            $0.details[detail.workout.id] = detail
             // Also upsert the summary.
-            workouts[detail.workout.id] = detail.workout
+            $0.workouts[detail.workout.id] = detail.workout
         }
     }
 
     public func save(details: [WorkoutDetail]) async throws {
-        lock.withLock {
+        state.withLock { state in
             for detail in details {
-                self.details[detail.workout.id] = detail
-                workouts[detail.workout.id] = detail.workout
+                state.details[detail.workout.id] = detail
+                state.workouts[detail.workout.id] = detail.workout
             }
         }
     }
 
     public func saveWorkouts(_ workouts: [Workout]) async throws {
-        lock.withLock {
+        state.withLock { state in
             for workout in workouts {
-                self.workouts[workout.id] = workout
+                state.workouts[workout.id] = workout
                 // Keep cached detail in sync: update the summary embedded in any
                 // existing detail so detail(id:) doesn't return stale metadata.
-                if var detail = details[workout.id] {
+                if var detail = state.details[workout.id] {
                     detail.workout = workout
-                    details[workout.id] = detail
+                    state.details[workout.id] = detail
                 } else {
                     // Create a placeholder detail so detail(id:) returns a value
                     // consistent with SQLiteWorkoutCache behavior.
-                    details[workout.id] = WorkoutDetail(workout: workout, strokes: [], splits: [])
+                    state.details[workout.id] = WorkoutDetail(workout: workout, strokes: [], splits: [])
                 }
             }
         }
     }
 
     public func listWorkouts() async throws -> [Workout] {
-        lock.withLock {
-            workouts.values.sorted { $0.date > $1.date }
+        state.withLock {
+            $0.workouts.values.sorted { $0.date > $1.date }
         }
     }
 
     public func detail(id: Workout.ID) async throws -> WorkoutDetail? {
-        lock.withLock {
-            details[id]
+        state.withLock {
+            $0.details[id]
         }
     }
 
     public func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
-        lock.withLock {
+        state.withLock { state in
             var result: [Workout.ID: WorkoutDetail] = [:]
             result.reserveCapacity(ids.count)
             for id in ids {
-                if let detail = details[id] {
+                if let detail = state.details[id] {
                     result[id] = detail
                 }
             }
@@ -136,16 +140,16 @@ public final class InMemoryWorkoutCache: WorkoutCache, @unchecked Sendable {
     }
 
     public func delete(id: Workout.ID) async throws {
-        lock.withLock {
-            workouts.removeValue(forKey: id)
-            details.removeValue(forKey: id)
+        state.withLock {
+            $0.workouts.removeValue(forKey: id)
+            $0.details.removeValue(forKey: id)
         }
     }
 
     public func deleteAll() async throws {
-        lock.withLock {
-            workouts.removeAll()
-            details.removeAll()
+        state.withLock {
+            $0.workouts.removeAll()
+            $0.details.removeAll()
         }
     }
 }

@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while real hardware transport remains a beta blocker below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 6.3+, macOS 14.0+) with zero external dependencies.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while real hardware transport remains a beta blocker below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 6.3+, macOS 26.0+) with zero external dependencies.
 
 ### What Is Implemented
 

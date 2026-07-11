@@ -29,7 +29,7 @@ public struct RepSeries: Equatable, Sendable {
     }
 }
 
-public enum RepDetection {
+public enum RepDetection: Sendable {
     private static let minRepSeconds: TimeInterval = 30
     private static let minReps = 2
 

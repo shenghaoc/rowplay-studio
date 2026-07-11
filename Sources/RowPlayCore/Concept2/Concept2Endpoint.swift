@@ -5,7 +5,7 @@ import Foundation
 /// Each case represents a single API endpoint and can construct the full URL
 /// from a base URL. The paths and query parameters match the web app's
 /// `Concept2Client` in `src/lib/server/concept2.ts`.
-public enum Concept2Endpoint {
+public enum Concept2Endpoint: Sendable {
     /// List workout summaries with pagination.
     case workoutSummaries(page: Int, number: Int)
     /// Fetch full workout detail by Concept2 workout ID.

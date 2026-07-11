@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 6.3, macOS 14.0+) with zero external dependencies. Swift 6.3 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
+RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 6.3, macOS 26.0+) with zero external dependencies. Swift 6.3 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
 
 ## Repository Structure
 
@@ -87,7 +87,7 @@ External boundaries are defined as protocols in `RowPlayCore` with production an
 | `LiveSource` | (deferred) | `MockLiveSource` |
 | `ErgConnection` | (deferred) | `MockErgConnection` |
 
-Mock classes are `@unchecked Sendable` and use `NSLock` for thread safety. Mock erg connections use manual `emitSample()` — no real timers.
+Mutable mock state uses Swift's `Synchronization.Mutex` so mocks can use checked `Sendable` conformance on both macOS and Linux. SQLite stores remain `@unchecked Sendable` because their raw C handles are confined to private serial queues. Mock erg connections use manual `emitSample()` — no real timers.
 
 ## Privacy and Security Invariants
 

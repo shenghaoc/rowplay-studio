@@ -3,7 +3,7 @@ import Foundation
 /// Parse and format user-entered `/500m` pace strings.
 ///
 /// Ported from the web app's `src/lib/paceInput.ts`.
-public enum PaceInput {
+public enum PaceInput: Sendable {
     private static let maxRawInputUTF16Length = 64
     private static let maxTrimmedInputUTF16Length = 20
 

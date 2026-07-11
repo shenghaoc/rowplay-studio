@@ -77,8 +77,9 @@ let targets: [Target] = [
 let package = Package(
     name: "RowPlayStudio",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     products: products,
-    targets: targets
+    targets: targets,
+    swiftLanguageModes: [.v6]
 )

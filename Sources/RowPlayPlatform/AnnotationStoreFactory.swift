@@ -7,7 +7,7 @@ import RowPlayCore
 /// a ``SQLiteAnnotationStore``. If the database cannot be opened or migrated,
 /// it logs through ``PrivacySafeLogger`` and returns an
 /// ``UnavailableAnnotationStore``.
-public enum AnnotationStoreFactory {
+public enum AnnotationStoreFactory: Sendable {
     private static let logger = PrivacySafeLogger(category: "annotation-store")
 
     /// Create the production annotation store.

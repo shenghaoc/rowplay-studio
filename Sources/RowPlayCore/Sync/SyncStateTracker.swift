@@ -39,7 +39,6 @@ public struct SyncState: Equatable, Sendable {
 /// - syncing → complete (on sync success)
 /// - syncing → error (on sync failure)
 /// - error → syncing (on retry)
-@available(macOS 14.0, *)
 @Observable
 @MainActor
 public final class SyncStateTracker {

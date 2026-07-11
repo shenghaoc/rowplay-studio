@@ -11,7 +11,7 @@ public struct HrSample: Equatable, Sendable {
     }
 }
 
-public enum HrImport {
+public enum HrImport: Sendable {
     private static let minSamples = 2
 
     /// Extract valid HR samples from strokes.

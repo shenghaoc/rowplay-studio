@@ -24,7 +24,7 @@ public struct ComparableContext: Equatable, Sendable {
     }
 }
 
-public enum ComparabilityGuard {
+public enum ComparabilityGuard: Sendable {
     /// Concept2 workout_type markers that indicate a time-axis workout.
     private static let timeAxisMarkers = ["justrow", "fixedtime"]
 

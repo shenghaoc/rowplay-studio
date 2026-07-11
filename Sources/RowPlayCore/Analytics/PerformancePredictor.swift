@@ -5,7 +5,7 @@ import Foundation
 /// Ports `src/lib/performancePredictor.ts` from the web app. Paul's Law is the
 /// Concept2 community standard for estimating race times across distances:
 /// `time₂ = time₁ × (distance₂ / distance₁)^1.06`.
-public enum PerformancePredictor {
+public enum PerformancePredictor: Sendable {
     /// Paul's Law exponent (Concept2 community standard).
     public static let paulExponent = 1.06
 

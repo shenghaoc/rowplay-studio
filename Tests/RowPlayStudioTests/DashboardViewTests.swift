@@ -2,6 +2,7 @@ import XCTest
 @testable import RowPlayCore
 @testable import RowPlayStudio
 
+@MainActor
 final class DashboardViewTests: XCTestCase {
     func testSportSummaryAccessibilityValueUsesSelectedDistanceUnit() {
         let summary = SportSummary(

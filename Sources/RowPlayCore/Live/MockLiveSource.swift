@@ -82,7 +82,7 @@ public actor MockLiveSource: LiveSource {
 /// limitations (e.g., correlated low-order bits). This is acceptable here
 /// since it is only used for mock workout generation and test determinism,
 /// not for cryptographic or high-quality random purposes.
-struct SeededGenerator: RandomNumberGenerator {
+struct SeededGenerator: RandomNumberGenerator, Sendable {
     private var state: UInt64
 
     init(seed: UInt64) {

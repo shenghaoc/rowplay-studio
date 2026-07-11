@@ -2,44 +2,48 @@
 import FoundationNetworking
 #endif
 import XCTest
+import Synchronization
 @testable import RowPlayCore
 
 // MARK: - Fake Transport
 
 /// Fake HTTP transport for testing. Captures requests and returns configured responses.
-final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _capturedRequests: [URLRequest] = []
-    private var _callCount = 0
-    private var _result: Result<(Data, HTTPURLResponse), Error>!
+final class FakeHTTPTransport: HTTPTransport {
+    private struct State: Sendable {
+        var capturedRequests: [URLRequest] = []
+        var callCount = 0
+        var result: Result<(Data, HTTPURLResponse), any Error>?
+    }
+
+    private let state = Mutex(State())
 
     /// All requests passed to `data(for:)`, in order.
     var capturedRequests: [URLRequest] {
-        lock.withLock { _capturedRequests }
+        state.withLock { $0.capturedRequests }
     }
 
     /// The last URLRequest passed to `data(for:)`.
     var capturedRequest: URLRequest? {
-        lock.withLock { _capturedRequests.last }
+        state.withLock { $0.capturedRequests.last }
     }
 
     /// The number of times `data(for:)` was called.
     var callCount: Int {
-        lock.withLock { _callCount }
+        state.withLock { $0.callCount }
     }
 
     /// The result to return on the next call. Set this before calling client methods.
-    var result: Result<(Data, HTTPURLResponse), Error>! {
-        get { lock.withLock { _result } }
-        set { lock.withLock { _result = newValue } }
+    var result: Result<(Data, HTTPURLResponse), any Error>! {
+        get { state.withLock { $0.result } }
+        set { state.withLock { $0.result = newValue } }
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        lock.withLock {
-            _capturedRequests.append(request)
-            _callCount += 1
+        let currentResult = state.withLock { state in
+            state.capturedRequests.append(request)
+            state.callCount += 1
+            return state.result!
         }
-        let currentResult = lock.withLock { _result! }
         switch currentResult {
         case let .success((data, response)):
             return (data, response)
@@ -50,26 +54,29 @@ final class FakeHTTPTransport: HTTPTransport, @unchecked Sendable {
 }
 
 /// Fake transport that returns responses in sequence (for multi-request operations).
-final class SequenceHTTPTransport: HTTPTransport, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _responses: [Result<(Data, HTTPURLResponse), Error>]
-    private var _index = 0
-    private var _capturedRequests: [URLRequest] = []
-
-    var capturedRequests: [URLRequest] {
-        lock.withLock { _capturedRequests }
+final class SequenceHTTPTransport: HTTPTransport {
+    private struct State: Sendable {
+        var responses: [Result<(Data, HTTPURLResponse), any Error>]
+        var index = 0
+        var capturedRequests: [URLRequest] = []
     }
 
-    init(responses: [Result<(Data, HTTPURLResponse), Error>]) {
-        _responses = responses
+    private let state: Mutex<State>
+
+    var capturedRequests: [URLRequest] {
+        state.withLock { $0.capturedRequests }
+    }
+
+    init(responses: [Result<(Data, HTTPURLResponse), any Error>]) {
+        state = Mutex(State(responses: responses))
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        let result: Result<(Data, HTTPURLResponse), Error> = lock.withLock {
-            _capturedRequests.append(request)
-            let idx = _index
-            _index += 1
-            return idx < _responses.count ? _responses[idx] : _responses.last!
+        let result = state.withLock { state in
+            state.capturedRequests.append(request)
+            let index = state.index
+            state.index += 1
+            return index < state.responses.count ? state.responses[index] : state.responses.last!
         }
         switch result {
         case let .success((data, response)):

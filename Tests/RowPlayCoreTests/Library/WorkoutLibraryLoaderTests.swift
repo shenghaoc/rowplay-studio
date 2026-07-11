@@ -1,4 +1,5 @@
 import XCTest
+import Synchronization
 @testable import RowPlayCore
 
 final class WorkoutLibraryLoaderTests: XCTestCase {
@@ -193,20 +194,19 @@ final class WorkoutLibraryLoaderTests: XCTestCase {
 /// A WorkoutCache that stores only summaries (no detail JSON), so `detail(id:)` always
 /// returns nil for workouts saved via `saveWorkouts`. Used to test the loader's
 /// placeholder fallback path.
-private final class SummaryOnlyCache: WorkoutCache, @unchecked Sendable {
-    private var workouts: [Int: Workout] = [:]
-    private let lock = NSLock()
+private final class SummaryOnlyCache: WorkoutCache {
+    private let workouts = Mutex([Int: Workout]())
 
     func migrate() throws {}
 
     func save(detail: WorkoutDetail) async throws {
-        lock.withLock {
-            workouts[detail.workout.id] = detail.workout
+        workouts.withLock {
+            $0[detail.workout.id] = detail.workout
         }
     }
 
     func save(details: [WorkoutDetail]) async throws {
-        lock.withLock {
+        workouts.withLock { workouts in
             for detail in details {
                 workouts[detail.workout.id] = detail.workout
             }
@@ -214,16 +214,16 @@ private final class SummaryOnlyCache: WorkoutCache, @unchecked Sendable {
     }
 
     func saveWorkouts(_ workouts: [Workout]) async throws {
-        lock.withLock {
+        self.workouts.withLock { storedWorkouts in
             for workout in workouts {
-                self.workouts[workout.id] = workout
+                storedWorkouts[workout.id] = workout
             }
         }
     }
 
     func listWorkouts() async throws -> [Workout] {
-        lock.withLock {
-            workouts.values.sorted { $0.date > $1.date }
+        workouts.withLock {
+            $0.values.sorted { $0.date > $1.date }
         }
     }
 
@@ -233,25 +233,24 @@ private final class SummaryOnlyCache: WorkoutCache, @unchecked Sendable {
     }
 
     func delete(id: Workout.ID) async throws {
-        lock.withLock { workouts[id] = nil }
+        workouts.withLock { $0[id] = nil }
     }
 
     func deleteAll() async throws {
-        lock.withLock { workouts.removeAll() }
+        workouts.withLock { $0.removeAll() }
     }
 }
 
-private final class BatchOnlyCache: WorkoutCache, @unchecked Sendable {
+private final class BatchOnlyCache: WorkoutCache {
     private let storedDetails: [Workout.ID: WorkoutDetail]
-    private let lock = NSLock()
-    private var _batchLookupCount = 0
+    private let batchLookupCountState = Mutex(0)
 
     init(details: [WorkoutDetail]) {
         storedDetails = Dictionary(uniqueKeysWithValues: details.map { ($0.workout.id, $0) })
     }
 
     var batchLookupCount: Int {
-        lock.withLock { _batchLookupCount }
+        batchLookupCountState.withLock { $0 }
     }
 
     func migrate() throws {}
@@ -264,7 +263,7 @@ private final class BatchOnlyCache: WorkoutCache, @unchecked Sendable {
     }
 
     func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
-        lock.withLock { _batchLookupCount += 1 }
+        batchLookupCountState.withLock { $0 += 1 }
         return Dictionary(uniqueKeysWithValues: ids.compactMap { id in
             storedDetails[id].map { (id, $0) }
         })

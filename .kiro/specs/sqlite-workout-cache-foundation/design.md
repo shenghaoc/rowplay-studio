@@ -81,7 +81,7 @@ This PR is a foundation. Summary columns store the complete `Workout` shape need
 
 ### Thread Safety
 
-`SQLiteWorkoutCache` is `@unchecked Sendable`. All database access is serialized through the serial `DispatchQueue`. This matches the existing `InMemoryWorkoutCache` pattern (NSLock-based).
+`SQLiteWorkoutCache` is `@unchecked Sendable`. All database access is serialized through the serial `DispatchQueue`. The in-memory cache uses checked `Sendable` conformance with `Synchronization.Mutex`; the SQLite store retains the narrow unchecked conformance because its raw C handle remains confined to the queue.
 
 ### Error Handling
 
