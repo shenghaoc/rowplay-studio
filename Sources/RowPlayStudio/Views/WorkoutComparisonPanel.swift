@@ -71,8 +71,16 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
+    // ⚡ Bolt: Cache DateFormatter to avoid expensive instantiation in list loops.
+    // .formatted() creates a new formatter implicitly on every call.
+    private static let candidateDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
+        return formatter
+    }()
+
     private func candidateLabel(_ candidate: WorkoutDetail) -> String {
-        let date = candidate.workout.date.formatted(.dateTime.year().month(.abbreviated).day())
+        let date = Self.candidateDateFormatter.string(from: candidate.workout.date)
         return "\(date) · \(candidate.workout.workoutType) · \(RowPlayFormatting.pace(candidate.workout.pace))"
     }
 
