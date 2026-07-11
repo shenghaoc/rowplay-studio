@@ -18,4 +18,4 @@
 - [x] Run the full Swift 6.3.3 build with warnings as errors.
 - [x] Stage and launch `dist/RowPlayStudio.app` with `--verify`.
 - [x] Confirm the staged binary and Info.plist both require macOS 26.0.
-- [ ] Confirm the updated GitHub Actions jobs pass on the pushed head.
+- [x] Confirm the updated GitHub Actions jobs pass on the pushed head.
