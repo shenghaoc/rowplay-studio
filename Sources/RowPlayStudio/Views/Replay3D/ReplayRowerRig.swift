@@ -201,10 +201,4 @@ final class ReplayRowerRig: ReplaySportRig {
         athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
         athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
     }
-
-    // MARK: - Ghost Translucency
-
-    func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
-    }
 }

@@ -98,8 +98,3 @@ public struct ReplayCourseLayout: Equatable, Sendable {
     }
 }
 
-// MARK: - Private
-
-private func finite(_ v: Double, fallback: Double) -> Double {
-    v.isFinite ? v : fallback
-}

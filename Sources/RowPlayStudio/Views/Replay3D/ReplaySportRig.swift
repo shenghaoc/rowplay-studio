@@ -17,6 +17,14 @@ protocol ReplaySportRig: AnyObject {
     func applyGhostTranslucency()
 }
 
+/// Default ghost translucency: recursively applies 0.45 opacity to all materials.
+@MainActor
+extension ReplaySportRig {
+    func applyGhostTranslucency() {
+        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
+    }
+}
+
 /// Factory for building sport-specific rigs.
 @MainActor
 enum ReplaySportRigFactory {

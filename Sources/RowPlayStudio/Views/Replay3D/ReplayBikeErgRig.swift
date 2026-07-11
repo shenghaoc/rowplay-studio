@@ -209,10 +209,4 @@ final class ReplayBikeErgRig: ReplaySportRig {
         athlete.footL.setPosition(pedalL.position(relativeTo: root), relativeTo: root)
         athlete.footR.setPosition(pedalR.position(relativeTo: root), relativeTo: root)
     }
-
-    // MARK: - Ghost Translucency
-
-    func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
-    }
 }

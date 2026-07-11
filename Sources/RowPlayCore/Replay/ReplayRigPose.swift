@@ -343,11 +343,14 @@ public enum ReplayRigPoseSolver {
         let wheelAngle = finite(phase * bikeWheelRatio, fallback: 0)
 
         // Pedal positions: left and right are 180° apart.
+        // cos(x+π) = -cos(x), sin(x+π) = -sin(x) — avoid redundant trig.
         let crankRadius: Double = 0.18
-        let pedalYL = crankRadius * cos(crankAngle)
-        let pedalZL = crankRadius * sin(crankAngle)
-        let pedalYR = crankRadius * cos(crankAngle + Double.pi)
-        let pedalZR = crankRadius * sin(crankAngle + Double.pi)
+        let cosCrank = cos(crankAngle)
+        let sinCrank = sin(crankAngle)
+        let pedalYL = crankRadius * cosCrank
+        let pedalZL = crankRadius * sinCrank
+        let pedalYR = -pedalYL
+        let pedalZR = -pedalZL
 
         // Rider sway with pedal stroke.
         let riderSway = sin(phase) * 0.05 * amp
@@ -368,8 +371,8 @@ public enum ReplayRigPoseSolver {
             hipFlexR: finite(thighAngleR, fallback: 0),
             kneeFlexL: finite(max(0, sin(crankAngle)) * 0.8 * amp, fallback: 0),
             kneeFlexR: finite(max(0, -sin(crankAngle)) * 0.8 * amp, fallback: 0),
-            ankleDorsiL: finite(sin(crankAngle) * 0.15, fallback: 0),
-            ankleDorsiR: finite(sin(crankAngle + Double.pi) * 0.15, fallback: 0)
+            ankleDorsiL: finite(sinCrank * 0.15, fallback: 0),
+            ankleDorsiR: finite(-sinCrank * 0.15, fallback: 0)
         )
 
         return ReplayBikeErgRigPose(
@@ -433,6 +436,7 @@ public enum ReplayRigPoseSolver {
 
 // MARK: - Private Helpers
 
-private func finite(_ v: Double, fallback: Double) -> Double {
+/// Returns `v` if finite, otherwise `fallback`. Shared across Core replay files.
+func finite(_ v: Double, fallback: Double) -> Double {
     v.isFinite ? v : fallback
 }

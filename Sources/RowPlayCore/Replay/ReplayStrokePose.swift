@@ -217,10 +217,6 @@ private func clamp(_ v: Double, lo: Double, hi: Double) -> Double {
     max(lo, min(hi, v))
 }
 
-private func finite(_ v: Double, fallback: Double) -> Double {
-    v.isFinite ? v : fallback
-}
-
 private func defaultRate(for sport: Sport) -> Double {
     switch sport {
     case .bike: 80
