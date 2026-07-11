@@ -34,13 +34,7 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
     }
 
     public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
-        var normalized = annotation
-        normalized.text = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Validate before saving
-        if let error = normalized.validate() {
-            throw AnnotationError.validationFailed(error)
-        }
+        let normalized = try annotation.normalizedForSave()
 
         return try lock.withLock {
             var annotations = storage[workoutId] ?? []
@@ -88,7 +82,40 @@ public final class InMemoryAnnotationStore: AnnotationStore, @unchecked Sendable
 }
 
 /// Errors from annotation operations.
+///
+/// Diagnostic messages must not include annotation text, tokens, complete
+/// workout payloads, or SQL containing user content.
 public enum AnnotationError: Error, Equatable {
     case validationFailed(String)
     case notFound
+    /// The annotation database cannot be opened or is fundamentally unusable.
+    case storageUnavailable
+    /// A specific storage operation failed. The associated string is a
+    /// privacy-safe diagnostic (no user content).
+    case storageFailed(String)
+}
+
+/// Sentinel annotation store that throws ``AnnotationError/storageUnavailable``
+/// for every operation.
+///
+/// Use this as the fallback when the real annotation database cannot be opened.
+/// It does **not** silently fall back to in-memory storage.
+public final class UnavailableAnnotationStore: AnnotationStore, Sendable {
+    public init() {}
+
+    public func loadAnnotations(workoutId: Int) async throws -> [Annotation] {
+        throw AnnotationError.storageUnavailable
+    }
+
+    public func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
+        throw AnnotationError.storageUnavailable
+    }
+
+    public func deleteAnnotation(workoutId: Int, id: Int) async throws {
+        throw AnnotationError.storageUnavailable
+    }
+
+    public func deleteAll() async throws {
+        throw AnnotationError.storageUnavailable
+    }
 }

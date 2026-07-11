@@ -106,7 +106,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes the saved token and clears cached Concept2 workouts from this Mac.")
+            Text("This deletes the saved token, clears cached Concept2 workouts, and removes all local annotations from this Mac.")
         }
     }
 }

@@ -114,7 +114,7 @@ Exit criteria:
 
 ## Phase 5 - Compare, Export, Share, And Annotations
 
-Status: foundation slice merged to `main` (PR #8); persistent annotations, TCX export, and full HR file parsing remain in progress. Local share packages are a native-only capability; public sharing is not a current web-parity target.
+Status: foundation slice merged to `main` (PR #8); persistent annotations merged. TCX export and full HR file parsing remain in progress. Local share packages are a native-only capability; public sharing is not a current web-parity target.
 
 Scope:
 

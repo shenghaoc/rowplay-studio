@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while persistent annotation storage and real hardware transport remain beta blockers below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7. The Phase 0 scaffold and Phase 1–7 PRs are on `main`, while real hardware transport remains a beta blocker below. The app is a functional offline/demo Concept2 logbook analytics and workout replay application built as a SwiftPM package (Swift 5.9+, macOS 14.0+) with zero external dependencies.
 
 ### What Is Implemented
 
@@ -59,7 +59,6 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 ### Must-Fix
 
 1. **No real Bluetooth transport**: `ErgConnection` is protocol-only with a mock. CoreBluetooth transport is needed for real hardware connectivity.
-2. **No persistent annotation storage**: `InMemoryAnnotationStore` loses data on restart. SQLite or Core Data backing is needed for annotations. (Workout cache now has a SQLite foundation via `SQLiteWorkoutCache`.)
 
 ### Should-Fix
 
@@ -76,4 +75,3 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 ## Recommended Next PRs
 
 1. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
-2. **Persistent annotation storage**: Back annotations with SQLite or Core Data so notes survive app restarts.

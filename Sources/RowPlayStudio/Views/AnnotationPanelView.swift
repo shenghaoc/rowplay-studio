@@ -132,13 +132,17 @@ struct AnnotationPanelView: View {
     }
 
     private func annotationErrorText(_ error: Error) -> String {
-        if case let AnnotationError.validationFailed(message) = error {
-            return message
+        if let annotationError = error as? AnnotationError {
+            switch annotationError {
+            case .validationFailed(let message):
+                return message
+            case .storageUnavailable, .storageFailed:
+                return "Annotation storage is unavailable."
+            case .notFound:
+                return "Annotation could not be updated."
+            }
         }
-        if error is AnnotationError {
-            return "Annotation could not be updated."
-        }
-        return error.localizedDescription
+        return "Annotation storage is unavailable."
     }
 }
 

@@ -323,7 +323,7 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertFalse(controller.isConnected)
         XCTAssertEqual(controller.syncState.totalWorkouts, 0)
         XCTAssertNotNil(controller.syncState.lastError)
-        XCTAssertEqual(controller.statusMessage, "Concept2 token deleted; cache cleanup failed.")
+        XCTAssertEqual(controller.statusMessage, "Concept2 token deleted; local data cleanup failed.")
     }
 
     func testSummaryFetchErrorDoesNotExposeToken() async throws {
@@ -382,6 +382,86 @@ final class Concept2SyncControllerTests: XCTestCase {
 
         XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
                         "syncState.lastError must not contain the raw token on disconnect")
+    }
+
+    // MARK: - Annotation Cleanup on Disconnect
+
+    func testDisconnectPurgesAnnotations() async throws {
+        let annotationStore = InMemoryAnnotationStore()
+        _ = try await annotationStore.saveAnnotation(
+            workoutId: 1,
+            Annotation(id: 0, timestamp: 30, text: "Test annotation", createdAt: 100)
+        )
+
+        let cache = InMemoryWorkoutCache()
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { cache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(
+            details: [],
+            annotationStore: annotationStore,
+            defaults: defaults
+        )
+
+        await controller.disconnect(library: library)
+
+        let annotations = try await annotationStore.loadAnnotations(workoutId: 1)
+        XCTAssertTrue(annotations.isEmpty, "Disconnect must purge all annotations")
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertEqual(controller.statusMessage, "Concept2 disconnected.")
+    }
+
+    func testDisconnectReportsCleanupFailureWhenAnnotationDeletionThrows() async throws {
+        let annotationStore = FailingDeleteAnnotationStore()
+        let cache = InMemoryWorkoutCache()
+        let tokenStore = FakeTokenStore(storedToken: "test-token")
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { cache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(
+            details: [],
+            annotationStore: annotationStore,
+            defaults: defaults
+        )
+
+        await controller.disconnect(library: library)
+
+        XCTAssertTrue(controller.isConnected == false)
+        XCTAssertTrue(controller.statusMessage?.contains("cleanup failed") ?? false,
+                       "Expected cleanup failure message, got: \(controller.statusMessage ?? "nil")")
+    }
+
+    func testDisconnectReportsCleanupFailureWhenCacheAndAnnotationBothFail() async throws {
+        let secretToken = "abcdef0123456789abcdef0123456789"
+        let annotationStore = FailingDeleteAnnotationStore()
+
+        let cache = InMemoryWorkoutCache()
+        try await cache.save(detail: makeDetail(id: 1))
+        let failingCache = FailingDeleteCache(wrapping: cache, token: secretToken)
+
+        let tokenStore = FakeTokenStore(storedToken: secretToken)
+        let controller = Concept2SyncController(
+            tokenStore: tokenStore,
+            cacheFactory: { failingCache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(
+            details: [makeDetail(id: 1)],
+            annotationStore: annotationStore,
+            defaults: defaults
+        )
+
+        await controller.disconnect(library: library)
+
+        XCTAssertFalse(controller.syncState.lastError?.contains(secretToken) ?? false,
+                        "syncState.lastError must not contain the raw token")
+        XCTAssertTrue(controller.statusMessage?.contains("cleanup failed") ?? false,
+                       "Expected cleanup failure message, got: \(controller.statusMessage ?? "nil")")
     }
 
     // MARK: - Silent Failure Fixes
@@ -529,4 +609,26 @@ private final class ListFailingWorkoutCache: WorkoutCache, @unchecked Sendable {
     func listWorkouts() async throws -> [Workout] { throw ListError.intentional }
     func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
     func deleteAll() async throws { try await wrapped.deleteAll() }
+}
+
+/// An AnnotationStore that throws from deleteAll to test cleanup failure reporting.
+private final class FailingDeleteAnnotationStore: AnnotationStore, @unchecked Sendable {
+    private let wrapped = InMemoryAnnotationStore()
+
+    func loadAnnotations(workoutId: Int) async throws -> [Annotation] {
+        try await wrapped.loadAnnotations(workoutId: workoutId)
+    }
+
+    func saveAnnotation(workoutId: Int, _ annotation: Annotation) async throws -> Annotation {
+        try await wrapped.saveAnnotation(workoutId: workoutId, annotation)
+    }
+
+    func deleteAnnotation(workoutId: Int, id: Int) async throws {
+        try await wrapped.deleteAnnotation(workoutId: workoutId, id: id)
+    }
+
+    func deleteAll() async throws {
+        struct IntentionalError: Error {}
+        throw IntentionalError()
+    }
 }

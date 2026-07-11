@@ -18,6 +18,17 @@ public struct Annotation: Codable, Equatable, Identifiable, Sendable {
         self.createdAt = createdAt
     }
 
+    /// Return a copy with `text` trimmed and validated, or throw
+    /// ``AnnotationError/validationFailed`` if the result is invalid.
+    public func normalizedForSave() throws -> Annotation {
+        var copy = self
+        copy.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = copy.validate() {
+            throw AnnotationError.validationFailed(error)
+        }
+        return copy
+    }
+
     /// Validate annotation fields. Returns nil if valid, error message otherwise.
     public func validate() -> String? {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
