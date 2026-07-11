@@ -7,13 +7,35 @@ on:
     branches: [main]
 
 jobs:
-  swift:
-    name: Swift
-    runs-on: macos-latest
+  # RowPlayCore: Pure Swift domain logic — test on Linux for cross-platform validation
+  core-linux:
+    name: RowPlayCore (Linux)
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '5.9'
+      - name: Verify Swift version
+        run: swift --version
+      - name: Install SQLite3 development libraries
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - name: Build RowPlayCore
+        run: swift build --target RowPlayCore
+      - name: Test RowPlayCore
+        run: swift test --filter RowPlayCoreTests
+
+  # Full stack: macOS-only targets (RowPlayPlatform + RowPlayStudio)
+  macos:
+    name: macOS (Full Stack)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+      - name: Verify Swift version
+        run: swift --version
       - name: Test
         run: swift test
       - name: Build
         run: swift build
-

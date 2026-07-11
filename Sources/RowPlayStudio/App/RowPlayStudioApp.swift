@@ -1,5 +1,6 @@
 import AppKit
 import RowPlayCore
+import RowPlayPlatform
 import SwiftUI
 
 @main

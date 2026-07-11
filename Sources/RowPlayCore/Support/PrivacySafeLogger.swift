@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(os)
 import os
+#endif
 
 /// Redaction marker substituted for sensitive content.
 public let redactedPlaceholder = "[REDACTED]"
@@ -7,6 +9,19 @@ public let redactedPlaceholder = "[REDACTED]"
 private struct RedactionRule {
     let regex: NSRegularExpression
     let replacement: String
+}
+
+/// Return an NSError only when the original value is an NSError instance (or
+/// subclass), not merely a native Swift Error bridged to NSError on Darwin.
+private func foundationNSError(from value: Any) -> NSError? {
+    var mirror: Mirror? = Mirror(reflecting: value)
+    while let current = mirror {
+        if ObjectIdentifier(current.subjectType) == ObjectIdentifier(NSError.self) {
+            return value as? NSError
+        }
+        mirror = current.superclassMirror
+    }
+    return nil
 }
 
 /// Regex-based patterns that match personally sensitive data.
@@ -48,6 +63,10 @@ public func redact(_ value: Any) -> String {
     let input: String
     if let string = value as? String {
         input = string
+    } else if let error = foundationNSError(from: value) {
+        // `String(describing: NSError)` omits the localized description on
+        // swift-corelibs-foundation, so use the portable Foundation API.
+        input = error.localizedDescription
     } else if let error = value as? Error {
         input = String(describing: error)
     } else {
@@ -82,7 +101,8 @@ func formatPrivacySafeLogMessage(_ message: String, args: [Any]) -> String {
 ///
 /// Mirrors the web app's `createLogger(console)` pattern.
 public struct PrivacySafeLogger: Sendable {
-    private let logger: os.Logger
+    private let subsystem: String
+    private let category: String
 
     /// Create a logger for the specified subsystem and category.
     ///
@@ -90,16 +110,29 @@ public struct PrivacySafeLogger: Sendable {
     ///   - subsystem: The app's bundle identifier or subsystem string.
     ///   - category: The log category (e.g., "sync", "token", "cache").
     public init(subsystem: String = Bundle.main.bundleIdentifier ?? "com.rowplay-studio", category: String) {
-        self.logger = os.Logger(subsystem: subsystem, category: category)
+        self.subsystem = subsystem
+        self.category = category
     }
 
     /// Log an error message with redacted arguments.
     public func error(_ message: String, _ args: Any...) {
-        logger.error("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
+        let formatted = formatPrivacySafeLogMessage(message, args: args)
+        #if canImport(os)
+        let logger = os.Logger(subsystem: subsystem, category: category)
+        logger.error("\(formatted, privacy: .public)")
+        #else
+        print("[ERROR] [\(category)] \(formatted)")
+        #endif
     }
 
     /// Log a warning message with redacted arguments.
     public func warn(_ message: String, _ args: Any...) {
-        logger.warning("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
+        let formatted = formatPrivacySafeLogMessage(message, args: args)
+        #if canImport(os)
+        let logger = os.Logger(subsystem: subsystem, category: category)
+        logger.warning("\(formatted, privacy: .public)")
+        #else
+        print("[WARN] [\(category)] \(formatted)")
+        #endif
     }
 }

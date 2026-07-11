@@ -3,38 +3,41 @@ import Foundation
 import RowPlayCore
 
 @MainActor
-final class WorkoutLibrary: ObservableObject {
-    @Published var details: [WorkoutDetail] {
+public final class WorkoutLibrary: ObservableObject {
+    @Published public var details: [WorkoutDetail] {
         didSet {
             guard !suppressDerivedUpdates else { return }
             updateAllDerivedData()
         }
     }
-    @Published var query: WorkoutListQuery {
+    @Published public var query: WorkoutListQuery {
         didSet {
             guard !suppressDerivedUpdates else { return }
             let sportChanged = query.sport != oldValue.sport
             updateQueryDerivedData(sportChanged: sportChanged)
         }
     }
-    @Published private(set) var pbIds: Set<Int> = []
-    @Published var liveState: LiveModeState = LiveModeState()
-    @Published private(set) var liveSample: LiveWorkoutSample?
+    @Published public private(set) var pbIds: Set<Int> = []
+    @Published public var liveState: LiveModeState = LiveModeState()
+    @Published public private(set) var liveSample: LiveWorkoutSample?
     /// Which data source the library last loaded from.
-    private(set) var librarySource: WorkoutLibrarySource = .empty
-    let annotationStore: any AnnotationStore
+    public private(set) var librarySource: WorkoutLibrarySource = .empty
+    public let annotationStore: any AnnotationStore
 
     private(set) var liveSource: any LiveSource = MockLiveSource()
     private let demoLiveSampleGenerator = DemoLiveSampleGenerator()
 
     // Caches to prevent expensive O(N) and O(N log N) recomputations on every render
-    private(set) var workouts: [Workout] = []
-    private(set) var filteredWorkouts: [Workout] = []
-    private(set) var filteredDetails: [WorkoutDetail] = []
-    private(set) var summary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
-    private(set) var filteredSummary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
-    private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
-    private(set) var filteredRecentPaceWorkouts: [Workout] = []
+    public private(set) var workouts: [Workout] = []
+    public private(set) var filteredWorkouts: [Workout] = []
+    public private(set) var filteredDetails: [WorkoutDetail] = []
+    public private(set) var summary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
+    public private(set) var filteredSummary: DashboardSummary = WorkoutAnalytics.dashboardSummary(for: [])
+    public private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
+    public private(set) var filteredRecentPaceWorkouts: [Workout] = []
+
+    /// Cached comparison candidates for the active workout, invalidated when `details` changes.
+    private var cachedComparisonCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
 
     /// When true, `didSet` observers skip derived-data recomputation.
     /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.
@@ -44,12 +47,12 @@ final class WorkoutLibrary: ObservableObject {
     private var detailByID: [Int: WorkoutDetail] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
-    private(set) var demoDetailIDs: Set<Int>
+    public private(set) var demoDetailIDs: Set<Int>
     private static let demoDetailsByID = Dictionary(
         uniqueKeysWithValues: DemoWorkoutLibrary.details.map { ($0.id, $0) }
     )
 
-    init(
+    public init(
         details: [WorkoutDetail],
         query: WorkoutListQuery = WorkoutQuery.defaultQuery,
         annotationStore: any AnnotationStore = InMemoryAnnotationStore(),
@@ -73,29 +76,33 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     /// Creates a library populated with demo data if the persisted preference allows it.
-    static func demo(defaults: UserDefaults = .standard) -> WorkoutLibrary {
+    public static func demo(defaults: UserDefaults = .standard) -> WorkoutLibrary {
         let demoEnabled = persistedDemoModeEnabled(in: defaults)
         return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [], defaults: defaults)
     }
 
-    private(set) var availableWorkoutTypes: [String] = []
+    public private(set) var availableWorkoutTypes: [String] = []
 
-    func detail(id: Int) -> WorkoutDetail? {
+    public func detail(id: Int) -> WorkoutDetail? {
         detailByID[id]
     }
 
-    func updateDetail(_ detail: WorkoutDetail) {
+    public func updateDetail(_ detail: WorkoutDetail) {
         guard let index = details.firstIndex(where: { $0.id == detail.id }) else { return }
         var updatedDetails = details
         updatedDetails[index] = detail
         details = updatedDetails
     }
 
-    func comparisonCandidates(for workoutID: Int) -> [WorkoutDetail] {
+    public func comparisonCandidates(for workoutID: Int) -> [WorkoutDetail] {
+        if let cachedComparisonCandidates,
+           cachedComparisonCandidates.workoutID == workoutID {
+            return cachedComparisonCandidates.candidates
+        }
         guard let target = detailByID[workoutID] else { return [] }
         let targetContext = comparableContext(for: target.workout)
 
-        return details
+        let candidates = details
             .filter { candidate in
                 candidate.id != workoutID && candidate.workout.sport == target.workout.sport
             }
@@ -126,20 +133,23 @@ final class WorkoutLibrary: ObservableObject {
 
                 return lhs.workout.date > rhs.workout.date
             }
+
+        cachedComparisonCandidates = (workoutID, candidates)
+        return candidates
     }
 
-    func reloadDemoData() {
+    public func reloadDemoData() {
         details = DemoWorkoutLibrary.details
         demoDetailIDs = Set(DemoWorkoutLibrary.details.map(\.id))
         librarySource = .demo
         query = WorkoutQuery.defaultQuery
     }
 
-    var isEmpty: Bool {
+    public var isEmpty: Bool {
         details.isEmpty
     }
 
-    func clearData() {
+    public func clearData() {
         details = []
         demoDetailIDs = []
         librarySource = .empty
@@ -147,7 +157,7 @@ final class WorkoutLibrary: ObservableObject {
     }
 
     /// Disable demo mode if currently enabled (e.g. after syncing real Concept2 data).
-    func disableDemoModeIfNeeded() {
+    public func disableDemoModeIfNeeded() {
         if demoModeEnabled {
             demoModeEnabled = false
             defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
@@ -159,7 +169,7 @@ final class WorkoutLibrary: ObservableObject {
     /// Uses the library's internal ``demoModeEnabled`` state (persisted in UserDefaults)
     /// to decide the fallback. This replaces all existing details with the fresh load result.
     /// Cache errors propagate to the caller and do not silently fall back to demo data.
-    func loadFromSource(cache: WorkoutCache) async throws {
+    public func loadFromSource(cache: WorkoutCache) async throws {
         let snapshot = try await WorkoutLibraryLoader.load(
             cache: cache,
             demoModeEnabled: demoModeEnabled
@@ -169,7 +179,7 @@ final class WorkoutLibrary: ObservableObject {
 
     /// Reload from cache without demo fallback, then disable demo mode after the
     /// cache result has been applied successfully.
-    func loadSyncedSource(cache: WorkoutCache) async throws {
+    public func loadSyncedSource(cache: WorkoutCache) async throws {
         let snapshot = try await WorkoutLibraryLoader.load(
             cache: cache,
             demoModeEnabled: false
@@ -251,29 +261,29 @@ final class WorkoutLibrary: ObservableObject {
 
     // MARK: - Live Mode
 
-    func startLiveMode(at date: Date = Date()) {
+    public func startLiveMode(at date: Date = Date()) {
         liveState.start()
         advanceDemoLiveSample(at: date)
     }
 
-    func stopLiveMode() {
+    public func stopLiveMode() {
         liveState.stop()
         liveSample = nil
         demoLiveSampleGenerator.reset()
     }
 
-    func setLiveInterval(_ sec: Int) {
+    public func setLiveInterval(_ sec: Int) {
         let previousInterval = liveState.intervalSec
         liveState.intervalChanged(sec)
         guard liveState.enabled, liveState.intervalSec != previousInterval else { return }
         liveState.tickScheduled(at: Date().addingTimeInterval(TimeInterval(liveState.intervalSec)))
     }
 
-    func setLiveSource(_ source: any LiveSource) {
+    public func setLiveSource(_ source: any LiveSource) {
         liveSource = source
     }
 
-    func advanceDemoLiveSample(at date: Date = Date()) {
+    public func advanceDemoLiveSample(at date: Date = Date()) {
         guard liveState.enabled else { return }
         liveState.pollStarted()
         liveSample = demoLiveSampleGenerator.nextSample(at: date)
@@ -281,7 +291,7 @@ final class WorkoutLibrary: ObservableObject {
         liveState.tickScheduled(at: date.addingTimeInterval(TimeInterval(liveState.intervalSec)))
     }
 
-    func advanceDemoLiveSampleIfDue(at date: Date = Date()) {
+    public func advanceDemoLiveSampleIfDue(at date: Date = Date()) {
         guard liveState.enabled else { return }
         guard let nextPollAt = liveState.nextPollAt else {
             advanceDemoLiveSample(at: date)
@@ -292,7 +302,7 @@ final class WorkoutLibrary: ObservableObject {
         }
     }
 
-    func ingestLiveResult(_ result: LivePollResult) {
+    public func ingestLiveResult(_ result: LivePollResult) {
         var existingIDs = Set(details.map(\.id))
         var newWorkouts: [Workout] = []
         for workout in result.workouts where !existingIDs.contains(workout.id) {
@@ -318,6 +328,7 @@ final class WorkoutLibrary: ObservableObject {
         workouts = details.map(\.workout)
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
         availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()
+        cachedComparisonCandidates = nil
         updateQueryDerivedData(sportChanged: true)
     }
 

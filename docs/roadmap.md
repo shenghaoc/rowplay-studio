@@ -21,6 +21,14 @@ web app is stateless with no KV/D1 workout cache:
 See web `.kiro/specs/remove-kv-d1/` for the authoritative web architecture
 spec.
 
+## Native Architecture
+
+The native app uses a three-layer architecture:
+
+- **RowPlayCore** — Pure Swift domain logic with no platform dependencies. Importable by future iOS targets.
+- **RowPlayPlatform** — macOS non-UI layer using Foundation and Combine. Contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), and factories (AnnotationStoreFactory).
+- **RowPlayStudio** — SwiftUI macOS UI layer. Contains `@main` entry and all Views.
+
 ## Phase 0 - Native Bootstrap
 
 Status: merged to `main`.

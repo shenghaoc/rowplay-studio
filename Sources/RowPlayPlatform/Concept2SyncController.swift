@@ -2,13 +2,13 @@ import Foundation
 import RowPlayCore
 
 @MainActor
-final class Concept2SyncController: ObservableObject {
-    typealias CacheFactory = () throws -> any WorkoutCache
-    typealias ClientFactory = (String) -> any Concept2APIClient
+public final class Concept2SyncController: ObservableObject {
+    public typealias CacheFactory = () throws -> any WorkoutCache
+    public typealias ClientFactory = (String) -> any Concept2APIClient
 
-    @Published private(set) var syncState: SyncState
-    @Published private(set) var isConnected: Bool
-    @Published private(set) var statusMessage: String?
+    @Published public private(set) var syncState: SyncState
+    @Published public private(set) var isConnected: Bool
+    @Published public private(set) var statusMessage: String?
 
     private let tokenStore: any TokenStore
     private let cacheFactory: CacheFactory
@@ -16,7 +16,7 @@ final class Concept2SyncController: ObservableObject {
     private var cache: (any WorkoutCache)?
     private var tracker: SyncStateTracker?
 
-    init(
+    public init(
         tokenStore: any TokenStore = KeychainTokenStore(),
         cacheFactory: @escaping CacheFactory = {
             try SQLiteWorkoutCache(path: try Concept2SyncController.defaultCachePath())
@@ -40,11 +40,11 @@ final class Concept2SyncController: ObservableObject {
         }
     }
 
-    var canSync: Bool {
+    public var canSync: Bool {
         isConnected && !syncState.inProgress
     }
 
-    func loadCachedWorkouts(into library: WorkoutLibrary) async {
+    public func loadCachedWorkouts(into library: WorkoutLibrary) async {
         guard !syncState.inProgress else { return }
 
         do {
@@ -64,7 +64,7 @@ final class Concept2SyncController: ObservableObject {
         }
     }
 
-    func saveToken(_ token: String) {
+    public func saveToken(_ token: String) {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             statusMessage = "Enter a Concept2 token."
@@ -86,7 +86,7 @@ final class Concept2SyncController: ObservableObject {
         }
     }
 
-    func syncNow(into library: WorkoutLibrary) async {
+    public func syncNow(into library: WorkoutLibrary) async {
         guard !syncState.inProgress else { return }
 
         do {
@@ -122,15 +122,17 @@ final class Concept2SyncController: ObservableObject {
         }
     }
 
-    func disconnect(library: WorkoutLibrary) async {
+    public func disconnect(library: WorkoutLibrary) async {
+        var tokenDeleteFailed = false
+        var tokenDeleteError: (message: String, date: Date)?
         do {
             try tokenStore.deleteToken()
             isConnected = false
         } catch {
-            syncState.lastError = redact(error)
-            syncState.lastErrorDate = Date()
-            statusMessage = "Could not delete Concept2 token."
-            return
+            tokenDeleteFailed = true
+            tokenDeleteError = (redact(error), Date())
+            syncState.lastError = tokenDeleteError?.message
+            syncState.lastErrorDate = tokenDeleteError?.date
         }
 
         var cacheCleanupFailed = false
@@ -177,14 +179,23 @@ final class Concept2SyncController: ObservableObject {
 
         library.clearData()
 
-        if cacheCleanupFailed || annotationCleanupFailed {
+        let localCleanupFailed = cacheCleanupFailed || annotationCleanupFailed
+        if let tokenDeleteError, !localCleanupFailed {
+            syncState.lastError = tokenDeleteError.message
+            syncState.lastErrorDate = tokenDeleteError.date
+        }
+        if tokenDeleteFailed {
+            statusMessage = localCleanupFailed
+                ? "Could not delete Concept2 token; some local cleanup also failed."
+                : "Could not delete Concept2 token; local data cleared."
+        } else if localCleanupFailed {
             statusMessage = "Concept2 token deleted; local data cleanup failed."
         } else {
             statusMessage = "Concept2 disconnected."
         }
     }
 
-    nonisolated static func defaultCachePath(fileManager: FileManager = .default) throws -> String {
+    nonisolated public static func defaultCachePath(fileManager: FileManager = .default) throws -> String {
         let base = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,

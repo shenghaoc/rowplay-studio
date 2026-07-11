@@ -1,6 +1,6 @@
 import XCTest
 @testable import RowPlayCore
-@testable import RowPlayStudio
+@testable import RowPlayPlatform
 
 /// A Concept2APIClient that delegates fetchWorkouts to a caller-provided handler and throws on fetchWorkoutDetail.
 private final class FailingConcept2Client: Concept2APIClient, Sendable {
@@ -490,22 +490,44 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Could not save Concept2 token.")
     }
 
-    func testDisconnectStoresErrorWhenTokenDeleteFails() async {
+    func testDisconnectContinuesLocalCleanupWhenTokenDeleteFails() async throws {
         struct TokenDeleteError: Error {}
         let tokenStore = FakeTokenStore(storedToken: "test-token")
         tokenStore.deleteError = TokenDeleteError()
 
+        let detail = makeDetail(id: 7)
+        let cache = InMemoryWorkoutCache()
+        try await cache.save(detail: detail)
+
+        let annotationStore = InMemoryAnnotationStore()
+        _ = try await annotationStore.saveAnnotation(
+            workoutId: detail.id,
+            Annotation(id: 0, timestamp: 10, text: "Private note", createdAt: 100)
+        )
+
         let controller = Concept2SyncController(
             tokenStore: tokenStore,
-            cacheFactory: { InMemoryWorkoutCache() },
+            cacheFactory: { cache },
             clientFactory: { _ in MockConcept2Client(details: []) }
         )
-        let library = WorkoutLibrary(details: [], defaults: defaults)
+        let library = WorkoutLibrary(
+            details: [detail],
+            annotationStore: annotationStore,
+            defaults: defaults
+        )
 
         await controller.disconnect(library: library)
 
+        let cachedWorkouts = try await cache.listWorkouts()
+        let annotations = try await annotationStore.loadAnnotations(workoutId: detail.id)
+
+        XCTAssertTrue(controller.isConnected)
+        XCTAssertEqual(try tokenStore.loadToken(), "test-token")
+        XCTAssertTrue(cachedWorkouts.isEmpty)
+        XCTAssertTrue(annotations.isEmpty)
+        XCTAssertTrue(library.isEmpty)
         XCTAssertNotNil(controller.syncState.lastError)
-        XCTAssertEqual(controller.statusMessage, "Could not delete Concept2 token.")
+        XCTAssertEqual(controller.statusMessage, "Could not delete Concept2 token; local data cleared.")
     }
 
     func testLoadCachedWorkoutsStoresErrorWhenCacheFactoryThrows() async {

@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(SQLite3)
 import SQLite3
+#else
+import CSQLite3
+#endif
 
 /// Schema migration logic for the SQLite workout cache.
 ///

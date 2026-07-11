@@ -1,6 +1,6 @@
 import XCTest
 @testable import RowPlayCore
-@testable import RowPlayStudio
+@testable import RowPlayPlatform
 
 @MainActor
 final class WorkoutLibraryDemoModeTests: XCTestCase {

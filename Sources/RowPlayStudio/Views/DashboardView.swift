@@ -1,5 +1,6 @@
 import Charts
 import RowPlayCore
+import RowPlayPlatform
 import SwiftUI
 
 struct DashboardView: View {
