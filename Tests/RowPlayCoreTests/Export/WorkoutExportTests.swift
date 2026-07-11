@@ -123,6 +123,37 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertEqual(result, "\"'\r=cmd\"")
     }
 
+    func testCsvCellProtectsTabPrefix() {
+        let result = WorkoutExport.csvCell("\t=cmd")
+        // Tab is stripped by .whitespacesAndNewlines for detection; original s preserved with prefix
+        XCTAssertEqual(result, "'\t=cmd")
+    }
+
+    func testCsvCellProtectsStandaloneTabPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\ttext"), "'\ttext")
+    }
+
+    func testCsvCellProtectsStandaloneCarriageReturnPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\rtext"), "\"'\rtext\"")
+    }
+
+    func testCsvCellProtectsStandaloneLineFeedPrefix() {
+        XCTAssertEqual(WorkoutExport.csvCell("\ntext"), "\"'\ntext\"")
+    }
+
+    func testCsvCellProtectsCRLFPrefix() {
+        let result = WorkoutExport.csvCell("\r\n=cmd")
+        // CRLF triggers both formula prefix (') via .whitespacesAndNewlines trimming,
+        // and RFC 4180 quoting via unicodeScalars-level CR/LF detection
+        XCTAssertEqual(result, "\"'\r\n=cmd\"")
+    }
+
+    func testCsvCellProtectsDoubleNewlinePrefix() {
+        let result = WorkoutExport.csvCell("\n\n=cmd")
+        // Newlines trigger RFC 4180 quoting; formula prefix still applied
+        XCTAssertEqual(result, "\"'\n\n=cmd\"")
+    }
+
     func testCsvCellNil() {
         XCTAssertEqual(WorkoutExport.csvCell(nil as String?), "")
     }

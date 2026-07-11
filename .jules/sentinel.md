@@ -17,3 +17,8 @@
 **Vulnerability:** The HTTP transport created for API calls relied on `URLSessionConfiguration.default`, which has a very high `timeoutIntervalForResource` (7 days) and a generic `timeoutIntervalForRequest` (60 seconds). This could lead to resource exhaustion if connecting to a slow or hanging server.
 **Learning:** Default configuration parameters may not be suited for robust network interactions where prompt failure is preferred over indefinitely tied-up resources.
 **Prevention:** Explicitly configure timeout limits on any `URLSessionConfiguration` that will be used to initialize a `URLSession`, setting strict thresholds for both `timeoutIntervalForRequest` and `timeoutIntervalForResource`.
+
+## 2026-07-07 - CSV Formula Injection Evasion via Newlines
+**Vulnerability:** The existing CSV Formula Injection protection checked the very first character of the input string for formula triggers (`=`, `+`, etc.) after trimming `.whitespaces`. This could still be bypassed by an attacker adding leading newline characters (e.g., `\n=cmd|...`), which spreadsheet software like Excel handles and then evaluates the formula.
+**Learning:** Checking the first character of a string trimmed only by `.whitespaces` is insufficient for CSV injection protection because spreadsheet parsers are robust against leading newlines and tabs.
+**Prevention:** Always strip leading whitespaces AND newlines before determining if the string begins with a formula trigger character. Use `.whitespacesAndNewlines` instead of `.whitespaces`.
