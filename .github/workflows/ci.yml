@@ -7,8 +7,21 @@ on:
     branches: [main]
 
 jobs:
-  swift:
-    name: Swift
+  # RowPlayCore: Pure Swift domain logic — test on Linux for cross-platform validation
+  core-linux:
+    name: RowPlayCore (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: '5.9'
+      - name: Test RowPlayCore
+        run: swift test --filter RowPlayCoreTests
+
+  # Full stack: macOS-only targets (RowPlayMacOS + RowPlayStudio)
+  macos:
+    name: macOS (Full Stack)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
