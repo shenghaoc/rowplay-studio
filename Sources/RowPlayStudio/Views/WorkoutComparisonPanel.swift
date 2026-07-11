@@ -73,7 +73,9 @@ struct WorkoutComparisonPanel: View {
 
     // ⚡ Bolt: Cache DateFormatter to avoid expensive instantiation in list loops.
     // .formatted() creates a new formatter implicitly on every call.
-    // Uses autoupdatingCurrent so the cached formatter adapts to runtime locale changes.
+    // No NSLock needed: SwiftUI evaluates body on the main thread.
+    // Uses autoupdatingCurrent so month/day names translate on locale change;
+    // component ordering is fixed at init time based on the initial locale.
     private static let candidateDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = .autoupdatingCurrent
