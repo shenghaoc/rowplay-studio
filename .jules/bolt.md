@@ -4,4 +4,4 @@
 
 ## 2024-05-18 - Caching DateFormatter for SwiftUI view performance
 **Learning:** In SwiftUI, `Date.formatted(...)` implicitly creates a new formatting instance on every call. Doing this inside a list loop (like `ForEach` in a `Picker`) can cause significant overhead and drop frames, as the string formatting object is recreated for each item during the view's evaluation.
-**Action:** Use a `static let DateFormatter` explicitly configured with `setLocalizedDateFormatFromTemplate` instead of using the inline `.formatted` extensions inside computed properties accessed during list rendering.
+**Action:** Use a `static let DateFormatter` explicitly configured with `setLocalizedDateFormatFromTemplate` instead of using the inline `.formatted` extensions inside computed properties accessed during list rendering. Set `formatter.locale = .autoupdatingCurrent` so the cached formatter adapts if the user changes their system locale at runtime.

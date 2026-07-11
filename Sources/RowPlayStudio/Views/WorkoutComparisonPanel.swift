@@ -73,8 +73,10 @@ struct WorkoutComparisonPanel: View {
 
     // ⚡ Bolt: Cache DateFormatter to avoid expensive instantiation in list loops.
     // .formatted() creates a new formatter implicitly on every call.
+    // Uses autoupdatingCurrent so the cached formatter adapts to runtime locale changes.
     private static let candidateDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
         formatter.setLocalizedDateFormatFromTemplate("yMMMd")
         return formatter
     }()
