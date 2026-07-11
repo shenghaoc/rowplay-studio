@@ -12,13 +12,13 @@
       "context": { "peakWatts": 280, "medianWatts": 220, "medianDPS": 12, "medianHR": 160, "maxHR": 178 },
       "queryTime": 3.0,
       "expected": {
-        "index": 0,
+        "index": 1,
         "cycleFrac": 0.5,
-        "drive": true,
-        "intensityRange": [0.60, 0.65],
-        "fatigueRange": [0.12, 0.14],
-        "amplitudeRange": [1.05, 1.10],
-        "driveFracRange": [0.38, 0.42]
+        "drive": false,
+        "intensityRange": [0.76, 0.77],
+        "fatigueRange": [0.24, 0.25],
+        "amplitudeRange": [1.13, 1.14],
+        "driveFracRange": [0.45, 0.46]
       }
     },
     {
@@ -32,13 +32,13 @@
       "context": { "peakWatts": 260, "medianWatts": 200, "medianDPS": 9, "medianHR": 165, "maxHR": 175 },
       "queryTime": 2.25,
       "expected": {
-        "index": 0,
+        "index": 1,
         "cycleFrac": 0.5,
-        "drive": true,
-        "driveFracRange": [0.32, 0.38],
-        "intensityRange": [0.50, 0.70],
-        "fatigueRange": [0.10, 0.20],
-        "amplitudeRange": [1.00, 1.15]
+        "drive": false,
+        "driveFracRange": [0.459, 0.461],
+        "intensityRange": [0.80, 0.81],
+        "fatigueRange": [0.29, 0.30],
+        "amplitudeRange": [1.15, 1.17]
       }
     },
     {
@@ -52,13 +52,13 @@
       "context": { "peakWatts": 320, "medianWatts": 250, "medianDPS": 6, "medianHR": 155, "maxHR": 165 },
       "queryTime": 1.5,
       "expected": {
-        "index": 0,
+        "index": 1,
         "cycleFrac": 0.5,
         "drive": false,
         "driveFrac": 0.5,
-        "intensityRange": [0.55, 0.65],
-        "fatigueRange": [0.15, 0.25],
-        "amplitudeRange": [1.03, 1.12]
+        "intensityRange": [0.74, 0.76],
+        "fatigueRange": [0.28, 0.30],
+        "amplitudeRange": [1.12, 1.14]
       }
     }
   ]

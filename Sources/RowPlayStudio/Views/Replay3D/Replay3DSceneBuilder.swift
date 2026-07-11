@@ -246,14 +246,23 @@ enum Replay3DSceneBuilder {
     ) {
         let radius = Float(layout.loopRadius)
 
-        // Main lane ring — approximated with a flattened torus-like mesh
-        let ringMesh = MeshResource.generateBox(size: SIMD3(radius * 2, 0.06, radius * 2))
+        // Main lane ring. Build a narrow annulus from tangent-aligned segments
+        // rather than a single box, which would cover the entire course
+        // interior and obscure the sport-specific ground surface.
+        let segmentCount = 160
+        let laneWidth: Float = 5
+        let segmentLength = (2 * Float.pi * radius) / Float(segmentCount) * 1.02
+        let ringMesh = MeshResource.generateBox(size: SIMD3(segmentLength, 0.06, laneWidth))
         let ringColor = laneColor(for: sport, colorScheme: colorScheme)
         let ringMat = SimpleMaterial(color: ringColor, roughness: 0.5, isMetallic: false)
-        let ring = ModelEntity(mesh: ringMesh, materials: [ringMat])
-        ring.name = "lane-ring"
-        ring.position = SIMD3(0, 0.03, 0)
-        parent.addChild(ring)
+        for index in 0..<segmentCount {
+            let angle = Float(index) / Float(segmentCount) * Float.pi * 2
+            let ringSegment = ModelEntity(mesh: ringMesh, materials: [ringMat])
+            ringSegment.name = "lane-ring-segment-\(index)"
+            ringSegment.position = SIMD3(radius * sin(angle), 0.03, radius * cos(angle))
+            ringSegment.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
+            parent.addChild(ringSegment)
+        }
 
         // Use small boxes around the circle as lane markers
         let markerMesh = MeshResource.generateBox(size: SIMD3(0.12, 0.08, 0.4))

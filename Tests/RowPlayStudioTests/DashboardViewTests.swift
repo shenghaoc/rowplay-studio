@@ -52,4 +52,14 @@ final class ReplayRendererModeTests: XCTestCase {
             XCTAssertEqual(mode.id, mode.rawValue)
         }
     }
+
+    func testGhostUsesElapsedReplayTimeInsteadOfLiveProgress() {
+        let strokes = [
+            Stroke(t: 10, d: 20, pace: 120, cadence: 28, watts: 150),
+            Stroke(t: 20, d: 100, pace: 120, cadence: 28, watts: 170),
+        ]
+
+        XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 4, strokes: strokes), 14)
+        XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 50, strokes: strokes), 20)
+    }
 }

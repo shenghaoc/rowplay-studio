@@ -147,8 +147,7 @@ struct RealityReplaySceneView: View {
     private func currentGhostPose() -> ReplayStrokePose? {
         guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return nil }
         guard let context = sceneState.ghostPoseContext else { return nil }
-        let ghostDist = ghostDistance()
-        let ghostTime = timeAtDistance(ghostDist, strokes: ghost.strokes)
+        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
         let ghostFrame = ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime)
         let strokeIndex = ReplaySample.sampleIndexAt(strokes: ghost.strokes, t: ghostTime)
         guard strokeIndex >= 0 else {
@@ -176,15 +175,13 @@ struct RealityReplaySceneView: View {
     }
 
     private func ghostDistance() -> Double {
-        guard let ghost = ghostDetail else { return 0 }
-        let ghostTotal = ghost.strokes.last?.d ?? ghost.workout.distance
-        return state.currentFrame.progress * ghostTotal
+        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return 0 }
+        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
+        return ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime).d
     }
 
-    private func timeAtDistance(_ distance: Double, strokes: [Stroke]) -> TimeInterval {
-        guard !strokes.isEmpty else { return 0 }
-        if distance <= 0 { return strokes.first?.t ?? 0 }
-        return strokes.first { $0.d >= distance }?.t ?? strokes.last?.t ?? 0
+    private func ghostTimeAtCurrentElapsedTime(strokes: [Stroke]) -> TimeInterval {
+        Replay3DPlayback.absoluteTime(elapsed: state.time, strokes: strokes)
     }
 
     // MARK: - Context Builders (called once)
@@ -261,6 +258,15 @@ struct RealityReplaySceneView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+}
+
+enum Replay3DPlayback {
+    static func absoluteTime(elapsed: TimeInterval, strokes: [Stroke]) -> TimeInterval {
+        guard let firstTime = strokes.first?.t, let lastTime = strokes.last?.t else { return 0 }
+        let duration = max(0, lastTime - firstTime)
+        let safeElapsed = elapsed.isFinite ? elapsed : 0
+        return firstTime + min(max(0, safeElapsed), duration)
     }
 }
 

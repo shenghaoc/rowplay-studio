@@ -352,13 +352,23 @@ final class ReplayStrokePoseTests: XCTestCase {
         struct CaseEntry: Codable {
             let name: String
             let sport: String
+            let strokes: [Stroke]
+            let context: ContextEntry
             let queryTime: Double
             let expected: ExpectedEntry
+        }
+        struct ContextEntry: Codable {
+            let peakWatts: Int
+            let medianWatts: Int
+            let medianDPS: Double
+            let medianHR: Int
+            let maxHR: Int
         }
         struct ExpectedEntry: Codable {
             let index: Int
             let cycleFrac: Double
             let drive: Bool
+            let driveFrac: Double?
             let driveFracRange: [Double]?
             let intensityRange: [Double]?
             let fatigueRange: [Double]?
@@ -372,15 +382,76 @@ final class ReplayStrokePoseTests: XCTestCase {
         XCTAssertFalse(fixture.cases.isEmpty, "Parity fixture should have cases")
 
         for testCase in fixture.cases {
-            // Verify ranges are structurally valid
-            if let range = testCase.expected.intensityRange {
-                XCTAssertEqual(range.count, 2)
-                XCTAssertTrue(range[0] <= range[1], "\(testCase.name): intensity range invalid")
+            let sport: Sport
+            switch testCase.sport {
+            case "rower": sport = .rower
+            case "skierg": sport = .skierg
+            case "bike": sport = .bike
+            default:
+                XCTFail("\(testCase.name): unknown sport \(testCase.sport)")
+                continue
             }
-            if let range = testCase.expected.driveFracRange {
-                XCTAssertEqual(range.count, 2)
-                XCTAssertTrue(range[0] <= range[1], "\(testCase.name): driveFrac range invalid")
+            guard let index = testCase.strokes.firstIndex(where: { testCase.queryTime < $0.t })
+                ?? testCase.strokes.indices.last else {
+                XCTFail("\(testCase.name): no sampled stroke")
+                continue
             }
+            let end = testCase.strokes[index]
+            let startTime = index > 0 ? testCase.strokes[index - 1].t : 0
+            let startDistance = index > 0 ? testCase.strokes[index - 1].d : 0
+            let duration = testCase.strokes.last?.t ?? 0
+            let frame = ReplayFrame(
+                t: testCase.queryTime,
+                d: end.d,
+                pace: end.pace,
+                cadence: end.cadence,
+                heartRate: end.heartRate,
+                watts: end.watts,
+                progress: duration > 0 ? testCase.queryTime / duration : 0
+            )
+            let pose = ReplayStrokePose.computeAtTime(
+                frame: frame,
+                strokeStartTime: startTime,
+                strokeEndTime: end.t,
+                strokeStartDistance: startDistance,
+                strokeEndDistance: end.d,
+                strokeIndex: index,
+                context: ReplayStrokePoseContext(
+                    sport: sport,
+                    peakWatts: testCase.context.peakWatts,
+                    medianWatts: testCase.context.medianWatts,
+                    medianDPS: testCase.context.medianDPS,
+                    maxHR: testCase.context.maxHR
+                ),
+                medianHR: testCase.context.medianHR,
+                duration: duration
+            )
+
+            XCTAssertEqual(pose.index, testCase.expected.index, "\(testCase.name): index")
+            XCTAssertEqual(pose.cycleFrac, testCase.expected.cycleFrac, accuracy: 0.000_001, "\(testCase.name): cycleFrac")
+            XCTAssertEqual(pose.drive, testCase.expected.drive, "\(testCase.name): drive")
+            if let expected = testCase.expected.driveFrac {
+                XCTAssertEqual(pose.driveFrac, expected, accuracy: 0.000_001, "\(testCase.name): driveFrac")
+            }
+            assert(pose.driveFrac, in: testCase.expected.driveFracRange, name: testCase.name, field: "driveFrac")
+            assert(pose.intensity, in: testCase.expected.intensityRange, name: testCase.name, field: "intensity")
+            assert(pose.fatigue, in: testCase.expected.fatigueRange, name: testCase.name, field: "fatigue")
+            assert(pose.amplitude, in: testCase.expected.amplitudeRange, name: testCase.name, field: "amplitude")
         }
+    }
+
+    private func assert(
+        _ value: Double,
+        in range: [Double]?,
+        name: String,
+        field: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let range else { return }
+        XCTAssertEqual(range.count, 2, "\(name): \(field) range", file: file, line: line)
+        guard range.count == 2 else { return }
+        XCTAssertGreaterThanOrEqual(value, range[0], "\(name): \(field) below range", file: file, line: line)
+        XCTAssertLessThanOrEqual(value, range[1], "\(name): \(field) above range", file: file, line: line)
     }
 }
