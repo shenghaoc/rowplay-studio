@@ -22,6 +22,10 @@ struct WorkoutFileActionsView: View {
                         Label("Export JSON", systemImage: "curlybraces")
                     }
 
+                    Button(action: saveTCX) {
+                        Label("Export TCX", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                    }
+
                     Button(action: saveSharePackage) {
                         Label("Share Package", systemImage: "square.and.arrow.up")
                     }
@@ -64,6 +68,13 @@ struct WorkoutFileActionsView: View {
         let filename = WorkoutExport.workoutExportFilename(id: detail.id, ext: "json")
         let data = Data(WorkoutExport.json([detail.workout]).utf8)
         save(data: data, suggestedFilename: filename, contentTypes: [.json])
+    }
+
+    private func saveTCX() {
+        let filename = WorkoutExport.workoutExportFilename(id: detail.id, ext: "tcx")
+        let data = Data(WorkoutExport.tcx(detail).utf8)
+        let tcxType = UTType(filenameExtension: "tcx") ?? .xml
+        save(data: data, suggestedFilename: filename, contentTypes: [tcxType])
     }
 
     private func saveSharePackage() {

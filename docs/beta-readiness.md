@@ -62,8 +62,7 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 
 ### Should-Fix
 
-1. **No TCX export**: Deferred from Phase 5; needed for round-trip with Concept2 ecosystem tools.
-2. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
+1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
 
 ## Must Not Ship Yet
 
