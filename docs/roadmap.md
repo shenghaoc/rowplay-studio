@@ -176,7 +176,7 @@ Exit criteria:
 
 ### Phase 8A - RealityKit Replay Foundation
 
-Status: foundation PR in progress.
+Status: merged to `main` (PR #47).
 
 Scope:
 
@@ -206,18 +206,58 @@ Non-goals for Phase 8A:
 - Particles, water simulation, interactive orbit camera, quality presets.
 - Metal shaders, SceneKit, Bluetooth, HR parsers, OAuth, public sharing.
 
-### Phase 8B+ - Future 3D Replay
+### Phase 8B - Articulated Sport Rigs
 
-Status: not started.
+Status: in progress.
 
-Scope (future PRs):
+Scope:
 
-- Final athlete rigs with higher-detail meshes and smooth animation.
+- Add `ReplayRigPose.swift` in `RowPlayCore` with portable, deterministic rig-pose value types (`ReplayAthleteJointPose`, `RowerRigPose`, `SkiErgRigPose`, `BikeErgRigPose`, `ReplaySportRigPose`) and `ReplayRigPoseSolver`.
+- Split Phase 8A placeholder `ReplaySportModels.swift` into focused files: `ReplaySportRig.swift` (protocol + factory), `ReplayAthleteRig.swift` (articulated body hierarchy), `ReplayRowerRig.swift`, `ReplaySkiErgRig.swift`, `ReplayBikeErgRig.swift`, `ReplayMeshFactory.swift` (reusable mesh/material helpers).
+- Build articulated entity hierarchies with named pivots: pelvis → torso → shoulders → arms → hands; pelvis → thighs → shins → feet.
+- Translate web `renderer3d.ts` avatar animation formulas: rower seat/handle/oar sweep, SkiErg crunch/pull, BikeErg crank/pedal/leg IK.
+- Contact invariants: hands on handle/handlebar, feet at footplate/platform/pedals, pelvis on seat/saddle, oars pivot from gates.
+- Ghost translucency applied recursively to every rig material.
+- Reduced motion returns stable neutral pose.
+- All solver inputs/outputs sanitized (no NaN/Infinity).
+- Tests: `ReplayRigPoseTests` (Core), `ReplaySportRigStructureTests` (Studio).
+
+Exit criteria:
+
+- `swift test` passes with all new and regression tests.
+- `swift build` passes.
+- Architecture checks pass (no forbidden imports in Core/Platform).
+- Articulated rigs replace Phase 8A placeholders.
+- Contact points do not visibly separate during animation.
+- Live and ghost rigs animate independently.
+
+Non-goals for Phase 8B:
+
 - Interactive orbit camera and camera presets.
 - Quality tiers (low/medium/high/ultra).
 - Water/snow surface effects, catch spray, wake trails.
 - Imported USD/USDZ sport equipment assets.
 - Performance governor and adaptive quality.
+
+### Phase 8C+ - Future 3D Replay
+
+Status: not started.
+
+Scope (future PRs):
+
+- Interactive orbit camera and camera presets.
+- Water/snow surface effects, catch spray, wake trails.
+- Imported USD/USDZ sport equipment assets.
+
+### Phase 8D - Performance and Polish
+
+Status: not started.
+
+Scope (future PRs):
+
+- Quality tiers (low/medium/high/ultra).
+- Performance governor and adaptive quality.
+- Extended profiling and polish.
 
 ## Review Strategy
 
