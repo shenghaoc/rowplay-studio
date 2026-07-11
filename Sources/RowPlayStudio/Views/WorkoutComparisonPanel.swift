@@ -71,23 +71,17 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    // ⚡ Bolt: Cache DateFormatter to avoid expensive instantiation in list loops.
-    // .formatted() creates a new formatter implicitly on every call.
-    // No NSLock needed: SwiftUI evaluates body on the main thread.
-    // Uses autoupdatingCurrent so month/day names translate on locale change;
-    // component ordering is fixed at init time based on the initial locale.
-    // Explicit Gregorian calendar prevents Islamic/Buddhist/Persian calendar
-    // inheritance from locale (FormatStyle always uses Gregorian).
-    private static let candidateDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = .autoupdatingCurrent
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.setLocalizedDateFormatFromTemplate("yMMMd")
-        return formatter
-    }()
+    // Keep the original FormatStyle behavior while reusing its value-type configuration.
+    // FormatStyle resolves localized component ordering when it formats each date, so a
+    // system locale change updates both the names and order of the date components.
+    private static let candidateDateFormatStyle = Date.FormatStyle.dateTime
+        .year()
+        .month(.abbreviated)
+        .day()
+        .locale(.autoupdatingCurrent)
 
     private func candidateLabel(_ candidate: WorkoutDetail) -> some View {
-        let date = Self.candidateDateFormatter.string(from: candidate.workout.date)
+        let date = candidate.workout.date.formatted(Self.candidateDateFormatStyle)
         let pace = RowPlayFormatting.pace(candidate.workout.pace)
         return HStack(spacing: 0) {
             Text(date)
