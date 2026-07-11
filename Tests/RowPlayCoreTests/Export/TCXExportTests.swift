@@ -54,8 +54,7 @@ final class TCXExportTests: XCTestCase {
         let parser = XMLParser(data: data)
         let delegate = TCXParserDelegate()
         parser.delegate = delegate
-        parser.parse()
-        return delegate.isValid
+        return parser.parse() && delegate.isValid
     }
 
     // MARK: - XML Well-Formedness
