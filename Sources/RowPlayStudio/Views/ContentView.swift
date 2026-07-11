@@ -18,23 +18,25 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if library.isEmpty && !preferences.demoModeEnabled {
-                emptyState
-            } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
-                WorkoutDetailView(
-                    detail: detail,
-                    summary: library.summary,
-                    comparisonCandidates: library.comparisonCandidates(for: detail.id),
-                    annotationStore: library.annotationStore,
-                    onUpdateDetail: library.updateDetail
-                )
-            } else {
-                DashboardView(
-                    library: library,
-                    summary: library.filteredSummary,
-                    personalBests: library.filteredPersonalBests,
-                    recentPaceWorkouts: library.filteredRecentPaceWorkouts
-                )
+            NavigationStack {
+                if library.isEmpty && !preferences.demoModeEnabled {
+                    emptyState
+                } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+                    WorkoutDetailView(
+                        detail: detail,
+                        summary: library.summary,
+                        comparisonCandidates: library.comparisonCandidates(for: detail.id),
+                        annotationStore: library.annotationStore,
+                        onUpdateDetail: library.updateDetail
+                    )
+                } else {
+                    DashboardView(
+                        library: library,
+                        summary: library.filteredSummary,
+                        personalBests: library.filteredPersonalBests,
+                        recentPaceWorkouts: library.filteredRecentPaceWorkouts
+                    )
+                }
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
