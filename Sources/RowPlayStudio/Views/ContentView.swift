@@ -9,6 +9,7 @@ struct ContentView: View {
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+    @State private var detailPath = NavigationPath()
 
     var body: some View {
         NavigationSplitView {
@@ -18,7 +19,7 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            NavigationStack {
+            NavigationStack(path: $detailPath) {
                 if library.isEmpty && !preferences.demoModeEnabled {
                     emptyState
                 } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
@@ -38,6 +39,7 @@ struct ContentView: View {
                     )
                 }
             }
+            .onChange(of: selectedWorkoutID) { detailPath = NavigationPath() }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
         .toolbar {
