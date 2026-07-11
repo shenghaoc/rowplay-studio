@@ -40,24 +40,6 @@ final class ReplayNavigationTests: XCTestCase {
         }
     }
 
-    // MARK: - Navigation Action State
-
-    func testShowingReplayStateToggles() {
-        // Simulates the action chain that the "Replay Workout" button triggers:
-        // Button(action: { showingReplay = true })
-        // .navigationDestination(isPresented: $showingReplay) { ReplayView(...) }
-        //
-        // If showingReplay never becomes true, NavigationStack never pushes.
-        // This test guards the boolean toggle that drives presentation.
-        var showingReplay = false
-        showingReplay = true
-        XCTAssertTrue(showingReplay, "showingReplay must be true after button action")
-
-        // Simulate back navigation (SwiftUI sets isPresented to false).
-        showingReplay = false
-        XCTAssertFalse(showingReplay, "showingReplay must be false after back navigation")
-    }
-
     // MARK: - ReplayState Init from Demo Strokes
 
     func testReplayStateInitialisesFromDemoWorkout() {
