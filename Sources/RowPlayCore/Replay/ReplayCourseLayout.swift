@@ -97,4 +97,3 @@ public struct ReplayCourseLayout: Equatable, Sendable {
         return min(laps, lapCount(for: safeDistance))
     }
 }
-
