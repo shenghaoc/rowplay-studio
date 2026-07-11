@@ -1,4 +1,5 @@
 import RowPlayCore
+import RowPlayMacOS
 import SwiftUI
 
 struct SidebarView: View {

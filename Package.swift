@@ -9,7 +9,8 @@ let package = Package(
     ],
     products: [
         .executable(name: "RowPlayStudio", targets: ["RowPlayStudio"]),
-        .library(name: "RowPlayCore", targets: ["RowPlayCore"])
+        .library(name: "RowPlayCore", targets: ["RowPlayCore"]),
+        .library(name: "RowPlayMacOS", targets: ["RowPlayMacOS"])
     ],
     targets: [
         .target(
@@ -18,9 +19,13 @@ let package = Package(
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .target(
+            name: "RowPlayMacOS",
+            dependencies: ["RowPlayCore"]
+        ),
         .executableTarget(
             name: "RowPlayStudio",
-            dependencies: ["RowPlayCore"]
+            dependencies: ["RowPlayMacOS", "RowPlayCore"]
         ),
         .testTarget(
             name: "RowPlayCoreTests",
@@ -37,7 +42,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RowPlayStudioTests",
-            dependencies: ["RowPlayStudio", "RowPlayCore"]
+            dependencies: ["RowPlayStudio", "RowPlayMacOS", "RowPlayCore"]
         )
     ]
 )

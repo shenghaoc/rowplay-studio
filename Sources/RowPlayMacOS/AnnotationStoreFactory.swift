@@ -7,14 +7,14 @@ import RowPlayCore
 /// a ``SQLiteAnnotationStore``. If the database cannot be opened or migrated,
 /// it logs through ``PrivacySafeLogger`` and returns an
 /// ``UnavailableAnnotationStore``.
-enum AnnotationStoreFactory {
+public enum AnnotationStoreFactory {
     private static let logger = PrivacySafeLogger(category: "annotation-store")
 
     /// Create the production annotation store.
     ///
     /// - Returns: A ``SQLiteAnnotationStore`` on success, or an
     ///   ``UnavailableAnnotationStore`` if the database cannot be opened.
-    static func makeDefault() -> any AnnotationStore {
+    public static func makeDefault() -> any AnnotationStore {
         do {
             let path = try defaultDatabasePath()
             return try SQLiteAnnotationStore(path: path)
@@ -25,7 +25,7 @@ enum AnnotationStoreFactory {
     }
 
     /// Resolve the default database path under Application Support.
-    nonisolated static func defaultDatabasePath(fileManager: FileManager = .default) throws -> String {
+    nonisolated public static func defaultDatabasePath(fileManager: FileManager = .default) throws -> String {
         let base = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,

@@ -1,5 +1,6 @@
 import XCTest
 @testable import RowPlayCore
+@testable import RowPlayMacOS
 @testable import RowPlayStudio
 
 @MainActor

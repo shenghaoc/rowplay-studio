@@ -8,20 +8,20 @@ import RowPlayCore
 /// rather than independent `@AppStorage` instances. The keys match the existing
 /// `SettingsView` bindings to preserve any values the user has already set.
 @MainActor
-final class AppPreferences: ObservableObject {
-    static let demoModeEnabledKey = "demoModeEnabled"
-    static let reduceReplayMotionKey = "reduceReplayMotion"
-    static let preferredDistanceUnitKey = "preferredDistanceUnit"
+public final class AppPreferences: ObservableObject {
+    public static let demoModeEnabledKey = "demoModeEnabled"
+    public static let reduceReplayMotionKey = "reduceReplayMotion"
+    public static let preferredDistanceUnitKey = "preferredDistanceUnit"
 
-    @Published var demoModeEnabled: Bool
-    @Published var reduceReplayMotion: Bool
-    @Published var distanceUnit: DistanceUnit
+    @Published public var demoModeEnabled: Bool
+    @Published public var reduceReplayMotion: Bool
+    @Published public var distanceUnit: DistanceUnit
 
     private let defaults: UserDefaults
     private var externalCancellable: AnyCancellable?
     private var internalCancellables = Set<AnyCancellable>()
 
-    init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
         // Read persisted values (or fall back to defaults).

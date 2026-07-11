@@ -20,9 +20,14 @@ Sources/RowPlayCore/        # Pure domain logic library (no SwiftUI/AppKit)
   Support/                  # Formatting, date/time, pace parsing, privacy redaction, logging
   Fixtures/                 # DemoWorkoutLibrary with deterministic seeded data
 
-Sources/RowPlayStudio/      # SwiftUI macOS app shell
+Sources/RowPlayMacOS/       # macOS non-UI layer (Foundation/Combine, no SwiftUI/AppKit)
+  WorkoutLibrary.swift      # Central app state (@MainActor ObservableObject)
+  Concept2SyncController.swift  # Sync orchestration
+  AppPreferences.swift      # UserDefaults-backed preferences
+  AnnotationStoreFactory.swift  # Production annotation store factory
+
+Sources/RowPlayStudio/      # SwiftUI macOS UI layer
   App/                      # @main entry, WindowGroup, NavigationSplitView, settings scene
-  Stores/                   # WorkoutLibrary (@MainActor ObservableObject) central app state
   Views/                    # Dashboard, sidebar, detail, replay canvas, comparison, live mode
 
 Tests/RowPlayCoreTests/     # XCTest suite for RowPlayCore
@@ -54,12 +59,13 @@ Do not launch the raw SwiftPM executable for GUI checks; always use the staged `
 
 ## Architecture Boundaries
 
-### RowPlayCore vs RowPlayStudio
+### Three-Layer Architecture
 
 - **RowPlayCore** — Pure domain logic. No SwiftUI, AppKit, or macOS-specific imports. Must remain importable by a future iOS target.
-- **RowPlayStudio** — SwiftUI macOS app shell. Depends on RowPlayCore. Contains `@main` entry, stores, and views.
+- **RowPlayMacOS** — macOS non-UI layer. Uses Foundation and Combine but no SwiftUI or AppKit. Contains state management (WorkoutLibrary), sync orchestration (Concept2SyncController), preferences (AppPreferences), and factories (AnnotationStoreFactory). Depends on RowPlayCore.
+- **RowPlayStudio** — SwiftUI macOS UI layer. Contains `@main` entry and all Views. Depends on RowPlayMacOS and RowPlayCore.
 
-Keep reusable math and data in `RowPlayCore`. Keep SwiftUI, AppKit, and macOS process behavior out of `RowPlayCore`.
+Keep reusable math and data in `RowPlayCore`. Keep macOS state management in `RowPlayMacOS`. Keep SwiftUI and AppKit in `RowPlayStudio`.
 
 ### Dependency Injection via Protocols
 

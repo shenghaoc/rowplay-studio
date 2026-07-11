@@ -1,5 +1,6 @@
 import Foundation
 import RowPlayCore
+import RowPlayMacOS
 import SwiftUI
 
 struct SettingsView: View {
