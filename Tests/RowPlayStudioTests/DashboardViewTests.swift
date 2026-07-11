@@ -62,4 +62,18 @@ final class ReplayRendererModeTests: XCTestCase {
         XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 4, strokes: strokes), 14)
         XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 50, strokes: strokes), 20)
     }
+
+    func testReplayPlaybackClockStartsAtZeroAfterResume() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        let resumed = ReplayPlaybackClock.tick(lastTickDate: nil, currentDate: now)
+        XCTAssertEqual(resumed.delta, 0)
+        XCTAssertEqual(resumed.lastTickDate, now)
+
+        let nextTick = ReplayPlaybackClock.tick(
+            lastTickDate: now,
+            currentDate: now.addingTimeInterval(0.25)
+        )
+        XCTAssertEqual(nextTick.delta, 0.1, accuracy: 0.0001)
+    }
 }

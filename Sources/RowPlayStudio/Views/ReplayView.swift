@@ -33,6 +33,11 @@ struct ReplayView: View {
             playbackControls
         }
         .navigationTitle("Replay")
+        .onChange(of: state.playing) { _, playing in
+            if playing {
+                lastTickDate = nil
+            }
+        }
         .onDisappear {
             state.pause()
         }
@@ -72,11 +77,12 @@ struct ReplayView: View {
                             lastTickDate = newDate
                             return
                         }
-                        let delta = lastTickDate.map {
-                            ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
-                        } ?? 0
-                        lastTickDate = newDate
-                        state.tick(deltaTime: delta)
+                        let tick = ReplayPlaybackClock.tick(
+                            lastTickDate: lastTickDate,
+                            currentDate: newDate
+                        )
+                        lastTickDate = tick.lastTickDate
+                        state.tick(deltaTime: tick.delta)
                     }
             }
             .frame(minHeight: 300)
@@ -221,6 +227,18 @@ struct ReplayView: View {
             .frame(maxWidth: 200)
         }
         .padding()
+    }
+}
+
+/// Shared timeline clock for replay surfaces. Resetting the date on resume
+/// makes the first post-pause tick deterministic rather than including the
+/// elapsed wall-clock pause duration.
+enum ReplayPlaybackClock {
+    static func tick(lastTickDate: Date?, currentDate: Date) -> (delta: TimeInterval, lastTickDate: Date) {
+        let delta = lastTickDate.map {
+            ReplayMotion.clampDt(ms: currentDate.timeIntervalSince($0) * 1_000)
+        } ?? 0
+        return (delta, currentDate)
     }
 }
 

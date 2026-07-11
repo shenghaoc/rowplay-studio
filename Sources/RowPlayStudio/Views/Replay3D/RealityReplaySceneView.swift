@@ -17,22 +17,20 @@ struct RealityReplaySceneView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var sceneState = Replay3DSceneState()
-    @State private var setupFailed = false
     @State private var lastTickDate: Date?
 
     private var sport: Sport { detail.workout.sport }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing)) { timeline in
-            ZStack {
-                if setupFailed {
-                    fallbackView
-                } else {
-                    realityContent(timeline: timeline)
-                }
-            }
+            realityContent(timeline: timeline)
         }
         .frame(minHeight: 300)
+        .onChange(of: state.playing) { _, playing in
+            if playing {
+                lastTickDate = nil
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
         .accessibilityValue(accessibilityDescription)
@@ -43,24 +41,20 @@ struct RealityReplaySceneView: View {
     @ViewBuilder
     private func realityContent(timeline: TimelineViewDefaultContext) -> some View {
         RealityView { make in
-            do {
-                // Precompute immutable aggregates once.
-                sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
-                sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
-                if let ghost = ghostDetail {
-                    sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                    sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
-                }
-
-                let container = try Replay3DSceneBuilder.buildScene(
-                    sport: sport,
-                    colorScheme: colorScheme
-                )
-                make.add(container.root)
-                sceneState.container = container
-            } catch {
-                setupFailed = true
+            // Precompute immutable aggregates once.
+            sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
+            sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
+            if let ghost = ghostDetail {
+                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
             }
+
+            let container = Replay3DSceneBuilder.buildScene(
+                sport: sport,
+                colorScheme: colorScheme
+            )
+            make.add(container.root)
+            sceneState.container = container
         } update: { _ in
             guard let container = sceneState.container else { return }
             let pose = currentPose()
@@ -85,13 +79,14 @@ struct RealityReplaySceneView: View {
                 lastTickDate = newDate
                 return
             }
-            let delta = lastTickDate.map {
-                ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
-            } ?? 0
-            lastTickDate = newDate
-            state.tick(deltaTime: delta)
+            let tick = ReplayPlaybackClock.tick(
+                lastTickDate: lastTickDate,
+                currentDate: newDate
+            )
+            lastTickDate = tick.lastTickDate
+            state.tick(deltaTime: tick.delta)
             if !reduceMotion {
-                sceneState.animPhase += (2.4 + state.currentFrame.cadence / 13) * delta
+                sceneState.animPhase += (2.4 + state.currentFrame.cadence / 13) * tick.delta
             }
         }
     }
@@ -243,22 +238,6 @@ struct RealityReplaySceneView: View {
         return "\(sportName) · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
     }
 
-    // MARK: - Fallback
-
-    private var fallbackView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("3D Replay Unavailable")
-                .font(.headline)
-            Text("RealityKit failed to initialize. Use the 2D view instead.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
 }
 
 enum Replay3DPlayback {

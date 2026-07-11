@@ -9,9 +9,9 @@ final class Replay3DSceneContainer {
     let root: Entity
     let camera: PerspectiveCamera
     let liveGroup: ModelEntity
-    let liveAvatar: SportAvatar
+    let liveRig: ReplaySportRig
     let ghostGroup: ModelEntity
-    let ghostAvatar: SportAvatar
+    let ghostRig: ReplaySportRig
     let course: Entity
     let groundEntity: ModelEntity
     let light: DirectionalLight
@@ -23,9 +23,9 @@ final class Replay3DSceneContainer {
         root: Entity,
         camera: PerspectiveCamera,
         liveGroup: ModelEntity,
-        liveAvatar: SportAvatar,
+        liveRig: ReplaySportRig,
         ghostGroup: ModelEntity,
-        ghostAvatar: SportAvatar,
+        ghostRig: ReplaySportRig,
         course: Entity,
         groundEntity: ModelEntity,
         light: DirectionalLight,
@@ -36,9 +36,9 @@ final class Replay3DSceneContainer {
         self.root = root
         self.camera = camera
         self.liveGroup = liveGroup
-        self.liveAvatar = liveAvatar
+        self.liveRig = liveRig
         self.ghostGroup = ghostGroup
-        self.ghostAvatar = ghostAvatar
+        self.ghostRig = ghostRig
         self.course = course
         self.groundEntity = groundEntity
         self.light = light
@@ -58,7 +58,7 @@ enum Replay3DSceneBuilder {
     static func buildScene(
         sport: Sport,
         colorScheme: ColorScheme
-    ) throws -> Replay3DSceneContainer {
+    ) -> Replay3DSceneContainer {
         let root = Entity()
         root.name = "scene-root"
 
@@ -108,22 +108,27 @@ enum Replay3DSceneBuilder {
         let liveGroup = ModelEntity()
         liveGroup.name = "live-athlete"
         root.addChild(liveGroup)
-        let liveAvatar = buildSportAvatar(sport: sport, accent: .green, into: liveGroup)
+        let liveRig = ReplaySportRigFactory.build(
+            sport: sport, into: liveGroup, accent: .green, opacity: 1.0
+        )
 
         // Ghost avatar
         let ghostGroup = ModelEntity()
         ghostGroup.name = "ghost-athlete"
         ghostGroup.isEnabled = false
         root.addChild(ghostGroup)
-        let ghostAvatar = buildSportAvatar(sport: sport, accent: .purple, into: ghostGroup, opacity: 0.45)
+        let ghostRig = ReplaySportRigFactory.build(
+            sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45
+        )
+        ghostRig.applyGhostTranslucency()
 
         return Replay3DSceneContainer(
             root: root,
             camera: camera,
             liveGroup: liveGroup,
-            liveAvatar: liveAvatar,
+            liveRig: liveRig,
             ghostGroup: ghostGroup,
-            ghostAvatar: ghostAvatar,
+            ghostRig: ghostRig,
             course: courseEntity,
             groundEntity: ground,
             light: sun,
@@ -152,6 +157,14 @@ enum Replay3DSceneBuilder {
     ) {
         let layout = container.layout
 
+        // Solve rig pose from stroke pose
+        let liveRigPose = ReplayRigPoseSolver.solve(
+            sport: sport,
+            strokePose: livePose,
+            distance: liveDistance,
+            reduceMotion: reduceMotion
+        )
+
         // Live position
         let livePos = layout.position(at: liveDistance)
         let liveHeading = layout.headingAngle(at: liveDistance)
@@ -161,13 +174,8 @@ enum Replay3DSceneBuilder {
         container.liveGroup.position = SIMD3(Float(livePos.x), bob, Float(livePos.z))
         container.liveGroup.orientation = simd_quatf(angle: Float(liveHeading), axis: SIMD3(0, 1, 0))
 
-        // Animate live avatar
-        container.liveAvatar.animate(
-            phase: livePose.phase,
-            reduceMotion: reduceMotion,
-            pose: livePose,
-            animPhase: animPhase
-        )
+        // Apply rig pose to live avatar
+        container.liveRig.applyPose(liveRigPose)
 
         // Ghost
         if ghostVisible, let ghostPose {
@@ -176,12 +184,14 @@ enum Replay3DSceneBuilder {
             let ghostHeading = layout.headingAngle(at: ghostDistance)
             container.ghostGroup.position = SIMD3(Float(ghostPos.x), 0, Float(ghostPos.z))
             container.ghostGroup.orientation = simd_quatf(angle: Float(ghostHeading), axis: SIMD3(0, 1, 0))
-            container.ghostAvatar.animate(
-                phase: ghostPose.phase,
-                reduceMotion: reduceMotion,
-                pose: ghostPose,
-                animPhase: animPhase * 0.9
+
+            let ghostRigPose = ReplayRigPoseSolver.solve(
+                sport: sport,
+                strokePose: ghostPose,
+                distance: ghostDistance,
+                reduceMotion: reduceMotion
             )
+            container.ghostRig.applyPose(ghostRigPose)
         } else {
             container.ghostGroup.isEnabled = false
         }
