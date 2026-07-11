@@ -56,7 +56,6 @@ final class ReplayAthleteRig {
         let hairMat = ReplayMeshFactory.hairMaterial(opacity: opacity)
 
         let torsoHeight: Float = seated ? 0.35 : 0.45
-        let torsoBaseY: Float = seated ? 0.48 : 0.95
 
         // Name all entities for debugging/tests
         pelvis.name = "pelvis"
@@ -270,14 +269,18 @@ final class ReplayAthleteRig {
         applyLegPose(
             thigh: thighL,
             shin: shinL,
+            foot: footL,
             hipFlex: pose.hipFlexL,
-            kneeFlex: pose.kneeFlexL
+            kneeFlex: pose.kneeFlexL,
+            ankleDorsi: pose.ankleDorsiL
         )
         applyLegPose(
             thigh: thighR,
             shin: shinR,
+            foot: footR,
             hipFlex: pose.hipFlexR,
-            kneeFlex: pose.kneeFlexR
+            kneeFlex: pose.kneeFlexR,
+            ankleDorsi: pose.ankleDorsiR
         )
     }
 
@@ -300,8 +303,10 @@ final class ReplayAthleteRig {
     private func applyLegPose(
         thigh: Entity,
         shin: Entity,
+        foot: Entity,
         hipFlex: Double,
-        kneeFlex: Double
+        kneeFlex: Double,
+        ankleDorsi: Double
     ) {
         thigh.orientation = simd_quatf(
             angle: ReplaySportRigFiniteGuard.finite(Float(hipFlex), fallback: 0),
@@ -309,6 +314,10 @@ final class ReplayAthleteRig {
         )
         shin.orientation = simd_quatf(
             angle: ReplaySportRigFiniteGuard.finite(Float(-kneeFlex), fallback: 0),
+            axis: SIMD3(1, 0, 0)
+        )
+        foot.orientation = simd_quatf(
+            angle: ReplaySportRigFiniteGuard.finite(Float(ankleDorsi), fallback: 0),
             axis: SIMD3(1, 0, 0)
         )
     }

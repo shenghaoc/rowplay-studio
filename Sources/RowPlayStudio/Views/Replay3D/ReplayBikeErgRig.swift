@@ -191,11 +191,10 @@ final class ReplayBikeErgRig: ReplaySportRig {
         // Apply athlete joint pose (includes aero tuck and leg pedaling)
         athlete.applyPose(bikePose.joints)
 
-        // Feet stay on pedals: adjust foot orientation to match crank angle
-        let footRotL = crankAngle
-        let footRotR = crankAngle + Float.pi
-        athlete.footL.orientation = simd_quatf(angle: footRotL, axis: SIMD3(1, 0, 0))
-        athlete.footR.orientation = simd_quatf(angle: footRotR, axis: SIMD3(1, 0, 0))
+        // Keep the ankle pivots on the moving pedals. Positioning relative to
+        // the rig root preserves contact even though feet remain in the leg hierarchy.
+        athlete.footL.setPosition(pedalL.position(relativeTo: root), relativeTo: root)
+        athlete.footR.setPosition(pedalR.position(relativeTo: root), relativeTo: root)
     }
 
     // MARK: - Ghost Translucency

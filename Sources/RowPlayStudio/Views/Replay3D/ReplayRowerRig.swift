@@ -168,7 +168,7 @@ final class ReplayRowerRig: ReplaySportRig {
                 axis: SIMD3(0, 1, 0)
             ) * simd_quatf(
                 angle: oarFeather * side,
-                axis: SIMD3(0, 0, 1)
+                axis: SIMD3(1, 0, 0)
             )
         }
 

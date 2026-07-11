@@ -141,6 +141,19 @@ final class ReplayRigPoseTests: XCTestCase {
         XCTAssertEqual(bike.pedalPosR.y, -0.18, accuracy: 0.001)
     }
 
+    func testBikeErgThighAnglesDoNotFlipAtBottomOfStroke() {
+        let pose = makeStrokePose(phase: .pi, amplitude: 1.0)
+        let result = ReplayRigPoseSolver.solve(
+            sport: .bike, strokePose: pose, distance: 0, reduceMotion: false
+        )
+        guard case .bike(let bike) = result else {
+            XCTFail("Expected bike pose"); return
+        }
+
+        XCTAssertLessThan(abs(bike.joints.hipFlexL), .pi / 2)
+        XCTAssertLessThan(abs(bike.joints.hipFlexR), .pi / 2)
+    }
+
     func testBikeErgWheelRotation() {
         let pose = makeStrokePose(phase: .pi, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(

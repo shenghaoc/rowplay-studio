@@ -217,6 +217,55 @@ final class ReplaySportRigStructureTests: XCTestCase {
             "Wheel orientation should change between 0° and 90° poses")
     }
 
+    func testBikeErgFeetRemainOnPedals() throws {
+        let rig = buildRig(sport: .bike)
+        let pose = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
+            joints: ReplayAthleteJointPose(ankleDorsiL: 0.12, ankleDorsiR: -0.12),
+            crankAngle: .pi / 2,
+            wheelAngle: .pi * 1.2,
+            pedalPosL: ReplayPedalPosition(y: 0, z: 0.18),
+            pedalPosR: ReplayPedalPosition(y: 0, z: -0.18)
+        ))
+
+        rig.applyPose(pose)
+
+        let footL = try XCTUnwrap(findEntity(named: "foot-L", in: rig.root))
+        let footR = try XCTUnwrap(findEntity(named: "foot-R", in: rig.root))
+        let pedalL = try XCTUnwrap(findEntity(named: "pedal-L", in: rig.root))
+        let pedalR = try XCTUnwrap(findEntity(named: "pedal-R", in: rig.root))
+        assertPositionsEqual(
+            footL.position(relativeTo: rig.root),
+            pedalL.position(relativeTo: rig.root)
+        )
+        assertPositionsEqual(
+            footR.position(relativeTo: rig.root),
+            pedalR.position(relativeTo: rig.root)
+        )
+    }
+
+    func testAthleteAppliesIndependentShouldersAndAnkles() throws {
+        let rig = buildRig(sport: .bike)
+        let pose = ReplaySportRigPose.bike(ReplayBikeErgRigPose(
+            joints: ReplayAthleteJointPose(
+                shoulderFlexL: 0.3,
+                shoulderFlexR: -0.2,
+                ankleDorsiL: 0.15,
+                ankleDorsiR: -0.1
+            )
+        ))
+
+        rig.applyPose(pose)
+
+        let shoulders = try XCTUnwrap(findEntity(named: "shoulders", in: rig.root))
+        let upperArmL = try XCTUnwrap(findEntity(named: "upperArm-L", in: rig.root))
+        let upperArmR = try XCTUnwrap(findEntity(named: "upperArm-R", in: rig.root))
+        let footL = try XCTUnwrap(findEntity(named: "foot-L", in: rig.root))
+        let footR = try XCTUnwrap(findEntity(named: "foot-R", in: rig.root))
+        XCTAssertEqual(shoulders.orientation, simd_quatf(angle: 0, axis: SIMD3(1, 0, 0)))
+        XCTAssertNotEqual(upperArmL.orientation, upperArmR.orientation)
+        XCTAssertNotEqual(footL.orientation, footR.orientation)
+    }
+
     // MARK: - No Drift on Repeated Application
 
     func testRepeatedPoseApplicationDoesNotDriftRower() {
@@ -318,6 +367,18 @@ final class ReplaySportRigStructureTests: XCTestCase {
         var names = Set<String>()
         collectNames(in: entity, into: &names)
         return names
+    }
+
+    private func assertPositionsEqual(
+        _ lhs: SIMD3<Float>,
+        _ rhs: SIMD3<Float>,
+        accuracy: Float = 0.0001,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(lhs.x, rhs.x, accuracy: accuracy, file: file, line: line)
+        XCTAssertEqual(lhs.y, rhs.y, accuracy: accuracy, file: file, line: line)
+        XCTAssertEqual(lhs.z, rhs.z, accuracy: accuracy, file: file, line: line)
     }
 
     private func collectNames(in entity: Entity, into names: inout Set<String>) {

@@ -355,8 +355,8 @@ public enum ReplayRigPoseSolver {
         let riderSway = sin(phase) * 0.05 * amp
 
         // Legs follow pedals: hip stays stable, knee follows pedal position.
-        let thighAngleL = atan2(pedalZL, pedalYL + 0.15)
-        let thighAngleR = atan2(pedalZR, pedalYR + 0.15)
+        let thighAngleL = atan2(pedalZL + 0.35, 0.8 - pedalYL)
+        let thighAngleR = atan2(pedalZR + 0.35, 0.8 - pedalYR)
 
         let joints = ReplayAthleteJointPose(
             torsoLean: 0.74, // aero tuck
