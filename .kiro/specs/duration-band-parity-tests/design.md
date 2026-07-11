@@ -42,7 +42,8 @@ identical logic.
 `PerformancePredictorParityTests` pattern:
 
 1. A private `Fixture` struct matching the JSON schema.
-2. `setUpWithError` loads fixtures via `ParityFixtureLoader.loadJSON`.
+2. Class-level `setUp` loads fixtures once via `ParityFixtureLoader.loadJSON`;
+   `setUpWithError` rethrows any stored load error for each test.
 3. `testFixturesLoaded` asserts non-empty.
 4. `testDurationBandParity` iterates all fixtures and asserts key, label, and
    nominal match.
