@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(os)
 import os
+#endif
 
 /// Redaction marker substituted for sensitive content.
 public let redactedPlaceholder = "[REDACTED]"
@@ -82,7 +84,10 @@ func formatPrivacySafeLogMessage(_ message: String, args: [Any]) -> String {
 ///
 /// Mirrors the web app's `createLogger(console)` pattern.
 public struct PrivacySafeLogger: Sendable {
+    private let category: String
+    #if canImport(os)
     private let logger: os.Logger
+    #endif
 
     /// Create a logger for the specified subsystem and category.
     ///
@@ -90,16 +95,29 @@ public struct PrivacySafeLogger: Sendable {
     ///   - subsystem: The app's bundle identifier or subsystem string.
     ///   - category: The log category (e.g., "sync", "token", "cache").
     public init(subsystem: String = Bundle.main.bundleIdentifier ?? "com.rowplay-studio", category: String) {
+        self.category = category
+        #if canImport(os)
         self.logger = os.Logger(subsystem: subsystem, category: category)
+        #endif
     }
 
     /// Log an error message with redacted arguments.
     public func error(_ message: String, _ args: Any...) {
-        logger.error("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
+        let formatted = formatPrivacySafeLogMessage(message, args: args)
+        #if canImport(os)
+        logger.error("\(formatted, privacy: .public)")
+        #else
+        print("[ERROR] [\(category)] \(formatted)")
+        #endif
     }
 
     /// Log a warning message with redacted arguments.
     public func warn(_ message: String, _ args: Any...) {
-        logger.warning("\(formatPrivacySafeLogMessage(message, args: args), privacy: .public)")
+        let formatted = formatPrivacySafeLogMessage(message, args: args)
+        #if canImport(os)
+        logger.warning("\(formatted, privacy: .public)")
+        #else
+        print("[WARN] [\(category)] \(formatted)")
+        #endif
     }
 }
