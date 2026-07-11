@@ -40,7 +40,7 @@ Requirement references point at `requirements.md`.
   - `git diff --check` ✓
   - _Requirements: all_
 
-- [ ] **7. Publish**
+- [x] **7. Publish**
   - Commit, push, open draft PR with summary, parity sources, boundary
     coverage, validation commands, and non-goals.
   - _Requirements: all_
