@@ -4,20 +4,8 @@ import XCTest
 @available(macOS 14.0, *)
 @MainActor
 final class SyncStateTrackerTests: XCTestCase {
-    private var cache: InMemoryWorkoutCache!
-    private var tracker: SyncStateTracker!
-
-    override func setUp() {
-        super.setUp()
-        cache = InMemoryWorkoutCache()
-        tracker = SyncStateTracker(cache: cache)
-    }
-
-    override func tearDown() {
-        tracker = nil
-        cache = nil
-        super.tearDown()
-    }
+    private let cache = InMemoryWorkoutCache()
+    private lazy var tracker = SyncStateTracker(cache: cache)
 
     // MARK: - Initial state
 
