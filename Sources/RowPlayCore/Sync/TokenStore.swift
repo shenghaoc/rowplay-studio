@@ -18,8 +18,8 @@ public protocol TokenStore: Sendable {
 public enum TokenStoreError: Error, Equatable {
     /// The token string could not be encoded as UTF-8 data.
     case encodingFailed
-    /// A Keychain framework error occurred. The OSStatus value is preserved for diagnostics.
-    case keychainError(OSStatus)
+    /// A Keychain framework error occurred. The OSStatus raw value is preserved for diagnostics.
+    case keychainError(Int32)
 }
 
 /// In-memory token store for tests and previews.
