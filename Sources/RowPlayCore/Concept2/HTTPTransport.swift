@@ -54,7 +54,7 @@ public final class URLSessionHTTPTransport: HTTPTransport {
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await withCheckedThrowingContinuation { [session, redirectDelegate] continuation in
-            var taskRef: URLSessionDataTask?
+            nonisolated(unsafe) var taskRef: URLSessionDataTask?
             let task = session.dataTask(with: request) { data, response, error in
                 if let taskID = taskRef?.taskIdentifier,
                    redirectDelegate.consumeBlockedRedirect(for: taskID) {
