@@ -1,6 +1,6 @@
 import SQLite3
 import XCTest
-@testable import RowPlayCore
+@preconcurrency @testable import RowPlayCore
 
 final class SQLiteAnnotationStoreTests: XCTestCase {
     private var tempDir: URL!
@@ -276,10 +276,11 @@ final class SQLiteAnnotationStoreTests: XCTestCase {
 
     func testConcurrentWritesDoNotLoseRows() async throws {
         let count = 50
+        let store = self.store!
         try await withThrowingTaskGroup(of: Void.self) { group in
             for i in 0..<count {
                 group.addTask {
-                    _ = try await self.store.saveAnnotation(
+                    _ = try await store.saveAnnotation(
                         workoutId: 1,
                         Annotation(id: 0, timestamp: Double(i), text: "Concurrent \(i)", createdAt: Int64(i * 1000))
                     )

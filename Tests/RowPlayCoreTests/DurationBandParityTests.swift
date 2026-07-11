@@ -12,8 +12,8 @@ final class DurationBandParityTests: XCTestCase {
         let expectedNominalSeconds: Double
     }
 
-    private static var fixtures: [Fixture] = []
-    private static var loadError: Error?
+    nonisolated(unsafe) private static var fixtures: [Fixture] = []
+    nonisolated(unsafe) private static var loadError: Error?
 
     override class func setUp() {
         super.setUp()
