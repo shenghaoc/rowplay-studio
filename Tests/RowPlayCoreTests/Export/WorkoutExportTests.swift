@@ -123,6 +123,24 @@ final class WorkoutExportTests: XCTestCase {
         XCTAssertEqual(result, "\"'\r=cmd\"")
     }
 
+    func testCsvCellProtectsTabPrefix() {
+        let result = WorkoutExport.csvCell("\t=cmd")
+        // Tab is stripped by .whitespacesAndNewlines for detection; original s preserved with prefix
+        XCTAssertEqual(result, "'\t=cmd")
+    }
+
+    func testCsvCellProtectsCRLFPrefix() {
+        let result = WorkoutExport.csvCell("\r\n=cmd")
+        // CRLF is stripped by .whitespacesAndNewlines for detection; original s preserved with prefix
+        XCTAssertEqual(result, "'\r\n=cmd")
+    }
+
+    func testCsvCellProtectsDoubleNewlinePrefix() {
+        let result = WorkoutExport.csvCell("\n\n=cmd")
+        // Newlines trigger RFC 4180 quoting; formula prefix still applied
+        XCTAssertEqual(result, "\"'\n\n=cmd\"")
+    }
+
     func testCsvCellNil() {
         XCTAssertEqual(WorkoutExport.csvCell(nil as String?), "")
     }
