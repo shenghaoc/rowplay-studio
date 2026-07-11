@@ -29,6 +29,14 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | `src/lib/replay/ghostPick.ts` | `Sources/RowPlayCore/Replay/GhostPick.swift` | Phase 3 ports ghost candidate selection logic. |
 | `src/lib/replay/sports.ts` | `Sources/RowPlayCore/Replay/ReplaySportTheme.swift` | Phase 3 ports sport labels and machine hex colors. |
 | `src/lib/replay/inspector.ts` | `Sources/RowPlayCore/Replay/ReplayInspector.swift` | Phase 3 ports distancePerStroke and splitIndexAt. |
+| `src/lib/replay/strokeModel.ts` (StrokePose) | `Sources/RowPlayCore/Replay/ReplayStrokePose.swift` | Phase 8A ports the renderer-neutral stroke pose model: drive/recovery state, intensity, fatigue, amplitude, drive fraction per sport. |
+| `src/lib/replay/strokeModel.ts` (buildStrokeTimeline, driveFraction) | `Sources/RowPlayCore/Replay/ReplayStrokePose.swift` | Phase 8A ports stroke timeline aggregation, drive fraction computation, secondsFromRate, metersFromPace. |
+| `src/lib/replay/strokeModel.ts` (fallbackStrokePose) | `Sources/RowPlayCore/Replay/ReplayStrokePose.swift` | Phase 8A ports fallback synthetic pose for workouts without stroke data. |
+| `src/lib/replay/strokeModel.ts` (catchTransitions) | `Sources/RowPlayCore/Replay/ReplayMotion.swift` | Phase 3 already ports catchEvents which mirrors catchTransitions. |
+| (new — no web equivalent) | `Sources/RowPlayCore/Replay/ReplayCourseLayout.swift` | Phase 8A adds renderer-neutral 400m loop course layout with position, tangent, heading, and lane offsets. |
+| `src/lib/replay/renderer3d.ts` (CourseRenderer3D) | `Sources/RowPlayStudio/Views/Replay3D/RealityReplaySceneView.swift` | Phase 8A ports the 3D course renderer concept to RealityKit `RealityView` on macOS. |
+| `src/lib/replay/renderer3d.ts` (avatar builders) | `Sources/RowPlayStudio/Views/Replay3D/ReplaySportModels.swift` | Phase 8A ports sport-specific low-poly avatar builders (rower, skier, cyclist) as procedural RealityKit entities. |
+| `src/lib/replay/renderer3d.ts` (scene/course) | `Sources/RowPlayStudio/Views/Replay3D/Replay3DSceneBuilder.swift` | Phase 8A ports the static scene builder (course ring, start/finish, lighting, camera). |
 | `src/lib/analytics.ts` (durationBand) | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Phase 3 adds `durationBand(for:)` for comparability guard. Duration-band parity fixture and direct tests at `Tests/RowPlayCoreTests/DurationBandParityTests.swift` with golden fixture at `Tests/RowPlayCoreTests/Fixtures/duration-band-parity.json`. |
 | `src/routes/replay/[id]` (UI) | `Sources/RowPlayStudio/Views/ReplayView.swift` | Phase 3 adds SwiftUI Canvas replay surface with playback controls. |
 | `src/lib/server/session.ts` (token handling) | `Sources/RowPlayCore/Sync/TokenStore.swift` | Phase 4 ports BYOT token storage to Keychain via `TokenStore` protocol (KeychainTokenStore + FakeTokenStore). |

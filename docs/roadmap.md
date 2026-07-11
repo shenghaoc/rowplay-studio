@@ -172,6 +172,53 @@ Exit criteria:
 - Full phase completion requires a user to connect to a real ergometer and see live telemetry.
 - Bluetooth work begins only after privacy, replay, storage, and live-mode foundations are in place.
 
+## Phase 8 - 3D Replay
+
+### Phase 8A - RealityKit Replay Foundation
+
+Status: foundation PR in progress.
+
+Scope:
+
+- Add renderer-neutral `ReplayStrokePose` model in `RowPlayCore` ported from web `strokeModel.ts`: drive/recovery state, intensity, fatigue, amplitude, drive fraction per sport.
+- Add renderer-neutral `ReplayCourseLayout` in `RowPlayCore`: 400-metre deterministic loop with position, tangent, heading, multiple-lap wrapping, and lane offsets.
+- Add `ReplayRendererMode` enum (`.twoD` / `.threeD`) and `RealityReplaySceneView` in `RowPlayStudio`.
+- Build a RealityKit `RealityView` scene with procedural 400m course, lane markings, start/finish marker, directional/fill lighting, and sport-specific low-poly procedural placeholders (RowErg hull/oars, SkiErg frame/poles, BikeErg frame/wheels).
+- Drive live position, orientation, bob/surge, and articulated motion from `ReplayStrokePose`.
+- Render optional ghost in a separate lane with translucent material.
+- Fixed deterministic chase camera following the live participant.
+- Respect reduced-motion preference: freeze body articulation and camera smoothing.
+- 2D/3D segmented picker in `ReplayView`. Default to 3D with full existing 2D fallback.
+- Parity fixture for web `strokePoseAt` outputs.
+- New tests: `ReplayStrokePoseTests`, `ReplayCourseLayoutTests`, `ReplayRendererModeTests`.
+
+Exit criteria:
+
+- `swift test` passes with all new and regression tests.
+- `swift build` passes.
+- RealityKit 3D scene renders with visible course, athlete, and ghost placeholders.
+- 2D/3D switching preserves all playback controls.
+- No architecture violations (no Core/Platform imports of RealityKit).
+
+Non-goals for Phase 8A:
+
+- Final high-detail athlete rigs, imported USD/USDZ assets, skinning, inverse kinematics.
+- Particles, water simulation, interactive orbit camera, quality presets.
+- Metal shaders, SceneKit, Bluetooth, HR parsers, OAuth, public sharing.
+
+### Phase 8B+ - Future 3D Replay
+
+Status: not started.
+
+Scope (future PRs):
+
+- Final athlete rigs with higher-detail meshes and smooth animation.
+- Interactive orbit camera and camera presets.
+- Quality tiers (low/medium/high/ultra).
+- Water/snow surface effects, catch spray, wake trails.
+- Imported USD/USDZ sport equipment assets.
+- Performance governor and adaptive quality.
+
 ## Review Strategy
 
 - Phase 0: direct commit to `main` to create the native scaffold.

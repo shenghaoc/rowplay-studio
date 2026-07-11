@@ -20,3 +20,36 @@ final class DashboardViewTests: XCTestCase {
         XCTAssertTrue(value.contains("3.11 mi"))
     }
 }
+
+// MARK: - ReplayRendererMode Tests
+
+@MainActor
+final class ReplayRendererModeTests: XCTestCase {
+    func testDefaultIsThreeD() {
+        let mode: ReplayRendererMode = .threeD
+        XCTAssertEqual(mode, .threeD)
+    }
+
+    func testAllCasesCount() {
+        XCTAssertEqual(ReplayRendererMode.allCases.count, 2)
+    }
+
+    func testDisplayNamesAreDistinct() {
+        let names = Set(ReplayRendererMode.allCases.map(\.displayName))
+        XCTAssertEqual(names.count, 2)
+        XCTAssertTrue(names.contains("2D"))
+        XCTAssertTrue(names.contains("3D"))
+    }
+
+    func testRawValuesMatchDisplayNames() {
+        for mode in ReplayRendererMode.allCases {
+            XCTAssertEqual(mode.rawValue, mode.displayName)
+        }
+    }
+
+    func testIdIsRawValue() {
+        for mode in ReplayRendererMode.allCases {
+            XCTAssertEqual(mode.id, mode.rawValue)
+        }
+    }
+}

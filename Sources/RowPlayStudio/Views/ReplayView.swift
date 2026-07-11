@@ -5,46 +5,89 @@ import SwiftUI
 
 struct ReplayView: View {
     let detail: WorkoutDetail
+    let ghostDetail: WorkoutDetail?
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var preferences: AppPreferences
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
+    @State private var rendererMode: ReplayRendererMode = .threeD
 
     private var unit: DistanceUnit { preferences.distanceUnit }
     private var reduceMotion: Bool { preferences.reduceReplayMotion }
 
-    init(detail: WorkoutDetail) {
+    init(detail: WorkoutDetail, ghostDetail: WorkoutDetail? = nil) {
         self.detail = detail
+        self.ghostDetail = ghostDetail
         _state = State(initialValue: ReplayState(strokes: detail.strokes))
     }
 
     var body: some View {
-        // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
-        let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
-        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
-            VStack(spacing: 0) {
-                replayCanvas
-                    .frame(minHeight: 300)
-                Divider()
-                telemetryBar
-                Divider()
-                playbackControls
-            }
-            .onChange(of: timelineContext.date) { oldDate, newDate in
-                guard state.playing else {
-                    lastTickDate = newDate
-                    return
-                }
-                let delta = lastTickDate.map {
-                    ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
-                } ?? 0
-                lastTickDate = newDate
-                state.tick(deltaTime: delta)
-            }
+        VStack(spacing: 0) {
+            // Mode picker
+            rendererPicker
+            // Replay surface
+            replaySurface
+            Divider()
+            telemetryBar
+            Divider()
+            playbackControls
         }
         .navigationTitle("Replay")
         .onDisappear {
             state.pause()
+        }
+    }
+
+    // MARK: - Renderer Picker
+
+    private var rendererPicker: some View {
+        HStack {
+            Spacer()
+            Picker("Renderer", selection: $rendererMode) {
+                ForEach(ReplayRendererMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 140)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal)
+        .background(.ultraThinMaterial)
+    }
+
+    // MARK: - Replay Surface
+
+    @ViewBuilder
+    private var replaySurface: some View {
+        switch rendererMode {
+        case .twoD:
+            // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
+            let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
+            TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
+                replayCanvas
+                    .onChange(of: timelineContext.date) { oldDate, newDate in
+                        guard state.playing else {
+                            lastTickDate = newDate
+                            return
+                        }
+                        let delta = lastTickDate.map {
+                            ReplayMotion.clampDt(ms: newDate.timeIntervalSince($0) * 1_000)
+                        } ?? 0
+                        lastTickDate = newDate
+                        state.tick(deltaTime: delta)
+                    }
+            }
+            .frame(minHeight: 300)
+        case .threeD:
+            RealityReplaySceneView(
+                detail: detail,
+                state: $state,
+                reduceMotion: reduceMotion,
+                ghostDetail: ghostDetail
+            )
+            .frame(minHeight: 300)
         }
     }
 
