@@ -324,7 +324,7 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertFalse(controller.isConnected)
         XCTAssertEqual(controller.syncState.totalWorkouts, 0)
         XCTAssertNotNil(controller.syncState.lastError)
-        XCTAssertEqual(controller.statusMessage, "Concept2 token deleted; local data cleanup failed.")
+        XCTAssertEqual(controller.statusMessage, "Concept2 disconnected; some cleanup failed.")
     }
 
     func testSummaryFetchErrorDoesNotExposeToken() async throws {
@@ -491,7 +491,7 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertEqual(controller.statusMessage, "Could not save Concept2 token.")
     }
 
-    func testDisconnectStoresErrorWhenTokenDeleteFails() async {
+    func testDisconnectContinuesWhenTokenDeleteFails() async {
         struct TokenDeleteError: Error {}
         let tokenStore = FakeTokenStore(storedToken: "test-token")
         tokenStore.deleteError = TokenDeleteError()
@@ -505,8 +505,10 @@ final class Concept2SyncControllerTests: XCTestCase {
 
         await controller.disconnect(library: library)
 
-        XCTAssertNotNil(controller.syncState.lastError)
-        XCTAssertEqual(controller.statusMessage, "Could not delete Concept2 token.")
+        // Disconnect should continue even if token deletion fails
+        XCTAssertFalse(controller.isConnected)
+        XCTAssertTrue(library.isEmpty)
+        XCTAssertEqual(controller.statusMessage, "Concept2 disconnected; some cleanup failed.")
     }
 
     func testLoadCachedWorkoutsStoresErrorWhenCacheFactoryThrows() async {
