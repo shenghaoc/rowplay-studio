@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Security)
 import Security
+#endif
 
 /// Protocol for Concept2 BYOT (bring-your-own-token) credential storage.
 ///
@@ -15,6 +17,7 @@ public protocol TokenStore: Sendable {
     func deleteToken() throws
 }
 
+#if canImport(Security)
 /// Keychain-backed token store for production use.
 ///
 /// Uses Security framework directly with `kSecClassGenericPassword` and
@@ -118,6 +121,7 @@ public final class KeychainTokenStore: TokenStore {
         }
     }
 }
+#endif
 
 /// Errors specific to token store operations.
 public enum TokenStoreError: Error, Equatable {
