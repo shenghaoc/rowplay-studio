@@ -131,7 +131,6 @@ final class ReplayRowerRig: ReplaySportRig {
             // Collar
             let collarMesh = MeshResource.generateSphere(radius: 0.05)
             let collar = ModelEntity(mesh: collarMesh, materials: [metalMat])
-            collar.position = SIMD3(side * 1.9, 0, 0)
             collar.name = "collar"
             oar.addChild(collar)
 
@@ -142,7 +141,9 @@ final class ReplayRowerRig: ReplaySportRig {
             blade.name = "blade"
             oar.addChild(blade)
 
-            oar.position = SIMD3(0, 0.24, 0)
+            // The oar entity origin is the gate, so sweep/feather rotations
+            // cannot translate the collar away from its fixed hull contact.
+            oar.position = SIMD3(side * 0.32, 0.24, 0)
             root.addChild(oar)
             oars.append(oar)
         }

@@ -257,6 +257,17 @@ final class ReplaySportRigStructureTests: XCTestCase {
         try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
     }
 
+    func testRowerOarCollarsRemainAtGateDuringSweep() throws {
+        let rig = buildRig(sport: .rower)
+        let portOar = try XCTUnwrap(findEntity(named: "oar-port", in: rig.root))
+        let collar = try XCTUnwrap(portOar.children.first(where: { $0.name == "collar" }))
+
+        rig.applyPose(.rower(ReplayRowerRigPose(oarSweep: -0.5, oarFeather: -0.06)))
+        let catchPosition = collar.position(relativeTo: rig.root)
+        rig.applyPose(.rower(ReplayRowerRigPose(oarSweep: 0.5, oarFeather: 0.2)))
+        assertPositionsEqual(catchPosition, collar.position(relativeTo: rig.root))
+    }
+
     func testSkiErgHandsFeetAndCableFollowEquipment() throws {
         let rig = buildRig(sport: .skierg)
         rig.applyPose(.skierg(ReplaySkiErgRigPose(
@@ -271,6 +282,12 @@ final class ReplaySportRigStructureTests: XCTestCase {
         try assertContact(named: "foot-L", with: "foot-anchor-L", in: rig)
         try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
         let cable = try XCTUnwrap(findEntity(named: "cable", in: rig.root))
+        let poleL = try XCTUnwrap(findEntity(named: "pole-L", in: rig.root))
+        let poleR = try XCTUnwrap(findEntity(named: "pole-R", in: rig.root))
+        let handleL = try XCTUnwrap(findEntity(named: "handle-L", in: rig.root))
+        let handleR = try XCTUnwrap(findEntity(named: "handle-R", in: rig.root))
+        XCTAssertEqual(poleL.position.x, handleL.position.x, accuracy: 0.0001)
+        XCTAssertEqual(poleR.position.x, handleR.position.x, accuracy: 0.0001)
         XCTAssertNotEqual(cable.orientation, simd_quatf(angle: 0, axis: SIMD3(1, 0, 0)))
         XCTAssertGreaterThan(cable.scale.y, 0)
     }
@@ -289,6 +306,35 @@ final class ReplaySportRigStructureTests: XCTestCase {
 
         try assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
         try assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
+    }
+
+    func testBikeErgPedalPhaseAndSaddleContact() throws {
+        let rig = buildRig(sport: .bike)
+        rig.applyPose(.bike(ReplayBikeErgRigPose(
+            joints: ReplayAthleteJointPose(torsoTilt: 0.05),
+            crankAngle: 0,
+            pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
+            pedalPosR: ReplayPedalPosition(y: -0.18, z: 0),
+            riderSway: 0.05
+        )))
+
+        let pedalL = try XCTUnwrap(findEntity(named: "pedal-L", in: rig.root))
+        let pedalR = try XCTUnwrap(findEntity(named: "pedal-R", in: rig.root))
+        let pelvis = try XCTUnwrap(findEntity(named: "pelvis", in: rig.root))
+        let saddle = try XCTUnwrap(findEntity(named: "saddle", in: rig.root))
+        XCTAssertGreaterThan(pedalL.position(relativeTo: rig.root).y,
+            pedalR.position(relativeTo: rig.root).y)
+        assertPositionsEqual(
+            pelvis.position(relativeTo: rig.root),
+            saddle.position(relativeTo: rig.root)
+        )
+    }
+
+    func testFootMeshOriginMatchesAnkleJoint() throws {
+        let rig = buildRig(sport: .bike)
+        let foot = try XCTUnwrap(findEntity(named: "foot-L", in: rig.root))
+        let shoe = try XCTUnwrap(foot.children.first(where: { $0.name == "foot" }))
+        XCTAssertEqual(shoe.position, .zero)
     }
 
     func testAthleteAppliesIndependentShouldersAndAnkles() throws {

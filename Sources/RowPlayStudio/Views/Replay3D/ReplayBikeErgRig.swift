@@ -124,14 +124,14 @@ final class ReplayBikeErgRig: ReplaySportRig {
         let pedalLModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
         pedalLModel.name = "pedal-model-L"
         pedalL.addChild(pedalLModel)
-        pedalL.position = SIMD3(-0.1, -0.18, 0)
+        pedalL.position = SIMD3(-0.1, 0.18, 0)
         cranks.addChild(pedalL)
 
         pedalR.name = "pedal-R"
         let pedalRModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
         pedalRModel.name = "pedal-model-R"
         pedalR.addChild(pedalRModel)
-        pedalR.position = SIMD3(0.1, 0.18, 0)
+        pedalR.position = SIMD3(0.1, -0.18, 0)
         cranks.addChild(pedalR)
 
         root.addChild(cranks)
@@ -163,13 +163,15 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
         // Rider group
         rider.name = "rider"
-        rider.position = SIMD3(0, wheelR + 0.5, -0.35)
+        // Pivot sway at the saddle/pelvis contact so the rider cannot slide
+        // laterally off the saddle.
+        rider.position = saddle.position
         root.addChild(rider)
 
         // Athlete body (seated, aero tuck)
         athlete.build(into: rider, seated: true, accent: accent, opacity: opacity)
         // Position pelvis on saddle relative to rider group
-        athlete.pelvis.position = SIMD3(0, 0.30, -0.05)
+        athlete.pelvis.position = .zero
     }
 
     // MARK: - Pose Application

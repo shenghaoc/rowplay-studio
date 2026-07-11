@@ -220,7 +220,7 @@ final class ReplayAthleteRig {
 
         // Foot at ankle
         let footEntity = ReplayMeshFactory.footEntity(material: shoeMat)
-        footEntity.position = SIMD3(0, -shinLength, 0)
+        foot.position = SIMD3(0, -shinLength, 0)
         foot.addChild(footEntity)
         shin.addChild(foot)
     }

@@ -132,7 +132,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
             basket.name = "basket"
             pole.addChild(basket)
 
-            pole.position = SIMD3(side * 0.3, 0.8, 0.1)
+            pole.position = SIMD3(side * 0.15, 0.8, 0.1)
             root.addChild(pole)
             poles.append(pole)
         }
