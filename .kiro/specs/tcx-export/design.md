@@ -46,7 +46,7 @@ This matches the TCX v2 `Sport_t` enumeration which only supports Running, Bikin
 
 ## Date Handling
 
-All timestamps use UTC ISO-8601. Activity and lap timestamps use second precision (`YYYY-MM-DDTHH:MM:SSZ`), while trackpoints include fractional seconds so distinct high-resolution samples are preserved. Cached `ISO8601DateFormatter` instances keep both forms deterministic.
+All timestamps use UTC ISO-8601. Activity and lap timestamps use second precision (`YYYY-MM-DDTHH:MM:SSZ`), while trackpoints include fractional seconds so distinct high-resolution samples are preserved. Each export operation creates its formatters locally, avoiding shared mutable formatter state while keeping both forms deterministic.
 
 ## Stroke Filtering and Validation
 

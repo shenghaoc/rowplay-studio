@@ -70,25 +70,20 @@ public enum WorkoutExport {
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 " +
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
 
-    private static let tcxISO8601Formatter: ISO8601DateFormatter = {
+    private static func makeTCXISO8601Formatter(fractionalSeconds: Bool = false) -> ISO8601DateFormatter {
         let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
+        f.formatOptions = fractionalSeconds
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
         f.timeZone = TimeZone(secondsFromGMT: 0)
         return f
-    }()
-
-    private static let tcxTrackpointISO8601Formatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        f.timeZone = TimeZone(secondsFromGMT: 0)
-        return f
-    }()
+    }
 
     /// Export a single workout detail as Garmin Training Center Database v2 XML.
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
-        let activityId = tcxISO8601Formatter.string(from: w.date)
+        let activityId = makeTCXISO8601Formatter().string(from: w.date)
         let calories = w.caloriesTotal ?? 0
 
         // Guard against non-finite workout summary values
@@ -114,7 +109,10 @@ public enum WorkoutExport {
         xml.append("        <TriggerMethod>Manual</TriggerMethod>")
 
         // Track (only when valid strokes exist)
-        let validStrokes = filterAndBuildTrackpoints(detail: detail)
+        let validStrokes = filterAndBuildTrackpoints(
+            detail: detail,
+            dateFormatter: makeTCXISO8601Formatter(fractionalSeconds: true)
+        )
         if !validStrokes.isEmpty {
             xml.append("        <Track>")
             for tp in validStrokes {
@@ -150,7 +148,10 @@ public enum WorkoutExport {
     }
 
     /// Filter strokes for TCX export: validate, clamp, deduplicate, sort.
-    private static func filterAndBuildTrackpoints(detail: WorkoutDetail) -> [TrackpointData] {
+    private static func filterAndBuildTrackpoints(
+        detail: WorkoutDetail,
+        dateFormatter: ISO8601DateFormatter
+    ) -> [TrackpointData] {
         let w = detail.workout
         let workoutDuration = w.time
         let workoutDistance = w.distance
@@ -172,7 +173,7 @@ public enum WorkoutExport {
             guard stroke.t <= workoutDuration else { continue }
 
             let absoluteDate = w.date.addingTimeInterval(stroke.t)
-            let timeString = tcxTrackpointISO8601Formatter.string(from: absoluteDate)
+            let timeString = dateFormatter.string(from: absoluteDate)
 
             // Deduplicate identical source timestamps without collapsing distinct
             // sub-second samples that happen within the same wall-clock second.

@@ -1,7 +1,7 @@
 # TCX Export Tasks
 
 - [x] Add `WorkoutExport.tcx(_ detail: WorkoutDetail) -> String` to `Sources/RowPlayCore/Export/WorkoutExport.swift`.
-- [x] Add cached TCX date formatters for activity timestamps and fractional-second trackpoints.
+- [x] Add per-export TCX date formatters for activity timestamps and fractional-second trackpoints.
 - [x] Add `tcxCadence(_:)` helper to round and clamp cadence to 0...255.
 - [x] Add stroke filtering, validation, distance clamping, and timestamp deduplication.
 - [x] Add "Export TCX" button to `Sources/RowPlayStudio/Views/WorkoutFileActionsView.swift`.
