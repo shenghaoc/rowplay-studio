@@ -13,9 +13,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '5.9'
       - name: Verify Swift version
         run: swift --version
       - name: Install SQLite3 development libraries
