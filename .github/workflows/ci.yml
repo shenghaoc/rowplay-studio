@@ -21,9 +21,9 @@ jobs:
       - name: Install SQLite3 development libraries
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
       - name: Test RowPlayCore
-        run: swift test --filter RowPlayCoreTests
+        run: swift test
 
-  # Full stack: macOS-only targets (RowPlayMacOS + RowPlayStudio)
+  # Full stack: macOS-only targets (RowPlayPlatform + RowPlayStudio)
   macos:
     name: macOS (Full Stack)
     runs-on: macos-26
@@ -38,4 +38,3 @@ jobs:
         run: swift test
       - name: Build
         run: swift build
-

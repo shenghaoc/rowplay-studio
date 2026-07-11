@@ -84,6 +84,7 @@ func formatPrivacySafeLogMessage(_ message: String, args: [Any]) -> String {
 ///
 /// Mirrors the web app's `createLogger(console)` pattern.
 public struct PrivacySafeLogger: Sendable {
+    private let subsystem: String
     private let category: String
 
     /// Create a logger for the specified subsystem and category.
@@ -92,6 +93,7 @@ public struct PrivacySafeLogger: Sendable {
     ///   - subsystem: The app's bundle identifier or subsystem string.
     ///   - category: The log category (e.g., "sync", "token", "cache").
     public init(subsystem: String = Bundle.main.bundleIdentifier ?? "com.rowplay-studio", category: String) {
+        self.subsystem = subsystem
         self.category = category
     }
 
@@ -99,7 +101,7 @@ public struct PrivacySafeLogger: Sendable {
     public func error(_ message: String, _ args: Any...) {
         let formatted = formatPrivacySafeLogMessage(message, args: args)
         #if canImport(os)
-        let logger = os.Logger(subsystem: "com.rowplay-studio", category: category)
+        let logger = os.Logger(subsystem: subsystem, category: category)
         logger.error("\(formatted, privacy: .public)")
         #else
         print("[ERROR] [\(category)] \(formatted)")
@@ -110,7 +112,7 @@ public struct PrivacySafeLogger: Sendable {
     public func warn(_ message: String, _ args: Any...) {
         let formatted = formatPrivacySafeLogMessage(message, args: args)
         #if canImport(os)
-        let logger = os.Logger(subsystem: "com.rowplay-studio", category: category)
+        let logger = os.Logger(subsystem: subsystem, category: category)
         logger.warning("\(formatted, privacy: .public)")
         #else
         print("[WARN] [\(category)] \(formatted)")

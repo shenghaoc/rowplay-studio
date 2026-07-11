@@ -124,14 +124,16 @@ public final class Concept2SyncController: ObservableObject {
 
     public func disconnect(library: WorkoutLibrary) async {
         var tokenDeleteFailed = false
+        var tokenDeleteError: (message: String, date: Date)?
         do {
             try tokenStore.deleteToken()
+            isConnected = false
         } catch {
             tokenDeleteFailed = true
-            syncState.lastError = redact(error)
-            syncState.lastErrorDate = Date()
+            tokenDeleteError = (redact(error), Date())
+            syncState.lastError = tokenDeleteError?.message
+            syncState.lastErrorDate = tokenDeleteError?.date
         }
-        isConnected = false
 
         var cacheCleanupFailed = false
         var cacheForCleanup: (any WorkoutCache)?
@@ -177,8 +179,17 @@ public final class Concept2SyncController: ObservableObject {
 
         library.clearData()
 
-        if tokenDeleteFailed || cacheCleanupFailed || annotationCleanupFailed {
-            statusMessage = "Concept2 disconnected; some cleanup failed."
+        let localCleanupFailed = cacheCleanupFailed || annotationCleanupFailed
+        if let tokenDeleteError, !localCleanupFailed {
+            syncState.lastError = tokenDeleteError.message
+            syncState.lastErrorDate = tokenDeleteError.date
+        }
+        if tokenDeleteFailed {
+            statusMessage = localCleanupFailed
+                ? "Could not delete Concept2 token; some local cleanup also failed."
+                : "Could not delete Concept2 token; local data cleared."
+        } else if localCleanupFailed {
+            statusMessage = "Concept2 token deleted; local data cleanup failed."
         } else {
             statusMessage = "Concept2 disconnected."
         }

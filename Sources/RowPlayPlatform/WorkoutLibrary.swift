@@ -36,8 +36,8 @@ public final class WorkoutLibrary: ObservableObject {
     public private(set) var filteredPersonalBests: [DashboardPersonalBest] = []
     public private(set) var filteredRecentPaceWorkouts: [Workout] = []
 
-    /// Cached comparison candidates by workout ID, rebuilt when `details` changes.
-    private var comparisonCandidatesByID: [Int: [WorkoutDetail]] = [:]
+    /// Cached comparison candidates for the active workout, invalidated when `details` changes.
+    private var cachedComparisonCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
 
     /// When true, `didSet` observers skip derived-data recomputation.
     /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.
@@ -95,8 +95,9 @@ public final class WorkoutLibrary: ObservableObject {
     }
 
     public func comparisonCandidates(for workoutID: Int) -> [WorkoutDetail] {
-        if let cached = comparisonCandidatesByID[workoutID] {
-            return cached
+        if let cachedComparisonCandidates,
+           cachedComparisonCandidates.workoutID == workoutID {
+            return cachedComparisonCandidates.candidates
         }
         guard let target = detailByID[workoutID] else { return [] }
         let targetContext = comparableContext(for: target.workout)
@@ -133,7 +134,7 @@ public final class WorkoutLibrary: ObservableObject {
                 return lhs.workout.date > rhs.workout.date
             }
 
-        comparisonCandidatesByID[workoutID] = candidates
+        cachedComparisonCandidates = (workoutID, candidates)
         return candidates
     }
 
@@ -327,7 +328,7 @@ public final class WorkoutLibrary: ObservableObject {
         workouts = details.map(\.workout)
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
         availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()
-        comparisonCandidatesByID = [:]
+        cachedComparisonCandidates = nil
         updateQueryDerivedData(sportChanged: true)
     }
 

@@ -165,6 +165,22 @@ final class WorkoutLibrarySourceTests: XCTestCase {
         XCTAssertTrue(library.details.isEmpty)
     }
 
+    func testComparisonCandidatesCacheInvalidatesWhenDetailsChange() {
+        let target = makeDetail(id: 1)
+        let firstCandidate = makeDetail(id: 2)
+        let library = WorkoutLibrary(details: [target, firstCandidate], defaults: defaults)
+
+        XCTAssertEqual(library.comparisonCandidates(for: target.id).map(\.id), [firstCandidate.id])
+
+        let newerCandidate = makeDetail(id: 3)
+        library.details.append(newerCandidate)
+
+        XCTAssertEqual(
+            library.comparisonCandidates(for: target.id).map(\.id),
+            [newerCandidate.id, firstCandidate.id]
+        )
+    }
+
     // MARK: - Helpers
 
     private func makeDetail(id: Int) -> WorkoutDetail {

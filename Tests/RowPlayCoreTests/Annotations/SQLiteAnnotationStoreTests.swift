@@ -1,4 +1,8 @@
+#if canImport(SQLite3)
 import SQLite3
+#else
+import CSQLite3
+#endif
 import XCTest
 @preconcurrency @testable import RowPlayCore
 
