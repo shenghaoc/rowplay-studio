@@ -10,32 +10,33 @@ jobs:
   # RowPlayCore: Pure Swift domain logic — test on Linux for cross-platform validation
   core-linux:
     name: RowPlayCore (Linux)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '5.9'
-      - name: Verify Swift version
-        run: swift --version
+      - name: Verify Swift 6.3.3
+        run: |
+          swift --version
+          swift --version | grep -F 'Swift version 6.3.3'
       - name: Install SQLite3 development libraries
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
       - name: Build RowPlayCore
-        run: swift build --target RowPlayCore
+        run: swift build --target RowPlayCore -Xswiftc -warnings-as-errors
       - name: Test RowPlayCore
-        run: swift test --filter RowPlayCoreTests
+        run: swift test --filter RowPlayCoreTests -Xswiftc -warnings-as-errors
 
   # Full stack: macOS-only targets (RowPlayPlatform + RowPlayStudio)
   macos:
     name: macOS (Full Stack)
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-      - name: Verify Swift version
-        run: swift --version
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Verify Swift 6.3.3
+        run: |
+          swift --version
+          swift --version | grep -F 'Swift version 6.3.3'
       - name: Test
-        run: swift test
+        run: swift test -Xswiftc -warnings-as-errors
       - name: Build
-        run: swift build
+        run: swift build -Xswiftc -warnings-as-errors

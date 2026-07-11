@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Error descriptions are privacy-safe: they never include the BYOT token,
 /// Authorization header values, raw response payloads, or other sensitive data.
-public enum Concept2Error: Error, Equatable {
+public enum Concept2Error: Error, Equatable, Sendable {
     /// The server returned HTTP 401 Unauthorized.
     case unauthorized
     /// The server returned HTTP 403 Forbidden.

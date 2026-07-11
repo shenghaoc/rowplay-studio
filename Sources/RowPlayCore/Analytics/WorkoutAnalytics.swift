@@ -50,7 +50,7 @@ public struct TrendFit: Equatable, Sendable {
     public var count: Int
 }
 
-public enum WorkoutAnalytics {
+public enum WorkoutAnalytics: Sendable {
     public static func dashboardSummary(for workouts: [Workout]) -> DashboardSummary {
         let totalDistance = workouts.reduce(0) { $0 + $1.distance }
         let challengeDistance = workouts.reduce(0) { $0 + RowPlayFormatting.challengeDistance(for: $1) }

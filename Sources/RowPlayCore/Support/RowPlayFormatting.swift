@@ -1,6 +1,6 @@
 import Foundation
 
-public enum RowPlayFormatting {
+public enum RowPlayFormatting: Sendable {
     public static let bikeWattsFromNormalizedPaceDivisor = 8.0
     private static let feetThreshold: Double = 304.8 // 1000 feet in metres
 

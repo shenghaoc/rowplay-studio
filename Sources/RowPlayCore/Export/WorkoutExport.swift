@@ -1,6 +1,6 @@
 import Foundation
 
-public enum WorkoutExport {
+public enum WorkoutExport: Sendable {
     private static let exportSchemaVersion = 1
 
     /// CSV column order (stable, matches web export).

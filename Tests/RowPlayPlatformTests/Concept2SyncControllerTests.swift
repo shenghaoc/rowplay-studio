@@ -1,4 +1,5 @@
 import XCTest
+import Synchronization
 @testable import RowPlayCore
 @testable import RowPlayPlatform
 
@@ -20,7 +21,7 @@ private final class FailingConcept2Client: Concept2APIClient, Sendable {
 }
 
 /// A WorkoutCache that wraps another cache but throws from deleteAll with a leaky error message.
-private final class FailingDeleteCache: WorkoutCache, @unchecked Sendable {
+private final class FailingDeleteCache: WorkoutCache {
     private let wrapped: InMemoryWorkoutCache
     private let token: String
 
@@ -46,21 +47,20 @@ private final class FailingDeleteCache: WorkoutCache, @unchecked Sendable {
 }
 
 /// A WorkoutCache that throws from migrate but still allows deleteAll.
-private final class MigrateFailingDeleteTrackingCache: WorkoutCache, @unchecked Sendable {
+private final class MigrateFailingDeleteTrackingCache: WorkoutCache {
     private struct MigrationError: Error, CustomStringConvertible {
         var description: String { "Migration failed" }
     }
 
     private let wrapped: InMemoryWorkoutCache
-    private let lock = NSLock()
-    private var _deleteAllCallCount = 0
+    private let deleteAllCallCountState = Mutex(0)
 
     init(wrapping cache: InMemoryWorkoutCache) {
         self.wrapped = cache
     }
 
     var deleteAllCallCount: Int {
-        lock.withLock { _deleteAllCallCount }
+        deleteAllCallCountState.withLock { $0 }
     }
 
     func migrate() throws {
@@ -74,7 +74,7 @@ private final class MigrateFailingDeleteTrackingCache: WorkoutCache, @unchecked 
     func listWorkouts() async throws -> [Workout] { try await wrapped.listWorkouts() }
     func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
     func deleteAll() async throws {
-        lock.withLock { _deleteAllCallCount += 1 }
+        deleteAllCallCountState.withLock { $0 += 1 }
         try await wrapped.deleteAll()
     }
 }
@@ -84,18 +84,18 @@ final class Concept2SyncControllerTests: XCTestCase {
     private var suiteName: String!
     private var defaults: UserDefaults!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         suiteName = "RowPlayStudioTests.Concept2Sync.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         suiteName = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testSaveTokenStoresTrimmedTokenAndMarksConnected() throws {
@@ -615,7 +615,7 @@ final class Concept2SyncControllerTests: XCTestCase {
     }
 }
 
-private final class ListFailingWorkoutCache: WorkoutCache, @unchecked Sendable {
+private final class ListFailingWorkoutCache: WorkoutCache {
     private enum ListError: Error { case intentional }
 
     private let wrapped = InMemoryWorkoutCache()
@@ -634,7 +634,7 @@ private final class ListFailingWorkoutCache: WorkoutCache, @unchecked Sendable {
 }
 
 /// An AnnotationStore that throws from deleteAll to test cleanup failure reporting.
-private final class FailingDeleteAnnotationStore: AnnotationStore, @unchecked Sendable {
+private final class FailingDeleteAnnotationStore: AnnotationStore {
     private let wrapped = InMemoryAnnotationStore()
 
     func loadAnnotations(workoutId: Int) async throws -> [Annotation] {

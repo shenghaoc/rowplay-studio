@@ -48,7 +48,7 @@ The native app must redact sensitive data before logging.
 The native app must track sync progress without importing Cloudflare D1 assumptions.
 
 - **R5.1** `SyncState` struct records `lastSyncDate`, `totalWorkouts`, `inProgress`, `lastError`, and `lastErrorDate`.
-- **R5.2** `SyncStateTracker` is an `@Observable`, `@MainActor` class (macOS 14+) that publishes sync state changes on the main actor.
+- **R5.2** `SyncStateTracker` is an `@Observable`, `@MainActor` class (macOS 26+) that publishes sync state changes on the main actor.
 - **R5.3** The tracker is backed by the workout cache (count-based) and a simple in-memory error log.
 - **R5.4** The tracker does not depend on any specific storage backend; it reads from the cache protocol.
 

@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 5.9, macOS 14.0+) with zero external dependencies. Swift 5.9 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
+RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytics and real-time workout replay app for RowErg, SkiErg, and BikeErg athletes. It is built as a SwiftPM package (Swift 6.3, macOS 26.0+) with zero external dependencies. Swift 6.3 is the repository baseline; upgrade the Swift language/toolchain and CI runners only in a dedicated follow-up change.
 
 ## Repository Structure
 
@@ -62,7 +62,7 @@ swift test --filter RowPlayStudioTests  # Run macOS UI tests
 ./script/build_and_run.sh --debug       # Launch under LLDB debugger
 ```
 
-Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 5.9-era toolchains.
+Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 6.3-era toolchains.
 
 ## Architecture Boundaries
 
@@ -87,7 +87,7 @@ External boundaries are defined as protocols in `RowPlayCore` with production an
 | `LiveSource` | (deferred) | `MockLiveSource` |
 | `ErgConnection` | (deferred) | `MockErgConnection` |
 
-Mock classes are `@unchecked Sendable` and use `NSLock` for thread safety. Mock erg connections use manual `emitSample()` — no real timers.
+Mutable mock state uses Swift's `Synchronization.Mutex` so mocks can use checked `Sendable` conformance on both macOS and Linux. SQLite stores remain `@unchecked Sendable` because their raw C handles are confined to private serial queues. Mock erg connections use manual `emitSample()` — no real timers.
 
 ## Privacy and Security Invariants
 

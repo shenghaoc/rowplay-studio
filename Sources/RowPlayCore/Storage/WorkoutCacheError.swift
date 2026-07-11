@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Each case carries a diagnostic message for debugging. Messages must not
 /// include full workout payloads to avoid leaking user data into logs.
-public enum WorkoutCacheError: Error, Equatable {
+public enum WorkoutCacheError: Error, Equatable, Sendable {
     /// The SQLite database could not be opened.
     case openFailed(String)
     /// Schema migration failed.

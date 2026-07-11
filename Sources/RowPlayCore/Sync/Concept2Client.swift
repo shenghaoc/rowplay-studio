@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// One page of results from the Concept2 logbook API.
 ///
@@ -35,20 +36,23 @@ public protocol Concept2APIClient: Sendable {
 ///
 /// Uses `DemoWorkoutLibrary` as the backing data source. Suitable for
 /// tests, previews, and demo mode. Supports pagination simulation.
-public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
+public final class MockConcept2Client: Concept2APIClient {
+    private struct State: Sendable {
+        var fetchWorkoutsCallCount = 0
+        var fetchDetailRequestedIDs: [Int] = []
+    }
+
     private let details: [WorkoutDetail]
-    private let lock = NSLock()
-    private var _fetchWorkoutsCallCount: Int = 0
-    private var _fetchDetailRequestedIDs: [Int] = []
+    private let state = Mutex(State())
 
     /// Tracks the number of `fetchWorkouts` calls for test assertions.
     public var fetchWorkoutsCallCount: Int {
-        lock.withLock { _fetchWorkoutsCallCount }
+        state.withLock { $0.fetchWorkoutsCallCount }
     }
 
     /// Tracks the IDs requested via `fetchWorkoutDetail` for test assertions.
     public var fetchDetailRequestedIDs: [Int] {
-        lock.withLock { _fetchDetailRequestedIDs }
+        state.withLock { $0.fetchDetailRequestedIDs }
     }
 
     private let sorted: [WorkoutDetail]
@@ -59,8 +63,8 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
     }
 
     public func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
-        lock.withLock {
-            _fetchWorkoutsCallCount += 1
+        state.withLock {
+            $0.fetchWorkoutsCallCount += 1
         }
 
         guard perPage > 0 else {
@@ -83,8 +87,8 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
     }
 
     public func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
-        lock.withLock {
-            _fetchDetailRequestedIDs.append(id)
+        state.withLock {
+            $0.fetchDetailRequestedIDs.append(id)
         }
 
         guard let detail = details.first(where: { $0.workout.id == id }) else {
@@ -95,7 +99,7 @@ public final class MockConcept2Client: Concept2APIClient, @unchecked Sendable {
 }
 
 /// Errors from Concept2 API client operations.
-public enum Concept2ClientError: Error, Equatable {
+public enum Concept2ClientError: Error, Equatable, Sendable {
     /// The requested workout ID does not exist.
     case workoutNotFound(Int)
     /// The API returned an HTTP error.

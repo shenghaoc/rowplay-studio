@@ -4,7 +4,7 @@ import Foundation
 ///
 /// This is a pure domain type with no SwiftUI or AppKit dependencies,
 /// making it testable with `InMemoryWorkoutCache` or throwing fakes.
-public enum WorkoutLibraryLoader {
+public enum WorkoutLibraryLoader: Sendable {
     /// Load workouts from the cache, falling back to demo data or empty as appropriate.
     ///
     /// - Parameters:

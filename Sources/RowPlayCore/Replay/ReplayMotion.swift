@@ -6,7 +6,7 @@ import Foundation
 /// independent: phases advance by wall-clock dt, smoothing uses exponential
 /// decay, and the particle/governor state machines can be unit-tested without
 /// a canvas.
-public enum ReplayMotion {
+public enum ReplayMotion: Sendable {
     /// Distance (m) per full stroke/pedal animation cycle, per sport.
     public static func metersPerCycle(for sport: Sport) -> Double {
         switch sport {

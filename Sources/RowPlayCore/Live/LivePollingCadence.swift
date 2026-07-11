@@ -7,7 +7,7 @@ public let liveIntervals: [Int] = [30, 60, 120, 300]
 private let hiddenMinIntervalSec = 300
 
 /// Stateless namespace for live-mode interval and backoff computation.
-public enum LivePollingCadence {
+public enum LivePollingCadence: Sendable {
     /// Active tab uses the configured interval; hidden tab slows to at least 5 minutes.
     public static func effectiveInterval(baseInterval: Int, isVisible: Bool) -> Int {
         if isVisible { return baseInterval }

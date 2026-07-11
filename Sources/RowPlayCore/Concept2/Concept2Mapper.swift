@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Maps raw Concept2 API responses to RowPlayCore domain types.
 ///
@@ -9,23 +10,22 @@ import Foundation
 /// - API `stroke.p` is pace in tenths of a second (per 500m for rower/skierg,
 ///   per 1000m for bike) → divide by 10, then by 2 for bike to normalise to
 ///   seconds per 500m.
-enum Concept2Mapper {
+enum Concept2Mapper: Sendable {
     /// Cached date formatter for Concept2 API timestamps ("yyyy-MM-dd HH:mm:ss").
     ///
-    /// `DateFormatter` is not thread-safe, so access is serialised through `formatterLock`.
-    private static let formatterLock = NSLock()
-    private static let apiDateFormatter: DateFormatter = {
+    /// `DateFormatter` is not thread-safe, so the formatter lives inside a mutex.
+    private static let apiDateFormatter = Mutex({
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
         fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.timeZone = TimeZone(secondsFromGMT: 0)
         return fmt
-    }()
+    }())
 
     /// Thread-safe date parsing.
     private static func parseDate(_ string: String) -> Date? {
-        formatterLock.withLock {
-            apiDateFormatter.date(from: string)
+        apiDateFormatter.withLock {
+            $0.date(from: string)
         }
     }
 

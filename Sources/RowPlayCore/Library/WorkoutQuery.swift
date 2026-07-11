@@ -78,7 +78,7 @@ public struct WorkoutListQuery: Equatable, Sendable {
 
 // MARK: - Chip Constants
 
-public enum WorkoutChips {
+public enum WorkoutChips: Sendable {
     /// Standard distance chip nominal metres with ±2% tolerance.
     public static let distanceChips: [(metres: Double, label: String)] = [
         (500, "500m"),
@@ -98,7 +98,7 @@ public enum WorkoutChips {
 
 // MARK: - Query Engine
 
-public enum WorkoutQuery {
+public enum WorkoutQuery: Sendable {
     // MARK: Filter + Sort
 
     /// Filter and sort workouts according to the query. Pure, testable.

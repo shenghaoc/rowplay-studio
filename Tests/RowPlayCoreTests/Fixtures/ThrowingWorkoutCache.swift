@@ -2,7 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 /// A `WorkoutCache` that throws on every operation for error-propagation testing.
-final class ThrowingWorkoutCache: WorkoutCache, @unchecked Sendable {
+final class ThrowingWorkoutCache: WorkoutCache {
     func migrate() throws { throw TestCacheError.intentional }
     func save(detail: WorkoutDetail) async throws { throw TestCacheError.intentional }
     func save(details: [WorkoutDetail]) async throws { throw TestCacheError.intentional }

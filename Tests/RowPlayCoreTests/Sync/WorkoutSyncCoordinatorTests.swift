@@ -1,28 +1,40 @@
 import XCTest
+import Synchronization
 @testable import RowPlayCore
 
 // MARK: - Fake Clients and Caches
 
 /// A Concept2APIClient that wraps another client and records all calls.
 /// Can be configured to throw on fetchWorkouts or fetchWorkoutDetail.
-private final class FakeConcept2Client: Concept2APIClient, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _fetchWorkoutsCalls: [(page: Int, perPage: Int)] = []
-    private var _fetchDetailIDs: [Int] = []
+private final class FakeConcept2Client: Concept2APIClient {
+    private struct State: Sendable {
+        var fetchWorkoutsCalls: [(page: Int, perPage: Int)] = []
+        var fetchDetailIDs: [Int] = []
+        var fetchWorkoutsHandler: (@Sendable (Int, Int) async throws -> Concept2Page)?
+        var fetchDetailHandler: (@Sendable (Int) async throws -> WorkoutDetail)?
+    }
 
-    var fetchWorkoutsHandler: ((Int, Int) async throws -> Concept2Page)?
-    var fetchDetailHandler: ((Int) async throws -> WorkoutDetail)?
+    private let state = Mutex(State())
+
+    var fetchWorkoutsHandler: (@Sendable (Int, Int) async throws -> Concept2Page)? {
+        get { state.withLock { $0.fetchWorkoutsHandler } }
+        set { state.withLock { $0.fetchWorkoutsHandler = newValue } }
+    }
+    var fetchDetailHandler: (@Sendable (Int) async throws -> WorkoutDetail)? {
+        get { state.withLock { $0.fetchDetailHandler } }
+        set { state.withLock { $0.fetchDetailHandler = newValue } }
+    }
 
     var fetchWorkoutsCalls: [(page: Int, perPage: Int)] {
-        lock.withLock { _fetchWorkoutsCalls }
+        state.withLock { $0.fetchWorkoutsCalls }
     }
 
     var fetchDetailIDs: [Int] {
-        lock.withLock { _fetchDetailIDs }
+        state.withLock { $0.fetchDetailIDs }
     }
 
     func fetchWorkouts(page: Int, perPage: Int) async throws -> Concept2Page {
-        lock.withLock { _fetchWorkoutsCalls.append((page: page, perPage: perPage)) }
+        state.withLock { $0.fetchWorkoutsCalls.append((page: page, perPage: perPage)) }
         if let handler = fetchWorkoutsHandler {
             return try await handler(page, perPage)
         }
@@ -30,7 +42,7 @@ private final class FakeConcept2Client: Concept2APIClient, @unchecked Sendable {
     }
 
     func fetchWorkoutDetail(id: Int) async throws -> WorkoutDetail {
-        lock.withLock { _fetchDetailIDs.append(id) }
+        state.withLock { $0.fetchDetailIDs.append(id) }
         if let handler = fetchDetailHandler {
             return try await handler(id)
         }
@@ -39,19 +51,27 @@ private final class FakeConcept2Client: Concept2APIClient, @unchecked Sendable {
 }
 
 /// A WorkoutCache that wraps another cache and can be configured to throw on save.
-private final class FailingWorkoutCache: WorkoutCache, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _savedDetails: [WorkoutDetail] = []
-    var saveHandler: ((WorkoutDetail) async throws -> Void)?
+private final class FailingWorkoutCache: WorkoutCache {
+    private struct State: Sendable {
+        var savedDetails: [WorkoutDetail] = []
+        var saveHandler: (@Sendable (WorkoutDetail) async throws -> Void)?
+    }
+
+    private let state = Mutex(State())
+
+    var saveHandler: (@Sendable (WorkoutDetail) async throws -> Void)? {
+        get { state.withLock { $0.saveHandler } }
+        set { state.withLock { $0.saveHandler = newValue } }
+    }
 
     var savedDetails: [WorkoutDetail] {
-        lock.withLock { _savedDetails }
+        state.withLock { $0.savedDetails }
     }
 
     func migrate() throws {}
 
     func save(detail: WorkoutDetail) async throws {
-        lock.withLock { _savedDetails.append(detail) }
+        state.withLock { $0.savedDetails.append(detail) }
         if let handler = saveHandler {
             try await handler(detail)
         }
@@ -71,12 +91,11 @@ private final class FailingWorkoutCache: WorkoutCache, @unchecked Sendable {
 }
 
 /// A WorkoutCache that tracks whether migrate() was called.
-private final class MigrateTrackingCache: WorkoutCache, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _migrateCallCount = 0
-    var migrateCallCount: Int { lock.withLock { _migrateCallCount } }
+private final class MigrateTrackingCache: WorkoutCache {
+    private let migrateCallCountState = Mutex(0)
+    var migrateCallCount: Int { migrateCallCountState.withLock { $0 } }
 
-    func migrate() throws { lock.withLock { _migrateCallCount += 1 } }
+    func migrate() throws { migrateCallCountState.withLock { $0 += 1 } }
     func save(detail: WorkoutDetail) async throws {}
     func save(details: [WorkoutDetail]) async throws {}
     func saveWorkouts(_ workouts: [Workout]) async throws {}
@@ -497,11 +516,9 @@ final class WorkoutSyncCoordinatorTests: XCTestCase {
 
     func testMultiPageSync() async throws {
         let details = (1...10).map { makeDetail(id: $0) }
-        var callCount = 0
 
         let client = FakeConcept2Client()
         client.fetchWorkoutsHandler = { page, perPage in
-            callCount += 1
             let all = details.map(\.workout)
             let perPage = 5
             let totalPages = 2

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -54,9 +55,10 @@ public final class URLSessionHTTPTransport: HTTPTransport {
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await withCheckedThrowingContinuation { [session, redirectDelegate] continuation in
-            var taskRef: URLSessionDataTask?
+            let taskReference = Mutex(Optional<URLSessionDataTask>.none)
             let task = session.dataTask(with: request) { data, response, error in
-                if let taskID = taskRef?.taskIdentifier,
+                let taskID = taskReference.withLock { $0?.taskIdentifier }
+                if let taskID,
                    redirectDelegate.consumeBlockedRedirect(for: taskID) {
                     continuation.resume(throwing: Concept2Error.insecureRedirectBlocked)
                     return
@@ -71,7 +73,7 @@ public final class URLSessionHTTPTransport: HTTPTransport {
                 }
                 continuation.resume(returning: (data, response))
             }
-            taskRef = task
+            taskReference.withLock { $0 = task }
             task.resume()
         }
     }
@@ -82,15 +84,14 @@ public final class URLSessionHTTPTransport: HTTPTransport {
 /// Prevents the `Authorization` header from being sent over unencrypted
 /// connections when a server responds with a redirect to `http://`.
 /// Tracks blocked redirects so the transport can throw a typed error.
-final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    private let lock = NSLock()
-    /// Set of task identifiers for which a redirect was blocked.
-    private var blockedTaskIDs = Set<Int>()
+final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    /// Task identifiers for which a redirect was blocked.
+    private let blockedTaskIDs = Mutex(Set<Int>())
 
     /// Returns `true` and clears the flag if the given task had its redirect blocked.
     func consumeBlockedRedirect(for taskID: Int) -> Bool {
-        lock.withLock {
-            blockedTaskIDs.remove(taskID) != nil
+        blockedTaskIDs.withLock {
+            $0.remove(taskID) != nil
         }
     }
 
@@ -105,7 +106,7 @@ final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
             completionHandler(request)
         } else {
             // Block redirect to non-HTTPS URL.
-            _ = lock.withLock { blockedTaskIDs.insert(task.taskIdentifier) }
+            _ = blockedTaskIDs.withLock { $0.insert(task.taskIdentifier) }
             completionHandler(nil)
         }
     }

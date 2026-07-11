@@ -4,7 +4,7 @@ import SQLite3
 import CSQLite3
 #endif
 import XCTest
-@preconcurrency @testable import RowPlayCore
+@testable import RowPlayCore
 
 final class SQLiteAnnotationStoreTests: XCTestCase {
     private var tempDir: URL!

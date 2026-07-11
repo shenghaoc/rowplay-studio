@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DemoWorkoutLibrary {
+public enum DemoWorkoutLibrary: Sendable {
     public static let defaultWorkoutID = 1001
 
     public static var details: [WorkoutDetail] {

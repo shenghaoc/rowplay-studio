@@ -30,7 +30,7 @@ public struct ReplayFrame: Equatable, Sendable {
     }
 }
 
-public enum ReplaySample {
+public enum ReplaySample: Sendable {
     /// Linearly interpolate the workout state at time `t` (seconds).
     ///
     /// Pure and stateless so it can be reused for a "ghost" track: just call

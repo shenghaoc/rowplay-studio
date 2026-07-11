@@ -25,7 +25,7 @@ public struct GhostPickContext: Equatable, Sendable {
     }
 }
 
-public enum GhostPick {
+public enum GhostPick: Sendable {
     /// Pick a meaningful default ghost rival: same comparability band, closest metres,
     /// then fastest pace (PB-like), then most recent session.
     public static func pickDefaultGhostCandidate(

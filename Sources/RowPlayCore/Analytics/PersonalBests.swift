@@ -17,7 +17,7 @@ public struct PersonalBest: Equatable, Sendable {
     }
 }
 
-public enum PersonalBests {
+public enum PersonalBests: Sendable {
     /// Standard Concept2 race distances for PB tracking.
     public static let standardDistances: [Double] = [500, 1000, 2000, 5000, 6000, 10000, 21_097, 42_195]
 

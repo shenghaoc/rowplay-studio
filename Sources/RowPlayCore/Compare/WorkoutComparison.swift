@@ -118,7 +118,7 @@ public struct DistanceOverlay: Equatable, Sendable {
     }
 }
 
-public enum WorkoutComparison {
+public enum WorkoutComparison: Sendable {
     // MARK: - Compare Verdict
 
     /// Decide which piece was "better" for like-for-like distances (same band),
