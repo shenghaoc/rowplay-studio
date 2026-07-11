@@ -26,6 +26,7 @@ let package = Package(
             name: "RowPlayCoreTests",
             dependencies: ["RowPlayCore"],
             resources: [
+                .copy("Fixtures/duration-band-parity.json"),
                 .copy("Fixtures/performance-predictor-parity.json"),
                 .copy("Fixtures/Concept2/rower-steady.fixture.json"),
                 .copy("Fixtures/Concept2/rower-interval.fixture.json"),
