@@ -50,6 +50,10 @@ public func redact(_ value: Any) -> String {
     let input: String
     if let string = value as? String {
         input = string
+    } else if let error = value as? NSError {
+        // `String(describing: NSError)` omits the localized description on
+        // swift-corelibs-foundation, so use the portable Foundation API.
+        input = error.localizedDescription
     } else if let error = value as? Error {
         input = String(describing: error)
     } else {
