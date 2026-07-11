@@ -16,6 +16,8 @@ jobs:
       - uses: swift-actions/setup-swift@v3
         with:
           swift-version: '6.4'
+      - name: Install SQLite3 development libraries
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
       - name: Test RowPlayCore
         run: swift test --filter RowPlayCoreTests
 
