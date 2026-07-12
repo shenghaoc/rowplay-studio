@@ -7,5 +7,5 @@
 **Action:** Keep `Date.FormatStyle` for localized SwiftUI date labels. A `static let` value-style configuration with `.locale(.autoupdatingCurrent)` is safe to reuse when needed; only introduce a mutable `DateFormatter` after profiling and with locale-change and concurrency behavior explicitly covered.
 
 ## 2024-11-20 - Non-Sendable Formatters in Swift 6
-**Learning:** `ISO8601DateFormatter` and `DateFormatter` are technically thread-safe at runtime on modern Apple platforms but are not strictly typed as `Sendable`. In a strict concurrency environment (Swift 5.10+ / Swift 6), defining them as shared global/static instances causes compiler warnings/errors about global concurrency data races.
-**Action:** When caching these formatters as `static let` inside types (like enums) to avoid expensive re-instantiations, prefix them with `nonisolated(unsafe)` to satisfy the Swift 6 compiler.
+**Learning:** `ISO8601DateFormatter` and `DateFormatter` are not `Sendable` and are not safe for concurrent `string(from:)` / `date(from:)` use. Caching them as bare `static let` (even with `nonisolated(unsafe)`) only silences the compiler; parallel exports can still race on the formatter's mutable internal state.
+**Action:** When caching formatters for performance, wrap them in `Mutex` (see `Concept2Mapper.apiDateFormatter` and `WorkoutExport` TCX/CSV formatters) and access via `withLock`. Prefer value-style formatters such as `Date.ISO8601FormatStyle` when they can produce the required format without a shared mutable instance.
