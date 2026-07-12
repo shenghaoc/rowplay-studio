@@ -42,6 +42,11 @@ struct ReplayView: View {
         .onDisappear {
             state.pause()
         }
+        .onAppear {
+            if !isolationConfig.replay3DEnabled, rendererMode == .threeD {
+                rendererMode = .twoD
+            }
+        }
     }
 
     // MARK: - Renderer Picker
@@ -50,7 +55,7 @@ struct ReplayView: View {
         HStack {
             Spacer()
             Picker("Renderer", selection: $rendererMode) {
-                ForEach(ReplayRendererMode.allCases) { mode in
+                ForEach(visibleRendererModes) { mode in
                     Text(mode.displayName).tag(mode)
                 }
             }
@@ -61,6 +66,12 @@ struct ReplayView: View {
         .padding(.vertical, 6)
         .padding(.horizontal)
         .background(.ultraThinMaterial)
+    }
+
+    private var visibleRendererModes: [ReplayRendererMode] {
+        isolationConfig.replay3DEnabled
+            ? ReplayRendererMode.allCases
+            : [.twoD]
     }
 
     // MARK: - Replay Surface
