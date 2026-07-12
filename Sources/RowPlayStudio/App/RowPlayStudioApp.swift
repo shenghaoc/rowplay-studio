@@ -16,7 +16,7 @@ struct RowPlayStudioApp: App {
         launchConfiguration = configuration
         _library = StateObject(
             wrappedValue: configuration.automationMode
-                ? WorkoutLibrary.demo()
+                ? WorkoutLibrary.automationDemo()
                 : WorkoutLibrary(
                     details: [],
                     annotationStore: AnnotationStoreFactory.makeDefault()

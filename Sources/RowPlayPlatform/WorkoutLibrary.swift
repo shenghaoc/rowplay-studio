@@ -83,6 +83,14 @@ public final class WorkoutLibrary: ObservableObject {
         return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [], defaults: defaults)
     }
 
+    /// Creates a deterministic demo library for scripted automation.
+    ///
+    /// Unlike ``demo(defaults:)``, this intentionally ignores the persisted
+    /// Demo Mode preference so automation always starts with the same fixtures.
+    public static func automationDemo(defaults: UserDefaults = .standard) -> WorkoutLibrary {
+        WorkoutLibrary(details: DemoWorkoutLibrary.details, defaults: defaults)
+    }
+
     public private(set) var availableWorkoutTypes: [String] = []
 
     public func detail(id: Int) -> WorkoutDetail? {

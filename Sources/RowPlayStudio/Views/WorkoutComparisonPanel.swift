@@ -43,13 +43,18 @@ struct WorkoutComparisonPanel: View {
                     alignSelection()
                     updateOverlayPoints()
                 }
-                .onChange(of: candidates) { _, _ in
+                .onChange(of: candidates.map(\.id)) { _, _ in
+                    alignSelection()
+                }
+                .onChange(of: detail.id) { _, _ in
+                    selectedCandidateID = nil
                     alignSelection()
                     updateOverlayPoints()
                 }
-                .onChange(of: detail) { _, _ in
-                    selectedCandidateID = nil
-                    alignSelection()
+                .onChange(of: detail.strokes) { _, _ in
+                    updateOverlayPoints()
+                }
+                .onChange(of: selectedCandidate?.strokes) { _, _ in
                     updateOverlayPoints()
                 }
                 .onChange(of: selectedCandidateID) { _, _ in
