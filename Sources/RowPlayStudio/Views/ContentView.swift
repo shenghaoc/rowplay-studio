@@ -8,23 +8,11 @@ struct ContentView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
-    @Environment(\.isolationConfig) private var isolationConfig
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
     @State private var detailNavigation = DetailNavigationState()
 
     var body: some View {
-        if isolationConfig.level == .minimal {
-            minimalView
-        } else {
-            mainContent
-        }
-    }
-
-    private var minimalView: some View {
-        Text("RowPlay Studio")
-            .font(.largeTitle)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        mainContent
     }
 
     private var mainContent: some View {
@@ -35,32 +23,25 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if isolationConfig.detailEnabled {
-                NavigationStack(path: $detailNavigation.path) {
-                    detailContent
-                        .navigationDestination(for: DetailNavigationState.Route.self) { route in
-                            switch route {
-                            case .replay(let workoutID):
-                                if let detail = library.detail(id: workoutID) {
-                                    ReplayView(detail: detail)
-                                } else {
-                                    ContentUnavailableView(
-                                        "Workout Unavailable",
-                                        systemImage: "exclamationmark.triangle",
-                                        description: Text("Return to the workout library and select another workout.")
-                                    )
-                                }
+            NavigationStack(path: $detailNavigation.path) {
+                detailContent
+                    .navigationDestination(for: DetailNavigationState.Route.self) { route in
+                        switch route {
+                        case .replay(let workoutID):
+                            if let detail = library.detail(id: workoutID) {
+                                ReplayView(detail: detail)
+                            } else {
+                                ContentUnavailableView(
+                                    "Workout Unavailable",
+                                    systemImage: "exclamationmark.triangle",
+                                    description: Text("Return to the workout library and select another workout.")
+                                )
                             }
                         }
-                        .onChange(of: selectedWorkoutID) {
-                            detailNavigation.resetForSelectionChange()
-                        }
-                }
-            } else {
-                // sidebarOnly / minimal: show empty placeholder in detail
-                Text("RowPlay Studio")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
+                    }
+                    .onChange(of: selectedWorkoutID) {
+                        detailNavigation.resetForSelectionChange()
+                    }
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
@@ -92,6 +73,7 @@ struct ContentView: View {
         } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
             WorkoutDetailView(
                 detail: detail,
+                strokeSummary: library.strokeSummary(for: detail.id),
                 summary: library.summary,
                 comparisonCandidates: library.comparisonCandidates(for: detail.id),
                 annotationStore: library.annotationStore,

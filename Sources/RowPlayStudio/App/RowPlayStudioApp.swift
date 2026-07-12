@@ -7,15 +7,15 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    private let isolationConfig: IsolationConfig
+    private let launchConfiguration: AppLaunchConfiguration
     @StateObject private var library: WorkoutLibrary
     @StateObject private var syncController = Concept2SyncController()
 
     init() {
-        let config = IsolationConfig.fromEnvironment()
-        isolationConfig = config
+        let configuration = AppLaunchConfiguration.fromEnvironment()
+        launchConfiguration = configuration
         _library = StateObject(
-            wrappedValue: config.automationMode
+            wrappedValue: configuration.automationMode
                 ? WorkoutLibrary.demo()
                 : WorkoutLibrary(
                     details: [],
@@ -30,10 +30,12 @@ struct RowPlayStudioApp: App {
                 .frame(minWidth: 1_000, minHeight: 680)
                 .environmentObject(preferences)
                 .environmentObject(syncController)
-                .environment(\.isolationConfig, isolationConfig)
+                .environment(\.automationModeEnabled, launchConfiguration.automationMode)
                 .task {
-                    AutomationReadinessTelemetry.recordContentPresented(for: isolationConfig)
-                    if !isolationConfig.automationMode {
+                    AutomationReadinessTelemetry.recordContentPresented(
+                        automationMode: launchConfiguration.automationMode
+                    )
+                    if !launchConfiguration.automationMode {
                         await syncController.loadCachedWorkouts(into: library)
                     }
                 }

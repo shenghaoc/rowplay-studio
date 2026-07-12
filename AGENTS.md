@@ -61,7 +61,6 @@ swift test --filter RowPlayStudioTests  # Run macOS UI tests
 ./script/build_and_run.sh --telemetry   # Launch with subsystem-scoped telemetry stream
 ./script/build_and_run.sh --debug       # Launch under LLDB debugger
 ./script/build_and_run.sh --automation  # Launch deterministic demo data with reduced replay motion
-./script/build_and_run.sh --verify --isolation no_charts  # Launch an isolation level (also: no_replay3d, no_replay, sidebar_only, minimal)
 ./script/build_and_run.sh --sign-verify # Verify the staged bundle's Info.plist and ad-hoc signature
 ```
 

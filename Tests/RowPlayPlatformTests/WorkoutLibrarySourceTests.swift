@@ -180,9 +180,32 @@ final class WorkoutLibrarySourceTests: XCTestCase {
         )
     }
 
+    func testStrokeSummaryCacheUpdatesWhenDetailsChange() {
+        let initial = makeDetail(
+            id: 1,
+            strokes: [Stroke(t: 0, d: 0, pace: 120, cadence: 28, heartRate: 150, watts: 200)]
+        )
+        let library = WorkoutLibrary(details: [initial], defaults: defaults)
+
+        XCTAssertEqual(library.strokeSummary(for: initial.id).averagePace, 120, accuracy: 0.0001)
+        XCTAssertEqual(library.strokeSummary(for: initial.id).peakWatts, 200)
+
+        let updated = makeDetail(
+            id: 1,
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 130, cadence: 28, heartRate: 150, watts: 220),
+                Stroke(t: 2, d: 10, pace: 110, cadence: 29, heartRate: 152, watts: 260)
+            ]
+        )
+        library.details = [updated]
+
+        XCTAssertEqual(library.strokeSummary(for: updated.id).averagePace, 120, accuracy: 0.0001)
+        XCTAssertEqual(library.strokeSummary(for: updated.id).peakWatts, 260)
+    }
+
     // MARK: - Helpers
 
-    private func makeDetail(id: Int) -> WorkoutDetail {
+    private func makeDetail(id: Int, strokes: [Stroke] = []) -> WorkoutDetail {
         WorkoutDetail(
             workout: Workout(
                 id: id,
@@ -192,9 +215,9 @@ final class WorkoutLibrarySourceTests: XCTestCase {
                 time: 480,
                 pace: 120,
                 workoutType: "Test",
-                hasStrokeData: false
+                hasStrokeData: !strokes.isEmpty
             ),
-            strokes: [],
+            strokes: strokes,
             splits: []
         )
     }

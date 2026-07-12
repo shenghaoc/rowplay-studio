@@ -45,6 +45,8 @@ public final class WorkoutLibrary: ObservableObject {
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
+    /// Cached stroke summaries for detail accessibility labels and metrics.
+    private var strokeSummaryByWorkoutID: [Int: StrokeSummary] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
     public private(set) var demoDetailIDs: Set<Int>
@@ -85,6 +87,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     public func detail(id: Int) -> WorkoutDetail? {
         detailByID[id]
+    }
+
+    public func strokeSummary(for workoutID: Int) -> StrokeSummary {
+        strokeSummaryByWorkoutID[workoutID] ?? .empty
     }
 
     public func updateDetail(_ detail: WorkoutDetail) {
@@ -325,6 +331,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     private func updateAllDerivedData() {
         detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        strokeSummaryByWorkoutID = Dictionary(
+            details.map { ($0.id, WorkoutAnalytics.strokeSummary(for: $0.strokes)) },
+            uniquingKeysWith: { first, _ in first }
+        )
         workouts = details.map(\.workout)
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
         availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()

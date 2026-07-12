@@ -1,66 +1,37 @@
 # Computer Use Automation Readiness — Tasks
 
-## Task 1: Create IsolationConfig infrastructure
+## Task 1: Diagnose and remove the incompatible accessibility representation
 
-- [x] Create `Sources/RowPlayStudio/App/IsolationConfig.swift`
-- [x] Define `IsolationConfig` struct with `IsolationLevel` enum
-- [x] Read `ROWPLAY_ISOLATION_LEVEL` from `ProcessInfo.processInfo.environment`
-- [x] Read `ROWPLAY_AUTOMATION` from environment
-- [x] Pass config through SwiftUI environment
-- [x] Update `RowPlayStudioApp.swift` to inject config
+- [x] Use temporary local probes to identify the failing framework AX container.
+- [x] Confirm SwiftUI `GroupBox` is the offending representation.
+- [x] Replace workout-tool `GroupBox` instances with `WorkoutToolSection`.
+- [x] Remove diagnostic isolation code after confirming the full surface works.
 
-## Task 2: Wire isolation into views
+## Task 2: Preserve full-surface semantic access
 
-- [x] Update `DashboardView` to conditionally render charts based on config
-- [x] Update `WorkoutDetailView` to conditionally render chart/replay based on config
-- [x] Update `ContentView` to conditionally render detail based on config
-- [x] Update `ReplayView` to conditionally render 3D/Canvas based on config
-- [x] Run the isolation matrix through Computer Use and record the confirmed offending AX element
+- [x] Add explicit semantic labels and values for dashboard and workout-detail charts.
+- [x] Preserve all replay modes, navigation, and workout-tool controls in the normal UI.
+- [x] Avoid duplicate VoiceOver section-title announcements.
 
-## Task 3: Add accessibility summaries for Charts
+## Task 3: Keep automation deterministic without changing the app surface
 
-- [x] Wrap `DashboardView` Distance by Sport chart with accessibility summary
-- [x] Wrap `DashboardView` Recent Pace chart with accessibility summary
-- [x] Wrap `WorkoutDetailView` Stroke Timeline chart with accessibility summary
-- [x] Ensure all charts use `.accessibilityElement(children: .ignore)` with explicit label/value
-- [x] Confirm the retained semantic summaries resolve the observed helper failure
+- [x] Add stable bundle metadata, ad-hoc signing, and strict verification.
+- [x] Add `--automation` to the staged launch script.
+- [x] Read `ROWPLAY_AUTOMATION` once at launch.
+- [x] Force demo data, skip sync, and reduce replay motion in automation mode.
 
-## Task 4: Bundle metadata hardening
+## Task 4: Cache render-facing derived data
 
-- [x] Update `build_and_run.sh` Info.plist: CFBundleName = RowPlayStudio
-- [x] Add CFBundleDisplayName = RowPlay Studio
-- [x] Add ad-hoc codesign after bundle assembly
-- [x] Add codesign verification step
-- [x] Add `--automation` mode to build script
-- [x] Add `--isolation LEVEL` mode so each isolation level reaches the staged bundle
+- [x] Add a single-pass `WorkoutAnalytics.strokeSummary(for:)` helper.
+- [x] Cache summaries in `WorkoutLibrary` when details change.
+- [x] Supply the cached summary to `WorkoutDetailView` accessibility labels.
 
-## Task 5: Add automation launch support
+## Task 5: Validate
 
-- [x] Read `ROWPLAY_AUTOMATION` environment variable in app
-- [x] When set: force demo mode, disable sync, reduce motion
-- [x] Ensure automation mode uses full production UI (not isolation modes)
-
-## Task 6: Add focused tests
-
-- [x] Create `Tests/RowPlayStudioTests/ComputerUseAutomationReadinessTests.swift`
-- [x] Test `IsolationConfig` default values
-- [x] Test `IsolationConfig` with environment overrides
-- [x] Test automation mode configuration
-- [x] Test environment-backed isolation parsing and invalid-level fallback
-
-## Task 7: Update documentation
-
-- [x] Update `docs/roadmap.md` with computer-use-automation-readiness phase
-- [x] Update `docs/beta-readiness.md` with verification status
-- [x] Update `docs/source-map.md` with new file entries
-
-## Task 8: Validate
-
-- [x] `swift test` passes
-- [x] `swift build` passes
-- [x] `git diff --check` passes
-- [x] `./script/build_and_run.sh --verify` launches
-- [x] `./script/build_and_run.sh --automation` launches
-- [x] `plutil -lint dist/RowPlayStudio.app/Contents/Info.plist` passes
-- [x] `codesign --verify --deep --strict dist/RowPlayStudio.app` passes
-- [x] Computer Use returns semantic state and remains running for the full surface
+- [x] `swift test` passes.
+- [x] `swift build` passes.
+- [x] `git diff --check` passes.
+- [x] `./script/build_and_run.sh --verify` launches.
+- [x] `./script/build_and_run.sh --automation` launches.
+- [x] `codesign --verify --deep --strict dist/RowPlayStudio.app` passes.
+- [x] Computer Use traverses the full production accessibility tree and remains running.

@@ -18,9 +18,9 @@ enum AutomationReadinessTelemetry {
         )
     }
 
-    static func recordContentPresented(for config: IsolationConfig) {
+    static func recordContentPresented(automationMode: Bool) {
         logger.info(
-            "main content presented automation=\(config.automationMode, privacy: .public) isolation=\(config.level.rawValue, privacy: .public)"
+            "main content presented automation=\(automationMode, privacy: .public)"
         )
     }
 }

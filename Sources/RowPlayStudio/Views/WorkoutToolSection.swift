@@ -28,6 +28,5 @@ struct WorkoutToolSection<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
     }
 }

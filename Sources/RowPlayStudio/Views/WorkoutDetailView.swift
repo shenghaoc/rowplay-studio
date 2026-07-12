@@ -5,13 +5,13 @@ import SwiftUI
 
 struct WorkoutDetailView: View {
     var detail: WorkoutDetail
+    var strokeSummary: StrokeSummary
     var summary: DashboardSummary
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
     var onUpdateDetail: (WorkoutDetail) -> Void
     var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
-    @Environment(\.isolationConfig) private var isolationConfig
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
@@ -20,20 +20,14 @@ struct WorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 metricStrip
-                if isolationConfig.replayEnabled {
-                    replayButton
-                }
+                replayButton
                 WorkoutToolsView(
                     detail: detail,
                     comparisonCandidates: comparisonCandidates,
                     annotationStore: annotationStore,
                     onUpdateDetail: onUpdateDetail
                 )
-                if isolationConfig.chartsEnabled {
-                    strokeChart
-                } else {
-                    strokeTextSummary
-                }
+                strokeChart
                 splitTable
             }
             .padding(28)
@@ -129,61 +123,7 @@ struct WorkoutDetailView: View {
     }
 
     private var strokeTimelineAccessibilityValue: String {
-        let count = detail.strokes.count
-        let (totalPace, totalWatts) = detail.strokes.reduce((0.0, 0.0)) { ($0.0 + $1.pace, $0.1 + Double($1.watts)) }
-        let avgPace = totalPace / max(Double(count), 1)
-        let avgWatts = totalWatts / max(Double(count), 1)
-        return "\(count) strokes, avg pace \(RowPlayFormatting.pace(avgPace)), avg watts \(Int(avgWatts))"
-    }
-
-    private var strokeSummaryStats: (count: Int, avgPace: Double, avgWatts: Double, maxWatts: Int) {
-        let count = detail.strokes.count
-        var totalPace: Double = 0
-        var totalWatts: Double = 0
-        var maxWatts: Int = 0
-        for stroke in detail.strokes {
-            totalPace += stroke.pace
-            totalWatts += Double(stroke.watts)
-            if stroke.watts > maxWatts {
-                maxWatts = stroke.watts
-            }
-        }
-        let avgPace = totalPace / max(Double(count), 1)
-        let avgWatts = totalWatts / max(Double(count), 1)
-        return (count, avgPace, avgWatts, maxWatts)
-    }
-
-    @ViewBuilder
-    private var strokeTextSummary: some View {
-        if detail.strokes.isEmpty {
-            ContentUnavailableView("No Stroke Detail", systemImage: "waveform.path.ecg", description: Text("This workout only has summary and split data."))
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Stroke Summary")
-                    .font(.title3.weight(.semibold))
-
-                let stats = strokeSummaryStats
-
-                HStack(spacing: 24) {
-                    VStack(alignment: .leading) {
-                        Text("Strokes").font(.caption).foregroundStyle(.secondary)
-                        Text("\(stats.count)").font(.title3.monospacedDigit())
-                    }
-                    VStack(alignment: .leading) {
-                        Text("Avg Pace").font(.caption).foregroundStyle(.secondary)
-                        Text(RowPlayFormatting.pace(stats.avgPace)).font(.title3.monospacedDigit())
-                    }
-                    VStack(alignment: .leading) {
-                        Text("Avg Watts").font(.caption).foregroundStyle(.secondary)
-                        Text("\(Int(stats.avgWatts))").font(.title3.monospacedDigit())
-                    }
-                    VStack(alignment: .leading) {
-                        Text("Peak Watts").font(.caption).foregroundStyle(.secondary)
-                        Text("\(stats.maxWatts)").font(.title3.monospacedDigit())
-                    }
-                }
-            }
-        }
+        "\(strokeSummary.count) strokes, avg pace \(RowPlayFormatting.pace(strokeSummary.averagePace)), avg watts \(Int(strokeSummary.averageWatts))"
     }
 
     private var splitTable: some View {

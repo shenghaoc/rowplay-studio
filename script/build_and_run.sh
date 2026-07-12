@@ -2,7 +2,6 @@
 set -euo pipefail
 
 MODE="run"
-ISOLATION_LEVEL=""
 APP_NAME="RowPlayStudio"
 BUNDLE_ID="com.shenghaoc.RowPlayStudio"
 MIN_SYSTEM_VERSION="26.0"
@@ -16,8 +15,7 @@ APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 
 usage() {
-  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify] [--isolation LEVEL]" >&2
-  echo "levels: full, no_charts, no_replay3d, no_replay, sidebar_only, minimal" >&2
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify]" >&2
 }
 
 while (($#)); do
@@ -28,14 +26,6 @@ while (($#)); do
         exit 2
       fi
       MODE="$1"
-      ;;
-    --isolation)
-      if (($# < 2)); then
-        usage
-        exit 2
-      fi
-      ISOLATION_LEVEL="$2"
-      shift
       ;;
     --help|-h)
       usage
@@ -48,19 +38,6 @@ while (($#)); do
   esac
   shift
 done
-
-case "$ISOLATION_LEVEL" in
-  ""|full|no_charts|no_replay3d|no_replay|sidebar_only|minimal) ;;
-  *)
-    usage
-    exit 2
-    ;;
-esac
-
-if [[ -n "$ISOLATION_LEVEL" && ( "$MODE" == "--automation" || "$MODE" == "automation" ) ]]; then
-  echo "--automation always launches the full production surface; do not combine it with --isolation." >&2
-  exit 2
-fi
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -108,11 +85,7 @@ codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 
 open_app() {
-  if [[ -n "$ISOLATION_LEVEL" ]]; then
-    /usr/bin/open -n --env "ROWPLAY_ISOLATION_LEVEL=$ISOLATION_LEVEL" "$APP_BUNDLE"
-  else
-    /usr/bin/open -n "$APP_BUNDLE"
-  fi
+  /usr/bin/open -n "$APP_BUNDLE"
 }
 
 open_app_automation() {

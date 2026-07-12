@@ -8,7 +8,7 @@ struct WorkoutComparisonPanel: View {
     var candidates: [WorkoutDetail]
 
     @State private var selectedCandidateID: Int?
-    @Environment(\.isolationConfig) private var isolationConfig
+    @State private var overlayPoints: [CompareOverlayPoint] = []
 
     var body: some View {
         WorkoutToolSection("Compare") {
@@ -35,17 +35,25 @@ struct WorkoutComparisonPanel: View {
 
                         intervalRows(candidate: candidate)
 
-                        overlayChart(candidate: candidate)
+                        overlayChart(points: overlayPoints)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .onAppear(perform: alignSelection)
-                .onChange(of: candidates.map(\.id)) { _, _ in
+                .onAppear {
                     alignSelection()
+                    updateOverlayPoints()
                 }
-                .onChange(of: detail.id) { _, _ in
+                .onChange(of: candidates) { _, _ in
+                    alignSelection()
+                    updateOverlayPoints()
+                }
+                .onChange(of: detail) { _, _ in
                     selectedCandidateID = nil
                     alignSelection()
+                    updateOverlayPoints()
+                }
+                .onChange(of: selectedCandidateID) { _, _ in
+                    updateOverlayPoints()
                 }
             }
         }
@@ -191,9 +199,8 @@ struct WorkoutComparisonPanel: View {
     }
 
     @ViewBuilder
-    private func overlayChart(candidate: WorkoutDetail) -> some View {
-        let points = overlayPoints(candidate: candidate)
-        if isolationConfig.chartsEnabled, !points.isEmpty {
+    private func overlayChart(points: [CompareOverlayPoint]) -> some View {
+        if !points.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pace Overlay")
                     .font(.subheadline.weight(.semibold))
@@ -212,7 +219,15 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    private func overlayPoints(candidate: WorkoutDetail) -> [CompareOverlayPoint] {
+    private func updateOverlayPoints() {
+        guard let candidate = selectedCandidate else {
+            overlayPoints = []
+            return
+        }
+        overlayPoints = makeOverlayPoints(candidate: candidate)
+    }
+
+    private func makeOverlayPoints(candidate: WorkoutDetail) -> [CompareOverlayPoint] {
         guard let overlay = WorkoutComparison.buildDistanceOverlay(detail.strokes, candidate.strokes) else {
             return []
         }

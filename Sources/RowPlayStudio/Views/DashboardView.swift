@@ -6,7 +6,6 @@ import SwiftUI
 struct DashboardView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
-    @Environment(\.isolationConfig) private var isolationConfig
     var summary: DashboardSummary
     var personalBests: [DashboardPersonalBest]
     var recentPaceWorkouts: [Workout]
@@ -35,13 +34,8 @@ struct DashboardView: View {
 
                 sportSummarySection
 
-                if isolationConfig.chartsEnabled {
-                    distanceBySportChart
-                    recentPaceChart
-                } else {
-                    // Text summary fallback when charts are disabled
-                    distanceBySportTextSummary
-                }
+                distanceBySportChart
+                recentPaceChart
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,25 +68,6 @@ struct DashboardView: View {
         summary.bySport.map { item in
             "\(item.sport.displayName): \(RowPlayFormatting.distance(item.distance, unit: unit))"
         }.joined(separator: ", ")
-    }
-
-    private var distanceBySportTextSummary: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Distance by Sport")
-                .font(.title3.weight(.semibold))
-
-            ForEach(summary.bySport) { item in
-                HStack {
-                    Image(systemName: item.sport.iconName)
-                        .foregroundStyle(.secondary)
-                    Text(item.sport.displayName)
-                    Spacer()
-                    Text(RowPlayFormatting.distance(item.distance, unit: unit))
-                        .monospacedDigit()
-                }
-                .font(.subheadline)
-            }
-        }
     }
 
     private var recentPaceChart: some View {

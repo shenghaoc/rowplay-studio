@@ -8,13 +8,13 @@ struct ReplayView: View {
     let ghostDetail: WorkoutDetail?
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var preferences: AppPreferences
-    @Environment(\.isolationConfig) private var isolationConfig
+    @Environment(\.automationModeEnabled) private var automationModeEnabled
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
 
     private var unit: DistanceUnit { preferences.distanceUnit }
-    private var reduceMotion: Bool { preferences.reduceReplayMotion || isolationConfig.automationMode }
+    private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
 
     init(detail: WorkoutDetail, ghostDetail: WorkoutDetail? = nil) {
         self.detail = detail
@@ -42,11 +42,6 @@ struct ReplayView: View {
         .onDisappear {
             state.pause()
         }
-        .onAppear {
-            if !isolationConfig.replay3DEnabled, rendererMode == .threeD {
-                rendererMode = .twoD
-            }
-        }
     }
 
     // MARK: - Renderer Picker
@@ -69,9 +64,7 @@ struct ReplayView: View {
     }
 
     private var visibleRendererModes: [ReplayRendererMode] {
-        isolationConfig.replay3DEnabled
-            ? ReplayRendererMode.allCases
-            : [.twoD]
+        ReplayRendererMode.allCases
     }
 
     // MARK: - Replay Surface
@@ -82,17 +75,13 @@ struct ReplayView: View {
         case .twoD:
             twoDReplaySurface
         case .threeD:
-            if isolationConfig.replay3DEnabled {
-                RealityReplaySceneView(
-                    detail: detail,
-                    state: $state,
-                    reduceMotion: reduceMotion,
-                    ghostDetail: ghostDetail
-                )
-                .frame(minHeight: 300)
-            } else {
-                twoDReplaySurface
-            }
+            RealityReplaySceneView(
+                detail: detail,
+                state: $state,
+                reduceMotion: reduceMotion,
+                ghostDetail: ghostDetail
+            )
+            .frame(minHeight: 300)
         }
     }
 
