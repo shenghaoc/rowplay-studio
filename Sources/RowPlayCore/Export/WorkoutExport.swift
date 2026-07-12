@@ -13,26 +13,19 @@ public enum WorkoutExport: Sendable {
     ]
 
     // MARK: - Formatters (Performance Optimization)
-    // Instantiating DateFormatter / ISO8601DateFormatter is expensive. Reuse
-    // static instances, but guard access with Mutex — these types are not
-    // thread-safe, so nonisolated(unsafe) alone is insufficient for concurrent
-    // export paths (batch/parallel TCX or CSV).
+    // Instantiating DateFormatter is expensive. Reuse static instances, but
+    // guard access with Mutex because DateFormatter is mutable and non-Sendable.
+    // TCX uses immutable, Sendable ISO8601FormatStyle values so parallel exports
+    // do not contend on a shared formatter lock.
 
     /// Activity / lap timestamps: second-precision UTC ISO-8601.
-    private static let tcxISO8601Formatter = Mutex({
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        f.timeZone = TimeZone(secondsFromGMT: 0)
-        return f
-    }())
+    private static let tcxISO8601Format = Date.ISO8601FormatStyle(timeZone: .gmt)
 
     /// Trackpoint timestamps: fractional-second UTC ISO-8601.
-    private static let tcxISO8601FormatterFractional = Mutex({
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        f.timeZone = TimeZone(secondsFromGMT: 0)
-        return f
-    }())
+    private static let tcxISO8601FractionalFormat = Date.ISO8601FormatStyle(
+        includingFractionalSeconds: true,
+        timeZone: .gmt
+    )
 
     private static let filenameDateFormatter = Mutex({
         let formatter = DateFormatter()
@@ -112,7 +105,7 @@ public enum WorkoutExport: Sendable {
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
-        let activityId = tcxISO8601Formatter.withLock { $0.string(from: w.date) }
+        let activityId = w.date.formatted(tcxISO8601Format)
         let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
 
         // Guard against non-finite workout summary values
@@ -188,52 +181,48 @@ public enum WorkoutExport: Sendable {
 
         let sortedStrokes = detail.strokes.sorted { $0.t < $1.t }
 
-        // Hold the formatter lock for the whole pass so concurrent exports
-        // cannot race on ISO8601DateFormatter's mutable internal state.
-        return tcxISO8601FormatterFractional.withLock { dateFormatter in
-            for stroke in sortedStrokes {
-                // Reject non-finite or negative timestamps
-                guard stroke.t.isFinite, stroke.t >= 0 else { continue }
-                // Reject non-finite or negative distances
-                guard stroke.d.isFinite, stroke.d >= 0 else { continue }
+        for stroke in sortedStrokes {
+            // Reject non-finite or negative timestamps
+            guard stroke.t.isFinite, stroke.t >= 0 else { continue }
+            // Reject non-finite or negative distances
+            guard stroke.d.isFinite, stroke.d >= 0 else { continue }
 
-                // Skip strokes beyond workout duration
-                guard stroke.t <= workoutDuration else { continue }
+            // Skip strokes beyond workout duration
+            guard stroke.t <= workoutDuration else { continue }
 
-                let absoluteDate = w.date.addingTimeInterval(stroke.t)
-                let timeString = dateFormatter.string(from: absoluteDate)
+            let absoluteDate = w.date.addingTimeInterval(stroke.t)
+            let timeString = absoluteDate.formatted(tcxISO8601FractionalFormat)
 
-                // Deduplicate identical source timestamps without collapsing distinct
-                // sub-second samples that happen within the same wall-clock second.
-                guard seenOffsets.insert(stroke.t).inserted else { continue }
+            // Deduplicate identical source timestamps without collapsing distinct
+            // sub-second samples that happen within the same wall-clock second.
+            guard seenOffsets.insert(stroke.t).inserted else { continue }
 
-                // Clamp distance to workout distance
-                let clampedDistance = min(stroke.d, workoutDistance)
-                let distanceString = formatDecimal(clampedDistance)
+            // Clamp distance to workout distance
+            let clampedDistance = min(stroke.d, workoutDistance)
+            let distanceString = formatDecimal(clampedDistance)
 
-                // Heart rate: only 1...255
-                var hr: Int? = nil
-                if let rawHR = stroke.heartRate, rawHR >= 1, rawHR <= 255 {
-                    hr = rawHR
-                }
-
-                // Cadence: finite, non-negative, rounded and clamped to the
-                // TCX CadenceValue_t range 0...254 before converting to Int.
-                var cadence: Int? = nil
-                if stroke.cadence.isFinite, stroke.cadence >= 0 {
-                    cadence = Int(min(stroke.cadence.rounded(), 254))
-                }
-
-                result.append(TrackpointData(
-                    time: timeString,
-                    distance: distanceString,
-                    heartRate: hr,
-                    cadence: cadence
-                ))
+            // Heart rate: only 1...255
+            var hr: Int? = nil
+            if let rawHR = stroke.heartRate, rawHR >= 1, rawHR <= 255 {
+                hr = rawHR
             }
 
-            return result
+            // Cadence: finite, non-negative, rounded and clamped to the
+            // TCX CadenceValue_t range 0...254 before converting to Int.
+            var cadence: Int? = nil
+            if stroke.cadence.isFinite, stroke.cadence >= 0 {
+                cadence = Int(min(stroke.cadence.rounded(), 254))
+            }
+
+            result.append(TrackpointData(
+                time: timeString,
+                distance: distanceString,
+                heartRate: hr,
+                cadence: cadence
+            ))
         }
+
+        return result
     }
 
     /// Locale-independent integer formatting.
