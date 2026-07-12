@@ -21,9 +21,10 @@ public protocol HTTPTransport: Sendable {
 /// URLSession-backed transport for production use.
 ///
 /// By default, creates a session with redirect protection that rejects
-/// HTTPS-to-HTTP downgrade redirects to prevent token leakage. A custom
-/// `URLSessionConfiguration` can be injected for testing or special
-/// configurations while keeping that protection installed.
+/// HTTPS-to-HTTP downgrade redirects and cross-host HTTPS redirects to
+/// prevent token leakage. A custom `URLSessionConfiguration` can be injected
+/// for testing or special configurations while keeping that protection
+/// installed.
 public final class URLSessionHTTPTransport: HTTPTransport {
     private let session: URLSession
     private let redirectDelegate: HTTPSRedirectDelegate
@@ -79,10 +80,12 @@ public final class URLSessionHTTPTransport: HTTPTransport {
     }
 }
 
-/// URLSession task delegate that rejects HTTP downgrade redirects.
+/// URLSession task delegate that rejects insecure redirects.
 ///
-/// Prevents the `Authorization` header from being sent over unencrypted
-/// connections when a server responds with a redirect to `http://`.
+/// Allows redirects only when the new request is HTTPS and targets the same
+/// host as the original request (host comparison is case-insensitive per
+/// RFC 3986). Blocks HTTP downgrades and cross-host HTTPS redirects so the
+/// `Authorization` header is never sent to an unencrypted or unintended host.
 /// Tracks blocked redirects so the transport can throw a typed error.
 final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
     /// Task identifiers for which a redirect was blocked.
@@ -103,7 +106,11 @@ final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
         let isHTTPS = request.url?.scheme?.lowercased() == "https"
-        let isSameHost = request.url?.host == task.originalRequest?.url?.host
+        // Hostnames are case-insensitive (RFC 3986). Require non-nil hosts so
+        // nil == nil does not incorrectly treat malformed URLs as same-host.
+        let newHost = request.url?.host?.lowercased()
+        let originalHost = task.originalRequest?.url?.host?.lowercased()
+        let isSameHost = newHost != nil && newHost == originalHost
 
         if isHTTPS && isSameHost {
             completionHandler(request)

@@ -26,4 +26,4 @@
 ## 2026-07-08 - Token Leak via HTTPS Redirect to Different Host
 **Vulnerability:** The HTTP transport created for API calls only rejected redirects to non-HTTPS URLs. It allowed redirects to different hosts as long as they were HTTPS. This could lead to a token leakage if a server returned a redirect to an attacker-controlled HTTPS server, and the token was attached to the redirect request.
 **Learning:** Checking the scheme of the redirect URL is not sufficient to prevent token leakage. An attacker could set up an HTTPS server and redirect the client to it, capturing the bearer token.
-**Prevention:** Ensure that redirects are only allowed if the new URL has the same host as the original request, in addition to being HTTPS. If the host is different, block the redirect.
+**Prevention:** Ensure that redirects are only allowed if the new URL has the same host as the original request, in addition to being HTTPS. Compare hosts case-insensitively (RFC 3986) and require both hosts to be non-nil so malformed URLs do not pass a `nil == nil` check. If the host is different or missing, block the redirect.

@@ -558,6 +558,66 @@ final class URLSessionConcept2ClientTests: XCTestCase {
         session.invalidateAndCancel()
     }
 
+    func testHTTPSRedirectToSameHostDifferentCaseIsAllowedByDelegate() {
+        let delegate = HTTPSRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: URL(string: "https://log.concept2.com/api/test")!)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://log.concept2.com/api/test")!,
+            statusCode: 302,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": "https://LOG.CONCEPT2.COM/api/test/redirected"]
+        )!
+        let redirectedRequest = URLRequest(
+            url: URL(string: "https://LOG.CONCEPT2.COM/api/test/redirected")!
+        )
+
+        var allowedRequest: URLRequest?
+        delegate.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: redirectedRequest
+        ) { request in
+            allowedRequest = request
+        }
+
+        XCTAssertEqual(allowedRequest?.url, redirectedRequest.url)
+        XCTAssertFalse(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        session.invalidateAndCancel()
+    }
+
+    func testHTTPSRedirectWithMissingHostIsBlockedByDelegate() {
+        let delegate = HTTPSRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: URL(string: "https://log.concept2.com/api/test")!)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://log.concept2.com/api/test")!,
+            statusCode: 302,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": "https:///stolen"]
+        )!
+        // Empty-host absolute URL: scheme is https but host is nil.
+        // nil must not compare equal to the original host (or to another nil).
+        let emptyHostURL = URL(string: "https:///stolen")!
+        XCTAssertNil(emptyHostURL.host, "Test requires a URL whose host component is nil")
+        let redirectedRequest = URLRequest(url: emptyHostURL)
+
+        var allowedRequest: URLRequest?
+        delegate.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: redirectedRequest
+        ) { request in
+            allowedRequest = request
+        }
+
+        XCTAssertNil(allowedRequest)
+        XCTAssertTrue(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        session.invalidateAndCancel()
+    }
+
     // MARK: - Concept2Error Descriptions
 
     func testErrorDescriptionsDoNotContainSensitiveData() {
