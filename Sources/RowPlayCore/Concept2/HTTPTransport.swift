@@ -83,9 +83,10 @@ public final class URLSessionHTTPTransport: HTTPTransport {
 /// URLSession task delegate that rejects insecure redirects.
 ///
 /// Allows redirects only when the new request is HTTPS and targets the same
-/// host as the original request (host comparison is case-insensitive per
-/// RFC 3986). Blocks HTTP downgrades and cross-host HTTPS redirects so the
-/// `Authorization` header is never sent to an unencrypted or unintended host.
+/// origin as the original request (host comparison is case-insensitive per
+/// RFC 3986, and ports are normalized). Blocks HTTP downgrades and cross-origin
+/// HTTPS redirects so the `Authorization` header is never sent to an
+/// unencrypted or unintended service.
 /// Tracks blocked redirects so the transport can throw a typed error.
 final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
     /// Task identifiers for which a redirect was blocked.
@@ -111,11 +112,14 @@ final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
         let newHost = request.url?.host?.lowercased()
         let originalHost = task.originalRequest?.url?.host?.lowercased()
         let isSameHost = newHost != nil && newHost == originalHost
+        let newPort = request.url?.port ?? 443
+        let originalPort = task.originalRequest?.url?.port ?? 443
+        let isSamePort = newPort == originalPort
 
-        if isHTTPS && isSameHost {
+        if isHTTPS && isSameHost && isSamePort {
             completionHandler(request)
         } else {
-            // Block redirect to non-HTTPS URL or different host to prevent token leakage.
+            // Block non-HTTPS and cross-origin redirects to prevent token leakage.
             _ = blockedTaskIDs.withLock { $0.insert(task.taskIdentifier) }
             completionHandler(nil)
         }

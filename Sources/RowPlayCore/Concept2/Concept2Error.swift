@@ -19,7 +19,7 @@ public enum Concept2Error: Error, Equatable, Sendable {
     case decodingFailed
     /// Attempted to connect over unencrypted HTTP.
     case insecureConnection
-    /// A redirect to a non-HTTPS URL was blocked to prevent token leakage.
+    /// An insecure or cross-origin redirect was blocked to prevent token leakage.
     case insecureRedirectBlocked
 }
 
@@ -41,7 +41,7 @@ extension Concept2Error: CustomStringConvertible {
         case .insecureConnection:
             "Concept2 API connection must use HTTPS"
         case .insecureRedirectBlocked:
-            "Concept2 API redirect to non-HTTPS URL blocked"
+            "Concept2 API insecure or cross-origin redirect blocked"
         }
     }
 }
