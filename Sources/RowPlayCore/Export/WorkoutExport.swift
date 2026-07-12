@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 public enum WorkoutExport: Sendable {
     private static let exportSchemaVersion = 1
@@ -10,6 +11,36 @@ public enum WorkoutExport: Sendable {
         "calories", "watt_minutes", "drag_factor", "workout_type", "comments",
         "has_stroke_data",
     ]
+
+    // MARK: - Formatters (Performance Optimization)
+    // Instantiating DateFormatter is expensive. Reuse static instances, but
+    // guard access with Mutex because DateFormatter is mutable and non-Sendable.
+    // TCX uses immutable, Sendable ISO8601FormatStyle values so parallel exports
+    // do not contend on a shared formatter lock.
+
+    /// Activity / lap timestamps: second-precision UTC ISO-8601.
+    private static let tcxISO8601Format = Date.ISO8601FormatStyle(timeZone: .gmt)
+
+    /// Trackpoint timestamps: fractional-second UTC ISO-8601.
+    private static let tcxISO8601FractionalFormat = Date.ISO8601FormatStyle(
+        includingFractionalSeconds: true,
+        timeZone: .gmt
+    )
+
+    private static let filenameDateFormatter = Mutex({
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }())
+
+    private static let logbookDateFormatter = Mutex({
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }())
 
     // MARK: - CSV Export
 
@@ -70,20 +101,11 @@ public enum WorkoutExport: Sendable {
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 " +
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
 
-    private static func makeTCXISO8601Formatter(fractionalSeconds: Bool = false) -> ISO8601DateFormatter {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = fractionalSeconds
-            ? [.withInternetDateTime, .withFractionalSeconds]
-            : [.withInternetDateTime]
-        f.timeZone = TimeZone(secondsFromGMT: 0)
-        return f
-    }
-
     /// Export a single workout detail as Garmin Training Center Database v2 XML.
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
-        let activityId = makeTCXISO8601Formatter().string(from: w.date)
+        let activityId = w.date.formatted(tcxISO8601Format)
         let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
 
         // Guard against non-finite workout summary values
@@ -109,10 +131,7 @@ public enum WorkoutExport: Sendable {
         xml.append("        <TriggerMethod>Manual</TriggerMethod>")
 
         // Track (only when valid strokes exist)
-        let validStrokes = filterAndBuildTrackpoints(
-            detail: detail,
-            dateFormatter: makeTCXISO8601Formatter(fractionalSeconds: true)
-        )
+        let validStrokes = filterAndBuildTrackpoints(detail: detail)
         if !validStrokes.isEmpty {
             xml.append("        <Track>")
             for tp in validStrokes {
@@ -149,8 +168,7 @@ public enum WorkoutExport: Sendable {
 
     /// Filter strokes for TCX export: validate, clamp, deduplicate, sort.
     private static func filterAndBuildTrackpoints(
-        detail: WorkoutDetail,
-        dateFormatter: ISO8601DateFormatter
+        detail: WorkoutDetail
     ) -> [TrackpointData] {
         let w = detail.workout
         let workoutDuration = w.time
@@ -173,7 +191,7 @@ public enum WorkoutExport: Sendable {
             guard stroke.t <= workoutDuration else { continue }
 
             let absoluteDate = w.date.addingTimeInterval(stroke.t)
-            let timeString = dateFormatter.string(from: absoluteDate)
+            let timeString = absoluteDate.formatted(tcxISO8601FractionalFormat)
 
             // Deduplicate identical source timestamps without collapsing distinct
             // sub-second samples that happen within the same wall-clock second.
@@ -219,27 +237,9 @@ public enum WorkoutExport: Sendable {
 
     // MARK: - Filenames
 
-    // MARK: - Formatters (Performance Optimization)
-    // Instantiating DateFormatter is expensive. Reusing static formatters
-    // significantly speeds up formatting loops during batch exports.
-    private static let filenameDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
-
-    private static let logbookDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
-
     /// Generate a stable export filename.
     public static func exportFilename(ext: String) -> String {
-        let dateKey = filenameDateFormatter.string(from: Date())
+        let dateKey = filenameDateFormatter.withLock { $0.string(from: Date()) }
         return "rowplay-logbook-\(dateKey).\(ext)"
     }
 
@@ -250,7 +250,7 @@ public enum WorkoutExport: Sendable {
 
     /// Concept2 logbook timestamp string (`YYYY-MM-DD HH:MM:SS`) interpreted in UTC.
     static func logbookDateString(from date: Date) -> String {
-        return logbookDateFormatter.string(from: date)
+        logbookDateFormatter.withLock { $0.string(from: date) }
     }
 
     // MARK: - CSV Cell Escaping (RFC 4180 + formula injection protection)

@@ -2,6 +2,7 @@ import Foundation
 #if canImport(FoundationXML)
 import FoundationXML
 #endif
+import Synchronization
 import XCTest
 @testable import RowPlayCore
 
@@ -478,6 +479,29 @@ final class TCXExportTests: XCTestCase {
         let xml1 = WorkoutExport.tcx(detail)
         let xml2 = WorkoutExport.tcx(detail)
         XCTAssertEqual(xml1, xml2)
+    }
+
+    func testConcurrentTCXExportsProduceIdenticalOutput() {
+        // Cached ISO8601DateFormatter instances are Mutex-guarded; concurrent
+        // exports must not race or produce corrupted timestamps.
+        let strokes = (0..<200).map { i in
+            makeStroke(t: Double(i) * 0.5 + 0.123, d: Double(i) * 4.2)
+        }
+        let detail = makeDetail(strokes: strokes)
+        let expected = WorkoutExport.tcx(detail)
+
+        let iterations = 32
+        let results = Mutex([(String, Int)]())
+        DispatchQueue.concurrentPerform(iterations: iterations) { index in
+            let xml = WorkoutExport.tcx(detail)
+            results.withLock { $0.append((xml, index)) }
+        }
+
+        let all = results.withLock { $0 }
+        XCTAssertEqual(all.count, iterations)
+        for (xml, index) in all {
+            XCTAssertEqual(xml, expected, "Concurrent export \(index) diverged from serial baseline")
+        }
     }
 
     // MARK: - Privacy Exclusions
