@@ -16,13 +16,20 @@ RunPlayStudio, a similar SwiftUI macOS app, works correctly with Computer Use
 on the same machine. The difference is in RowPlayStudio's UI complexity:
 Charts views, RealityKit 3D scenes, and custom Canvas replay surfaces.
 
-## Root Cause Hypothesis
+## Confirmed Diagnosis
 
-SwiftUI Charts and RealityKit views generate framework-level accessibility
-elements that Computer Use's `TransformedUIElement` transformer cannot process.
-When the helper encounters an incompatible AX role, representation, or deeply
-nested hierarchy, it hits an internal assertion (`AccessibilitySupport.UIElementError`)
-and crashes with SIGTRAP.
+`SkyComputerUseService` terminated with `EXC_BREAKPOINT` / `SIGTRAP` while it
+held AX observers for RowPlayStudio. Progressive isolation established that the
+minimal window, sidebar, chart-free detail, and `WorkoutToolsView` heading all
+traverse successfully. The generated SwiftUI accessibility representation of a
+`GroupBox("Annotations")` still crashes the helper when its content is reduced
+to one static `Text`; that is the confirmed offending representation.
+
+The exact source-level AX boundary is therefore the framework-generated
+`GroupBox` container labelled `Annotations`, not its text field, slider,
+annotation list, Charts, Canvas, or RealityKit content. The helper crashes
+before it serializes a stable AX role for that `GroupBox`, so the production
+fix removes the representation rather than hiding its content.
 
 The crash is NOT caused by:
 - Missing accessibility labels (these would cause silent failures, not crashes)
@@ -52,68 +59,50 @@ etc. before rendering the corresponding section.
 
 ### Isolation Binary Search Order
 
-1. Start at `full` — confirm crash reproduces
-2. Try `no_charts` — if this fixes it, Charts is the offender
-3. Try `no_replay3d` — if this fixes it, RealityKit is the offender
-4. Try `no_replay` — narrows to replay surfaces
-5. Try `sidebar_only` — confirms the basic shell works
+1. `minimal` and `sidebar_only` returned semantic trees.
+2. `no_charts` still crashed, excluding Charts as the primary cause.
+3. The temporary chart-free tools isolation succeeded; a static
+   `GroupBox("Annotations")` reproduced the crash.
+4. Replace all workout-tool `GroupBox` containers, then retest `full`.
+5. `full` returned the complete app tree and both 2D and 3D replay surfaces.
+
+Launch a level reproducibly with:
+
+```bash
+./script/build_and_run.sh --verify --isolation no_charts
+```
+
+The script passes the level directly to the staged bundle with `open --env`;
+setting an environment variable in the invoking shell alone is not reliable
+for a Launch Services launch.
 
 ### Safety
 
 - `IsolationConfig` lives in `RowPlayStudio` only (not Core or Platform)
 - Defaults to `.full` — zero behavior change for normal launches
-- The `--automation` flag sets `no_charts` + demo mode (see below)
+- The `--automation` flag uses the full production surface with demo mode
 - Temporary probes are removed after diagnosis; only the final config remains
 
-## Remediation Plan
+## Remediation
 
-After identifying the offender, apply the minimum fix:
+`WorkoutToolSection` replaces `GroupBox` in the export/share, HR import,
+comparison, and annotations panels. It uses an explicit heading, visual
+container, `.accessibilityElement(children: .contain)`, and an explicit label.
+This preserves every child control and its action for VoiceOver and Computer
+Use. The verified tree exposes each section as a container, its heading, and
+all buttons, picker, slider, text field, and annotation actions.
 
-### If Charts is the offender
-
-Every `Chart` view already uses standard SwiftUI accessibility. The fix is to
-wrap each Chart in `.accessibilityElement(children: .ignore)` with an explicit
-`.accessibilityLabel` and `.accessibilityValue` containing the chart's semantic
-summary (e.g., "Distance by sport chart: Rower 45 km, SkiErg 12 km").
-
-This preserves the data for VoiceOver users while giving Computer Use a clean
-text representation instead of the framework's internal chart AX tree.
-
-Affected views:
-- `DashboardView` — Distance by Sport chart, Recent Pace chart
-- `WorkoutDetailView` — Stroke Timeline chart
-
-### If RealityKit is the offender
-
-`RealityReplaySceneView` already has `.accessibilityElement(children: .ignore)`
-with label "3D workout replay" and value containing sport/progress/pace. This
-should be sufficient. If the RealityView itself generates incompatible children
-despite `.ignore`, the fix is to ensure the entire RealityView subtree is
-excluded from accessibility.
-
-### If Canvas is the offender
-
-`ReplayView.replayCanvas` already has `.accessibilityLabel("Workout replay
-timeline")`. The Canvas itself should not generate child accessibility elements.
-If it does, wrap with `.accessibilityElement(children: .ignore)`.
+The existing chart summaries and replay labels remain semantically correct and
+also traverse successfully on the full surface.
 
 ## Bundle Metadata Hardening
 
-### Current State
-
-The `build_and_run.sh` script generates Info.plist but does not:
-1. Set `CFBundleName` to match the executable name (`RowPlayStudio`)
-2. Ad-hoc sign the bundle
-3. Verify the bundle with `codesign`
-
-### Target State
-
-Update Info.plist generation to use `CFBundleName = RowPlayStudio` (technical
-identity) while keeping `CFBundleDisplayName = RowPlay Studio` (human-facing).
-Add ad-hoc signing after bundle assembly:
+The staged bundle now uses `CFBundleName = RowPlayStudio` (technical identity)
+and `CFBundleDisplayName = RowPlay Studio` (human-facing). It is ad-hoc signed
+and strictly verified after bundle assembly:
 
 ```bash
-codesign --force --deep --sign - "$APP_BUNDLE"
+codesign --force --deep --sign - --identifier com.shenghaoc.RowPlayStudio "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"
 ```
 
@@ -160,6 +149,17 @@ changes to the app beyond reading the environment variable.
 The crash is in the AX tree phase, not the screenshot phase. The
 ScreenCaptureKit indicator is unrelated to the crash.
 
+### Diagnostics
+
+The `automation-readiness` OSLog category emits only the bundle identifier,
+technical bundle name, automation flag, isolation level, and confirmation that
+the main content was presented. It contains no workout, account, or filesystem
+data. This distinguishes a successful app launch and visible shell from a
+Computer Use failure. The Computer Use result and the newest
+`SkyComputerUseService` crash report remain the evidence for helper-side AX
+traversal or helper crashes; the app cannot truthfully claim to observe those
+host-process failures.
+
 ## File Changes Expected
 
 | File | Change |
@@ -169,6 +169,7 @@ ScreenCaptureKit indicator is unrelated to the crash.
 | `Sources/RowPlayStudio/Views/DashboardView.swift` | Wrap charts with accessibility summary |
 | `Sources/RowPlayStudio/Views/WorkoutDetailView.swift` | Wrap chart with accessibility summary |
 | `Sources/RowPlayStudio/Views/ReplayView.swift` | Check canvas accessibility |
+| `Sources/RowPlayStudio/Views/WorkoutToolSection.swift` | Explicit semantic replacement for incompatible workout-tool `GroupBox` containers |
 | `script/build_and_run.sh` | Add `--automation`, signing, verify |
 | `Tests/RowPlayStudioTests/ComputerUseAutomationReadinessTests.swift` | NEW — focused tests |
 | `.kiro/specs/computer-use-automation-readiness/*` | This spec |

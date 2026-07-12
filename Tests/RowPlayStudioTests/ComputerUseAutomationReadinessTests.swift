@@ -3,8 +3,6 @@ import XCTest
 
 final class ComputerUseAutomationReadinessTests: XCTestCase {
 
-    // MARK: - IsolationConfig Defaults
-
     func testDefaultIsolationConfigIsFull() {
         let config = IsolationConfig(level: .full, automationMode: false)
         XCTAssertEqual(config.level, .full)
@@ -55,19 +53,34 @@ final class ComputerUseAutomationReadinessTests: XCTestCase {
         XCTAssertFalse(config.detailEnabled)
     }
 
-    // MARK: - Automation Mode
-
-    func testAutomationModeFlag() {
+    func testAutomationModeUsesFullProductionSurface() {
         let config = IsolationConfig(level: .full, automationMode: true)
         XCTAssertTrue(config.automationMode)
-        // Automation mode uses full production UI
         XCTAssertTrue(config.chartsEnabled)
         XCTAssertTrue(config.replay3DEnabled)
         XCTAssertTrue(config.replayEnabled)
         XCTAssertTrue(config.detailEnabled)
     }
 
-    // MARK: - Level Raw Values
+    func testEnvironmentConfigurationUsesIsolationLevelAndAutomationMode() {
+        let config = IsolationConfig.from(environment: [
+            "ROWPLAY_ISOLATION_LEVEL": "no_replay3d",
+            "ROWPLAY_AUTOMATION": "1"
+        ])
+
+        XCTAssertEqual(config.level, .noReplay3D)
+        XCTAssertTrue(config.automationMode)
+    }
+
+    func testInvalidEnvironmentIsolationLevelFallsBackToFull() {
+        let config = IsolationConfig.from(environment: [
+            "ROWPLAY_ISOLATION_LEVEL": "not-a-level",
+            "ROWPLAY_AUTOMATION": "true"
+        ])
+
+        XCTAssertEqual(config.level, .full)
+        XCTAssertFalse(config.automationMode)
+    }
 
     func testLevelRawValuesMatchEnvironmentStrings() {
         XCTAssertEqual(IsolationConfig.Level.full.rawValue, "full")
@@ -77,13 +90,6 @@ final class ComputerUseAutomationReadinessTests: XCTestCase {
         XCTAssertEqual(IsolationConfig.Level.sidebarOnly.rawValue, "sidebar_only")
         XCTAssertEqual(IsolationConfig.Level.minimal.rawValue, "minimal")
     }
-
-    func testLevelInitFromInvalidRawValueReturnsNil() {
-        XCTAssertNil(IsolationConfig.Level(rawValue: "invalid"))
-        XCTAssertNil(IsolationConfig.Level(rawValue: ""))
-    }
-
-    // MARK: - All Cases
 
     func testAllCasesCount() {
         XCTAssertEqual(IsolationConfig.Level.allCases.count, 6)

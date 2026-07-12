@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
+MODE="run"
+ISOLATION_LEVEL=""
 APP_NAME="RowPlayStudio"
 BUNDLE_ID="com.shenghaoc.RowPlayStudio"
 MIN_SYSTEM_VERSION="26.0"
@@ -13,6 +14,53 @@ APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
+
+usage() {
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify] [--isolation LEVEL]" >&2
+  echo "levels: full, no_charts, no_replay3d, no_replay, sidebar_only, minimal" >&2
+}
+
+while (($#)); do
+  case "$1" in
+    run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify|--automation|automation|--sign-verify|sign-verify)
+      if [[ "$MODE" != "run" ]]; then
+        usage
+        exit 2
+      fi
+      MODE="$1"
+      ;;
+    --isolation)
+      if (($# < 2)); then
+        usage
+        exit 2
+      fi
+      ISOLATION_LEVEL="$2"
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+case "$ISOLATION_LEVEL" in
+  ""|full|no_charts|no_replay3d|no_replay|sidebar_only|minimal) ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+if [[ -n "$ISOLATION_LEVEL" && ( "$MODE" == "--automation" || "$MODE" == "automation" ) ]]; then
+  echo "--automation always launches the full production surface; do not combine it with --isolation." >&2
+  exit 2
+fi
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -54,11 +102,17 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc sign the staged bundle for consistent identity and accessibility discovery
-codesign --force --deep --sign - "$APP_BUNDLE" || true
+# Ad-hoc sign the completed bundle for consistent discovery. Do not hide a
+# signing failure: the staged app must be verifiably signed before launch.
+codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
 
 open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
+  if [[ -n "$ISOLATION_LEVEL" ]]; then
+    /usr/bin/open -n --env "ROWPLAY_ISOLATION_LEVEL=$ISOLATION_LEVEL" "$APP_BUNDLE"
+  else
+    /usr/bin/open -n "$APP_BUNDLE"
+  fi
 }
 
 open_app_automation() {
@@ -100,7 +154,7 @@ case "$MODE" in
     echo "Bundle verification complete."
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify]" >&2
+    usage
     exit 2
     ;;
 esac

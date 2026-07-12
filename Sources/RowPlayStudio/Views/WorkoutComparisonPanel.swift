@@ -11,7 +11,7 @@ struct WorkoutComparisonPanel: View {
     @Environment(\.isolationConfig) private var isolationConfig
 
     var body: some View {
-        GroupBox("Compare") {
+        WorkoutToolSection("Compare") {
             if candidates.isEmpty {
                 ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 120)

@@ -71,17 +71,25 @@ extension IsolationConfig {
     /// Read configuration from the current process environment.
     /// Called once at app launch.
     static func fromEnvironment() -> IsolationConfig {
-        let env = ProcessInfo.processInfo.environment
+        from(environment: ProcessInfo.processInfo.environment)
+    }
 
+    /// Parses a launch configuration without reading global process state.
+    ///
+    /// Keeping the parser separate gives the automation launch contract focused,
+    /// deterministic test coverage without exposing launch-only configuration to
+    /// the Core or Platform layers.
+    static func from(environment: [String: String]) -> IsolationConfig {
         let level: Level = {
-            guard let raw = env["ROWPLAY_ISOLATION_LEVEL"], !raw.isEmpty else {
+            guard let raw = environment["ROWPLAY_ISOLATION_LEVEL"], !raw.isEmpty else {
                 return .full
             }
             return Level(rawValue: raw) ?? .full
         }()
 
-        let automation = env["ROWPLAY_AUTOMATION"] == "1"
-
-        return IsolationConfig(level: level, automationMode: automation)
+        return IsolationConfig(
+            level: level,
+            automationMode: environment["ROWPLAY_AUTOMATION"] == "1"
+        )
     }
 }

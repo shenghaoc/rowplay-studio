@@ -7,17 +7,22 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    private let isolationConfig = IsolationConfig.fromEnvironment()
-    @StateObject private var library: WorkoutLibrary = {
-        if IsolationConfig.fromEnvironment().automationMode {
-            return WorkoutLibrary.demo()
-        }
-        return WorkoutLibrary(
-            details: [],
-            annotationStore: AnnotationStoreFactory.makeDefault()
-        )
-    }()
+    private let isolationConfig: IsolationConfig
+    @StateObject private var library: WorkoutLibrary
     @StateObject private var syncController = Concept2SyncController()
+
+    init() {
+        let config = IsolationConfig.fromEnvironment()
+        isolationConfig = config
+        _library = StateObject(
+            wrappedValue: config.automationMode
+                ? WorkoutLibrary.demo()
+                : WorkoutLibrary(
+                    details: [],
+                    annotationStore: AnnotationStoreFactory.makeDefault()
+                )
+        )
+    }
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
@@ -27,6 +32,7 @@ struct RowPlayStudioApp: App {
                 .environmentObject(syncController)
                 .environment(\.isolationConfig, isolationConfig)
                 .task {
+                    AutomationReadinessTelemetry.recordContentPresented(for: isolationConfig)
                     if !isolationConfig.automationMode {
                         await syncController.loadCachedWorkouts(into: library)
                     }
@@ -64,6 +70,7 @@ struct RowPlayStudioApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AutomationReadinessTelemetry.recordApplicationLaunch()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }

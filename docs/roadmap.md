@@ -208,7 +208,7 @@ Non-goals for Phase 8A:
 
 ### Phase 8B - Articulated Sport Rigs
 
-Status: in progress.
+Status: complete.
 
 Scope:
 
@@ -250,7 +250,10 @@ Scope:
 - Add text-summary fallbacks for charts when isolation disables them.
 - Harden staged bundle metadata: consistent CFBundleName/CFBundleDisplayName, ad-hoc signing, codesign verification.
 - Add `--automation` launch mode in `build_and_run.sh` for deterministic Computer Use testing.
+- Add `--isolation LEVEL` staged launches so every diagnostic surface can be reproduced through Launch Services.
+- Emit privacy-safe launch telemetry that distinguishes staged-app launch and visible-shell failures from helper-side accessibility failures.
 - Add focused tests for isolation config and automation mode.
+- Replace the incompatible workout-tool `GroupBox` AX representation with explicit semantic sections that preserve every child action.
 - Update roadmap, beta-readiness, and source-map documentation.
 
 Exit criteria:
@@ -259,6 +262,7 @@ Exit criteria:
 - `swift build` passes.
 - `./script/build_and_run.sh --verify` launches successfully.
 - `./script/build_and_run.sh --automation` launches successfully.
+- `./script/build_and_run.sh --verify --isolation no_charts` launches successfully.
 - `codesign --verify --deep --strict dist/RowPlayStudio.app` passes.
 - Computer Use can traverse the full production accessibility tree without crashing `SkyComputerUseService`.
 - VoiceOver accessibility is preserved with meaningful names, values, and roles.

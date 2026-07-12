@@ -12,7 +12,6 @@ struct WorkoutDetailView: View {
     var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
     @Environment(\.isolationConfig) private var isolationConfig
-    @State private var showingReplay = false
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
@@ -41,15 +40,6 @@ struct WorkoutDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
-        .navigationDestination(isPresented: $showingReplay) {
-            if isolationConfig.replayEnabled {
-                ReplayView(detail: detail)
-            } else {
-                Text("Replay disabled in isolation mode")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 
     private var header: some View {
