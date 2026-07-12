@@ -22,3 +22,8 @@
 **Vulnerability:** The existing CSV Formula Injection protection checked the very first character of the input string for formula triggers (`=`, `+`, etc.) after trimming `.whitespaces`. This could still be bypassed by an attacker adding leading newline characters (e.g., `\n=cmd|...`), which spreadsheet software like Excel handles and then evaluates the formula.
 **Learning:** Checking the first character of a string trimmed only by `.whitespaces` is insufficient for CSV injection protection because spreadsheet parsers are robust against leading newlines and tabs.
 **Prevention:** Always strip leading whitespaces AND newlines before determining if the string begins with a formula trigger character. Use `.whitespacesAndNewlines` instead of `.whitespaces`.
+
+## 2026-07-08 - Token Leak via HTTPS Redirect to Different Host
+**Vulnerability:** The HTTP transport created for API calls only rejected redirects to non-HTTPS URLs. It allowed redirects to different hosts as long as they were HTTPS. This could lead to a token leakage if a server returned a redirect to an attacker-controlled HTTPS server, and the token was attached to the redirect request.
+**Learning:** Checking the scheme of the redirect URL is not sufficient to prevent token leakage. An attacker could set up an HTTPS server and redirect the client to it, capturing the bearer token.
+**Prevention:** Ensure that redirects are only allowed if the new URL has the same host as the original request, in addition to being HTTPS. Compare hosts case-insensitively (RFC 3986) and require both hosts to be non-nil so malformed URLs do not pass a `nil == nil` check. If the host is different or missing, block the redirect.
