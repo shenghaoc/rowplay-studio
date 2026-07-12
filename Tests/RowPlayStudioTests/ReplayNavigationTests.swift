@@ -1,0 +1,73 @@
+import XCTest
+@testable import RowPlayCore
+@testable import RowPlayStudio
+
+/// Regression tests for the "Replay Workout" navigation fix.
+///
+/// These tests verify the production detail-navigation state plus ReplayView
+/// and ReplayState construction from demo workout data for every sport.
+///
+/// **Boundary**: The actual fix is wrapping `NavigationSplitView`'s detail
+/// column in `NavigationStack` (`ContentView.swift`). SwiftUI push behaviour
+/// cannot be verified in SwiftPM XCTest without an external view-inspection
+/// library (e.g. ViewInspector), which this project does not use. The
+/// `NavigationStack` wiring remains a compile-time structural guarantee
+/// verified by `swift build`; route creation and sidebar-reset behavior are
+/// exercised directly through `DetailNavigationState`.
+@MainActor
+final class ReplayNavigationTests: XCTestCase {
+
+    // MARK: - Production Navigation State
+
+    func testReplayActionRoutesSelectedWorkout() {
+        var navigation = DetailNavigationState()
+
+        navigation.showReplay(workoutID: 42)
+
+        XCTAssertEqual(navigation.path, [.replay(workoutID: 42)])
+    }
+
+    func testSidebarSelectionClearsPresentedReplay() {
+        var navigation = DetailNavigationState()
+        navigation.showReplay(workoutID: 42)
+
+        navigation.resetForSelectionChange()
+
+        XCTAssertTrue(navigation.path.isEmpty)
+    }
+
+    // MARK: - Demo Data Coverage
+
+    func testDemoDataCoversAllSports() {
+        for sport in [Sport.rower, .skierg, .bike] {
+            XCTAssertNotNil(
+                DemoWorkoutLibrary.details.first { $0.workout.sport == sport },
+                "Demo data must include a \(sport.displayName) workout"
+            )
+        }
+    }
+
+    // MARK: - ReplayView Construction (crash guard per sport)
+
+    func testReplayViewConstructsForEverySport() {
+        for sport in [Sport.rower, .skierg, .bike] {
+            let detail = DemoWorkoutLibrary.details.first { $0.workout.sport == sport }
+            XCTAssertNotNil(detail, "Missing demo detail for \(sport.displayName)")
+            guard let detail else { continue }
+            // ReplayView is a struct — init cannot return nil. A crash here
+            // would abort the test process, which is the real guard.
+            _ = ReplayView(detail: detail)
+        }
+    }
+
+    // MARK: - ReplayState Init from Demo Strokes
+
+    func testReplayStateInitialisesFromDemoWorkout() {
+        let detail = DemoWorkoutLibrary.details.first
+        XCTAssertNotNil(detail, "Demo data must include at least one workout")
+        guard let detail else { return }
+        let state = ReplayState(strokes: detail.strokes)
+        XCTAssertGreaterThan(state.duration, 0, "ReplayState duration must be > 0 for replay to be meaningful")
+        XCTAssertFalse(state.playing, "ReplayState must start paused")
+    }
+}

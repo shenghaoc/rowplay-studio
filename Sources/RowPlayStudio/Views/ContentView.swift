@@ -9,6 +9,7 @@ struct ContentView: View {
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
+    @State private var detailNavigation = DetailNavigationState()
 
     var body: some View {
         NavigationSplitView {
@@ -18,23 +19,45 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            if library.isEmpty && !preferences.demoModeEnabled {
-                emptyState
-            } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
-                WorkoutDetailView(
-                    detail: detail,
-                    summary: library.summary,
-                    comparisonCandidates: library.comparisonCandidates(for: detail.id),
-                    annotationStore: library.annotationStore,
-                    onUpdateDetail: library.updateDetail
-                )
-            } else {
-                DashboardView(
-                    library: library,
-                    summary: library.filteredSummary,
-                    personalBests: library.filteredPersonalBests,
-                    recentPaceWorkouts: library.filteredRecentPaceWorkouts
-                )
+            NavigationStack(path: $detailNavigation.path) {
+                if library.isEmpty && !preferences.demoModeEnabled {
+                    emptyState
+                } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+                    WorkoutDetailView(
+                        detail: detail,
+                        summary: library.summary,
+                        comparisonCandidates: library.comparisonCandidates(for: detail.id),
+                        annotationStore: library.annotationStore,
+                        onUpdateDetail: library.updateDetail,
+                        onReplay: {
+                            detailNavigation.showReplay(workoutID: detail.id)
+                        }
+                    )
+                } else {
+                    DashboardView(
+                        library: library,
+                        summary: library.filteredSummary,
+                        personalBests: library.filteredPersonalBests,
+                        recentPaceWorkouts: library.filteredRecentPaceWorkouts
+                    )
+                }
+            }
+            .navigationDestination(for: DetailNavigationState.Route.self) { route in
+                switch route {
+                case .replay(let workoutID):
+                    if let detail = library.detail(id: workoutID) {
+                        ReplayView(detail: detail)
+                    } else {
+                        ContentUnavailableView(
+                            "Workout Unavailable",
+                            systemImage: "exclamationmark.triangle",
+                            description: Text("Return to the workout library and select another workout.")
+                        )
+                    }
+                }
+            }
+            .onChange(of: selectedWorkoutID) {
+                detailNavigation.resetForSelectionChange()
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)

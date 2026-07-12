@@ -9,8 +9,8 @@ struct WorkoutDetailView: View {
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
     var onUpdateDetail: (WorkoutDetail) -> Void
+    var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
-    @State private var showingReplay = false
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
@@ -33,9 +33,6 @@ struct WorkoutDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
-        .navigationDestination(isPresented: $showingReplay) {
-            ReplayView(detail: detail)
-        }
     }
 
     private var header: some View {
@@ -83,7 +80,7 @@ struct WorkoutDetailView: View {
     @ViewBuilder
     private var replayButton: some View {
         if detail.workout.hasStrokeData {
-            Button(action: { showingReplay = true }) {
+            Button(action: onReplay) {
                 Label("Replay Workout", systemImage: "play.rectangle.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
