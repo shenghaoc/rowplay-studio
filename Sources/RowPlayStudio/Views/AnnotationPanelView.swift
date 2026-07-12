@@ -22,17 +22,22 @@ struct AnnotationPanelView: View {
 
                         Slider(value: $draftTimestamp, in: 0...maxTimestamp)
                             .frame(maxWidth: 320)
+                            .accessibilityLabel("Annotation timestamp")
+                            .accessibilityValue(RowPlayFormatting.time(draftTimestamp, tenths: true))
                     }
 
                     TextField("Add annotation", text: $draftText, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(2...4)
 
+                    // Avoid allocating a trimmed copy on every keystroke/body re-eval.
+                    let isDraftEmpty = draftText.allSatisfy(\.isWhitespace)
                     Button(action: saveDraft) {
                         Label("Save Annotation", systemImage: "text.badge.plus")
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isDraftEmpty)
+                    .help(isDraftEmpty ? "Enter text to save an annotation" : "Save annotation")
                 }
 
                 Divider()
