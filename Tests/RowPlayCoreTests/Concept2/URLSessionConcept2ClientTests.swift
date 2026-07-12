@@ -530,6 +530,34 @@ final class URLSessionConcept2ClientTests: XCTestCase {
         session.invalidateAndCancel()
     }
 
+    func testHTTPSRedirectToDifferentHostIsBlockedByDelegate() {
+        let delegate = HTTPSRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: URL(string: "https://log.concept2.com/api/test")!)
+        let response = HTTPURLResponse(
+            url: URL(string: "https://log.concept2.com/api/test")!,
+            statusCode: 302,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": "https://attacker.example.com/stolen"]
+        )!
+        let redirectedRequest = URLRequest(url: URL(string: "https://attacker.example.com/stolen")!)
+
+        var allowedRequest: URLRequest?
+        delegate.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: redirectedRequest
+        ) { request in
+            allowedRequest = request
+        }
+
+        XCTAssertNil(allowedRequest)
+        XCTAssertTrue(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        XCTAssertFalse(delegate.consumeBlockedRedirect(for: task.taskIdentifier))
+        session.invalidateAndCancel()
+    }
+
     // MARK: - Concept2Error Descriptions
 
     func testErrorDescriptionsDoNotContainSensitiveData() {

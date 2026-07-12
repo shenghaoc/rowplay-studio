@@ -102,10 +102,13 @@ final class HTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        if request.url?.scheme?.lowercased() == "https" {
+        let isHTTPS = request.url?.scheme?.lowercased() == "https"
+        let isSameHost = request.url?.host == task.originalRequest?.url?.host
+
+        if isHTTPS && isSameHost {
             completionHandler(request)
         } else {
-            // Block redirect to non-HTTPS URL.
+            // Block redirect to non-HTTPS URL or different host to prevent token leakage.
             _ = blockedTaskIDs.withLock { $0.insert(task.taskIdentifier) }
             completionHandler(nil)
         }
