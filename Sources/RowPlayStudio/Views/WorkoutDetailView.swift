@@ -140,9 +140,27 @@ struct WorkoutDetailView: View {
 
     private var strokeTimelineAccessibilityValue: String {
         let count = detail.strokes.count
-        let avgPace = detail.strokes.map(\.pace).reduce(0, +) / max(Double(count), 1)
-        let avgWatts = detail.strokes.map { Double($0.watts) }.reduce(0, +) / max(Double(count), 1)
+        let (totalPace, totalWatts) = detail.strokes.reduce((0.0, 0.0)) { ($0.0 + $1.pace, $0.1 + Double($1.watts)) }
+        let avgPace = totalPace / max(Double(count), 1)
+        let avgWatts = totalWatts / max(Double(count), 1)
         return "\(count) strokes, avg pace \(RowPlayFormatting.pace(avgPace)), avg watts \(Int(avgWatts))"
+    }
+
+    private var strokeSummaryStats: (count: Int, avgPace: Double, avgWatts: Double, maxWatts: Int) {
+        let count = detail.strokes.count
+        var totalPace: Double = 0
+        var totalWatts: Double = 0
+        var maxWatts: Int = 0
+        for stroke in detail.strokes {
+            totalPace += stroke.pace
+            totalWatts += Double(stroke.watts)
+            if stroke.watts > maxWatts {
+                maxWatts = stroke.watts
+            }
+        }
+        let avgPace = totalPace / max(Double(count), 1)
+        let avgWatts = totalWatts / max(Double(count), 1)
+        return (count, avgPace, avgWatts, maxWatts)
     }
 
     @ViewBuilder
@@ -154,27 +172,24 @@ struct WorkoutDetailView: View {
                 Text("Stroke Summary")
                     .font(.title3.weight(.semibold))
 
-                let count = detail.strokes.count
-                let avgPace = detail.strokes.map(\.pace).reduce(0, +) / max(Double(count), 1)
-                let avgWatts = detail.strokes.map { Double($0.watts) }.reduce(0, +) / max(Double(count), 1)
-                let maxWatts = detail.strokes.map(\.watts).max() ?? 0
+                let stats = strokeSummaryStats
 
                 HStack(spacing: 24) {
                     VStack(alignment: .leading) {
                         Text("Strokes").font(.caption).foregroundStyle(.secondary)
-                        Text("\(count)").font(.title3.monospacedDigit())
+                        Text("\(stats.count)").font(.title3.monospacedDigit())
                     }
                     VStack(alignment: .leading) {
                         Text("Avg Pace").font(.caption).foregroundStyle(.secondary)
-                        Text(RowPlayFormatting.pace(avgPace)).font(.title3.monospacedDigit())
+                        Text(RowPlayFormatting.pace(stats.avgPace)).font(.title3.monospacedDigit())
                     }
                     VStack(alignment: .leading) {
                         Text("Avg Watts").font(.caption).foregroundStyle(.secondary)
-                        Text("\(Int(avgWatts))").font(.title3.monospacedDigit())
+                        Text("\(Int(stats.avgWatts))").font(.title3.monospacedDigit())
                     }
                     VStack(alignment: .leading) {
                         Text("Peak Watts").font(.caption).foregroundStyle(.secondary)
-                        Text("\(maxWatts)").font(.title3.monospacedDigit())
+                        Text("\(stats.maxWatts)").font(.title3.monospacedDigit())
                     }
                 }
             }

@@ -55,7 +55,7 @@ cat >"$INFO_PLIST" <<PLIST
 PLIST
 
 # Ad-hoc sign the staged bundle for consistent identity and accessibility discovery
-codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
+codesign --force --deep --sign - "$APP_BUNDLE" || true
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
