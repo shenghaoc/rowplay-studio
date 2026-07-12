@@ -241,7 +241,7 @@ Non-goals for Phase 8B:
 
 ## Phase 9 - Computer Use Automation Readiness
 
-Status: complete (PR #51 pending CI).
+Status: complete.
 
 Scope:
 

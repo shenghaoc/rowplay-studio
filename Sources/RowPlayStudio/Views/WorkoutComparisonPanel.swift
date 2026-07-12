@@ -39,26 +39,24 @@ struct WorkoutComparisonPanel: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .onAppear {
-                    alignSelection()
-                    updateOverlayPoints()
-                }
+                .onAppear(perform: alignSelection)
                 .onChange(of: candidates.map(\.id)) { _, _ in
                     alignSelection()
                 }
                 .onChange(of: detail.id) { _, _ in
                     selectedCandidateID = nil
                     alignSelection()
-                    updateOverlayPoints()
                 }
-                .onChange(of: detail.strokes) { _, _ in
-                    updateOverlayPoints()
-                }
-                .onChange(of: selectedCandidate?.strokes) { _, _ in
-                    updateOverlayPoints()
-                }
-                .onChange(of: selectedCandidateID) { _, _ in
-                    updateOverlayPoints()
+                .task(id: overlayInput) {
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    guard let overlayInput else {
+                        overlayPoints = []
+                        return
+                    }
+                    let points = makeOverlayPoints(input: overlayInput)
+                    guard !Task.isCancelled else { return }
+                    overlayPoints = points
                 }
             }
         }
@@ -77,12 +75,28 @@ struct WorkoutComparisonPanel: View {
         return candidates.first { $0.id == id }
     }
 
+    private var overlayInput: CompareOverlayInput? {
+        guard let selectedCandidate else { return nil }
+        return CompareOverlayInput(
+            detailID: detail.id,
+            detailStrokes: detail.strokes,
+            candidateID: selectedCandidate.id,
+            candidateStrokes: selectedCandidate.strokes
+        )
+    }
+
     private func alignSelection() {
-        guard let selectedCandidateID,
-              candidates.contains(where: { $0.id == selectedCandidateID }) else {
-            selectedCandidateID = candidates.first?.id
-            return
+        selectedCandidateID = Self.alignedCandidateID(
+            current: selectedCandidateID,
+            candidateIDs: candidates.map(\.id)
+        )
+    }
+
+    static func alignedCandidateID(current: Int?, candidateIDs: [Int]) -> Int? {
+        guard let current, candidateIDs.contains(current) else {
+            return candidateIDs.first
         }
+        return current
     }
 
     // Keep the original FormatStyle behavior while reusing its value-type configuration.
@@ -224,16 +238,11 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    private func updateOverlayPoints() {
-        guard let candidate = selectedCandidate else {
-            overlayPoints = []
-            return
-        }
-        overlayPoints = makeOverlayPoints(candidate: candidate)
-    }
-
-    private func makeOverlayPoints(candidate: WorkoutDetail) -> [CompareOverlayPoint] {
-        guard let overlay = WorkoutComparison.buildDistanceOverlay(detail.strokes, candidate.strokes) else {
+    private func makeOverlayPoints(input: CompareOverlayInput) -> [CompareOverlayPoint] {
+        guard let overlay = WorkoutComparison.buildDistanceOverlay(
+            input.detailStrokes,
+            input.candidateStrokes
+        ) else {
             return []
         }
 
@@ -274,6 +283,13 @@ struct WorkoutComparisonPanel: View {
         }
         return formatted
     }
+}
+
+private struct CompareOverlayInput: Equatable, Sendable {
+    let detailID: Int
+    let detailStrokes: [Stroke]
+    let candidateID: Int
+    let candidateStrokes: [Stroke]
 }
 
 private struct CompareOverlayPoint: Identifiable {

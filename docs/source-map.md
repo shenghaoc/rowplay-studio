@@ -101,6 +101,7 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | (new — no web equivalent) | `Sources/RowPlayStudio/App/AutomationReadinessTelemetry.swift` | Privacy-safe app launch diagnostics for staged bundle identity, automation mode, and main-content presentation. |
 | (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolSection.swift` | Explicit accessible section container that replaces incompatible SwiftUI `GroupBox` representations in workout tools. |
 | (new — no web equivalent) | `Tests/RowPlayStudioTests/ComputerUseAutomationReadinessTests.swift` | Tests for the deterministic automation launch configuration. |
+| (new — no web equivalent) | `Tests/RowPlayStudioTests/WorkoutComparisonPanelTests.swift` | Regression tests for stable ID-based comparison selection during overlay refreshes. |
 
 ## Retired Web Surfaces
 

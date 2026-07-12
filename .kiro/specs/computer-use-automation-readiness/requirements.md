@@ -47,11 +47,13 @@ absolute app path.
 
 ## R6. Diagnostics
 
-Add concise launch/automation telemetry sufficient to distinguish: build
-failure, launch failure, missing window, app-discovery ambiguity,
-accessibility traversal failure, and Computer Use helper crash. Do not log
-workout contents, Concept2 tokens, file paths containing user data, or other
-sensitive data.
+Add concise launch/automation telemetry sufficient to confirm staged-app
+identity, launch, automation mode, and main-content presentation. Combined
+with the Computer Use result and helper crash reports, this evidence must
+distinguish app-side launch/window failures from external accessibility-helper
+failures. The app must not claim to observe helper-process crashes directly.
+Do not log workout contents, Concept2 tokens, file paths containing user data,
+or other sensitive data.
 
 ## R7. Tests and documentation
 

@@ -27,6 +27,11 @@ used by the Stroke Timeline accessibility value are calculated by
 collection changes. Views receive the cached value, so SwiftUI render cycles do
 not traverse a workout's strokes.
 
+The comparison pace overlay is refreshed by one task keyed to the current and
+selected workout IDs and their stroke inputs. Candidate alignment remains
+ID-based, preserving the selected comparison across same-workout edits and
+avoiding equality checks across every candidate's full stroke and split history.
+
 ## Bundle and Automation Contract
 
 The staged bundle uses a stable technical identity:
@@ -65,4 +70,6 @@ automation surface; no diagnostic isolation mode ships in the app.
 | `Sources/RowPlayPlatform/WorkoutLibrary.swift` | Cache stroke summaries alongside other view-facing derived data. |
 | `Sources/RowPlayCore/Analytics/WorkoutAnalytics.swift` | Pure single-pass stroke-summary calculation. |
 | `Sources/RowPlayStudio/Views/WorkoutToolSection.swift` | Explicit semantic replacement for incompatible `GroupBox` containers. |
+| `Sources/RowPlayStudio/Views/WorkoutComparisonPanel.swift` | Coalesced selected-pair overlay refresh outside render evaluation. |
+| `Tests/RowPlayStudioTests/WorkoutComparisonPanelTests.swift` | Comparison-selection regression coverage. |
 | `script/build_and_run.sh` | Staged bundle assembly, signing, verification, and automation launch. |
