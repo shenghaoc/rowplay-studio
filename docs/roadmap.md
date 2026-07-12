@@ -208,7 +208,7 @@ Non-goals for Phase 8A:
 
 ### Phase 8B - Articulated Sport Rigs
 
-Status: in progress.
+Status: complete.
 
 Scope:
 
@@ -238,6 +238,40 @@ Non-goals for Phase 8B:
 - Water/snow surface effects, catch spray, wake trails.
 - Imported USD/USDZ sport equipment assets.
 - Performance governor and adaptive quality.
+
+## Phase 9 - Computer Use Automation Readiness
+
+Status: complete.
+
+Scope:
+
+- Wrap Charts views with `.accessibilityElement(children: .ignore)` and explicit semantic summaries for Computer Use compatibility.
+- Harden staged bundle metadata: consistent CFBundleName/CFBundleDisplayName, ad-hoc signing, codesign verification.
+- Add `--automation` launch mode in `build_and_run.sh` for deterministic Computer Use testing.
+- Emit privacy-safe launch telemetry that distinguishes staged-app launch and visible-shell failures from helper-side accessibility failures.
+- Add focused tests for automation mode and cached stroke summaries.
+- Replace the incompatible workout-tool `GroupBox` AX representation with explicit semantic sections that preserve every child action.
+- Cache per-workout stroke summaries in `WorkoutLibrary` so accessibility values never recompute stroke-derived metrics during SwiftUI renders.
+- Update roadmap, beta-readiness, and source-map documentation.
+
+Exit criteria:
+
+- `swift test` passes with all new and regression tests.
+- `swift build` passes.
+- `./script/build_and_run.sh --verify` launches successfully.
+- `./script/build_and_run.sh --automation` launches successfully.
+- `codesign --verify --deep --strict dist/RowPlayStudio.app` passes.
+- Computer Use can traverse the full production accessibility tree without crashing `SkyComputerUseService`.
+- VoiceOver accessibility is preserved with meaningful names, values, and roles.
+
+Non-goals:
+
+- External dependencies.
+- Modifying RunPlayStudio.
+- Adding screen-recording, microphone, audio-capture, or private TCC entitlements.
+- Altering macOS privacy settings or resetting TCC databases.
+- Hiding meaningful UI from VoiceOver.
+- Upgrading Swift, macOS deployment target, CI runners, or architecture layers.
 
 ### Phase 8C+ - Future 3D Replay
 

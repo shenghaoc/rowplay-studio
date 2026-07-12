@@ -60,6 +60,8 @@ swift test --filter RowPlayStudioTests  # Run macOS UI tests
 ./script/build_and_run.sh --logs        # Launch with live os_log stream
 ./script/build_and_run.sh --telemetry   # Launch with subsystem-scoped telemetry stream
 ./script/build_and_run.sh --debug       # Launch under LLDB debugger
+./script/build_and_run.sh --automation  # Launch deterministic demo data with reduced replay motion
+./script/build_and_run.sh --sign-verify # Verify the staged bundle's Info.plist and ad-hoc signature
 ```
 
 Do not launch the raw SwiftPM executable for GUI checks; always use the staged `.app` bundle under `dist/`. CI runs the Core graph on Linux in parallel with `swift test` then `swift build` for the full stack on macOS. Both jobs use Swift 6.3-era toolchains.

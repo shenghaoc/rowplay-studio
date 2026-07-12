@@ -7,11 +7,22 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    @StateObject private var library = WorkoutLibrary(
-        details: [],
-        annotationStore: AnnotationStoreFactory.makeDefault()
-    )
+    private let launchConfiguration: AppLaunchConfiguration
+    @StateObject private var library: WorkoutLibrary
     @StateObject private var syncController = Concept2SyncController()
+
+    init() {
+        let configuration = AppLaunchConfiguration.fromEnvironment()
+        launchConfiguration = configuration
+        _library = StateObject(
+            wrappedValue: configuration.automationMode
+                ? WorkoutLibrary.automationDemo()
+                : WorkoutLibrary(
+                    details: [],
+                    annotationStore: AnnotationStoreFactory.makeDefault()
+                )
+        )
+    }
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
@@ -19,8 +30,14 @@ struct RowPlayStudioApp: App {
                 .frame(minWidth: 1_000, minHeight: 680)
                 .environmentObject(preferences)
                 .environmentObject(syncController)
+                .environment(\.automationModeEnabled, launchConfiguration.automationMode)
                 .task {
-                    await syncController.loadCachedWorkouts(into: library)
+                    AutomationReadinessTelemetry.recordContentPresented(
+                        automationMode: launchConfiguration.automationMode
+                    )
+                    if !launchConfiguration.automationMode {
+                        await syncController.loadCachedWorkouts(into: library)
+                    }
                 }
         }
         .commands {
@@ -55,6 +72,7 @@ struct RowPlayStudioApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AutomationReadinessTelemetry.recordApplicationLaunch()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }

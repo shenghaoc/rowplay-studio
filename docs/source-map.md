@@ -97,6 +97,11 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | `tests/fixtures/golden/*.fixture.json` | `Tests/RowPlayCoreTests/Fixtures/Concept2/` | Sanitized Concept2 golden fixtures copied from the web repo. Used by `Concept2FixtureDecodingTests` to validate native decoding/mapping parity and dynamically redaction-scan every bundled fixture. No real network calls or tokens. |
 | `src/lib/server/concept2.golden.test.ts` | `Tests/RowPlayCoreTests/Concept2/Concept2FixtureDecodingTests.swift` | Native parity tests for Concept2 decoding/mapping against golden fixtures. Covers rower steady, rower interval, SkiErg, BikeErg, stroke monotonicity, and fixture redaction scanning. |
 | (new — no web equivalent) | `Tests/RowPlayCoreTests/Concept2/Concept2AuthenticatedSmokeTests.swift` | Opt-in authenticated smoke tests for real Concept2 API validation. Skipped unless `ROWPLAY_CONCEPT2_TOKEN` is set. CI does not require credentials. Covers summary fetch, detail fetch, and token-redaction in errors. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/App/AppLaunchConfiguration.swift` | Small launch-only configuration for deterministic Computer Use automation. Reads `ROWPLAY_AUTOMATION` and supplies a SwiftUI environment value for reduced replay motion. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/App/AutomationReadinessTelemetry.swift` | Privacy-safe app launch diagnostics for staged bundle identity, automation mode, and main-content presentation. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/Views/WorkoutToolSection.swift` | Explicit accessible section container that replaces incompatible SwiftUI `GroupBox` representations in workout tools. |
+| (new — no web equivalent) | `Tests/RowPlayStudioTests/ComputerUseAutomationReadinessTests.swift` | Tests for the deterministic automation launch configuration. |
+| (new — no web equivalent) | `Tests/RowPlayStudioTests/WorkoutComparisonPanelTests.swift` | Regression tests for stable ID-based comparison selection during overlay refreshes. |
 
 ## Retired Web Surfaces
 

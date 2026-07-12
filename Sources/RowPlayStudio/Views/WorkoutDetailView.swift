@@ -5,6 +5,8 @@ import SwiftUI
 
 struct WorkoutDetailView: View {
     var detail: WorkoutDetail
+    var detailsRevision: UInt64
+    var strokeSummary: StrokeSummary
     var summary: DashboardSummary
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
@@ -22,6 +24,7 @@ struct WorkoutDetailView: View {
                 replayButton
                 WorkoutToolsView(
                     detail: detail,
+                    detailsRevision: detailsRevision,
                     comparisonCandidates: comparisonCandidates,
                     annotationStore: annotationStore,
                     onUpdateDetail: onUpdateDetail
@@ -115,7 +118,14 @@ struct WorkoutDetailView: View {
                 .chartXAxisLabel("seconds")
                 .frame(height: 260)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Stroke Timeline chart")
+            .accessibilityValue(strokeTimelineAccessibilityValue)
         }
+    }
+
+    private var strokeTimelineAccessibilityValue: String {
+        "\(strokeSummary.count) strokes, avg pace \(RowPlayFormatting.pace(strokeSummary.averagePace)), avg watts \(Int(strokeSummary.averageWatts))"
     }
 
     private var splitTable: some View {

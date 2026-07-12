@@ -11,7 +11,7 @@ struct WorkoutFileActionsView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        GroupBox("Export and Share") {
+        WorkoutToolSection("Export and Share") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     Button(action: saveCSV) {

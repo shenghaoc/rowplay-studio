@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
+MODE="run"
 APP_NAME="RowPlayStudio"
 BUNDLE_ID="com.shenghaoc.RowPlayStudio"
 MIN_SYSTEM_VERSION="26.0"
@@ -14,6 +14,31 @@ APP_MACOS="$APP_CONTENTS/MacOS"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 
+usage() {
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify]" >&2
+}
+
+while (($#)); do
+  case "$1" in
+    run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify|--automation|automation|--sign-verify|sign-verify)
+      if [[ "$MODE" != "run" ]]; then
+        usage
+        exit 2
+      fi
+      MODE="$1"
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+  shift
+done
+
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 swift build --package-path "$ROOT_DIR"
@@ -24,6 +49,9 @@ mkdir -p "$APP_MACOS"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
+# Generate Info.plist with stable technical identity.
+# CFBundleName = RowPlayStudio (matches executable, used for app discovery)
+# CFBundleDisplayName = RowPlay Studio (human-facing name)
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -34,11 +62,15 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleName</key>
-  <string>RowPlay Studio</string>
+  <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
   <string>RowPlay Studio</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
@@ -47,8 +79,17 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+# Ad-hoc sign the completed bundle for consistent discovery. Do not hide a
+# signing failure: the staged app must be verifiably signed before launch.
+codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
+}
+
+open_app_automation() {
+  /usr/bin/open -n --env ROWPLAY_AUTOMATION=1 "$APP_BUNDLE"
 }
 
 case "$MODE" in
@@ -71,8 +112,22 @@ case "$MODE" in
     sleep 1
     pgrep -x "$APP_NAME" >/dev/null
     ;;
+  --automation|automation)
+    echo "Launching in automation mode (demo data, reduced motion)..."
+    open_app_automation
+    sleep 1
+    pgrep -x "$APP_NAME" >/dev/null
+    echo "Automation launch verified."
+    ;;
+  --sign-verify|sign-verify)
+    echo "Verifying bundle signature..."
+    plutil -lint "$INFO_PLIST"
+    codesign --verify --deep --strict "$APP_BUNDLE"
+    codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 | grep -E "^(Identifier|TeamIdentifier|Signature)" || true
+    echo "Bundle verification complete."
+    ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    usage
     exit 2
     ;;
 esac

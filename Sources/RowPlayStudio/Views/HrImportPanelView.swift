@@ -13,7 +13,7 @@ struct HrImportPanelView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        GroupBox("Heart Rate Import") {
+        WorkoutToolSection("Heart Rate Import") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
                     Stepper(value: $offsetSec, in: -600...600, step: 0.5) {

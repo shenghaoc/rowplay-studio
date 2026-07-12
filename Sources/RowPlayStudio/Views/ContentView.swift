@@ -12,6 +12,10 @@ struct ContentView: View {
     @State private var detailNavigation = DetailNavigationState()
 
     var body: some View {
+        mainContent
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             SidebarView(
                 library: library,
@@ -20,44 +24,24 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
             NavigationStack(path: $detailNavigation.path) {
-                if library.isEmpty && !preferences.demoModeEnabled {
-                    emptyState
-                } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
-                    WorkoutDetailView(
-                        detail: detail,
-                        summary: library.summary,
-                        comparisonCandidates: library.comparisonCandidates(for: detail.id),
-                        annotationStore: library.annotationStore,
-                        onUpdateDetail: library.updateDetail,
-                        onReplay: {
-                            detailNavigation.showReplay(workoutID: detail.id)
+                detailContent
+                    .navigationDestination(for: DetailNavigationState.Route.self) { route in
+                        switch route {
+                        case .replay(let workoutID):
+                            if let detail = library.detail(id: workoutID) {
+                                ReplayView(detail: detail)
+                            } else {
+                                ContentUnavailableView(
+                                    "Workout Unavailable",
+                                    systemImage: "exclamationmark.triangle",
+                                    description: Text("Return to the workout library and select another workout.")
+                                )
+                            }
                         }
-                    )
-                } else {
-                    DashboardView(
-                        library: library,
-                        summary: library.filteredSummary,
-                        personalBests: library.filteredPersonalBests,
-                        recentPaceWorkouts: library.filteredRecentPaceWorkouts
-                    )
-                }
-            }
-            .navigationDestination(for: DetailNavigationState.Route.self) { route in
-                switch route {
-                case .replay(let workoutID):
-                    if let detail = library.detail(id: workoutID) {
-                        ReplayView(detail: detail)
-                    } else {
-                        ContentUnavailableView(
-                            "Workout Unavailable",
-                            systemImage: "exclamationmark.triangle",
-                            description: Text("Return to the workout library and select another workout.")
-                        )
                     }
-                }
-            }
-            .onChange(of: selectedWorkoutID) {
-                detailNavigation.resetForSelectionChange()
+                    .onChange(of: selectedWorkoutID) {
+                        detailNavigation.resetForSelectionChange()
+                    }
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
@@ -79,6 +63,33 @@ struct ContentView: View {
                 }
                 .disabled(syncController.syncState.inProgress)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        if library.isEmpty && !preferences.demoModeEnabled {
+            emptyState
+        } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+            WorkoutDetailView(
+                detail: detail,
+                detailsRevision: library.detailsRevision,
+                strokeSummary: library.strokeSummary(for: detail.id),
+                summary: library.summary,
+                comparisonCandidates: library.comparisonCandidates(for: detail.id),
+                annotationStore: library.annotationStore,
+                onUpdateDetail: library.updateDetail,
+                onReplay: {
+                    detailNavigation.showReplay(workoutID: detail.id)
+                }
+            )
+        } else {
+            DashboardView(
+                library: library,
+                summary: library.filteredSummary,
+                personalBests: library.filteredPersonalBests,
+                recentPaceWorkouts: library.filteredRecentPaceWorkouts
+            )
         }
     }
 

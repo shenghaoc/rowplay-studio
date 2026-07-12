@@ -5,12 +5,14 @@ import SwiftUI
 
 struct WorkoutComparisonPanel: View {
     var detail: WorkoutDetail
+    var detailsRevision: UInt64
     var candidates: [WorkoutDetail]
 
     @State private var selectedCandidateID: Int?
+    @State private var overlayPoints: [CompareOverlayPoint] = []
 
     var body: some View {
-        GroupBox("Compare") {
+        WorkoutToolSection("Compare") {
             if candidates.isEmpty {
                 ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 120)
@@ -34,7 +36,7 @@ struct WorkoutComparisonPanel: View {
 
                         intervalRows(candidate: candidate)
 
-                        overlayChart(candidate: candidate)
+                        overlayChart(points: overlayPoints)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,6 +47,20 @@ struct WorkoutComparisonPanel: View {
                 .onChange(of: detail.id) { _, _ in
                     selectedCandidateID = nil
                     alignSelection()
+                }
+                .task(id: overlayIdentity) {
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    guard let selectedCandidate else {
+                        overlayPoints = []
+                        return
+                    }
+                    let points = makeOverlayPoints(
+                        detailStrokes: detail.strokes,
+                        candidateStrokes: selectedCandidate.strokes
+                    )
+                    guard !Task.isCancelled else { return }
+                    overlayPoints = points
                 }
             }
         }
@@ -63,12 +79,27 @@ struct WorkoutComparisonPanel: View {
         return candidates.first { $0.id == id }
     }
 
+    private var overlayIdentity: CompareOverlayIdentity? {
+        guard let selectedCandidate else { return nil }
+        return CompareOverlayIdentity(
+            detailID: detail.id,
+            candidateID: selectedCandidate.id,
+            detailsRevision: detailsRevision
+        )
+    }
+
     private func alignSelection() {
-        guard let selectedCandidateID,
-              candidates.contains(where: { $0.id == selectedCandidateID }) else {
-            selectedCandidateID = candidates.first?.id
-            return
+        selectedCandidateID = Self.alignedCandidateID(
+            current: selectedCandidateID,
+            candidateIDs: candidates.map(\.id)
+        )
+    }
+
+    static func alignedCandidateID(current: Int?, candidateIDs: [Int]) -> Int? {
+        guard let current, candidateIDs.contains(current) else {
+            return candidateIDs.first
         }
+        return current
     }
 
     // Keep the original FormatStyle behavior while reusing its value-type configuration.
@@ -190,8 +221,7 @@ struct WorkoutComparisonPanel: View {
     }
 
     @ViewBuilder
-    private func overlayChart(candidate: WorkoutDetail) -> some View {
-        let points = overlayPoints(candidate: candidate)
+    private func overlayChart(points: [CompareOverlayPoint]) -> some View {
         if !points.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pace Overlay")
@@ -211,8 +241,14 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    private func overlayPoints(candidate: WorkoutDetail) -> [CompareOverlayPoint] {
-        guard let overlay = WorkoutComparison.buildDistanceOverlay(detail.strokes, candidate.strokes) else {
+    private func makeOverlayPoints(
+        detailStrokes: [Stroke],
+        candidateStrokes: [Stroke]
+    ) -> [CompareOverlayPoint] {
+        guard let overlay = WorkoutComparison.buildDistanceOverlay(
+            detailStrokes,
+            candidateStrokes
+        ) else {
             return []
         }
 
@@ -253,6 +289,12 @@ struct WorkoutComparisonPanel: View {
         }
         return formatted
     }
+}
+
+private struct CompareOverlayIdentity: Equatable, Sendable {
+    let detailID: Int
+    let candidateID: Int
+    let detailsRevision: UInt64
 }
 
 private struct CompareOverlayPoint: Identifiable {

@@ -50,7 +50,36 @@ public struct TrendFit: Equatable, Sendable {
     public var count: Int
 }
 
+public struct StrokeSummary: Equatable, Sendable {
+    public var count: Int
+    public var averagePace: TimeInterval
+    public var averageWatts: Double
+    public var peakWatts: Int
+
+    public static let empty = StrokeSummary(count: 0, averagePace: 0, averageWatts: 0, peakWatts: 0)
+}
+
 public enum WorkoutAnalytics: Sendable {
+    public static func strokeSummary(for strokes: [Stroke]) -> StrokeSummary {
+        guard !strokes.isEmpty else { return .empty }
+
+        var totalPace: TimeInterval = 0
+        var totalWatts = 0.0
+        var peakWatts = 0
+        for stroke in strokes {
+            totalPace += stroke.pace
+            totalWatts += Double(stroke.watts)
+            peakWatts = max(peakWatts, stroke.watts)
+        }
+
+        return StrokeSummary(
+            count: strokes.count,
+            averagePace: totalPace / Double(strokes.count),
+            averageWatts: totalWatts / Double(strokes.count),
+            peakWatts: peakWatts
+        )
+    }
+
     public static func dashboardSummary(for workouts: [Workout]) -> DashboardSummary {
         let totalDistance = workouts.reduce(0) { $0 + $1.distance }
         let challengeDistance = workouts.reduce(0) { $0 + RowPlayFormatting.challengeDistance(for: $1) }

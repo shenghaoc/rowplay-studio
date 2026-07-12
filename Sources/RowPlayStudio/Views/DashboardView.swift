@@ -34,44 +34,71 @@ struct DashboardView: View {
 
                 sportSummarySection
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Distance by Sport")
-                        .font(.title3.weight(.semibold))
-
-                    Chart(summary.bySport) { item in
-                        BarMark(
-                            x: .value("Sport", item.sport.displayName),
-                            y: .value("Distance", unit == .imperial ? item.distance / 1_609.344 : item.distance / 1_000)
-                        )
-                        .foregroundStyle(by: .value("Sport", item.sport.displayName))
-                    }
-                    .chartYAxisLabel(unit == .imperial ? "mi" : "km")
-                    .frame(height: 220)
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent Pace")
-                        .font(.title3.weight(.semibold))
-
-                    Chart(recentPaceWorkouts) { workout in
-                        LineMark(
-                            x: .value("Date", workout.date),
-                            y: .value("Pace", workout.pace)
-                        )
-                        .interpolationMethod(.catmullRom)
-
-                        PointMark(
-                            x: .value("Date", workout.date),
-                            y: .value("Pace", workout.pace)
-                        )
-                    }
-                    .chartYAxisLabel("sec/500m")
-                    .frame(height: 220)
-                }
+                distanceBySportChart
+                recentPaceChart
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    // MARK: - Charts
+
+    private var distanceBySportChart: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Distance by Sport")
+                .font(.title3.weight(.semibold))
+
+            Chart(summary.bySport) { item in
+                BarMark(
+                    x: .value("Sport", item.sport.displayName),
+                    y: .value("Distance", unit == .imperial ? item.distance / 1_609.344 : item.distance / 1_000)
+                )
+                .foregroundStyle(by: .value("Sport", item.sport.displayName))
+            }
+            .chartYAxisLabel(unit == .imperial ? "mi" : "km")
+            .frame(height: 220)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Distance by Sport chart")
+        .accessibilityValue(distanceBySportAccessibilityValue)
+    }
+
+    private var distanceBySportAccessibilityValue: String {
+        summary.bySport.map { item in
+            "\(item.sport.displayName): \(RowPlayFormatting.distance(item.distance, unit: unit))"
+        }.joined(separator: ", ")
+    }
+
+    private var recentPaceChart: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Pace")
+                .font(.title3.weight(.semibold))
+
+            Chart(recentPaceWorkouts) { workout in
+                LineMark(
+                    x: .value("Date", workout.date),
+                    y: .value("Pace", workout.pace)
+                )
+                .interpolationMethod(.catmullRom)
+
+                PointMark(
+                    x: .value("Date", workout.date),
+                    y: .value("Pace", workout.pace)
+                )
+            }
+            .chartYAxisLabel("sec/500m")
+            .frame(height: 220)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recent Pace chart")
+        .accessibilityValue(recentPaceAccessibilityValue)
+    }
+
+    private var recentPaceAccessibilityValue: String {
+        guard !recentPaceWorkouts.isEmpty else { return "No data" }
+        let paces = recentPaceWorkouts.map { RowPlayFormatting.pace($0.pace) }
+        return "\(recentPaceWorkouts.count) workouts, paces: \(paces.joined(separator: ", "))"
     }
 
     // MARK: - Personal Bests

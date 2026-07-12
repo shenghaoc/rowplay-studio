@@ -13,7 +13,7 @@ struct AnnotationPanelView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        GroupBox("Annotations") {
+        WorkoutToolSection("Annotations") {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {

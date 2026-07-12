@@ -61,6 +61,15 @@ final class WorkoutLibraryDemoModeTests: XCTestCase {
         XCTAssertEqual(library.librarySource, .empty)
     }
 
+    func testAutomationDemoIgnoresDisabledDemoModePreference() {
+        defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
+
+        let library = WorkoutLibrary.automationDemo(defaults: defaults)
+
+        XCTAssertEqual(library.details, DemoWorkoutLibrary.details)
+        XCTAssertEqual(library.librarySource, .demo)
+    }
+
     func testDemoModeNotificationReloadsDemoDataWhenEnabled() async {
         defaults.set(false, forKey: AppPreferences.demoModeEnabledKey)
         let library = WorkoutLibrary.demo(defaults: defaults)

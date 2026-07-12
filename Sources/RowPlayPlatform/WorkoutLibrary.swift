@@ -6,6 +6,7 @@ import RowPlayCore
 public final class WorkoutLibrary: ObservableObject {
     @Published public var details: [WorkoutDetail] {
         didSet {
+            detailsRevision &+= 1
             guard !suppressDerivedUpdates else { return }
             updateAllDerivedData()
         }
@@ -39,12 +40,18 @@ public final class WorkoutLibrary: ObservableObject {
     /// Cached comparison candidates for the active workout, invalidated when `details` changes.
     private var cachedComparisonCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
 
+    /// Lightweight change token for views that must react to detail-content updates
+    /// without comparing complete stroke and split histories during body evaluation.
+    public private(set) var detailsRevision: UInt64 = 0
+
     /// When true, `didSet` observers skip derived-data recomputation.
     /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.
     private var suppressDerivedUpdates = false
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
+    /// Cached stroke summaries for detail accessibility labels and metrics.
+    private var strokeSummaryByWorkoutID: [Int: StrokeSummary] = [:]
     private let defaults: UserDefaults
     private var demoModeEnabled: Bool
     public private(set) var demoDetailIDs: Set<Int>
@@ -81,10 +88,22 @@ public final class WorkoutLibrary: ObservableObject {
         return WorkoutLibrary(details: demoEnabled ? DemoWorkoutLibrary.details : [], defaults: defaults)
     }
 
+    /// Creates a deterministic demo library for scripted automation.
+    ///
+    /// Unlike ``demo(defaults:)``, this intentionally ignores the persisted
+    /// Demo Mode preference so automation always starts with the same fixtures.
+    public static func automationDemo(defaults: UserDefaults = .standard) -> WorkoutLibrary {
+        WorkoutLibrary(details: DemoWorkoutLibrary.details, defaults: defaults)
+    }
+
     public private(set) var availableWorkoutTypes: [String] = []
 
     public func detail(id: Int) -> WorkoutDetail? {
         detailByID[id]
+    }
+
+    public func strokeSummary(for workoutID: Int) -> StrokeSummary {
+        strokeSummaryByWorkoutID[workoutID] ?? .empty
     }
 
     public func updateDetail(_ detail: WorkoutDetail) {
@@ -325,6 +344,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     private func updateAllDerivedData() {
         detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        strokeSummaryByWorkoutID = Dictionary(
+            details.map { ($0.id, WorkoutAnalytics.strokeSummary(for: $0.strokes)) },
+            uniquingKeysWith: { first, _ in first }
+        )
         workouts = details.map(\.workout)
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
         availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()

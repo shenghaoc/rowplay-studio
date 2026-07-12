@@ -3,6 +3,7 @@ import SwiftUI
 
 struct WorkoutToolsView: View {
     var detail: WorkoutDetail
+    var detailsRevision: UInt64
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
     var onUpdateDetail: (WorkoutDetail) -> Void
@@ -21,6 +22,7 @@ struct WorkoutToolsView: View {
 
             WorkoutComparisonPanel(
                 detail: detail,
+                detailsRevision: detailsRevision,
                 candidates: comparisonCandidates
             )
 

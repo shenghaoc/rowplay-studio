@@ -31,6 +31,21 @@ final class WorkoutAnalyticsTests: XCTestCase {
         XCTAssertEqual(summary.bySport.first?.sport, .rower)
     }
 
+    func testStrokeSummaryCalculatesAllMetricsInOnePass() {
+        let strokes = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 28, heartRate: 150, watts: 200),
+            Stroke(t: 2, d: 10, pace: 130, cadence: 29, heartRate: 152, watts: 240),
+            Stroke(t: 4, d: 20, pace: 110, cadence: 30, heartRate: 154, watts: 220)
+        ]
+
+        let summary = WorkoutAnalytics.strokeSummary(for: strokes)
+
+        XCTAssertEqual(summary.count, 3)
+        XCTAssertEqual(summary.averagePace, 120, accuracy: 0.0001)
+        XCTAssertEqual(summary.averageWatts, 220, accuracy: 0.0001)
+        XCTAssertEqual(summary.peakWatts, 240)
+    }
+
     func testDistanceBandUsesStandardDistanceTolerance() {
         XCTAssertEqual(WorkoutAnalytics.distanceBand(for: 2_003).label, "2k")
         XCTAssertEqual(WorkoutAnalytics.distanceBand(for: 8_000).label, "7k-15k")
