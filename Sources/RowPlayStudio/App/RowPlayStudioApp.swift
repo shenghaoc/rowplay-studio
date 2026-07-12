@@ -7,12 +7,17 @@ import SwiftUI
 struct RowPlayStudioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var preferences = AppPreferences()
-    @StateObject private var library = WorkoutLibrary(
-        details: [],
-        annotationStore: AnnotationStoreFactory.makeDefault()
-    )
-    @StateObject private var syncController = Concept2SyncController()
     private let isolationConfig = IsolationConfig.fromEnvironment()
+    @StateObject private var library: WorkoutLibrary = {
+        if IsolationConfig.fromEnvironment().automationMode {
+            return WorkoutLibrary.demo()
+        }
+        return WorkoutLibrary(
+            details: [],
+            annotationStore: AnnotationStoreFactory.makeDefault()
+        )
+    }()
+    @StateObject private var syncController = Concept2SyncController()
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
@@ -22,7 +27,9 @@ struct RowPlayStudioApp: App {
                 .environmentObject(syncController)
                 .environment(\.isolationConfig, isolationConfig)
                 .task {
-                    await syncController.loadCachedWorkouts(into: library)
+                    if !isolationConfig.automationMode {
+                        await syncController.loadCachedWorkouts(into: library)
+                    }
                 }
         }
         .commands {

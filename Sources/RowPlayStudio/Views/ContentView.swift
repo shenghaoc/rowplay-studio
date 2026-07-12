@@ -13,6 +13,21 @@ struct ContentView: View {
     @State private var detailNavigation = DetailNavigationState()
 
     var body: some View {
+        if isolationConfig.level == .minimal {
+            minimalView
+        } else {
+            mainContent
+        }
+    }
+
+    private var minimalView: some View {
+        Text("RowPlay Studio")
+            .font(.largeTitle)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             SidebarView(
                 library: library,

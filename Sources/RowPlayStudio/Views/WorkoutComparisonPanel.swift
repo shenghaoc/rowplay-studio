@@ -8,6 +8,7 @@ struct WorkoutComparisonPanel: View {
     var candidates: [WorkoutDetail]
 
     @State private var selectedCandidateID: Int?
+    @Environment(\.isolationConfig) private var isolationConfig
 
     var body: some View {
         GroupBox("Compare") {
@@ -192,7 +193,7 @@ struct WorkoutComparisonPanel: View {
     @ViewBuilder
     private func overlayChart(candidate: WorkoutDetail) -> some View {
         let points = overlayPoints(candidate: candidate)
-        if !points.isEmpty {
+        if isolationConfig.chartsEnabled, !points.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pace Overlay")
                     .font(.subheadline.weight(.semibold))
