@@ -6,6 +6,7 @@ import RowPlayCore
 public final class WorkoutLibrary: ObservableObject {
     @Published public var details: [WorkoutDetail] {
         didSet {
+            detailsRevision &+= 1
             guard !suppressDerivedUpdates else { return }
             updateAllDerivedData()
         }
@@ -38,6 +39,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     /// Cached comparison candidates for the active workout, invalidated when `details` changes.
     private var cachedComparisonCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
+
+    /// Lightweight change token for views that must react to detail-content updates
+    /// without comparing complete stroke and split histories during body evaluation.
+    public private(set) var detailsRevision: UInt64 = 0
 
     /// When true, `didSet` observers skip derived-data recomputation.
     /// Used by `loadFromSource` to batch `details` and `query` updates into one pass.

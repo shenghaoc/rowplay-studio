@@ -28,9 +28,10 @@ collection changes. Views receive the cached value, so SwiftUI render cycles do
 not traverse a workout's strokes.
 
 The comparison pace overlay is refreshed by one task keyed to the current and
-selected workout IDs and their stroke inputs. Candidate alignment remains
-ID-based, preserving the selected comparison across same-workout edits and
-avoiding equality checks across every candidate's full stroke and split history.
+selected workout IDs plus `WorkoutLibrary.detailsRevision`, a lightweight token
+incremented whenever workout details change. Candidate alignment remains
+ID-based, preserving the selected comparison across same-workout edits while
+avoiding equality checks across stroke and split histories during view updates.
 
 ## Bundle and Automation Contract
 

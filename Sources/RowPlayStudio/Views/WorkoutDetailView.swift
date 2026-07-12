@@ -5,6 +5,7 @@ import SwiftUI
 
 struct WorkoutDetailView: View {
     var detail: WorkoutDetail
+    var detailsRevision: UInt64
     var strokeSummary: StrokeSummary
     var summary: DashboardSummary
     var comparisonCandidates: [WorkoutDetail]
@@ -23,6 +24,7 @@ struct WorkoutDetailView: View {
                 replayButton
                 WorkoutToolsView(
                     detail: detail,
+                    detailsRevision: detailsRevision,
                     comparisonCandidates: comparisonCandidates,
                     annotationStore: annotationStore,
                     onUpdateDetail: onUpdateDetail

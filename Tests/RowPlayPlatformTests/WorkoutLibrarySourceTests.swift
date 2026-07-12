@@ -183,23 +183,28 @@ final class WorkoutLibrarySourceTests: XCTestCase {
     func testStrokeSummaryCacheUpdatesWhenDetailsChange() {
         let initial = makeDetail(
             id: 1,
-            strokes: [Stroke(t: 0, d: 0, pace: 120, cadence: 28, heartRate: 150, watts: 200)]
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 110, cadence: 28, heartRate: 150, watts: 200),
+                Stroke(t: 2, d: 10, pace: 130, cadence: 29, heartRate: 152, watts: 210)
+            ]
         )
         let library = WorkoutLibrary(details: [initial], defaults: defaults)
 
         XCTAssertEqual(library.strokeSummary(for: initial.id).averagePace, 120, accuracy: 0.0001)
-        XCTAssertEqual(library.strokeSummary(for: initial.id).peakWatts, 200)
+        XCTAssertEqual(library.strokeSummary(for: initial.id).peakWatts, 210)
 
         let updated = makeDetail(
             id: 1,
             strokes: [
                 Stroke(t: 0, d: 0, pace: 130, cadence: 28, heartRate: 150, watts: 220),
-                Stroke(t: 2, d: 10, pace: 110, cadence: 29, heartRate: 152, watts: 260)
+                Stroke(t: 2, d: 10, pace: 120, cadence: 29, heartRate: 152, watts: 260)
             ]
         )
+        let initialRevision = library.detailsRevision
         library.details = [updated]
 
-        XCTAssertEqual(library.strokeSummary(for: updated.id).averagePace, 120, accuracy: 0.0001)
+        XCTAssertEqual(library.detailsRevision, initialRevision + 1)
+        XCTAssertEqual(library.strokeSummary(for: updated.id).averagePace, 125, accuracy: 0.0001)
         XCTAssertEqual(library.strokeSummary(for: updated.id).peakWatts, 260)
     }
 

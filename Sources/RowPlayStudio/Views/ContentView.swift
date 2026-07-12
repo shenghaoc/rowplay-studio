@@ -73,6 +73,7 @@ struct ContentView: View {
         } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
             WorkoutDetailView(
                 detail: detail,
+                detailsRevision: library.detailsRevision,
                 strokeSummary: library.strokeSummary(for: detail.id),
                 summary: library.summary,
                 comparisonCandidates: library.comparisonCandidates(for: detail.id),

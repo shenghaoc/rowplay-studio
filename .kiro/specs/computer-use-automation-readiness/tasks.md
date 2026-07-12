@@ -25,7 +25,7 @@
 - [x] Add a single-pass `WorkoutAnalytics.strokeSummary(for:)` helper.
 - [x] Cache summaries in `WorkoutLibrary` when details change.
 - [x] Supply the cached summary to `WorkoutDetailView` accessibility labels.
-- [x] Coalesce comparison-overlay refreshes by current and selected stroke inputs.
+- [x] Coalesce comparison-overlay refreshes with a lightweight detail revision token.
 - [x] Preserve comparison selection across edits to the same workout.
 - [x] Add focused comparison-selection regression tests.
 

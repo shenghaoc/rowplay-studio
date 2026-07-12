@@ -5,6 +5,7 @@ import SwiftUI
 
 struct WorkoutComparisonPanel: View {
     var detail: WorkoutDetail
+    var detailsRevision: UInt64
     var candidates: [WorkoutDetail]
 
     @State private var selectedCandidateID: Int?
@@ -47,14 +48,17 @@ struct WorkoutComparisonPanel: View {
                     selectedCandidateID = nil
                     alignSelection()
                 }
-                .task(id: overlayInput) {
+                .task(id: overlayIdentity) {
                     await Task.yield()
                     guard !Task.isCancelled else { return }
-                    guard let overlayInput else {
+                    guard let selectedCandidate else {
                         overlayPoints = []
                         return
                     }
-                    let points = makeOverlayPoints(input: overlayInput)
+                    let points = makeOverlayPoints(
+                        detailStrokes: detail.strokes,
+                        candidateStrokes: selectedCandidate.strokes
+                    )
                     guard !Task.isCancelled else { return }
                     overlayPoints = points
                 }
@@ -75,13 +79,12 @@ struct WorkoutComparisonPanel: View {
         return candidates.first { $0.id == id }
     }
 
-    private var overlayInput: CompareOverlayInput? {
+    private var overlayIdentity: CompareOverlayIdentity? {
         guard let selectedCandidate else { return nil }
-        return CompareOverlayInput(
+        return CompareOverlayIdentity(
             detailID: detail.id,
-            detailStrokes: detail.strokes,
             candidateID: selectedCandidate.id,
-            candidateStrokes: selectedCandidate.strokes
+            detailsRevision: detailsRevision
         )
     }
 
@@ -238,10 +241,13 @@ struct WorkoutComparisonPanel: View {
         }
     }
 
-    private func makeOverlayPoints(input: CompareOverlayInput) -> [CompareOverlayPoint] {
+    private func makeOverlayPoints(
+        detailStrokes: [Stroke],
+        candidateStrokes: [Stroke]
+    ) -> [CompareOverlayPoint] {
         guard let overlay = WorkoutComparison.buildDistanceOverlay(
-            input.detailStrokes,
-            input.candidateStrokes
+            detailStrokes,
+            candidateStrokes
         ) else {
             return []
         }
@@ -285,11 +291,10 @@ struct WorkoutComparisonPanel: View {
     }
 }
 
-private struct CompareOverlayInput: Equatable, Sendable {
+private struct CompareOverlayIdentity: Equatable, Sendable {
     let detailID: Int
-    let detailStrokes: [Stroke]
     let candidateID: Int
-    let candidateStrokes: [Stroke]
+    let detailsRevision: UInt64
 }
 
 private struct CompareOverlayPoint: Identifiable {
