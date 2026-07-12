@@ -30,7 +30,8 @@ struct AnnotationPanelView: View {
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(2...4)
 
-                    let isDraftEmpty = draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    // Avoid allocating a trimmed copy on every keystroke/body re-eval.
+                    let isDraftEmpty = draftText.allSatisfy(\.isWhitespace)
                     Button(action: saveDraft) {
                         Label("Save Annotation", systemImage: "text.badge.plus")
                     }
