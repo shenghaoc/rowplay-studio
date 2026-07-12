@@ -70,20 +70,28 @@ public enum WorkoutExport: Sendable {
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 " +
         "http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
 
-    private static func makeTCXISO8601Formatter(fractionalSeconds: Bool = false) -> ISO8601DateFormatter {
+    // MARK: - Formatters (Performance Optimization)
+    // Instantiating ISO8601DateFormatter is expensive. Reusing static formatters
+    // significantly speeds up formatting loops during TCX exports.
+    nonisolated(unsafe) private static let tcxISO8601Formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
-        f.formatOptions = fractionalSeconds
-            ? [.withInternetDateTime, .withFractionalSeconds]
-            : [.withInternetDateTime]
+        f.formatOptions = [.withInternetDateTime]
         f.timeZone = TimeZone(secondsFromGMT: 0)
         return f
-    }
+    }()
+
+    nonisolated(unsafe) private static let tcxISO8601FormatterFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f
+    }()
 
     /// Export a single workout detail as Garmin Training Center Database v2 XML.
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
-        let activityId = makeTCXISO8601Formatter().string(from: w.date)
+        let activityId = tcxISO8601Formatter.string(from: w.date)
         let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
 
         // Guard against non-finite workout summary values
@@ -111,7 +119,7 @@ public enum WorkoutExport: Sendable {
         // Track (only when valid strokes exist)
         let validStrokes = filterAndBuildTrackpoints(
             detail: detail,
-            dateFormatter: makeTCXISO8601Formatter(fractionalSeconds: true)
+            dateFormatter: tcxISO8601FormatterFractional
         )
         if !validStrokes.isEmpty {
             xml.append("        <Track>")
