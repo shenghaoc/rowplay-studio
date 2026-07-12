@@ -8,6 +8,7 @@ struct ContentView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
+    @Environment(\.isolationConfig) private var isolationConfig
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
     @State private var detailNavigation = DetailNavigationState()
 
@@ -19,45 +20,32 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
-            NavigationStack(path: $detailNavigation.path) {
-                if library.isEmpty && !preferences.demoModeEnabled {
-                    emptyState
-                } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
-                    WorkoutDetailView(
-                        detail: detail,
-                        summary: library.summary,
-                        comparisonCandidates: library.comparisonCandidates(for: detail.id),
-                        annotationStore: library.annotationStore,
-                        onUpdateDetail: library.updateDetail,
-                        onReplay: {
-                            detailNavigation.showReplay(workoutID: detail.id)
+            if isolationConfig.detailEnabled {
+                NavigationStack(path: $detailNavigation.path) {
+                    detailContent
+                        .navigationDestination(for: DetailNavigationState.Route.self) { route in
+                            switch route {
+                            case .replay(let workoutID):
+                                if let detail = library.detail(id: workoutID) {
+                                    ReplayView(detail: detail)
+                                } else {
+                                    ContentUnavailableView(
+                                        "Workout Unavailable",
+                                        systemImage: "exclamationmark.triangle",
+                                        description: Text("Return to the workout library and select another workout.")
+                                    )
+                                }
+                            }
                         }
-                    )
-                } else {
-                    DashboardView(
-                        library: library,
-                        summary: library.filteredSummary,
-                        personalBests: library.filteredPersonalBests,
-                        recentPaceWorkouts: library.filteredRecentPaceWorkouts
-                    )
+                        .onChange(of: selectedWorkoutID) {
+                            detailNavigation.resetForSelectionChange()
+                        }
                 }
-            }
-            .navigationDestination(for: DetailNavigationState.Route.self) { route in
-                switch route {
-                case .replay(let workoutID):
-                    if let detail = library.detail(id: workoutID) {
-                        ReplayView(detail: detail)
-                    } else {
-                        ContentUnavailableView(
-                            "Workout Unavailable",
-                            systemImage: "exclamationmark.triangle",
-                            description: Text("Return to the workout library and select another workout.")
-                        )
-                    }
-                }
-            }
-            .onChange(of: selectedWorkoutID) {
-                detailNavigation.resetForSelectionChange()
+            } else {
+                // sidebarOnly / minimal: show empty placeholder in detail
+                Text("RowPlay Studio")
+                    .font(.title)
+                    .foregroundStyle(.secondary)
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
@@ -79,6 +67,31 @@ struct ContentView: View {
                 }
                 .disabled(syncController.syncState.inProgress)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        if library.isEmpty && !preferences.demoModeEnabled {
+            emptyState
+        } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+            WorkoutDetailView(
+                detail: detail,
+                summary: library.summary,
+                comparisonCandidates: library.comparisonCandidates(for: detail.id),
+                annotationStore: library.annotationStore,
+                onUpdateDetail: library.updateDetail,
+                onReplay: {
+                    detailNavigation.showReplay(workoutID: detail.id)
+                }
+            )
+        } else {
+            DashboardView(
+                library: library,
+                summary: library.filteredSummary,
+                personalBests: library.filteredPersonalBests,
+                recentPaceWorkouts: library.filteredRecentPaceWorkouts
+            )
         }
     }
 

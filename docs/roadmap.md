@@ -239,6 +239,39 @@ Non-goals for Phase 8B:
 - Imported USD/USDZ sport equipment assets.
 - Performance governor and adaptive quality.
 
+## Phase 9 - Computer Use Automation Readiness
+
+Status: in progress.
+
+Scope:
+
+- Add progressive UI isolation infrastructure (`IsolationConfig`) to diagnose Computer Use helper crashes.
+- Wrap Charts views with `.accessibilityElement(children: .ignore)` and explicit semantic summaries for Computer Use compatibility.
+- Add text-summary fallbacks for charts when isolation disables them.
+- Harden staged bundle metadata: consistent CFBundleName/CFBundleDisplayName, ad-hoc signing, codesign verification.
+- Add `--automation` launch mode in `build_and_run.sh` for deterministic Computer Use testing.
+- Add focused tests for isolation config and automation mode.
+- Update roadmap, beta-readiness, and source-map documentation.
+
+Exit criteria:
+
+- `swift test` passes with all new and regression tests.
+- `swift build` passes.
+- `./script/build_and_run.sh --verify` launches successfully.
+- `./script/build_and_run.sh --automation` launches successfully.
+- `codesign --verify --deep --strict dist/RowPlayStudio.app` passes.
+- Computer Use can traverse the full production accessibility tree without crashing `SkyComputerUseService`.
+- VoiceOver accessibility is preserved with meaningful names, values, and roles.
+
+Non-goals:
+
+- External dependencies.
+- Modifying RunPlayStudio.
+- Adding screen-recording, microphone, audio-capture, or private TCC entitlements.
+- Altering macOS privacy settings or resetting TCC databases.
+- Hiding meaningful UI from VoiceOver.
+- Upgrading Swift, macOS deployment target, CI runners, or architecture layers.
+
 ### Phase 8C+ - Future 3D Replay
 
 Status: not started.

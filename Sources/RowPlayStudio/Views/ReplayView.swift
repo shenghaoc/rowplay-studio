@@ -8,12 +8,13 @@ struct ReplayView: View {
     let ghostDetail: WorkoutDetail?
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var preferences: AppPreferences
+    @Environment(\.isolationConfig) private var isolationConfig
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
 
     private var unit: DistanceUnit { preferences.distanceUnit }
-    private var reduceMotion: Bool { preferences.reduceReplayMotion }
+    private var reduceMotion: Bool { preferences.reduceReplayMotion || isolationConfig.automationMode }
 
     init(detail: WorkoutDetail, ghostDetail: WorkoutDetail? = nil) {
         self.detail = detail
@@ -68,33 +69,41 @@ struct ReplayView: View {
     private var replaySurface: some View {
         switch rendererMode {
         case .twoD:
-            // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
-            let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
-            TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
-                replayCanvas
-                    .onChange(of: timelineContext.date) { oldDate, newDate in
-                        guard state.playing else {
-                            lastTickDate = newDate
-                            return
-                        }
-                        let tick = ReplayPlaybackClock.tick(
-                            lastTickDate: lastTickDate,
-                            currentDate: newDate
-                        )
-                        lastTickDate = tick.lastTickDate
-                        state.tick(deltaTime: tick.delta)
-                    }
-            }
-            .frame(minHeight: 300)
+            twoDReplaySurface
         case .threeD:
-            RealityReplaySceneView(
-                detail: detail,
-                state: $state,
-                reduceMotion: reduceMotion,
-                ghostDetail: ghostDetail
-            )
-            .frame(minHeight: 300)
+            if isolationConfig.replay3DEnabled {
+                RealityReplaySceneView(
+                    detail: detail,
+                    state: $state,
+                    reduceMotion: reduceMotion,
+                    ghostDetail: ghostDetail
+                )
+                .frame(minHeight: 300)
+            } else {
+                twoDReplaySurface
+            }
         }
+    }
+
+    private var twoDReplaySurface: some View {
+        // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
+        let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
+        return TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
+            replayCanvas
+                .onChange(of: timelineContext.date) { oldDate, newDate in
+                    guard state.playing else {
+                        lastTickDate = newDate
+                        return
+                    }
+                    let tick = ReplayPlaybackClock.tick(
+                        lastTickDate: lastTickDate,
+                        currentDate: newDate
+                    )
+                    lastTickDate = tick.lastTickDate
+                    state.tick(deltaTime: tick.delta)
+                }
+        }
+        .frame(minHeight: 300)
     }
 
     // MARK: - Canvas

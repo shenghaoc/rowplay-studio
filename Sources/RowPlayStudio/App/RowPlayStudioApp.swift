@@ -12,6 +12,7 @@ struct RowPlayStudioApp: App {
         annotationStore: AnnotationStoreFactory.makeDefault()
     )
     @StateObject private var syncController = Concept2SyncController()
+    private let isolationConfig = IsolationConfig.fromEnvironment()
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
@@ -19,6 +20,7 @@ struct RowPlayStudioApp: App {
                 .frame(minWidth: 1_000, minHeight: 680)
                 .environmentObject(preferences)
                 .environmentObject(syncController)
+                .environment(\.isolationConfig, isolationConfig)
                 .task {
                     await syncController.loadCachedWorkouts(into: library)
                 }

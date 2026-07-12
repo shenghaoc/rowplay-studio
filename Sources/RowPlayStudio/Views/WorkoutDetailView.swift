@@ -11,6 +11,8 @@ struct WorkoutDetailView: View {
     var onUpdateDetail: (WorkoutDetail) -> Void
     var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
+    @Environment(\.isolationConfig) private var isolationConfig
+    @State private var showingReplay = false
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
@@ -19,20 +21,35 @@ struct WorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 metricStrip
-                replayButton
+                if isolationConfig.replayEnabled {
+                    replayButton
+                }
                 WorkoutToolsView(
                     detail: detail,
                     comparisonCandidates: comparisonCandidates,
                     annotationStore: annotationStore,
                     onUpdateDetail: onUpdateDetail
                 )
-                strokeChart
+                if isolationConfig.chartsEnabled {
+                    strokeChart
+                } else {
+                    strokeTextSummary
+                }
                 splitTable
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
+        .navigationDestination(isPresented: $showingReplay) {
+            if isolationConfig.replayEnabled {
+                ReplayView(detail: detail)
+            } else {
+                Text("Replay disabled in isolation mode")
+                    .font(.title)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var header: some View {
@@ -114,6 +131,52 @@ struct WorkoutDetailView: View {
                 }
                 .chartXAxisLabel("seconds")
                 .frame(height: 260)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Stroke Timeline chart")
+            .accessibilityValue(strokeTimelineAccessibilityValue)
+        }
+    }
+
+    private var strokeTimelineAccessibilityValue: String {
+        let count = detail.strokes.count
+        let avgPace = detail.strokes.map(\.pace).reduce(0, +) / max(Double(count), 1)
+        let avgWatts = detail.strokes.map { Double($0.watts) }.reduce(0, +) / max(Double(count), 1)
+        return "\(count) strokes, avg pace \(RowPlayFormatting.pace(avgPace)), avg watts \(Int(avgWatts))"
+    }
+
+    @ViewBuilder
+    private var strokeTextSummary: some View {
+        if detail.strokes.isEmpty {
+            ContentUnavailableView("No Stroke Detail", systemImage: "waveform.path.ecg", description: Text("This workout only has summary and split data."))
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Stroke Summary")
+                    .font(.title3.weight(.semibold))
+
+                let count = detail.strokes.count
+                let avgPace = detail.strokes.map(\.pace).reduce(0, +) / max(Double(count), 1)
+                let avgWatts = detail.strokes.map { Double($0.watts) }.reduce(0, +) / max(Double(count), 1)
+                let maxWatts = detail.strokes.map(\.watts).max() ?? 0
+
+                HStack(spacing: 24) {
+                    VStack(alignment: .leading) {
+                        Text("Strokes").font(.caption).foregroundStyle(.secondary)
+                        Text("\(count)").font(.title3.monospacedDigit())
+                    }
+                    VStack(alignment: .leading) {
+                        Text("Avg Pace").font(.caption).foregroundStyle(.secondary)
+                        Text(RowPlayFormatting.pace(avgPace)).font(.title3.monospacedDigit())
+                    }
+                    VStack(alignment: .leading) {
+                        Text("Avg Watts").font(.caption).foregroundStyle(.secondary)
+                        Text("\(Int(avgWatts))").font(.title3.monospacedDigit())
+                    }
+                    VStack(alignment: .leading) {
+                        Text("Peak Watts").font(.caption).foregroundStyle(.secondary)
+                        Text("\(maxWatts)").font(.title3.monospacedDigit())
+                    }
+                }
             }
         }
     }

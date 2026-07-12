@@ -24,6 +24,9 @@ mkdir -p "$APP_MACOS"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
+# Generate Info.plist with stable technical identity.
+# CFBundleName = RowPlayStudio (matches executable, used for app discovery)
+# CFBundleDisplayName = RowPlay Studio (human-facing name)
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -34,11 +37,15 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleName</key>
-  <string>RowPlay Studio</string>
+  <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
   <string>RowPlay Studio</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
@@ -47,8 +54,15 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+# Ad-hoc sign the staged bundle for consistent identity and accessibility discovery
+codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
+}
+
+open_app_automation() {
+  /usr/bin/open -n --env ROWPLAY_AUTOMATION=1 "$APP_BUNDLE"
 }
 
 case "$MODE" in
@@ -71,8 +85,22 @@ case "$MODE" in
     sleep 1
     pgrep -x "$APP_NAME" >/dev/null
     ;;
+  --automation|automation)
+    echo "Launching in automation mode (demo data, reduced motion)..."
+    open_app_automation
+    sleep 1
+    pgrep -x "$APP_NAME" >/dev/null
+    echo "Automation launch verified."
+    ;;
+  --sign-verify|sign-verify)
+    echo "Verifying bundle signature..."
+    plutil -lint "$INFO_PLIST"
+    codesign --verify --deep --strict "$APP_BUNDLE"
+    codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 | grep -E "^(Identifier|TeamIdentifier|Signature)" || true
+    echo "Bundle verification complete."
+    ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify]" >&2
     exit 2
     ;;
 esac

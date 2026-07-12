@@ -54,6 +54,7 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 - Sync pipeline integration: `SyncPipelineIntegrationTests` validates fake Concept2 data flows through `WorkoutSyncCoordinator` → `SQLiteWorkoutCache` → `WorkoutLibraryLoader`. Real network sync still needs separate validation.
 - Concept2 fixture decoding parity: `Concept2FixtureDecodingTests` validates native decoding/mapping against sanitized golden fixtures from the web repo (rower steady, rower interval, SkiErg, BikeErg) and redaction-scans every bundled fixture for credentials and PII. No real network calls.
 - Authenticated Concept2 smoke tests: `Concept2AuthenticatedSmokeTests` validates real API request/response integration when `ROWPLAY_CONCEPT2_TOKEN` is set locally. Tests are skipped in CI. Token-redaction coverage ensures no credentials leak into error descriptions. Full production sync UX still needs separate QA.
+- Computer Use readiness: `IsolationConfig` provides progressive UI isolation for crash diagnosis. Charts views wrapped with accessibility summaries. Bundle metadata hardened with consistent CFBundleName/CFBundleDisplayName and ad-hoc signing. `--automation` launch mode available for deterministic testing. Focused tests in `ComputerUseAutomationReadinessTests`.
 
 ## Gaps Before Beta
 

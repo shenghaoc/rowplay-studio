@@ -97,6 +97,8 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | `tests/fixtures/golden/*.fixture.json` | `Tests/RowPlayCoreTests/Fixtures/Concept2/` | Sanitized Concept2 golden fixtures copied from the web repo. Used by `Concept2FixtureDecodingTests` to validate native decoding/mapping parity and dynamically redaction-scan every bundled fixture. No real network calls or tokens. |
 | `src/lib/server/concept2.golden.test.ts` | `Tests/RowPlayCoreTests/Concept2/Concept2FixtureDecodingTests.swift` | Native parity tests for Concept2 decoding/mapping against golden fixtures. Covers rower steady, rower interval, SkiErg, BikeErg, stroke monotonicity, and fixture redaction scanning. |
 | (new — no web equivalent) | `Tests/RowPlayCoreTests/Concept2/Concept2AuthenticatedSmokeTests.swift` | Opt-in authenticated smoke tests for real Concept2 API validation. Skipped unless `ROWPLAY_CONCEPT2_TOKEN` is set. CI does not require credentials. Covers summary fetch, detail fetch, and token-redaction in errors. |
+| (new — no web equivalent) | `Sources/RowPlayStudio/App/IsolationConfig.swift` | Progressive UI isolation for Computer Use crash diagnosis. Reads `ROWPLAY_ISOLATION_LEVEL` and `ROWPLAY_AUTOMATION` from environment. |
+| (new — no web equivalent) | `Tests/RowPlayStudioTests/ComputerUseAutomationReadinessTests.swift` | Tests for isolation config levels, automation mode flag, and environment-driven behavior. |
 
 ## Retired Web Surfaces
 
