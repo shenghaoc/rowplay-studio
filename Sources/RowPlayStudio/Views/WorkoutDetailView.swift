@@ -14,6 +14,9 @@ struct WorkoutDetailView: View {
     var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
 
+    @State private var paceChartDomain: ClosedRange<Double> = -180 ... -60
+    @State private var splitBoundaryDistances: [Double] = []
+
     private var unit: DistanceUnit { preferences.distanceUnit }
 
     private func chartDistance(_ meters: Double) -> Double {
@@ -22,6 +25,15 @@ struct WorkoutDetailView: View {
 
     private var chartDistanceAxisLabel: String {
         unit == .imperial ? "Distance (mi)" : "Distance (km)"
+    }
+
+    /// Downsample strokes for chart rendering — caps at ~500 points regardless of
+    /// workout length. A 150pt chart can't meaningfully render more detail than this.
+    private var chartStrokes: [Stroke] {
+        let strokes = detail.strokes
+        guard strokes.count > 500 else { return strokes }
+        let step = max(strokes.count / 500, 1)
+        return stride(from: 0, to: strokes.count, by: step).map { strokes[$0] }
     }
 
     var body: some View {
@@ -48,6 +60,13 @@ struct WorkoutDetailView: View {
                     .keyboardShortcut("p", modifiers: [.command, .shift])
                 }
             }
+        }
+        .onAppear {
+            paceChartDomain = Self.computePaceChartDomain(strokes: detail.strokes)
+            splitBoundaryDistances = Self.computeSplitBoundaryDistances(
+                splits: detail.splits,
+                distanceTransform: { unit == .imperial ? $0 / 1_609.344 : $0 / 1_000 }
+            )
         }
     }
 
@@ -209,7 +228,7 @@ struct WorkoutDetailView: View {
 
     private var paceChart: some View {
         Chart {
-            ForEach(detail.strokes) { stroke in
+            ForEach(chartStrokes) { stroke in
                 LineMark(
                     x: .value("Distance", chartDistance(stroke.d)),
                     y: .value("Pace", -stroke.pace)
@@ -239,7 +258,7 @@ struct WorkoutDetailView: View {
 
     private var powerChart: some View {
         Chart {
-            ForEach(detail.strokes) { stroke in
+            ForEach(chartStrokes) { stroke in
                 LineMark(
                     x: .value("Distance", chartDistance(stroke.d)),
                     y: .value("Power", stroke.watts)
@@ -257,13 +276,25 @@ struct WorkoutDetailView: View {
         .frame(height: 150)
     }
 
-    private var paceChartDomain: ClosedRange<Double> {
-        let paces = detail.strokes.map(\.pace).filter { $0.isFinite && $0 > 0 }
+    static func computePaceChartDomain(strokes: [Stroke]) -> ClosedRange<Double> {
+        let paces = strokes.map(\.pace).filter { $0.isFinite && $0 > 0 }
         guard let fastest = paces.min(), let slowest = paces.max() else {
             return -180 ... -60
         }
         let padding = max((slowest - fastest) * 0.12, 3)
         return -(slowest + padding) ... -(fastest - padding)
+    }
+
+    static func computeSplitBoundaryDistances(
+        splits: [Split],
+        distanceTransform: (Double) -> Double
+    ) -> [Double] {
+        guard splits.count > 1 else { return [] }
+        var cumulative = 0.0
+        return splits.dropLast().map { split in
+            cumulative += split.distance
+            return distanceTransform(cumulative)
+        }
     }
 
     @ChartContentBuilder
@@ -285,15 +316,6 @@ struct WorkoutDetailView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-    }
-
-    private var splitBoundaryDistances: [Double] {
-        guard detail.splits.count > 1 else { return [] }
-        var cumulative = 0.0
-        return detail.splits.dropLast().map { split in
-            cumulative += split.distance
-            return chartDistance(cumulative)
-        }
     }
 
     private var splitFocusSubtitle: String {

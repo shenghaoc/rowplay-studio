@@ -12,7 +12,9 @@ struct WorkoutComparisonPanel: View {
     @State private var overlayPoints: [CompareOverlayPoint] = []
 
     var body: some View {
-        WorkoutToolSection("Compare") {
+        let candidateIDs = candidates.map(\.id)
+
+        return WorkoutToolSection("Compare") {
             if candidates.isEmpty {
                 ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 120)
@@ -42,7 +44,7 @@ struct WorkoutComparisonPanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onAppear(perform: alignSelection)
-                .onChange(of: candidates.map(\.id)) { _, _ in
+                .onChange(of: candidateIDs) { _, _ in
                     alignSelection()
                 }
                 .onChange(of: detail.id) { _, _ in

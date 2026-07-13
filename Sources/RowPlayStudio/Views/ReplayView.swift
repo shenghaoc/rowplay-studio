@@ -12,6 +12,9 @@ struct ReplayView: View {
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
+    @State private var strokePath = Path()
+    @State private var canvasSize: CGSize = .zero
+    @State private var cachedMachineColor: Color = .accentColor
 
     private var unit: DistanceUnit { preferences.distanceUnit }
     private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
@@ -110,34 +113,28 @@ struct ReplayView: View {
 
     private var replayCanvas: some View {
         Canvas { context, size in
-            drawStrokePath(in: &context, size: size)
+            context.stroke(strokePath, with: .color(cachedMachineColor.opacity(0.7)), lineWidth: 2)
             drawPlayhead(in: &context, size: size)
         }
         .accessibilityLabel("Workout replay timeline")
-    }
-
-    private func drawStrokePath(in context: inout GraphicsContext, size: CGSize) {
-        let strokes = detail.strokes
-        guard strokes.count > 1 else { return }
-
-        let originT = strokes[0].t
-        let maxT = strokes.last?.t ?? originT
-        let duration = maxT - originT
-        let maxD = strokes.last?.d ?? 1
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
-
-        var path = Path()
-        for (i, stroke) in strokes.enumerated() {
-            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
-            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
-            if i == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
+        .background(
+            GeometryReader { proxy in
+                Color.clear.onAppear {
+                    canvasSize = proxy.size
+                    strokePath = self.makeStrokePath(strokes: detail.strokes, size: proxy.size)
+                }
+                .onChange(of: proxy.size) { _, newSize in
+                    canvasSize = newSize
+                    strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
+                }
             }
+        )
+        .onAppear {
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
         }
-
-        context.stroke(path, with: .color(machineColor.opacity(0.7)), lineWidth: 2)
+        .onChange(of: colorScheme) { _, scheme in
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: scheme)
+        }
     }
 
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
@@ -170,6 +167,29 @@ struct ReplayView: View {
         return CGFloat(max(0, min(1, numerator / denominator)))
     }
 
+    /// Precomputes the full stroke trail path so the Canvas draw closure only strokes it.
+    func makeStrokePath(strokes: [Stroke], size: CGSize) -> Path {
+        guard strokes.count > 1 else { return Path() }
+
+        let originT = strokes[0].t
+        let maxT = strokes.last?.t ?? originT
+        let maxD = strokes.last?.d ?? 1
+        let duration = maxT - originT
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
+
+        var path = Path()
+        for (i, stroke) in strokes.enumerated() {
+            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
+            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
+            if i == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        return path
+    }
+
     // MARK: - Telemetry
 
     private var telemetryBar: some View {
@@ -193,8 +213,8 @@ struct ReplayView: View {
         return String(Int(state.currentFrame.cadence.rounded()))
     }
 
-    private var machineColor: Color {
-        let color = ReplaySportThemeLookup.machineColor(for: detail.workout.sport)
+    static func machineColor(for sport: Sport, colorScheme: ColorScheme) -> Color {
+        let color = ReplaySportThemeLookup.machineColor(for: sport)
         return Color(hex: colorScheme == .dark ? color.dark : color.light)
     }
 
