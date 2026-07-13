@@ -120,14 +120,11 @@ struct ReplayView: View {
         .accessibilityLabel("Workout replay timeline")
         .background(
             GeometryReader { proxy in
-                Color.clear.onAppear {
-                    canvasSize = proxy.size
-                    strokePath = self.makeStrokePath(strokes: detail.strokes, size: proxy.size)
-                }
-                .onChange(of: proxy.size) { _, newSize in
-                    canvasSize = newSize
-                    strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
-                }
+                Color.clear
+                    .onChange(of: proxy.size, initial: true) { _, newSize in
+                        canvasSize = newSize
+                        strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
+                    }
             }
         )
         .onAppear {

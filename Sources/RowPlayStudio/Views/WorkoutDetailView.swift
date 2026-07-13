@@ -232,7 +232,7 @@ struct WorkoutDetailView: View {
     static func powerText(for sport: Sport, pace: TimeInterval) -> String {
         guard pace.isFinite, pace > 0 else { return "-" }
         let watts = RowPlayFormatting.paceToWatts(for: sport, pacePer500m: pace)
-        guard watts.isFinite, watts >= 0, watts <= Double(Int.max) else { return "-" }
+        guard watts.isFinite, watts >= 0, watts <= 100_000 else { return "-" }
         return String(Int(watts.rounded()))
     }
 }
