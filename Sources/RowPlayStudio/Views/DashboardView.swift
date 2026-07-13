@@ -62,9 +62,7 @@ struct DashboardView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Distance by Sport chart")
         .accessibilityValue(distanceBySportAccessibilityValue)
-        .padding(AppDesign.Spacing.xLarge)
-        .background(AppDesign.panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
+        .panelStyle()
     }
 
     private var distanceBySportAccessibilityValue: String {
@@ -96,9 +94,7 @@ struct DashboardView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recent Pace chart")
         .accessibilityValue(recentPaceAccessibilityValue)
-        .padding(AppDesign.Spacing.xLarge)
-        .background(AppDesign.panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
+        .panelStyle()
     }
 
     private var recentPaceAccessibilityValue: String {

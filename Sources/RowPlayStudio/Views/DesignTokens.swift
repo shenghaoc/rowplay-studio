@@ -134,6 +134,14 @@ enum AppDesign {
     static let overlayBackground = Color(nsColor: .controlBackgroundColor).opacity(0.85)
 }
 
+extension View {
+    func panelStyle() -> some View {
+        padding(AppDesign.Spacing.xLarge)
+            .background(AppDesign.panelBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
+    }
+}
+
 // MARK: - Color Hex Initializer
 
 extension Color {

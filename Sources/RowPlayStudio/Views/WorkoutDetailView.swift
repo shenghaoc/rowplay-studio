@@ -132,9 +132,7 @@ struct WorkoutDetailView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Stroke Timeline chart")
             .accessibilityValue(strokeTimelineAccessibilityValue)
-            .padding(AppDesign.Spacing.xLarge)
-            .background(AppDesign.panelBackground)
-            .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
+            .panelStyle()
         }
     }
 
@@ -173,9 +171,7 @@ struct WorkoutDetailView: View {
             }
             .font(.callout)
         }
-        .padding(AppDesign.Spacing.xLarge)
-        .background(AppDesign.panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
+        .panelStyle()
     }
 
     private var cadenceText: String {
