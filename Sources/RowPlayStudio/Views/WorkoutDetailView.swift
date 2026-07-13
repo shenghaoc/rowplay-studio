@@ -21,21 +21,41 @@ struct WorkoutDetailView: View {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
                 header
                 metricStrip
-                replayButton
-                WorkoutToolsView(
-                    detail: detail,
-                    detailsRevision: detailsRevision,
-                    comparisonCandidates: comparisonCandidates,
-                    annotationStore: annotationStore,
-                    onUpdateDetail: onUpdateDetail
-                )
                 strokeChart
                 splitTable
+                toolSection
             }
             .padding(AppDesign.Spacing.xxxLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
+        .toolbar {
+            if detail.workout.hasStrokeData {
+                ToolbarItem {
+                    Button(action: onReplay) {
+                        Label("Replay Workout", systemImage: "play.rectangle.fill")
+                    }
+                    .help("Replay workout with stroke data")
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                }
+            }
+        }
+    }
+
+    private var toolSection: some View {
+        DisclosureGroup {
+            WorkoutToolsView(
+                detail: detail,
+                detailsRevision: detailsRevision,
+                comparisonCandidates: comparisonCandidates,
+                annotationStore: annotationStore,
+                onUpdateDetail: onUpdateDetail
+            )
+            .padding(.top, AppDesign.Spacing.medium)
+        } label: {
+            Text("Workout Tools")
+                .font(AppDesign.Typography.sectionHeadline)
+        }
     }
 
     private var header: some View {
@@ -77,19 +97,6 @@ struct WorkoutDetailView: View {
             MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer", color: AppDesign.MetricColor.pace)
             MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome", color: AppDesign.MetricColor.cadence)
             MetricTile(title: "Watts", value: wattsText, systemImage: "bolt", color: AppDesign.MetricColor.watts)
-        }
-    }
-
-    @ViewBuilder
-    private var replayButton: some View {
-        if detail.workout.hasStrokeData {
-            Button(action: onReplay) {
-                Label("Replay Workout", systemImage: "play.rectangle.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
     }
 

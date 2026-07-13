@@ -21,10 +21,25 @@ struct ContentView: View {
                 library: library,
                 selectedWorkoutID: selectionBinding
             )
+            .redacted(reason: syncController.isLoading ? .placeholder : [])
+            .disabled(syncController.isLoading)
             .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         } detail: {
             NavigationStack(path: $detailNavigation.path) {
-                detailContent
+                Group {
+                    if syncController.isLoading {
+                        DashboardView(
+                            library: library,
+                            summary: library.filteredSummary,
+                            personalBests: [],
+                            recentPaceWorkouts: []
+                        )
+                        .redacted(reason: .placeholder)
+                        .disabled(true)
+                    } else {
+                        detailContent
+                    }
+                }
                     .navigationDestination(for: DetailNavigationState.Route.self) { route in
                         switch route {
                         case .replay(let workoutID):
@@ -45,6 +60,14 @@ struct ContentView: View {
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
+        .background {
+            Button("Dashboard") {
+                storedSelectedWorkoutID = Self.dashboardSelectionID
+            }
+            .keyboardShortcut("1", modifiers: .command)
+            .opacity(0)
+            .accessibilityHidden(true)
+        }
         .toolbar {
             ToolbarItemGroup {
                 Picker("Sport", selection: sportBinding) {
@@ -62,6 +85,7 @@ struct ContentView: View {
                     Label("Reload Workout Library", systemImage: "arrow.clockwise")
                 }
                 .disabled(syncController.syncState.inProgress)
+                .keyboardShortcut("r", modifiers: .command)
             }
         }
     }
@@ -94,11 +118,38 @@ struct ContentView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Workouts", systemImage: "figure.rower")
-        } description: {
-            Text("Enable Demo Mode in Settings to explore sample workouts, or add real workout data.")
+        VStack(spacing: AppDesign.Spacing.xxxLarge) {
+            VStack(spacing: AppDesign.Spacing.large) {
+                Image(systemName: "figure.rower")
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundStyle(AppDesign.MetricColor.duration)
+                    .symbolEffect(.pulse, options: .repeating)
+
+                VStack(spacing: AppDesign.Spacing.small) {
+                    Text("Ready When You Are")
+                        .font(.title.weight(.semibold))
+
+                    Text("Enable Demo Mode to explore sample workouts with seeded data, or connect your Concept2 logbook to sync your training history.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
+                }
+            }
+
+            VStack(spacing: AppDesign.Spacing.medium) {
+                Button("Enable Demo Mode") {
+                    preferences.demoModeEnabled = true
+                }
+                .buttonStyle(.borderedProminent)
+
+                SettingsLink {
+                    Text("Open Settings")
+                }
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(AppDesign.Spacing.xxxLarge)
     }
 
     private var selectedWorkoutID: Int? {

@@ -10,9 +10,6 @@ struct WorkoutToolsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.xLarge) {
-            Text("Workout Tools")
-                .font(AppDesign.Typography.sectionHeadline)
-
             WorkoutFileActionsView(detail: detail)
 
             HrImportPanelView(
