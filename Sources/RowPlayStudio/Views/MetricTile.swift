@@ -9,8 +9,8 @@ struct MetricTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(color?.opacity(0.7) ?? .secondary)
+                .font(.body)
+                .foregroundStyle(color?.opacity(0.5) ?? .secondary)
             Text(value)
                 .font(AppDesign.Typography.heroMetric)
                 .foregroundStyle(color ?? .primary)

@@ -111,9 +111,6 @@ private struct WorkoutSidebarRow: View {
                 HStack(spacing: AppDesign.Spacing.small) {
                     HStack(spacing: AppDesign.Spacing.xSmall) {
                         Text(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day())
-                        Text("·")
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
                         Text(RowPlayFormatting.distance(workout.distance, unit: distanceUnit))
                     }
                     .foregroundStyle(.secondary)

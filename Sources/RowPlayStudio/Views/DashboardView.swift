@@ -32,8 +32,6 @@ struct DashboardView: View {
 
                 personalBestsSection
 
-                sportSummarySection
-
                 distanceBySportChart
                 recentPaceChart
             }
@@ -82,7 +80,7 @@ struct DashboardView: View {
 
     private var distanceBySportChart: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
-            Text("Distance by Sport")
+            Text("By Sport")
                 .font(AppDesign.Typography.sectionHeadline)
 
             Chart(summary.bySport) { item in
@@ -195,51 +193,5 @@ struct DashboardView: View {
             return "\(Int(distance / 1_000))k"
         }
         return "\(Int(distance))m"
-    }
-
-    // MARK: - Sport Summary
-
-    @ViewBuilder
-    private var sportSummarySection: some View {
-        if !summary.bySport.isEmpty {
-            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
-                Text("By Sport")
-                    .font(AppDesign.Typography.sectionHeadline)
-
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 180, maximum: 240))
-                ], spacing: AppDesign.Spacing.large) {
-                    ForEach(summary.bySport) { sport in
-                        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
-                            HStack(spacing: AppDesign.Spacing.small) {
-                                Image(systemName: sport.sport.iconName)
-                                    .foregroundStyle(.secondary)
-                                Text(sport.sport.displayName)
-                                    .font(.headline)
-                            }
-                            Text("\(sport.sessions) sessions")
-                                .font(AppDesign.Typography.compactLabel)
-                                .foregroundStyle(.secondary)
-                            Text(RowPlayFormatting.distance(sport.distance, unit: unit))
-                                .font(AppDesign.Typography.metricValue.monospacedDigit())
-                                .foregroundStyle(AppDesign.MetricColor.distance)
-                            Text("Best: \(RowPlayFormatting.pace(sport.bestPace))")
-                                .font(AppDesign.Typography.compactLabel)
-                                .foregroundStyle(AppDesign.MetricColor.pace)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(AppDesign.Spacing.large)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(sport.sport.displayName) Summary")
-                        .accessibilityValue(Self.sportSummaryAccessibilityValue(sport, unit: unit))
-                    }
-                }
-            }
-        }
-    }
-
-    static func sportSummaryAccessibilityValue(_ sport: SportSummary, unit: DistanceUnit) -> String {
-        "\(sport.sessions) sessions, \(RowPlayFormatting.distance(sport.distance, unit: unit)), Best Pace: \(Duration.seconds(sport.bestPace).formatted(.units(width: .wide, fractionalPart: .show(length: 1)))) per 500 meters"
     }
 }

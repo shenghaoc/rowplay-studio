@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class DashboardViewTests: XCTestCase {
-    func testSportSummaryAccessibilityValueUsesSelectedDistanceUnit() {
+    func testDistanceChartAccessibilityDescriptionUsesSelectedDistanceUnit() {
         let summary = SportSummary(
             sport: .rower,
             sessions: 2,
@@ -15,7 +15,7 @@ final class DashboardViewTests: XCTestCase {
             longestDistance: 5_000
         )
 
-        let value = DashboardView.sportSummaryAccessibilityValue(summary, unit: .imperial)
+        let value = DashboardView.distanceBySportAccessibilityDescription([summary], unit: .imperial)
 
         XCTAssertTrue(value.contains("3.11 mi"))
     }

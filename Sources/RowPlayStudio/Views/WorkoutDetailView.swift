@@ -130,36 +130,30 @@ struct WorkoutDetailView: View {
                 RowPlayFormatting.distance(detail.workout.distance, unit: unit),
                 color: AppDesign.MetricColor.distance
             )
-            metricDivider
             performanceMetric(
                 "Time",
                 RowPlayFormatting.time(detail.workout.time, tenths: true),
                 color: .primary
             )
-            metricDivider
             performanceMetric(
                 "Avg Pace",
                 RowPlayFormatting.pace(detail.workout.pace),
                 color: AppDesign.MetricColor.pace
             )
-            metricDivider
             performanceMetric(
                 "Avg Cadence",
                 "\(cadenceText) \(detail.workout.sport.cadenceUnit)",
                 color: AppDesign.MetricColor.cadence
             )
-            metricDivider
             performanceMetric(
                 "Avg Power",
                 "\(wattsText) W",
                 color: AppDesign.MetricColor.watts
             )
             if let calories = detail.workout.caloriesTotal {
-                metricDivider
                 performanceMetric("Calories", "\(calories) Cal", color: .primary)
             }
             if let heartRate = detail.workout.heartRateAvg {
-                metricDivider
                 performanceMetric(
                     "Avg HR",
                     "\(heartRate) bpm",
@@ -167,9 +161,7 @@ struct WorkoutDetailView: View {
                 )
             }
         }
-        .padding(.vertical, AppDesign.Spacing.xLarge)
-        .overlay(alignment: .top) { Divider() }
-        .overlay(alignment: .bottom) { Divider() }
+        .padding(.vertical, AppDesign.Spacing.large)
     }
 
     private func performanceMetric(_ label: String, _ value: String, color: Color) -> some View {
@@ -189,11 +181,6 @@ struct WorkoutDetailView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue(value)
-    }
-
-    private var metricDivider: some View {
-        Divider()
-            .frame(height: 52)
     }
 
     @ViewBuilder
@@ -225,9 +212,6 @@ struct WorkoutDetailView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Stroke Timeline chart")
             .accessibilityValue(strokeTimelineAccessibilityValue)
-            .padding(.vertical, AppDesign.Spacing.xLarge)
-            .overlay(alignment: .top) { Divider() }
-            .overlay(alignment: .bottom) { Divider() }
         }
     }
 
@@ -375,8 +359,6 @@ struct WorkoutDetailView: View {
                         Text(split.heartRate?.average.map(String.init) ?? "-")
                     }
                     .monospacedDigit()
-                    Divider()
-                        .gridCellColumns(7)
                 }
             }
             .font(.callout)
