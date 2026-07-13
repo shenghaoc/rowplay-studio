@@ -1,4 +1,3 @@
-import Charts
 import RowPlayCore
 import RowPlayPlatform
 import SwiftUI
@@ -7,49 +6,76 @@ struct WorkoutDetailView: View {
     var detail: WorkoutDetail
     var detailsRevision: UInt64
     var strokeSummary: StrokeSummary
-    var summary: DashboardSummary
     var comparisonCandidates: [WorkoutDetail]
     var annotationStore: any AnnotationStore
     var onUpdateDetail: (WorkoutDetail) -> Void
     var onReplay: () -> Void
     @EnvironmentObject private var preferences: AppPreferences
+    @Environment(\.automationModeEnabled) private var automationModeEnabled
+    @State private var areToolsExpanded = false
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
                 header
                 metricStrip
-                replayButton
-                WorkoutToolsView(
-                    detail: detail,
-                    detailsRevision: detailsRevision,
-                    comparisonCandidates: comparisonCandidates,
-                    annotationStore: annotationStore,
-                    onUpdateDetail: onUpdateDetail
-                )
                 strokeChart
                 splitTable
+                toolSection
             }
-            .padding(28)
+            .padding(AppDesign.Spacing.xxxLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(detail.workout.workoutType)
+        .toolbar {
+            if detail.workout.hasStrokeData {
+                ToolbarItem {
+                    Button(action: onReplay) {
+                        Label("Replay Workout", systemImage: "play.rectangle.fill")
+                    }
+                    .help("Replay workout with stroke data")
+                    .accessibilityHint("Opens the workout replay viewer")
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                }
+            }
+        }
+        .onAppear {
+            if automationModeEnabled {
+                areToolsExpanded = true
+            }
+        }
+    }
+
+    private var toolSection: some View {
+        DisclosureGroup(isExpanded: $areToolsExpanded) {
+            WorkoutToolsView(
+                detail: detail,
+                detailsRevision: detailsRevision,
+                comparisonCandidates: comparisonCandidates,
+                annotationStore: annotationStore,
+                onUpdateDetail: onUpdateDetail
+            )
+            .padding(.top, AppDesign.Spacing.medium)
+        } label: {
+            Text("Workout Tools")
+                .font(AppDesign.Typography.sectionHeadline)
+        }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
             HStack(alignment: .firstTextBaseline) {
                 Text(detail.workout.workoutType)
-                    .font(.largeTitle.weight(.semibold))
+                    .font(AppDesign.Typography.pageTitle)
                 Spacer()
                 Text(detail.workout.sport.displayName)
-                    .font(.headline)
+                    .font(AppDesign.Typography.sectionHeadline)
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: AppDesign.Spacing.medium) {
                 Text(detail.workout.date, style: .date)
                 Text(detail.workout.date, style: .time)
                 if let source = detail.workout.source {
@@ -71,78 +97,97 @@ struct WorkoutDetailView: View {
     }
 
     private var metricStrip: some View {
-        HStack(spacing: 12) {
-            MetricTile(title: "Distance", value: RowPlayFormatting.distance(detail.workout.distance, unit: unit), systemImage: "ruler")
-            MetricTile(title: "Time", value: RowPlayFormatting.time(detail.workout.time, tenths: true), systemImage: "timer")
-            MetricTile(title: "Pace", value: RowPlayFormatting.pace(detail.workout.pace), systemImage: "speedometer")
-            MetricTile(title: "Cadence", value: "\(cadenceText) \(detail.workout.sport.cadenceUnit)", systemImage: "metronome")
-            MetricTile(title: "Watts", value: wattsText, systemImage: "bolt")
-        }
-    }
-
-    @ViewBuilder
-    private var replayButton: some View {
-        if detail.workout.hasStrokeData {
-            Button(action: onReplay) {
-                Label("Replay Workout", systemImage: "play.rectangle.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+        HStack(alignment: .top, spacing: 0) {
+            performanceMetric(
+                "Distance",
+                RowPlayFormatting.distance(detail.workout.distance, unit: unit),
+                color: AppDesign.MetricColor.distance
+            )
+            performanceMetric(
+                "Time",
+                RowPlayFormatting.time(detail.workout.time, tenths: true),
+                color: .primary
+            )
+            performanceMetric(
+                "Pace /500m",
+                RowPlayFormatting.time(detail.workout.pace, tenths: true),
+                color: AppDesign.MetricColor.pace,
+                accessibilityLabel: "Average Pace",
+                accessibilityValue: RowPlayFormatting.pace(detail.workout.pace)
+            )
+            performanceMetric(
+                "Avg Cadence",
+                "\(cadenceText) \(detail.workout.sport.cadenceUnit)",
+                color: AppDesign.MetricColor.cadence
+            )
+            performanceMetric(
+                "Avg Power",
+                "\(wattsText) W",
+                color: AppDesign.MetricColor.watts
+            )
+            if let calories = detail.workout.caloriesTotal {
+                performanceMetric("Calories", "\(calories) Cal", color: .primary)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            if let heartRate = detail.workout.heartRateAvg {
+                performanceMetric(
+                    "Avg HR",
+                    "\(heartRate) bpm",
+                    color: AppDesign.MetricColor.heartRate
+                )
+            }
         }
+        .padding(.vertical, AppDesign.Spacing.large)
     }
 
-    @ViewBuilder
+    private func performanceMetric(
+        _ label: String,
+        _ value: String,
+        color: Color,
+        accessibilityLabel: String? = nil,
+        accessibilityValue: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
+            Text(label.uppercased())
+                .font(AppDesign.Typography.metricLabel)
+                .kerning(0.8)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(AppDesign.Typography.stripMetric)
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, AppDesign.Spacing.xLarge)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel ?? label)
+        .accessibilityValue(accessibilityValue ?? value)
+    }
+
     private var strokeChart: some View {
-        if detail.strokes.isEmpty {
-            ContentUnavailableView("No Stroke Detail", systemImage: "waveform.path.ecg", description: Text("This workout only has summary and split data."))
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Stroke Timeline")
-                    .font(.title3.weight(.semibold))
-
-                Chart(detail.strokes) { stroke in
-                    LineMark(
-                        x: .value("Time", stroke.t),
-                        y: .value("Pace", stroke.pace)
-                    )
-                    .foregroundStyle(.blue)
-
-                    LineMark(
-                        x: .value("Time", stroke.t),
-                        y: .value("Watts", Double(stroke.watts))
-                    )
-                    .foregroundStyle(.orange)
-                }
-                .chartXAxisLabel("seconds")
-                .frame(height: 260)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Stroke Timeline chart")
-            .accessibilityValue(strokeTimelineAccessibilityValue)
-        }
-    }
-
-    private var strokeTimelineAccessibilityValue: String {
-        "\(strokeSummary.count) strokes, avg pace \(RowPlayFormatting.pace(strokeSummary.averagePace)), avg watts \(Int(strokeSummary.averageWatts))"
+        WorkoutStrokeAnalysisView(
+            detail: detail,
+            detailsRevision: detailsRevision,
+            strokeSummary: strokeSummary,
+            unit: unit
+        )
     }
 
     private var splitTable: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text(detail.workout.isInterval ? "Intervals" : "Splits")
-                .font(.title3.weight(.semibold))
+                .font(AppDesign.Typography.sectionHeadline)
 
-            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.large) {
                 GridRow {
-                    Text("#").foregroundStyle(.secondary)
-                    Text("Distance").foregroundStyle(.secondary)
-                    Text("Time").foregroundStyle(.secondary)
-                    Text("Pace").foregroundStyle(.secondary)
-                    Text(detail.workout.sport.cadenceUnit).foregroundStyle(.secondary)
-                    Text("HR").foregroundStyle(.secondary)
+                    tableHeader("Split")
+                    tableHeader("Distance")
+                    tableHeader("Time")
+                    tableHeader("Pace (/500m)")
+                    tableHeader(detail.workout.sport.cadenceUnit)
+                    tableHeader("Power (W)")
+                    tableHeader("HR")
                 }
-                .font(.caption.weight(.semibold))
 
                 ForEach(detail.splits) { split in
                     GridRow {
@@ -150,15 +195,30 @@ struct WorkoutDetailView: View {
                         Text(RowPlayFormatting.distance(split.distance, unit: unit))
                         Text(RowPlayFormatting.time(split.time, tenths: true))
                         Text(RowPlayFormatting.pace(split.pace))
+                            .foregroundStyle(AppDesign.MetricColor.pace)
                         Text(split.cadence.map { String(Int($0.rounded())) } ?? "-")
+                            .foregroundStyle(AppDesign.MetricColor.cadence)
+                        Text(splitPower(split))
+                            .foregroundStyle(AppDesign.MetricColor.watts)
                         Text(split.heartRate?.average.map(String.init) ?? "-")
                     }
-                    Divider()
-                        .gridCellColumns(6)
+                    .monospacedDigit()
                 }
             }
             .font(.callout)
         }
+        .padding(.vertical, AppDesign.Spacing.xLarge)
+    }
+
+    private func tableHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(AppDesign.Typography.metricLabel)
+            .kerning(0.8)
+            .foregroundStyle(.secondary)
+    }
+
+    private func splitPower(_ split: Split) -> String {
+        Self.powerText(for: detail.workout.sport, pace: split.pace)
     }
 
     private var cadenceText: String {
@@ -166,6 +226,13 @@ struct WorkoutDetailView: View {
     }
 
     private var wattsText: String {
-        String(Int(RowPlayFormatting.paceToWatts(for: detail.workout.sport, pacePer500m: detail.workout.pace).rounded()))
+        Self.powerText(for: detail.workout.sport, pace: detail.workout.pace)
+    }
+
+    static func powerText(for sport: Sport, pace: TimeInterval) -> String {
+        guard pace.isFinite, pace > 0 else { return "-" }
+        let watts = RowPlayFormatting.paceToWatts(for: sport, pacePer500m: pace)
+        guard watts.isFinite, watts >= 0, watts <= 100_000 else { return "-" }
+        return String(Int(watts.rounded()))
     }
 }

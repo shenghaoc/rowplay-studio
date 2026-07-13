@@ -17,16 +17,16 @@ struct WorkoutToolSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text(title)
-                .font(.headline)
+                .font(AppDesign.Typography.sectionHeadline)
                 .accessibilityAddTraits(.isHeader)
 
             content
         }
-        .padding(12)
+        .padding(AppDesign.Spacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
         .accessibilityElement(children: .contain)
     }
 }

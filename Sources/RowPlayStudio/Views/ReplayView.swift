@@ -12,6 +12,9 @@ struct ReplayView: View {
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
+    @State private var strokePath = Path()
+    @State private var canvasSize: CGSize = .zero
+    @State private var cachedMachineColor: Color = .accentColor
 
     private var unit: DistanceUnit { preferences.distanceUnit }
     private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
@@ -55,6 +58,7 @@ struct ReplayView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .frame(maxWidth: 140)
             Spacer()
         }
@@ -110,34 +114,29 @@ struct ReplayView: View {
 
     private var replayCanvas: some View {
         Canvas { context, size in
-            drawStrokePath(in: &context, size: size)
+            context.stroke(strokePath, with: .color(cachedMachineColor.opacity(0.7)), lineWidth: 2)
             drawPlayhead(in: &context, size: size)
         }
         .accessibilityLabel("Workout replay timeline")
-    }
-
-    private func drawStrokePath(in context: inout GraphicsContext, size: CGSize) {
-        let strokes = detail.strokes
-        guard strokes.count > 1 else { return }
-
-        let originT = strokes[0].t
-        let maxT = strokes.last?.t ?? originT
-        let duration = maxT - originT
-        let maxD = strokes.last?.d ?? 1
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
-
-        var path = Path()
-        for (i, stroke) in strokes.enumerated() {
-            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
-            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
-            if i == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: proxy.size, initial: true) { _, newSize in
+                        canvasSize = newSize
+                        strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
+                    }
             }
+        )
+        .onAppear {
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
         }
-
-        context.stroke(path, with: .color(machineColor.opacity(0.7)), lineWidth: 2)
+        .onChange(of: colorScheme) { _, scheme in
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: scheme)
+        }
+        .onChange(of: detail.id) { _, _ in
+            strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
+        }
     }
 
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
@@ -152,7 +151,8 @@ struct ReplayView: View {
         var playhead = Path()
         playhead.move(to: CGPoint(x: x, y: 0))
         playhead.addLine(to: CGPoint(x: x, y: size.height))
-        context.stroke(playhead, with: .color(.red), lineWidth: 1)
+        let playheadColor = AppDesign.alertRed
+        context.stroke(playhead, with: .color(playheadColor), lineWidth: 1)
 
         let dotSize: CGFloat = 8
         let dot = Path(ellipseIn: CGRect(
@@ -161,7 +161,7 @@ struct ReplayView: View {
             width: dotSize,
             height: dotSize
         ))
-        context.fill(dot, with: .color(.red))
+        context.fill(dot, with: .color(playheadColor))
     }
 
     private func unitFraction(_ numerator: Double, denominator: Double) -> CGFloat {
@@ -169,20 +169,43 @@ struct ReplayView: View {
         return CGFloat(max(0, min(1, numerator / denominator)))
     }
 
+    /// Precomputes the full stroke trail path so the Canvas draw closure only strokes it.
+    func makeStrokePath(strokes: [Stroke], size: CGSize) -> Path {
+        guard strokes.count > 1 else { return Path() }
+
+        let originT = strokes[0].t
+        let maxT = strokes.last?.t ?? originT
+        let maxD = strokes.last?.d ?? 1
+        let duration = maxT - originT
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
+
+        var path = Path()
+        for (i, stroke) in strokes.enumerated() {
+            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
+            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
+            if i == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        return path
+    }
+
     // MARK: - Telemetry
 
     private var telemetryBar: some View {
-        HStack(spacing: 16) {
-            TelemetryItem(label: "Time", value: RowPlayFormatting.time(state.currentFrame.t, tenths: true))
-            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d, unit: unit))
-            TelemetryItem(label: "Pace", value: RowPlayFormatting.pace(state.currentFrame.pace))
-            TelemetryItem(label: detail.workout.sport.cadenceUnit, value: cadenceText)
-            TelemetryItem(label: "Watts", value: "\(state.currentFrame.watts)")
+        HStack(spacing: AppDesign.Spacing.xLarge) {
+            TelemetryItem(label: "Time", value: RowPlayFormatting.time(state.currentFrame.t, tenths: true), color: AppDesign.MetricColor.duration)
+            TelemetryItem(label: "Distance", value: RowPlayFormatting.distance(state.currentFrame.d, unit: unit), color: AppDesign.MetricColor.distance)
+            TelemetryItem(label: "Pace", value: RowPlayFormatting.pace(state.currentFrame.pace), color: AppDesign.MetricColor.pace)
+            TelemetryItem(label: detail.workout.sport.cadenceUnit, value: cadenceText, color: AppDesign.MetricColor.cadence)
+            TelemetryItem(label: "Watts", value: "\(state.currentFrame.watts)", color: AppDesign.MetricColor.watts)
             if let hr = state.currentFrame.heartRate {
-                TelemetryItem(label: "HR", value: "\(hr)")
+                TelemetryItem(label: "HR", value: "\(hr)", color: AppDesign.MetricColor.heartRate)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, AppDesign.Spacing.medium)
         .padding(.horizontal)
         .background(.ultraThinMaterial)
     }
@@ -192,8 +215,8 @@ struct ReplayView: View {
         return String(Int(state.currentFrame.cadence.rounded()))
     }
 
-    private var machineColor: Color {
-        let color = ReplaySportThemeLookup.machineColor(for: detail.workout.sport)
+    static func machineColor(for sport: Sport, colorScheme: ColorScheme) -> Color {
+        let color = ReplaySportThemeLookup.machineColor(for: sport)
         return Color(hex: colorScheme == .dark ? color.dark : color.light)
     }
 
@@ -202,14 +225,13 @@ struct ReplayView: View {
     private var playbackControls: some View {
         let playPauseLabel: LocalizedStringKey = state.playing ? "Pause replay" : "Play replay"
 
-        return HStack(spacing: 16) {
-            Button(action: { state.toggle() }) {
-                Image(systemName: state.playing ? "pause.fill" : "play.fill")
-                    .font(.title2)
-            }
-            .accessibilityLabel(playPauseLabel)
-            .help(playPauseLabel)
-            .keyboardShortcut(.space, modifiers: [])
+        return HStack(spacing: AppDesign.Spacing.xLarge) {
+            PlayPauseButton(isPlaying: state.playing, action: { state.toggle() })
+                .accessibilityLabel(playPauseLabel)
+                #if os(macOS)
+                .help(playPauseLabel)
+                #endif
+                .keyboardShortcut(.space, modifiers: [])
 
             Slider(
                 value: Binding(
@@ -221,6 +243,7 @@ struct ReplayView: View {
                     if isEditing { state.pause() }
                 }
             )
+            .tint(AppDesign.MetricColor.pace)
             .accessibilityLabel("Replay progress")
             .accessibilityValue("\(RowPlayFormatting.time(state.time, tenths: true)) of \(RowPlayFormatting.time(state.duration, tenths: true))")
 
@@ -236,6 +259,35 @@ struct ReplayView: View {
             .frame(maxWidth: 200)
         }
         .padding()
+    }
+}
+
+// MARK: - Play/Pause Button
+
+private struct PlayPauseButton: View {
+    let isPlaying: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.title2)
+                .frame(width: 48, height: 48)
+                .background(
+                    Circle()
+                        .fill(isHovering ? Color.accentColor.opacity(0.16) : AppDesign.activeCardBackground)
+                )
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        #endif
     }
 }
 
@@ -256,14 +308,16 @@ enum ReplayPlaybackClock {
 private struct TelemetryItem: View {
     let label: String
     let value: String
+    var color: Color = .primary
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: AppDesign.Spacing.xxSmall) {
             Text(value)
-                .font(.system(.body, design: .monospaced).weight(.medium))
+                .font(AppDesign.Typography.metricValue.monospacedDigit())
+                .foregroundStyle(color)
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(AppDesign.Typography.compactLabel)
+                .foregroundStyle(.tertiary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)

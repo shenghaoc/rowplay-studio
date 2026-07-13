@@ -9,6 +9,7 @@ public final class Concept2SyncController: ObservableObject {
     @Published public private(set) var syncState: SyncState
     @Published public private(set) var isConnected: Bool
     @Published public private(set) var statusMessage: String?
+    @Published public private(set) var isLoading = false
 
     private let tokenStore: any TokenStore
     private let cacheFactory: CacheFactory
@@ -41,11 +42,14 @@ public final class Concept2SyncController: ObservableObject {
     }
 
     public var canSync: Bool {
-        isConnected && !syncState.inProgress
+        isConnected && !isLoading && !syncState.inProgress
     }
 
     public func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard !syncState.inProgress else { return }
+        guard !isLoading, !syncState.inProgress else { return }
+
+        isLoading = true
+        defer { isLoading = false }
 
         do {
             let cache = try resolvedCache()
@@ -87,7 +91,10 @@ public final class Concept2SyncController: ObservableObject {
     }
 
     public func syncNow(into library: WorkoutLibrary) async {
-        guard !syncState.inProgress else { return }
+        guard !isLoading, !syncState.inProgress else { return }
+
+        isLoading = true
+        defer { isLoading = false }
 
         do {
             guard let token = try tokenStore.loadToken(), !token.isEmpty else {

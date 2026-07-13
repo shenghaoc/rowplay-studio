@@ -1,11 +1,12 @@
-import AppKit
 import RowPlayCore
 import RowPlayPlatform
 import SwiftUI
 
 @main
 struct RowPlayStudioApp: App {
+    #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @StateObject private var preferences = AppPreferences()
     private let launchConfiguration: AppLaunchConfiguration
     @StateObject private var library: WorkoutLibrary
@@ -27,7 +28,9 @@ struct RowPlayStudioApp: App {
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
             ContentView(library: library)
+                #if os(macOS)
                 .frame(minWidth: 1_000, minHeight: 680)
+                #endif
                 .environmentObject(preferences)
                 .environmentObject(syncController)
                 .environment(\.automationModeEnabled, launchConfiguration.automationMode)
@@ -40,6 +43,7 @@ struct RowPlayStudioApp: App {
                     }
                 }
         }
+        #if os(macOS)
         .commands {
             SidebarCommands()
             CommandMenu("Workout") {
@@ -57,18 +61,24 @@ struct RowPlayStudioApp: App {
                     }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(syncController.syncState.inProgress)
+                .disabled(syncController.isLoading)
             }
         }
+        #endif
 
+        #if os(macOS)
         Settings {
             SettingsView()
                 .environmentObject(preferences)
                 .environmentObject(library)
                 .environmentObject(syncController)
         }
+        #endif
     }
 }
+
+#if os(macOS)
+import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -77,3 +87,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 }
+#endif

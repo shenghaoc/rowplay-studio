@@ -9,18 +9,19 @@ struct LiveModePanelView: View {
     private let demoTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             HStack {
-                Image(systemName: "dot.radiows.left.and.right")
-                    .foregroundStyle(library.liveState.status == .polling ? .green : .secondary)
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .foregroundStyle(library.liveState.status == .polling ? AppDesign.energeticGreen : .secondary)
                     .accessibilityHidden(true)
                 Text("Live Mode")
-                    .font(.headline)
+                    .font(AppDesign.Typography.sectionHeadline)
                 Spacer()
                 if library.liveState.hasWarning {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppDesign.warmYellow)
                         .help("\(library.liveState.consecutiveFailures) consecutive failures")
+                        .accessibilityHint("Shows the count of consecutive live polling failures")
                         .accessibilityLabel("\(library.liveState.consecutiveFailures) consecutive failures")
                 }
                 Toggle("Enable Live Mode", isOn: Binding(
@@ -43,8 +44,8 @@ struct LiveModePanelView: View {
                 statusSection
             }
         }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .padding(AppDesign.Spacing.large)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
         .onReceive(demoTimer) { date in
             library.advanceDemoLiveSampleIfDue(at: date)
         }
@@ -55,16 +56,16 @@ struct LiveModePanelView: View {
     @ViewBuilder
     private var sampleSection: some View {
         if let sample = library.liveSample {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
+                HStack(spacing: AppDesign.Spacing.medium) {
                     Image(systemName: sample.sport.iconName)
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
                         Text(sample.sport.displayName)
-                            .font(.subheadline.weight(.medium))
-                        Text("Mock workout")
-                            .font(.caption)
+                            .font(AppDesign.Typography.metricValue)
+                        Text("Demo sample")
+                            .font(AppDesign.Typography.compactLabel)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -75,22 +76,23 @@ struct LiveModePanelView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Refresh demo sample")
+                    .accessibilityHint("Advances to the next simulated live telemetry sample")
                     .accessibilityLabel("Refresh demo sample")
                 }
 
-                HStack(spacing: 16) {
-                    sampleMetric("Distance", RowPlayFormatting.distance(sample.distance, unit: preferences.distanceUnit))
-                    sampleMetric("Time", RowPlayFormatting.time(sample.time, tenths: true))
-                    sampleMetric("Pace", RowPlayFormatting.pace(sample.pace))
-                    sampleMetric("Rate", "\(Int(sample.strokeRate.rounded())) \(sample.sport.cadenceUnit)")
+                HStack(spacing: AppDesign.Spacing.xLarge) {
+                    sampleMetric("Distance", RowPlayFormatting.distance(sample.distance, unit: preferences.distanceUnit), color: AppDesign.MetricColor.distance)
+                    sampleMetric("Time", RowPlayFormatting.time(sample.time, tenths: true), color: AppDesign.MetricColor.duration)
+                    sampleMetric("Pace", RowPlayFormatting.pace(sample.pace), color: AppDesign.MetricColor.pace)
+                    sampleMetric("Rate", "\(Int(sample.strokeRate.rounded())) \(sample.sport.cadenceUnit)", color: AppDesign.MetricColor.cadence)
                     if let heartRate = sample.heartRateAvg {
-                        sampleMetric("HR", "\(heartRate) bpm")
+                        sampleMetric("HR", "\(heartRate) bpm", color: AppDesign.MetricColor.heartRate)
                     }
                 }
             }
         } else {
-            Text("Waiting for mock workout")
-                .font(.caption)
+            Text("Waiting for simulated workout")
+                .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
         }
     }
@@ -98,12 +100,12 @@ struct LiveModePanelView: View {
     // MARK: - Interval Picker
 
     private var intervalPicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
             Text("Polling Interval")
-                .font(.caption)
+                .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 4) {
+            HStack(spacing: AppDesign.Spacing.xSmall) {
                 ForEach(liveIntervals, id: \.self) { sec in
                     Button(intervalLabel(sec)) {
                         library.setLiveInterval(sec)
@@ -120,50 +122,50 @@ struct LiveModePanelView: View {
 
     @ViewBuilder
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.xSmall) {
             Divider()
 
             if library.liveState.status == .polling {
-                HStack(spacing: 6) {
+                HStack(spacing: AppDesign.Spacing.small) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Polling...")
-                        .font(.caption)
-                        .foregroundStyle(.green)
+                    Text("Polling for telemetry…")
+                        .font(AppDesign.Typography.compactLabel)
+                        .foregroundStyle(AppDesign.energeticGreen)
                 }
             } else {
                 HStack {
                     Text("Last poll")
-                        .font(.caption)
+                        .font(AppDesign.Typography.compactLabel)
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let last = library.liveState.lastPollAt {
                         Text(last, style: .time)
-                            .font(.caption.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     } else {
                         Text("—")
-                            .font(.caption.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     }
                 }
                 HStack {
                     Text("Next poll")
-                        .font(.caption)
+                        .font(AppDesign.Typography.compactLabel)
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let next = library.liveState.nextPollAt {
                         Text(next, style: .timer)
-                            .font(.caption.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     } else {
                         Text("—")
-                            .font(.caption.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     }
                 }
             }
 
             if library.liveState.status == .error {
-                Text("Polling error — retrying with backoff")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                Text("Polling error — retrying automatically")
+                    .font(AppDesign.Typography.compactLabel)
+                    .foregroundStyle(AppDesign.alertRed)
             }
         }
     }
@@ -175,13 +177,14 @@ struct LiveModePanelView: View {
         return "\(sec / 60)m"
     }
 
-    private func sampleMetric(_ label: LocalizedStringKey, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func sampleMetric(_ label: LocalizedStringKey, _ value: String, color: Color = .primary) -> some View {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
             Text(label)
-                .font(.caption2)
+                .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.caption.monospacedDigit())
+                .font(AppDesign.Typography.metricLabel.monospacedDigit())
+                .foregroundStyle(color)
         }
         .frame(minWidth: 64, alignment: .leading)
         .accessibilityElement(children: .ignore)

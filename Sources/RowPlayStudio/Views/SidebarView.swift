@@ -22,8 +22,9 @@ struct SidebarView: View {
             } header: {
                 HStack {
                     Text("\(filteredDetails.count) workouts")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppDesign.Typography.compactLabel)
+                        .foregroundStyle(.tertiary)
+                        .textCase(.uppercase)
                     Spacer()
                     Menu {
                         ForEach(WorkoutSortField.allCases, id: \.self) { field in
@@ -40,12 +41,13 @@ struct SidebarView: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .font(.caption)
+                            .font(AppDesign.Typography.compactLabel)
                     }
                     .menuStyle(.borderlessButton)
                     .frame(width: 24)
                     .accessibilityLabel("Sort workouts")
                     .help("Sort workouts")
+                    .accessibilityHint("Change the sort order of the workout list")
                 }
             }
         }
@@ -92,49 +94,43 @@ private struct WorkoutSidebarRow: View {
 
     var body: some View {
         Label {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
+                HStack(spacing: AppDesign.Spacing.small) {
                     Text(workout.workoutType)
                         .lineLimit(1)
                     if isPB {
                         Text("PB")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 4)
+                            .font(AppDesign.Typography.compactLabel)
+                            .foregroundStyle(AppDesign.comparisonOrange)
+                            .padding(.horizontal, AppDesign.Spacing.xSmall)
                             .padding(.vertical, 1)
-                            .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
+                            .background(AppDesign.comparisonOrange.opacity(0.15), in: Capsule())
                             .accessibilityLabel("Personal Best")
                     }
                 }
-                HStack(spacing: 4) {
-                    Text(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day())
-                        .font(.caption)
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                    Text(RowPlayFormatting.distance(workout.distance, unit: distanceUnit))
-                        .font(.caption)
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                    Text(RowPlayFormatting.time(workout.time))
-                        .font(.caption)
-                    Text("·")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
+                HStack(spacing: AppDesign.Spacing.small) {
+                    HStack(spacing: AppDesign.Spacing.xSmall) {
+                        Text(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day())
+                        Text(RowPlayFormatting.distance(workout.distance, unit: distanceUnit))
+                    }
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                    Spacer(minLength: AppDesign.Spacing.medium)
+
                     Text(RowPlayFormatting.pace(workout.pace))
-                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                        .layoutPriority(1)
                 }
-                .foregroundStyle(.secondary)
+                .font(AppDesign.Typography.metricLabel)
                 .lineLimit(1)
             }
         } icon: {
             Image(systemName: workout.sport.iconName)
                 .foregroundStyle(.secondary)
         }
+        .padding(.vertical, AppDesign.Spacing.xxSmall)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(workout.sport.displayName) \(workout.workoutType)\(isPB ? ", Personal Best" : "")"))
         .accessibilityValue(Text("\(workout.date, format: .dateTime.year(.twoDigits).month(.abbreviated).day()); \(RowPlayFormatting.distance(workout.distance, unit: distanceUnit)); \(RowPlayFormatting.time(workout.time)); \(RowPlayFormatting.pace(workout.pace))"))

@@ -269,6 +269,34 @@ final class Concept2SyncControllerTests: XCTestCase {
         XCTAssertNil(controller.statusMessage)
     }
 
+    func testLoadCachedWorkoutsRejectsOverlappingLibraryOperations() async {
+        let cache = BlockingListWorkoutCache()
+        let controller = Concept2SyncController(
+            tokenStore: FakeTokenStore(storedToken: "test-token"),
+            cacheFactory: { cache },
+            clientFactory: { _ in MockConcept2Client(details: []) }
+        )
+        let library = WorkoutLibrary(details: [], defaults: defaults)
+
+        let firstLoad = Task { @MainActor in
+            await controller.loadCachedWorkouts(into: library)
+        }
+        await cache.waitUntilListStarted()
+
+        XCTAssertTrue(controller.isLoading)
+        XCTAssertFalse(controller.canSync)
+
+        await controller.loadCachedWorkouts(into: library)
+        let listCallCount = await cache.listCallCount()
+        XCTAssertEqual(listCallCount, 1)
+
+        await cache.releaseList()
+        await firstLoad.value
+
+        XCTAssertFalse(controller.isLoading)
+        XCTAssertTrue(controller.canSync)
+    }
+
     func testDisconnectAfterRelaunchMigratesAndDeletesSQLiteCache() async throws {
         let detail = makeDetail(id: 99)
         let cachePath = temporarySQLitePath()
@@ -631,6 +659,75 @@ private final class ListFailingWorkoutCache: WorkoutCache {
     func listWorkouts() async throws -> [Workout] { throw ListError.intentional }
     func delete(id: Workout.ID) async throws { try await wrapped.delete(id: id) }
     func deleteAll() async throws { try await wrapped.deleteAll() }
+}
+
+private actor BlockingListWorkoutCache: WorkoutCache {
+    private let wrapped = InMemoryWorkoutCache()
+    private var listCalls = 0
+    private var listStartedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var listReleaseContinuation: CheckedContinuation<Void, Never>?
+    private var listReleased = false
+
+    nonisolated func migrate() throws {}
+
+    func save(detail: WorkoutDetail) async throws {
+        try await wrapped.save(detail: detail)
+    }
+
+    func save(details: [WorkoutDetail]) async throws {
+        try await wrapped.save(details: details)
+    }
+
+    func saveWorkouts(_ workouts: [Workout]) async throws {
+        try await wrapped.saveWorkouts(workouts)
+    }
+
+    func detail(id: Workout.ID) async throws -> WorkoutDetail? {
+        try await wrapped.detail(id: id)
+    }
+
+    func details(for ids: [Workout.ID]) async throws -> [Workout.ID: WorkoutDetail] {
+        try await wrapped.details(for: ids)
+    }
+
+    func listWorkouts() async throws -> [Workout] {
+        listCalls += 1
+        listStartedWaiters.forEach { $0.resume() }
+        listStartedWaiters.removeAll()
+
+        if !listReleased {
+            await withCheckedContinuation { continuation in
+                listReleaseContinuation = continuation
+            }
+        }
+
+        return try await wrapped.listWorkouts()
+    }
+
+    func delete(id: Workout.ID) async throws {
+        try await wrapped.delete(id: id)
+    }
+
+    func deleteAll() async throws {
+        try await wrapped.deleteAll()
+    }
+
+    func waitUntilListStarted() async {
+        guard listCalls == 0 else { return }
+        await withCheckedContinuation { continuation in
+            listStartedWaiters.append(continuation)
+        }
+    }
+
+    func listCallCount() -> Int {
+        listCalls
+    }
+
+    func releaseList() {
+        listReleased = true
+        listReleaseContinuation?.resume()
+        listReleaseContinuation = nil
+    }
 }
 
 /// An AnnotationStore that throws from deleteAll to test cleanup failure reporting.

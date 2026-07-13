@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-13T16:00:00.000Z",
+  "title": "Design System: RowPlay Studio",
+  "extensions": {
+    "colorMeta": {
+      "monitor-blue": {
+        "role": "primary",
+        "displayName": "Monitor Blue",
+        "canonical": "#0066CC",
+        "canonicalDark": "#0A84FF",
+        "tonalRamp": [
+          "#001a33", "#003366", "#004d99", "#0066CC",
+          "#1a80e6", "#4d9fff", "#80bfff", "#b3d9ff"
+        ],
+        "purpose": "Distance metrics, primary actions, accent color. The PM5's signature blue."
+      },
+      "split-orange": {
+        "role": "accent",
+        "displayName": "Split Orange",
+        "canonical": "#9A5700",
+        "canonicalDark": "#FF9F0A",
+        "tonalRamp": [
+          "#4d2b00", "#663a00", "#804800", "#9A5700",
+          "#b36e1a", "#cc8533", "#e6a34d", "#ffc066"
+        ],
+        "purpose": "Watts, speed, split time. The amber of a PM5 split display."
+      },
+      "green-zone-green": {
+        "role": "accent",
+        "displayName": "Green Zone Green",
+        "canonical": "#137333",
+        "canonicalDark": "#30D158",
+        "tonalRamp": [
+          "#0a3919", "#0d4d22", "#10662d", "#137333",
+          "#2d8c4d", "#47a666", "#61bf80", "#7bd999"
+        ],
+        "purpose": "Positive deltas, target zone indicators, success states."
+      },
+      "red-zone-red": {
+        "role": "accent",
+        "displayName": "Red Zone Red",
+        "canonical": "#B3261E",
+        "canonicalDark": "#FF453A",
+        "tonalRamp": [
+          "#59130f", "#731a15", "#8c201a", "#B3261E",
+          "#c4403a", "#d45a55", "#e57570", "#f5908b"
+        ],
+        "purpose": "Heart rate metrics, negative deltas, finish markers."
+      },
+      "cadence-violet": {
+        "role": "accent",
+        "displayName": "Cadence Violet",
+        "canonical": "#7B2CBF",
+        "canonicalDark": "#BF5AF2",
+        "tonalRamp": [
+          "#3d1660", "#521d80", "#67249f", "#7B2CBF",
+          "#9445d1", "#ad5fe3", "#c679f5", "#df93ff"
+        ],
+        "purpose": "Cadence, stroke rate, secondary rhythm metrics."
+      },
+      "caution-amber": {
+        "role": "accent",
+        "displayName": "Caution Amber",
+        "canonical": "#7A5A00",
+        "canonicalDark": "#FFD60A",
+        "tonalRamp": [
+          "#3d2d00", "#523d00", "#664d00", "#7A5A00",
+          "#94701a", "#ad8633", "#c69c4d", "#e0b266"
+        ],
+        "purpose": "Warning states, active indicators, sync-in-progress."
+      },
+      "duration-teal": {
+        "role": "primary",
+        "displayName": "Duration Teal",
+        "canonical": "#007A99",
+        "canonicalDark": "#64D2FF",
+        "tonalRamp": [
+          "#003d4d", "#005266", "#006680", "#007A99",
+          "#1a94b3", "#33aecd", "#4dc8e6", "#66e2ff"
+        ],
+        "purpose": "Time and duration metrics. Cool and measured, distinct from Monitor Blue."
+      }
+    },
+    "typographyMeta": {
+      "hero": {
+        "displayName": "Hero Metric",
+        "purpose": "Primary metric value in summary cards. SF Pro Rounded bold, at most once per card."
+      },
+      "headline": {
+        "displayName": "Section Headline",
+        "purpose": "Panel titles and section headers. SF Pro semibold."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Supporting text and descriptions. SF Pro regular, max 65-75ch line length."
+      },
+      "metric": {
+        "displayName": "Metric Value",
+        "purpose": "Data values in badges and tiles. SF Pro semibold with monospacedDigit."
+      },
+      "label": {
+        "displayName": "Metric Label",
+        "purpose": "Labels beneath metric values. SF Pro medium, secondary text color."
+      },
+      "compact": {
+        "displayName": "Compact",
+        "purpose": "Tight spaces: sidebar badges, comparison deltas, timestamps."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default macOS easing for state transitions and navigation."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Metric Tile",
+      "kind": "card",
+      "refersTo": "metric-tile",
+      "description": "Dashboard summary card displaying one headline metric with icon and label.",
+      "html": "<div class=\"ds-metric-tile\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#0066CC\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg><span class=\"ds-metric-tile-value\">42.5 km</span><span class=\"ds-metric-tile-label\">Distance</span></div>",
+      "css": ".ds-metric-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); } .ds-metric-tile-value { font-family: 'SF Pro Rounded', system-ui; font-size: 28px; font-weight: 700; color: #0066CC; font-variant-numeric: tabular-nums; } .ds-metric-tile-label { font-family: 'SF Pro', system-ui; font-size: 11px; font-weight: 500; color: rgba(0, 0, 0, 0.5); }"
+    },
+    {
+      "name": "Card Panel",
+      "kind": "card",
+      "refersTo": "card-panel",
+      "description": "Chart container with section headline. Used for chart panels in dashboard.",
+      "html": "<div class=\"ds-card-panel\"><h3 class=\"ds-card-panel-title\">Distance by Sport</h3><div class=\"ds-card-panel-content\">Chart content</div></div>",
+      "css": ".ds-card-panel { padding: 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.03); } .ds-card-panel-title { font-family: 'SF Pro', system-ui; font-size: 15px; font-weight: 600; color: rgba(0, 0, 0, 0.85); margin: 0 0 12px 0; } .ds-card-panel-content { font-family: 'SF Pro', system-ui; font-size: 13px; color: rgba(0, 0, 0, 0.6); }"
+    },
+    {
+      "name": "Personal Best Card",
+      "kind": "card",
+      "refersTo": "card-material",
+      "description": "Material-backed card for personal best entries. Sport icon, distance label, time, pace, date.",
+      "html": "<div class=\"ds-pb-card\"><div class=\"ds-pb-card-header\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"rgba(0,0,0,0.4)\" stroke-width=\"2\"><path d=\"M5 12h14\"/></svg><span class=\"ds-pb-card-label\">2k RowErg</span></div><span class=\"ds-pb-card-time\">7:12.3</span><span class=\"ds-pb-card-pace\">1:48.0/500m</span><span class=\"ds-pb-card-date\">Jul 2026</span></div>",
+      "css": ".ds-pb-card { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); } .ds-pb-card-header { display: flex; align-items: center; gap: 6px; font-family: 'SF Pro', system-ui; font-size: 10px; font-weight: 500; } .ds-pb-card-label { color: rgba(0, 0, 0, 0.4); } .ds-pb-card-time { font-family: 'SF Pro', system-ui; font-size: 18px; font-weight: 600; color: #007A99; font-variant-numeric: tabular-nums; } .ds-pb-card-pace { font-family: 'SF Pro', system-ui; font-size: 10px; font-weight: 500; color: #0066CC; } .ds-pb-card-date { font-family: 'SF Pro', system-ui; font-size: 10px; font-weight: 500; color: rgba(0, 0, 0, 0.25); }"
+    },
+    {
+      "name": "Segmented Picker",
+      "kind": "input",
+      "refersTo": "segmented-picker",
+      "description": "Sport filter segmented control in toolbar. Four segments: All, RowErg, SkiErg, BikeErg.",
+      "html": "<div class=\"ds-segmented\"><button class=\"ds-segmented-btn selected\">All</button><button class=\"ds-segmented-btn\">RowErg</button><button class=\"ds-segmented-btn\">SkiErg</button><button class=\"ds-segmented-btn\">BikeErg</button></div>",
+      "css": ".ds-segmented { display: inline-flex; border-radius: 6px; background: rgba(0, 0, 0, 0.06); padding: 2px; } .ds-segmented-btn { font-family: 'SF Pro', system-ui; font-size: 12px; font-weight: 500; padding: 4px 12px; border: none; border-radius: 4px; background: transparent; color: rgba(0, 0, 0, 0.6); cursor: pointer; transition: background 0.15s, color 0.15s; } .ds-segmented-btn.selected { background: white; color: rgba(0, 0, 0, 0.85); } .ds-segmented-btn:hover:not(.selected) { background: rgba(0, 0, 0, 0.04); }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "refersTo": "empty-state",
+      "description": "Actionable centered state shown when no workouts exist in the library.",
+      "html": "<div class=\"ds-empty-state\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"48\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"rgba(0,0,0,0.2)\" stroke-width=\"1.5\"><circle cx=\"12\" cy=\"7\" r=\"4\"/><path d=\"M5.5 21c0-4.5 3-7 6.5-7s6.5 2.5 6.5 7\"/><path d=\"M5 3l4 4M3 5l2-2\"/></svg><h3 class=\"ds-empty-title\">Ready When You Are</h3><p class=\"ds-empty-desc\">Enable Demo Mode to explore sample workouts, or connect your Concept2 logbook in Settings.</p><button>Enable Demo Mode</button><button>Open Settings</button></div>",
+      "css": ".ds-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 64px 24px; text-align: center; } .ds-empty-title { font-family: 'SF Pro', system-ui; font-size: 17px; font-weight: 600; color: rgba(0,0,0,0.6); margin: 0; } .ds-empty-desc { font-family: 'SF Pro', system-ui; font-size: 13px; color: rgba(0,0,0,0.4); max-width: 320px; margin: 0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Erg Display",
+    "overview": "RowPlay Studio channels the clarity of the Concept2 PM5 performance monitor — a display designed for one purpose: showing athletes their numbers without distraction. The design is clean and focused, with color serving meaning rather than decoration. Every hue maps to a specific metric role, just as the PM5's LCD uses color sparingly. The system is intentionally flat with tonal layering; it rejects the Strava/Garmin fitness-app aesthetic entirely.",
+    "keyCharacteristics": [
+      "Metric-first: color, typography, and layout serve the numbers",
+      "Flat with tonal layering: macOS materials and opacity, no shadows",
+      "Semantic color: each color maps to exactly one metric domain",
+      "System-native: SF Pro as the single typeface",
+      "Quiet energy: color accents are deliberate and sparing"
+    ],
+    "rules": [
+      { "name": "The Metric Mapping Rule", "body": "Each color maps to exactly one metric domain. Never use Split Orange for distance or Monitor Blue for heart rate. The athlete builds muscle memory with these color associations.", "section": "colors" },
+      { "name": "The One Hero Rule", "body": "SF Pro Rounded appears on at most one element per card. If every number is rounded, none of them matter.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "No shadows, ever. Depth is tonal, not spatial. If a surface needs to feel elevated, use a more opaque macOS material.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Monitor Blue exclusively for distance, primary actions, and accent color",
+      "Do use Split Orange for watts, speed, and split time",
+      "Do use SF Pro Rounded only for hero metric values — at most one per card",
+      "Do keep surfaces flat with tonal layering via macOS materials and opacity",
+      "Do use monospacedDigit() for all numeric metric displays",
+      "Do provide accessibility labels and values on every metric tile"
+    ],
+    "donts": [
+      "Don't use dark or black backgrounds — avoid the Strava/Garmin aesthetic",
+      "Don't add social or gamified badge systems, challenge counters, or feed elements",
+      "Don't use gradient text, glassmorphism, or decorative blurs",
+      "Don't use the hero-metric template as a default card pattern",
+      "Don't add shadows to any surface",
+      "Don't cross-assign semantic colors between metric domains"
+    ]
+  }
+}

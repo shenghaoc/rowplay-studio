@@ -1,6 +1,7 @@
 import Charts
 import Foundation
 import RowPlayCore
+import RowPlayPlatform
 import SwiftUI
 
 struct WorkoutComparisonPanel: View {
@@ -8,16 +9,20 @@ struct WorkoutComparisonPanel: View {
     var detailsRevision: UInt64
     var candidates: [WorkoutDetail]
 
+    @EnvironmentObject private var preferences: AppPreferences
     @State private var selectedCandidateID: Int?
     @State private var overlayPoints: [CompareOverlayPoint] = []
+    @State private var overlayPaceDomain: ClosedRange<Double> = -180 ... -60
 
     var body: some View {
-        WorkoutToolSection("Compare") {
+        let candidateIDs = candidates.map(\.id)
+
+        return WorkoutToolSection("Compare") {
             if candidates.isEmpty {
                 ContentUnavailableView("No Comparable Workouts", systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: AppDesign.Spacing.xLarge) {
                     Picker("Compare With", selection: candidateSelection) {
                         ForEach(candidates) { candidate in
                             candidateLabel(candidate)
@@ -25,12 +30,13 @@ struct WorkoutComparisonPanel: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: 360, alignment: .leading)
+                    .frame(minWidth: 420, maxWidth: 480, alignment: .leading)
 
                     if let candidate = selectedCandidate {
                         let verdict = WorkoutComparison.compareVerdict(detail, candidate)
                         Label(verdictText(verdict), systemImage: verdictIcon(verdict))
-                            .font(.headline)
+                            .font(AppDesign.Typography.sectionHeadline)
+                            .foregroundStyle(verdictColor(verdict))
 
                         statsGrid(candidate: candidate)
 
@@ -41,7 +47,7 @@ struct WorkoutComparisonPanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onAppear(perform: alignSelection)
-                .onChange(of: candidates.map(\.id)) { _, _ in
+                .onChange(of: candidateIDs) { _, _ in
                     alignSelection()
                 }
                 .onChange(of: detail.id) { _, _ in
@@ -53,6 +59,7 @@ struct WorkoutComparisonPanel: View {
                     guard !Task.isCancelled else { return }
                     guard let selectedCandidate else {
                         overlayPoints = []
+                        overlayPaceDomain = -180 ... -60
                         return
                     }
                     let points = makeOverlayPoints(
@@ -61,6 +68,7 @@ struct WorkoutComparisonPanel: View {
                     )
                     guard !Task.isCancelled else { return }
                     overlayPoints = points
+                    overlayPaceDomain = Self.paceChartDomain(for: points.map(\.pace))
                 }
             }
         }
@@ -100,6 +108,15 @@ struct WorkoutComparisonPanel: View {
             return candidateIDs.first
         }
         return current
+    }
+
+    static func paceChartDomain(for paces: [Double]) -> ClosedRange<Double> {
+        let validPaces = paces.filter { $0.isFinite && $0 > 0 }
+        guard let fastest = validPaces.min(), let slowest = validPaces.max() else {
+            return -180 ... -60
+        }
+        let padding = max((slowest - fastest) * 0.12, 3)
+        return -(slowest + padding) ... -(fastest - padding)
     }
 
     // Keep the original FormatStyle behavior while reusing its value-type configuration.
@@ -156,13 +173,13 @@ struct WorkoutComparisonPanel: View {
         let current = WorkoutComparison.sideStats(detail)
         let comparison = WorkoutComparison.sideStats(candidate)
 
-        return Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 8) {
+        return Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.medium) {
             GridRow {
                 Text("Metric")
                 Text("Current")
                 Text("Comparison")
             }
-            .font(.caption.weight(.semibold))
+            .font(AppDesign.Typography.compactLabel)
             .foregroundStyle(.secondary)
 
             metricRow("Time", RowPlayFormatting.time(current.time, tenths: true), RowPlayFormatting.time(comparison.time, tenths: true))
@@ -191,18 +208,18 @@ struct WorkoutComparisonPanel: View {
     @ViewBuilder
     private func intervalRows(candidate: WorkoutDetail) -> some View {
         if let rows = WorkoutComparison.compareIntervalReps(detail, candidate), !rows.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                 Text("Intervals")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
-                Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: AppDesign.Spacing.xxxLarge, verticalSpacing: AppDesign.Spacing.small) {
                     GridRow {
                         Text("#")
                         Text("Current")
                         Text("Comparison")
                         Text("Delta")
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(AppDesign.Typography.compactLabel)
                     .foregroundStyle(.secondary)
 
                     ForEach(rows.prefix(8), id: \.index) { row in
@@ -211,11 +228,12 @@ struct WorkoutComparisonPanel: View {
                             Text(RowPlayFormatting.pace(row.paceA))
                             Text(RowPlayFormatting.pace(row.paceB))
                             Text("\(formatSigned(row.paceDelta)) sec/500m")
+                                .foregroundStyle(AppDesign.deltaColor(row.paceDelta, threshold: 0.1))
                         }
                         .monospacedDigit()
                     }
                 }
-                .font(.caption)
+                .font(AppDesign.Typography.compactLabel)
             }
         }
     }
@@ -223,22 +241,52 @@ struct WorkoutComparisonPanel: View {
     @ViewBuilder
     private func overlayChart(points: [CompareOverlayPoint]) -> some View {
         if !points.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                 Text("Pace Overlay")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppDesign.Typography.sectionHeadline)
 
                 Chart(points) { point in
                     LineMark(
-                        x: .value("Distance", point.distance),
-                        y: .value("Pace", point.pace)
+                        x: .value("Distance", chartDistance(point.distance)),
+                        y: .value("Pace", -point.pace)
                     )
                     .foregroundStyle(by: .value("Workout", point.series))
                 }
-                .chartXAxisLabel("metres")
-                .chartYAxisLabel("sec/500m")
-                .frame(height: 220)
+                .chartForegroundStyleScale([
+                    "Current": AppDesign.primaryBlue,
+                    "Comparison": AppDesign.comparisonOrange
+                ])
+                .chartXAxisLabel(distanceAxisLabel)
+                .chartYAxisLabel("Pace (/500m)")
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let seconds = value.as(Double.self) {
+                            AxisValueLabel(RowPlayFormatting.pace(abs(seconds)))
+                        }
+                    }
+                }
+                .chartYScale(domain: overlayPaceDomain)
+                .frame(height: AppDesign.Chart.height)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Pace comparison chart")
+                .accessibilityValue(overlayAccessibilityValue)
             }
         }
+    }
+
+    private func chartDistance(_ metres: Double) -> Double {
+        preferences.distanceUnit == .imperial ? metres / 1_609.344 : metres / 1_000
+    }
+
+    private var distanceAxisLabel: String {
+        preferences.distanceUnit == .imperial ? "Distance (mi)" : "Distance (km)"
+    }
+
+    private var overlayAccessibilityValue: String {
+        guard let selectedCandidate else { return "No comparison selected" }
+        return "Current average \(RowPlayFormatting.pace(detail.workout.pace)); comparison average \(RowPlayFormatting.pace(selectedCandidate.workout.pace))"
     }
 
     private func makeOverlayPoints(
@@ -252,6 +300,18 @@ struct WorkoutComparisonPanel: View {
             return []
         }
 
+        return overlayPoints(from: overlay)
+    }
+
+    private func verdictColor(_ verdict: CompareVerdict) -> Color {
+        switch verdict.winner {
+        case .a: return AppDesign.energeticGreen
+        case .b: return AppDesign.alertRed
+        case .tie: return .secondary
+        }
+    }
+
+    private func overlayPoints(from overlay: DistanceOverlay) -> [CompareOverlayPoint] {
         var points: [CompareOverlayPoint] = []
         for index in overlay.xs.indices {
             let distance = overlay.xs[index]

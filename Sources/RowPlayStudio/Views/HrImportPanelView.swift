@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import RowPlayCore
 import SwiftUI
@@ -11,23 +10,25 @@ struct HrImportPanelView: View {
     @State private var offsetSec: TimeInterval = 0
     @State private var statusMessage: String?
     @State private var errorMessage: String?
+    @State private var showImporter = false
 
     var body: some View {
         WorkoutToolSection("Heart Rate Import") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
+                HStack(spacing: AppDesign.Spacing.large) {
                     Stepper(value: $offsetSec, in: -600...600, step: 0.5) {
                         LabeledContent("Offset", value: "\(formatSigned(offsetSec)) s")
                             .monospacedDigit()
                     }
                     .frame(maxWidth: 260)
 
-                    Button(action: importSamples) {
+                    Button(action: { showImporter = true }) {
                         Label("Import HR Samples", systemImage: "heart.text.square")
                     }
                     .buttonStyle(.bordered)
                     .disabled(detail.strokes.isEmpty)
                     .help("Import JSON or CSV samples with elapsed seconds and heart rate columns")
+                    .accessibilityHint("Opens a file picker to select a heart rate data file")
                 }
 
                 if let statusMessage {
@@ -39,9 +40,17 @@ struct HrImportPanelView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .alert("HR Import Failed", isPresented: errorBinding) {
-            Button("OK", role: .cancel) {}
+            Button("Dismiss", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .commaSeparatedText, .plainText]) { result in
+            switch result {
+            case .success(let url):
+                importSamples(from: url)
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -55,14 +64,13 @@ struct HrImportPanelView: View {
         }
     }
 
-    private func importSamples() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.json, .commaSeparatedText, .plainText]
-        panel.title = "Import HR Samples"
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+    private func importSamples(from url: URL) {
+        let accessedSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessedSecurityScopedResource {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
 
         do {
             let samples = try loadSamples(from: url)

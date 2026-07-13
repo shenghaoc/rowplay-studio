@@ -9,10 +9,7 @@ struct WorkoutToolsView: View {
     var onUpdateDetail: (WorkoutDetail) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Workout Tools")
-                .font(.title3.weight(.semibold))
-
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.xLarge) {
             WorkoutFileActionsView(detail: detail)
 
             HrImportPanelView(

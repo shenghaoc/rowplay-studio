@@ -14,8 +14,8 @@ struct AnnotationPanelView: View {
 
     var body: some View {
         WorkoutToolSection("Annotations") {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
+                VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                     HStack {
                         LabeledContent("Timestamp", value: RowPlayFormatting.time(draftTimestamp, tenths: true))
                             .monospacedDigit()
@@ -38,15 +38,16 @@ struct AnnotationPanelView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(isDraftEmpty)
                     .help(isDraftEmpty ? "Enter text to save an annotation" : "Save annotation")
+                    .accessibilityHint(isDraftEmpty ? "Type annotation text before saving" : "Saves the annotation at the selected timestamp")
                 }
 
                 Divider()
 
                 if annotations.isEmpty {
-                    ContentUnavailableView("No Annotations", systemImage: "text.bubble")
+                    ContentUnavailableView("No Annotations Yet", systemImage: "text.bubble", description: Text("Add your first note at any point in the workout timeline."))
                         .frame(maxWidth: .infinity, minHeight: 100)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                         ForEach(annotations) { annotation in
                             AnnotationRowView(annotation: annotation) {
                                 delete(annotation)
@@ -64,7 +65,7 @@ struct AnnotationPanelView: View {
             draftTimestamp = min(max(draftTimestamp, 0), maxTimestamp)
         }
         .alert("Annotation Failed", isPresented: errorBinding) {
-            Button("OK", role: .cancel) {}
+            Button("Dismiss", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }
@@ -158,19 +159,19 @@ private struct AnnotationRowView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: AppDesign.Spacing.medium) {
             Text(RowPlayFormatting.time(annotation.timestamp, tenths: true))
-                .font(.caption.monospacedDigit().weight(.semibold))
+                .font(AppDesign.Typography.metricLabel.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 74, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
                 Text(annotation.text)
                     .font(.callout)
                     .textSelection(.enabled)
 
                 Text(createdAtText)
-                    .font(.caption2)
+                    .font(AppDesign.Typography.compactLabel)
                     .foregroundStyle(.tertiary)
             }
 
@@ -183,14 +184,15 @@ private struct AnnotationRowView: View {
             .accessibilityLabel("Delete annotation")
             .accessibilityValue("at \(RowPlayFormatting.time(annotation.timestamp, tenths: true))")
             .help("Delete annotation")
+            .accessibilityHint("Deletes this annotation after confirmation")
             .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive, action: onDelete)
-                Button("Cancel", role: .cancel) {}
+                Button("Keep", role: .cancel) {}
             } message: {
-                Text("Are you sure you want to delete this annotation? This action cannot be undone.")
+                Text("This annotation will be permanently deleted.")
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppDesign.Spacing.xSmall)
     }
 
     private var createdAtText: String {
