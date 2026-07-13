@@ -9,3 +9,7 @@
 ## 2024-11-20 - Non-Sendable Formatters in Swift 6
 **Learning:** `ISO8601DateFormatter` and `DateFormatter` are not `Sendable` and are not safe for concurrent `string(from:)` / `date(from:)` use. Caching them as bare `static let` (even with `nonisolated(unsafe)`) only silences the compiler; parallel exports can still race on the formatter's mutable internal state.
 **Action:** When caching mutable formatters for performance, wrap them in `Mutex` (see `Concept2Mapper.apiDateFormatter` and the `WorkoutExport` CSV formatters) and access via `withLock`. Prefer value-style formatters such as the `Date.ISO8601FormatStyle` values used by TCX export when they can produce the required format without a shared mutable instance or cross-export contention.
+
+## 2024-11-21 - FormatStyle Allocations in Hot Loops
+**Learning:** Using `Date.ISO8601FormatStyle` with `.formatted()` inside hot loops (like generating thousands of TCX trackpoints) implicitly instantiates a new formatter object under the hood for each call. This results in significant memory allocation overhead.
+**Action:** For hot loops that do not require localized auto-updating behavior (e.g. strict ISO8601 data serialization), prefer a statically cached `ISO8601DateFormatter`. Ensure it is wrapped in a `Mutex` to prevent concurrent modification issues since formatters are mutable and not Sendable.

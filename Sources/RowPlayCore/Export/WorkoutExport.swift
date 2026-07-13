@@ -15,17 +15,21 @@ public enum WorkoutExport: Sendable {
     // MARK: - Formatters (Performance Optimization)
     // Instantiating DateFormatter is expensive. Reuse static instances, but
     // guard access with Mutex because DateFormatter is mutable and non-Sendable.
-    // TCX uses immutable, Sendable ISO8601FormatStyle values so parallel exports
-    // do not contend on a shared formatter lock.
 
     /// Activity / lap timestamps: second-precision UTC ISO-8601.
-    private static let tcxISO8601Format = Date.ISO8601FormatStyle(timeZone: .gmt)
+    private static let tcxISO8601Formatter = Mutex({
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }())
 
     /// Trackpoint timestamps: fractional-second UTC ISO-8601.
-    private static let tcxISO8601FractionalFormat = Date.ISO8601FormatStyle(
-        includingFractionalSeconds: true,
-        timeZone: .gmt
-    )
+    private static let tcxISO8601FractionalFormatter = Mutex({
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }())
 
     private static let filenameDateFormatter = Mutex({
         let formatter = DateFormatter()
@@ -105,7 +109,7 @@ public enum WorkoutExport: Sendable {
     public static func tcx(_ detail: WorkoutDetail) -> String {
         let w = detail.workout
         let sportAttr: String = w.sport == .bike ? "Biking" : "Other"
-        let activityId = w.date.formatted(tcxISO8601Format)
+        let activityId = tcxISO8601Formatter.withLock { $0.string(from: w.date) }
         let calories = min(max(w.caloriesTotal ?? 0, 0), Int(UInt16.max))
 
         // Guard against non-finite workout summary values
@@ -191,7 +195,7 @@ public enum WorkoutExport: Sendable {
             guard stroke.t <= workoutDuration else { continue }
 
             let absoluteDate = w.date.addingTimeInterval(stroke.t)
-            let timeString = absoluteDate.formatted(tcxISO8601FractionalFormat)
+            let timeString = tcxISO8601FractionalFormatter.withLock { $0.string(from: absoluteDate) }
 
             // Deduplicate identical source timestamps without collapsing distinct
             // sub-second samples that happen within the same wall-clock second.
