@@ -95,7 +95,7 @@ struct ContentView: View {
                 } label: {
                     Label("Reload Workout Library", systemImage: "arrow.clockwise")
                 }
-                .disabled(syncController.syncState.inProgress)
+                .disabled(syncController.isLoading)
                 .keyboardShortcut("r", modifiers: .command)
             }
         }
@@ -110,7 +110,6 @@ struct ContentView: View {
                 detail: detail,
                 detailsRevision: library.detailsRevision,
                 strokeSummary: library.strokeSummary(for: detail.id),
-                summary: library.summary,
                 comparisonCandidates: library.comparisonCandidates(for: detail.id),
                 annotationStore: library.annotationStore,
                 onUpdateDetail: library.updateDetail,

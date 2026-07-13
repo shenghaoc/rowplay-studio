@@ -72,7 +72,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Disconnect", systemImage: "xmark.circle")
                     }
-                    .disabled(!syncController.isConnected || syncController.syncState.inProgress)
+                    .disabled(!syncController.isConnected || syncController.isLoading)
                 }
 
                 if syncController.syncState.inProgress {
@@ -80,6 +80,13 @@ struct SettingsView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text("Syncing with Concept2…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if syncController.isLoading {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading workout library…")
                             .foregroundStyle(.secondary)
                     }
                 } else if let statusMessage = syncController.statusMessage {

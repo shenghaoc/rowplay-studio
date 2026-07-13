@@ -91,7 +91,7 @@ struct LiveModePanelView: View {
                 }
             }
         } else {
-            Text("Waiting for mock workout")
+            Text("Waiting for simulated workout")
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
         }

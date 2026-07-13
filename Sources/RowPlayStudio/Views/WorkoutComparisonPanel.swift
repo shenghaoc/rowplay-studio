@@ -1,6 +1,7 @@
 import Charts
 import Foundation
 import RowPlayCore
+import RowPlayPlatform
 import SwiftUI
 
 struct WorkoutComparisonPanel: View {
@@ -8,8 +9,10 @@ struct WorkoutComparisonPanel: View {
     var detailsRevision: UInt64
     var candidates: [WorkoutDetail]
 
+    @EnvironmentObject private var preferences: AppPreferences
     @State private var selectedCandidateID: Int?
     @State private var overlayPoints: [CompareOverlayPoint] = []
+    @State private var overlayPaceDomain: ClosedRange<Double> = -180 ... -60
 
     var body: some View {
         let candidateIDs = candidates.map(\.id)
@@ -27,7 +30,7 @@ struct WorkoutComparisonPanel: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: 360, alignment: .leading)
+                    .frame(minWidth: 420, maxWidth: 480, alignment: .leading)
 
                     if let candidate = selectedCandidate {
                         let verdict = WorkoutComparison.compareVerdict(detail, candidate)
@@ -56,6 +59,7 @@ struct WorkoutComparisonPanel: View {
                     guard !Task.isCancelled else { return }
                     guard let selectedCandidate else {
                         overlayPoints = []
+                        overlayPaceDomain = -180 ... -60
                         return
                     }
                     let points = makeOverlayPoints(
@@ -64,6 +68,7 @@ struct WorkoutComparisonPanel: View {
                     )
                     guard !Task.isCancelled else { return }
                     overlayPoints = points
+                    overlayPaceDomain = Self.paceChartDomain(for: points.map(\.pace))
                 }
             }
         }
@@ -103,6 +108,15 @@ struct WorkoutComparisonPanel: View {
             return candidateIDs.first
         }
         return current
+    }
+
+    static func paceChartDomain(for paces: [Double]) -> ClosedRange<Double> {
+        let validPaces = paces.filter { $0.isFinite && $0 > 0 }
+        guard let fastest = validPaces.min(), let slowest = validPaces.max() else {
+            return -180 ... -60
+        }
+        let padding = max((slowest - fastest) * 0.12, 3)
+        return -(slowest + padding) ... -(fastest - padding)
     }
 
     // Keep the original FormatStyle behavior while reusing its value-type configuration.
@@ -233,8 +247,8 @@ struct WorkoutComparisonPanel: View {
 
                 Chart(points) { point in
                     LineMark(
-                        x: .value("Distance", point.distance),
-                        y: .value("Pace", point.pace)
+                        x: .value("Distance", chartDistance(point.distance)),
+                        y: .value("Pace", -point.pace)
                     )
                     .foregroundStyle(by: .value("Workout", point.series))
                 }
@@ -242,11 +256,37 @@ struct WorkoutComparisonPanel: View {
                     "Current": AppDesign.primaryBlue,
                     "Comparison": AppDesign.comparisonOrange
                 ])
-                .chartXAxisLabel("metres")
-                .chartYAxisLabel("sec/500m")
+                .chartXAxisLabel(distanceAxisLabel)
+                .chartYAxisLabel("Pace (/500m)")
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let seconds = value.as(Double.self) {
+                            AxisValueLabel(RowPlayFormatting.pace(abs(seconds)))
+                        }
+                    }
+                }
+                .chartYScale(domain: overlayPaceDomain)
                 .frame(height: AppDesign.Chart.height)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Pace comparison chart")
+                .accessibilityValue(overlayAccessibilityValue)
             }
         }
+    }
+
+    private func chartDistance(_ metres: Double) -> Double {
+        preferences.distanceUnit == .imperial ? metres / 1_609.344 : metres / 1_000
+    }
+
+    private var distanceAxisLabel: String {
+        preferences.distanceUnit == .imperial ? "Distance (mi)" : "Distance (km)"
+    }
+
+    private var overlayAccessibilityValue: String {
+        guard let selectedCandidate else { return "No comparison selected" }
+        return "Current average \(RowPlayFormatting.pace(detail.workout.pace)); comparison average \(RowPlayFormatting.pace(selectedCandidate.workout.pace))"
     }
 
     private func makeOverlayPoints(

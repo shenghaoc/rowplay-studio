@@ -7,7 +7,7 @@ final class WorkoutDetailViewTests: XCTestCase {
     func testDownsampleStrokesCapsCountAndPreservesEndpoints() {
         let strokes = makeStrokes(count: 999)
 
-        let sampled = WorkoutDetailView.downsampleStrokes(strokes, limit: 500)
+        let sampled = WorkoutStrokeAnalysisView.downsampleStrokes(strokes, limit: 500)
 
         XCTAssertEqual(sampled.count, 500)
         XCTAssertEqual(sampled.first, strokes.first)
@@ -18,7 +18,7 @@ final class WorkoutDetailViewTests: XCTestCase {
     func testDownsampleStrokesLeavesBoundedInputUnchanged() {
         let strokes = makeStrokes(count: 12)
 
-        XCTAssertEqual(WorkoutDetailView.downsampleStrokes(strokes, limit: 500), strokes)
+        XCTAssertEqual(WorkoutStrokeAnalysisView.downsampleStrokes(strokes, limit: 500), strokes)
     }
 
     func testSplitBoundaryDistancesFollowDistanceTransform() {
@@ -27,11 +27,11 @@ final class WorkoutDetailViewTests: XCTestCase {
             Split(index: 2, distance: 1_000, time: 240, pace: 120)
         ]
 
-        let kilometres = WorkoutDetailView.computeSplitBoundaryDistances(
+        let kilometres = WorkoutStrokeAnalysisView.computeSplitBoundaryDistances(
             splits: splits,
             distanceTransform: { $0 / 1_000 }
         )
-        let miles = WorkoutDetailView.computeSplitBoundaryDistances(
+        let miles = WorkoutStrokeAnalysisView.computeSplitBoundaryDistances(
             splits: splits,
             distanceTransform: { $0 / 1_609.344 }
         )

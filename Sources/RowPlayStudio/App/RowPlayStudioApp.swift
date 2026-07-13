@@ -61,7 +61,7 @@ struct RowPlayStudioApp: App {
                     }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(syncController.syncState.inProgress)
+                .disabled(syncController.isLoading)
             }
         }
         #endif

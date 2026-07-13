@@ -58,6 +58,7 @@ struct ReplayView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .frame(maxWidth: 140)
             Spacer()
         }

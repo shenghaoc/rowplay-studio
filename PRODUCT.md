@@ -34,7 +34,7 @@ RowPlay Studio is a native macOS port of rowplay — a Concept2 logbook analytic
 
 ## Accessibility & Inclusion
 
-- WCAG 2.1 AA minimum
+- Target WCAG 2.1 AA-equivalent contrast and semantics where they apply to native macOS UI
 - Support reduced motion preferences (already implemented in replay engine)
 - Color is never the sole differentiator — pair semantic colors with labels, icons, or position
 - Accessible labels and values on all metric tiles and interactive elements

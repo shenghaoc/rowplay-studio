@@ -24,7 +24,7 @@ struct WorkoutToolSection<Content: View>: View {
 
             content
         }
-        .padding(12)
+        .padding(AppDesign.Spacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.medium))
         .accessibilityElement(children: .contain)

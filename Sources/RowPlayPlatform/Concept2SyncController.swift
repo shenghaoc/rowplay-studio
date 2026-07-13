@@ -42,11 +42,11 @@ public final class Concept2SyncController: ObservableObject {
     }
 
     public var canSync: Bool {
-        isConnected && !syncState.inProgress
+        isConnected && !isLoading && !syncState.inProgress
     }
 
     public func loadCachedWorkouts(into library: WorkoutLibrary) async {
-        guard !syncState.inProgress else { return }
+        guard !isLoading, !syncState.inProgress else { return }
 
         isLoading = true
         defer { isLoading = false }
@@ -91,7 +91,7 @@ public final class Concept2SyncController: ObservableObject {
     }
 
     public func syncNow(into library: WorkoutLibrary) async {
-        guard !syncState.inProgress else { return }
+        guard !isLoading, !syncState.inProgress else { return }
 
         isLoading = true
         defer { isLoading = false }

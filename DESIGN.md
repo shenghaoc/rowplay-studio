@@ -39,7 +39,7 @@ typography:
     fontWeight: 500
   compact:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "9px"
+    fontSize: "10px"
     fontWeight: 500
 rounded:
   sm: "6px"
@@ -57,10 +57,10 @@ spacing:
   "24": "24px"
 components:
   metric-tile:
-    backgroundColor: "{colors.monitor-blue} at 4% opacity"
-    textColor: "{colors.monitor-blue}"
+    backgroundColor: ".regularMaterial"
+    textColor: "semantic metric color or primary"
     rounded: "{rounded.md}"
-    padding: "{spacing.12}"
+    padding: "{spacing.16}"
   card-panel:
     backgroundColor: "primary.opacity(0.03)"
     rounded: "{rounded.md}"
@@ -122,7 +122,7 @@ A six-color semantic palette, each named for its role on the erg display. Light 
 - **Body** (regular, 13pt, 1.4 line-height): Supporting text, descriptions, workout metadata. Max line length 65–75ch when in prose contexts.
 - **Metric** (semibold, 13pt, 1.2 line-height): Data values in badges, tiles, and comparison panels. Monospaced digit variant.
 - **Label** (medium, 11pt, 1.3 line-height): Labels beneath metric values. Secondary text color.
-- **Compact** (medium, 9pt, 1.2 line-height): Tight spaces — sidebar badges, comparison deltas, annotation timestamps.
+- **Compact** (medium, 10pt, 1.2 line-height): Tight spaces — sidebar badges, comparison deltas, annotation timestamps.
 
 ### Named Rules
 **The One Hero Rule.** SF Pro Rounded appears on at most one element per card. If every number is rounded, none of them matter.
@@ -142,7 +142,7 @@ No drop shadows, no box shadows, no elevation tokens. Surfaces differentiate via
 Dashboard summary cards displaying a single headline metric. Clean, icon-led, no decoration.
 
 - **Shape:** 8pt radius (`RoundedRectangle(cornerRadius: 8)`)
-- **Background:** `.regularMaterial` with optional metric color at low opacity
+- **Background:** `.regularMaterial`; semantic color is reserved for the icon/value
 - **Typograpy:** SF Pro Rounded bold for the value, SF Pro medium for the label
 - **States:** No hover or active state — tiles are read-only display surfaces
 - **Accessibility:** `.accessibilityElement(children: .ignore)` with explicit label and value
@@ -161,7 +161,7 @@ Sport summary and personal best cards. Elevated from the scroll background.
 
 - **Shape:** 6pt radius (sm) or 8pt (md) depending on context
 - **Background:** `.regularMaterial`
-- **Internal padding:** 8–12pt depending on density needs
+- **Internal padding:** 8–16pt depending on density needs
 - **Content:** Icon + label header row, metric value, supporting stat line
 
 ### Navigation (Sidebar)
@@ -180,11 +180,13 @@ Sport filter in the toolbar, filtering workouts by RowErg / SkiErg / BikeErg.
 - **Behavior:** Filters sidebar list and dashboard metrics immediately
 
 ### Empty State
-ContentUnavailableView shown when no workouts exist.
+Centered native empty state shown when no workouts exist.
 
 - **Icon:** `figure.rower` SF Symbol
-- **Title:** "No Workouts"
-- **Description:** Guides user to enable demo mode or sync real data
+- **Title:** "Ready When You Are"
+- **Description:** Guides the user to enable Demo Mode or connect a Concept2 logbook in Settings
+- **Actions:** Native prominent Demo Mode button and Settings link
+- **Motion:** Pulse is disabled when Reduce Motion is active
 - **Behavior:** Triggers when library is empty and demo mode is off
 
 ## 6. Do's and Don'ts
@@ -199,7 +201,7 @@ ContentUnavailableView shown when no workouts exist.
 
 ### Don't:
 - **Don't** use dark or black backgrounds — avoid the Strava/Garmin dark fitness-app aesthetic
-- **Don't** add gamification badges, challenge counters, or social feed elements — this is an analysis tool, not a social platform
+- **Don't** add social or gamified badge systems, challenge counters, or feed elements; a compact PB label may identify an actual personal record
 - **Don't** use gradient text, glassmorphism, or decorative blurs
 - **Don't** use the hero-metric template (big number, small label, supporting stats, gradient accent) as a default card pattern
 - **Don't** use border-left or border-right stripes greater than 1px as colored accents on cards
