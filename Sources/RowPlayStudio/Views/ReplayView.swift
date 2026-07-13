@@ -82,6 +82,7 @@ struct ReplayView: View {
                     Label(cameraPreset.displayName, systemImage: cameraPreset.systemImage)
                 }
                 .pickerStyle(.menu)
+                .labelStyle(.iconOnly)
                 .accessibilityLabel("Replay camera")
                 .accessibilityValue(cameraPreset.displayName)
                 #if os(macOS)

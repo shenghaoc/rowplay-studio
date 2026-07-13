@@ -299,7 +299,7 @@ Branch validation:
 
 - The full SwiftPM build/test matrix, whitespace check, architecture scans, staged launch, automation launch, and bundle-signature verification pass.
 - Visual inspection covered all sport scenes, all camera presets, orbit drag and double-click reset, pause/resume, backward/forward seek, the 2D fallback, reduced-motion particle suppression, the 1000-point minimum-width layout, and the largest 1307x768 app window available in the validation environment. No control or text overlap was observed.
-- Trackpad magnification was unavailable through the Computer Use bridge. Ghost replay is not reachable through the production navigation route because it never supplies `ghostDetail`; ghost separation, translucency, and independent wake state remain covered by scene tests. Exact 1440x900 inspection was unavailable on the 1307x768 validation desktop. Phase 8C therefore remains draft/in progress rather than claiming complete visual proof.
+- Trackpad magnification was unavailable through the Computer Use bridge. Ghost replay is not reachable through the production navigation route because it never supplies `ghostDetail`; ghost separation, translucency, and independent wake state remain covered by scene tests. Exact 1440x900 inspection was unavailable on the 1307x768 validation desktop. Phase 8C therefore remains in progress and its PR is not merge-ready rather than claiming complete visual proof.
 
 Non-goals for Phase 8C:
 
