@@ -218,7 +218,7 @@ struct WorkoutDetailView: View {
     }
 
     private func splitPower(_ split: Split) -> String {
-        String(Int(RowPlayFormatting.paceToWatts(for: detail.workout.sport, pacePer500m: split.pace).rounded()))
+        Self.powerText(for: detail.workout.sport, pace: split.pace)
     }
 
     private var cadenceText: String {
@@ -226,6 +226,13 @@ struct WorkoutDetailView: View {
     }
 
     private var wattsText: String {
-        String(Int(RowPlayFormatting.paceToWatts(for: detail.workout.sport, pacePer500m: detail.workout.pace).rounded()))
+        Self.powerText(for: detail.workout.sport, pace: detail.workout.pace)
+    }
+
+    static func powerText(for sport: Sport, pace: TimeInterval) -> String {
+        guard pace.isFinite, pace > 0 else { return "-" }
+        let watts = RowPlayFormatting.paceToWatts(for: sport, pacePer500m: pace)
+        guard watts.isFinite, watts >= 0, watts <= Double(Int.max) else { return "-" }
+        return String(Int(watts.rounded()))
     }
 }

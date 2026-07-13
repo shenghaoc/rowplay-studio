@@ -65,11 +65,12 @@ struct HrImportPanelView: View {
     }
 
     private func importSamples(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else {
-            errorMessage = "Could not access the selected file."
-            return
+        let accessedSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessedSecurityScopedResource {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
 
         do {
             let samples = try loadSamples(from: url)

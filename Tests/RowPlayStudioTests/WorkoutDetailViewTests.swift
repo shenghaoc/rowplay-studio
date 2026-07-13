@@ -40,6 +40,17 @@ final class WorkoutDetailViewTests: XCTestCase {
         XCTAssertEqual(miles[0], 0.621371, accuracy: 0.000001)
     }
 
+    func testPowerTextRejectsInvalidPace() {
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: 0), "-")
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: -.infinity), "-")
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: .nan), "-")
+    }
+
+    func testPowerTextFormatsValidPace() {
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: 120), "203")
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .bike, pace: 120), "25")
+    }
+
     private func makeStrokes(count: Int) -> [Stroke] {
         (0..<count).map { index in
             Stroke(
