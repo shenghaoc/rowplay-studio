@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import RealityKit
 import RowPlayCore
 import RowPlayPlatform
@@ -14,9 +15,13 @@ struct RealityReplaySceneView: View {
     @Binding var state: ReplayState
     let reduceMotion: Bool
     let ghostDetail: WorkoutDetail?
+    let cameraPreset: ReplayCameraPreset
+    let cameraResetGeneration: Int
+    let replayDiscontinuityGeneration: Int
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var sceneState = Replay3DSceneState()
+    @State private var cameraController = ReplayCameraController()
     @State private var lastTickDate: Date?
 
     private var sport: Sport { detail.workout.sport }
@@ -34,6 +39,13 @@ struct RealityReplaySceneView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
         .accessibilityValue(accessibilityDescription)
+        .simultaneousGesture(orbitDragGesture)
+        .simultaneousGesture(orbitMagnificationGesture)
+        .simultaneousGesture(orbitResetGesture)
+        .onChange(of: cameraPreset) { _, _ in
+            cameraController.endOrbitDrag()
+            cameraController.endOrbitMagnification()
+        }
     }
 
     // MARK: - Reality Content
@@ -55,28 +67,34 @@ struct RealityReplaySceneView: View {
             )
             make.add(container.root)
             sceneState.container = container
+            cameraController.resetSceneState()
         } update: { _ in
             guard let container = sceneState.container else { return }
             let pose = currentPose()
-            let ghostPose = currentGhostPose()
+            let ghostSample = currentGhostSample()
 
             Replay3DSceneBuilder.updateScene(
                 container: container,
                 livePose: pose,
                 liveDistance: state.currentFrame.d,
-                liveFrame: state.currentFrame,
                 sport: sport,
-                ghostPose: ghostPose,
-                ghostDistance: ghostDistance(),
+                ghostPose: ghostSample.pose,
+                ghostDistance: ghostSample.distance,
                 ghostVisible: ghostDetail != nil,
                 reduceMotion: reduceMotion,
-                colorScheme: colorScheme,
-                animPhase: sceneState.animPhase
+                deltaTime: sceneState.lastFrameDelta,
+                playbackTickGeneration: sceneState.playbackTickGeneration,
+                isPlaying: state.playing,
+                cameraController: cameraController,
+                cameraPreset: cameraPreset,
+                cameraResetGeneration: cameraResetGeneration,
+                replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
         }
         .onChange(of: timeline.date) { _, newDate in
             guard state.playing else {
                 lastTickDate = newDate
+                sceneState.lastFrameDelta = 0
                 return
             }
             let tick = ReplayPlaybackClock.tick(
@@ -84,10 +102,9 @@ struct RealityReplaySceneView: View {
                 currentDate: newDate
             )
             lastTickDate = tick.lastTickDate
+            sceneState.lastFrameDelta = tick.delta
+            sceneState.playbackTickGeneration &+= 1
             state.tick(deltaTime: tick.delta)
-            if !reduceMotion {
-                sceneState.animPhase += (2.4 + state.currentFrame.cadence / 13) * tick.delta
-            }
         }
     }
 
@@ -95,20 +112,21 @@ struct RealityReplaySceneView: View {
 
     private func currentPose() -> ReplayStrokePose {
         let frame = state.currentFrame
+        let fallbackPhase = stableFallbackPhase(distance: frame.d)
 
         if detail.strokes.isEmpty {
-            return .fallback(sport: sport, phase: sceneState.animPhase, rate: frame.cadence)
+            return .fallback(sport: sport, phase: fallbackPhase, rate: frame.cadence)
         }
 
         guard let context = sceneState.livePoseContext else {
-            return .fallback(sport: sport, phase: sceneState.animPhase, rate: frame.cadence)
+            return .fallback(sport: sport, phase: fallbackPhase, rate: frame.cadence)
         }
 
         // frame.t is relative to replay start; offset by first stroke's absolute time.
         let absoluteT = frame.t + (detail.strokes.first?.t ?? 0)
         let strokeIndex = ReplaySample.sampleIndexAt(strokes: detail.strokes, t: absoluteT)
         guard strokeIndex >= 0 else {
-            return .fallback(sport: sport, phase: sceneState.animPhase, rate: frame.cadence)
+            return .fallback(sport: sport, phase: fallbackPhase, rate: frame.cadence)
         }
 
         let strokes = detail.strokes
@@ -139,14 +157,19 @@ struct RealityReplaySceneView: View {
         return reduceMotion ? .reducedMotion(pose) : pose
     }
 
-    private func currentGhostPose() -> ReplayStrokePose? {
-        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return nil }
-        guard let context = sceneState.ghostPoseContext else { return nil }
+    private func currentGhostSample() -> (pose: ReplayStrokePose?, distance: Double) {
+        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return (nil, 0) }
+        guard let context = sceneState.ghostPoseContext else { return (nil, 0) }
         let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
         let ghostFrame = ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime)
         let strokeIndex = ReplaySample.sampleIndexAt(strokes: ghost.strokes, t: ghostTime)
         guard strokeIndex >= 0 else {
-            return .fallback(sport: sport, phase: sceneState.animPhase * 0.9, rate: ghostFrame.cadence)
+            let fallback = ReplayStrokePose.fallback(
+                sport: sport,
+                phase: stableFallbackPhase(distance: ghostFrame.d),
+                rate: ghostFrame.cadence
+            )
+            return (reduceMotion ? .reducedMotion(fallback) : fallback, ghostFrame.d)
         }
 
         let strokes = ghost.strokes
@@ -166,17 +189,17 @@ struct RealityReplaySceneView: View {
             medianHR: sceneState.ghostMedianHR,
             duration: ghost.strokes.last?.t ?? 1
         )
-        return reduceMotion ? .reducedMotion(pose) : pose
-    }
-
-    private func ghostDistance() -> Double {
-        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return 0 }
-        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
-        return ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime).d
+        return (reduceMotion ? .reducedMotion(pose) : pose, ghostFrame.d)
     }
 
     private func ghostTimeAtCurrentElapsedTime(strokes: [Stroke]) -> TimeInterval {
         Replay3DPlayback.absoluteTime(elapsed: state.time, strokes: strokes)
+    }
+
+    private func stableFallbackPhase(distance: Double) -> Double {
+        let safeDistance = distance.isFinite ? max(0, distance) : 0
+        let metersPerCycle = ReplayMotion.metersPerCycle(for: sport)
+        return safeDistance / metersPerCycle * Double.pi * 2
     }
 
     // MARK: - Context Builders (called once)
@@ -226,6 +249,40 @@ struct RealityReplaySceneView: View {
         return nums[mid]
     }
 
+    // MARK: - Camera Gestures
+
+    private var orbitDragGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { value in
+                guard cameraPreset == .orbit else { return }
+                cameraController.updateOrbitDrag(
+                    translationX: Double(value.translation.width),
+                    translationY: Double(value.translation.height)
+                )
+            }
+            .onEnded { _ in
+                cameraController.endOrbitDrag()
+            }
+    }
+
+    private var orbitMagnificationGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                guard cameraPreset == .orbit else { return }
+                cameraController.updateOrbitMagnification(Double(value.magnification))
+            }
+            .onEnded { _ in
+                cameraController.endOrbitMagnification()
+            }
+    }
+
+    private var orbitResetGesture: some Gesture {
+        TapGesture(count: 2)
+            .onEnded {
+                cameraController.resetOrbit()
+            }
+    }
+
     // MARK: - Accessibility
 
     private var accessibilityDescription: String {
@@ -235,7 +292,7 @@ struct RealityReplaySceneView: View {
         let cadence = state.currentFrame.cadence.isFinite ? String(Int(state.currentFrame.cadence.rounded())) : "-"
         let unit = sport.cadenceUnit
         let ghost = ghostDetail != nil ? "ghost present" : "no ghost"
-        return "\(sportName) · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
+        return "\(sportName) · \(cameraPreset.displayName) camera · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
     }
 
 }
@@ -257,7 +314,11 @@ enum Replay3DPlayback {
 @Observable
 final class Replay3DSceneState {
     var container: Replay3DSceneContainer?
-    var animPhase: Double = 0
+    @ObservationIgnored var lastFrameDelta: TimeInterval = 0
+    /// Changes exactly once per playback-clock callback. RealityView may
+    /// refresh for gestures or controls between ticks; render adapters use
+    /// this token to avoid integrating the same frame delta twice.
+    var playbackTickGeneration: UInt64 = 0
     /// Precomputed live pose context (immutable during replay).
     var livePoseContext: ReplayStrokePoseContext?
     /// Precomputed live median HR (immutable during replay).

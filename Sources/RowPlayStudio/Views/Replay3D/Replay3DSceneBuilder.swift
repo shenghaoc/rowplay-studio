@@ -16,6 +16,7 @@ final class Replay3DSceneContainer {
     let groundEntity: ModelEntity
     let light: DirectionalLight
     let fillLight: DirectionalLight
+    let effectRenderer: ReplayEffectRenderer
     let sport: Sport
     let layout: ReplayCourseLayout
 
@@ -30,6 +31,7 @@ final class Replay3DSceneContainer {
         groundEntity: ModelEntity,
         light: DirectionalLight,
         fillLight: DirectionalLight,
+        effectRenderer: ReplayEffectRenderer,
         sport: Sport,
         layout: ReplayCourseLayout
     ) {
@@ -43,6 +45,7 @@ final class Replay3DSceneContainer {
         self.groundEntity = groundEntity
         self.light = light
         self.fillLight = fillLight
+        self.effectRenderer = effectRenderer
         self.sport = sport
         self.layout = layout
     }
@@ -122,6 +125,12 @@ enum Replay3DSceneBuilder {
         )
         ghostRig.applyGhostTranslucency()
 
+        // Every wake and spray entity is allocated once with the scene.
+        let effectRenderer = ReplayEffectRenderer(
+            sport: sport,
+            parent: root
+        )
+
         return Replay3DSceneContainer(
             root: root,
             camera: camera,
@@ -133,6 +142,7 @@ enum Replay3DSceneBuilder {
             groundEntity: ground,
             light: sun,
             fillLight: fill,
+            effectRenderer: effectRenderer,
             sport: sport,
             layout: layout
         )
@@ -146,14 +156,18 @@ enum Replay3DSceneBuilder {
         container: Replay3DSceneContainer,
         livePose: ReplayStrokePose,
         liveDistance: Double,
-        liveFrame: ReplayFrame,
         sport: Sport,
         ghostPose: ReplayStrokePose?,
         ghostDistance: Double,
         ghostVisible: Bool,
         reduceMotion: Bool,
-        colorScheme: ColorScheme,
-        animPhase: Double
+        deltaTime: TimeInterval,
+        playbackTickGeneration: UInt64,
+        isPlaying: Bool,
+        cameraController: ReplayCameraController,
+        cameraPreset: ReplayCameraPreset,
+        cameraResetGeneration: Int,
+        replayDiscontinuityGeneration: Int
     ) {
         let layout = container.layout
 
@@ -196,54 +210,32 @@ enum Replay3DSceneBuilder {
             container.ghostGroup.isEnabled = false
         }
 
-        // Chase camera
-        updateCamera(
+        cameraController.update(
             camera: container.camera,
-            target: container.liveGroup.position,
-            heading: Float(liveHeading),
-            reduceMotion: reduceMotion
-        )
-    }
-
-    // MARK: - Camera
-
-    private static func updateCamera(
-        camera: PerspectiveCamera,
-        target: SIMD3<Float>,
-        heading: Float,
-        reduceMotion: Bool
-    ) {
-        // Chase camera offsets: 8m behind, 5m above, looking 6m ahead.
-        let back: Float = 8
-        let height: Float = 5
-        let ahead: Float = 6
-
-        let sinH = sin(heading)
-        let cosH = cos(heading)
-
-        let desiredPos = SIMD3(
-            target.x - sinH * back,
-            height,
-            target.z - cosH * back
-        )
-        let lookTarget = SIMD3(
-            target.x + sinH * ahead,
-            0.5,
-            target.z + cosH * ahead
+            layout: layout,
+            distance: liveDistance,
+            deltaTime: deltaTime,
+            playbackTickGeneration: playbackTickGeneration,
+            preset: cameraPreset,
+            reduceMotion: reduceMotion,
+            isPlaying: isPlaying,
+            resetGeneration: cameraResetGeneration,
+            discontinuityGeneration: replayDiscontinuityGeneration
         )
 
-        if reduceMotion {
-            camera.position = desiredPos
-        } else {
-            // Simple per-frame lerp. RealityKit's update cadence is tied to the
-            // display refresh rate, so the effective smoothing speed is roughly
-            // proportional to frame rate. This is acceptable for a chase camera
-            // that only needs to feel smooth, not be physically accurate.
-            let factor: Float = 0.08
-            camera.position = camera.position + (desiredPos - camera.position) * factor
-        }
-
-        camera.look(at: lookTarget, from: camera.position, relativeTo: nil)
+        container.effectRenderer.update(
+            layout: layout,
+            liveDistance: liveDistance,
+            livePhase: livePose.phase,
+            liveCatchOrdinal: livePose.index,
+            ghostDistance: ghostDistance,
+            ghostVisible: ghostVisible,
+            deltaTime: deltaTime,
+            playbackTickGeneration: playbackTickGeneration,
+            isPlaying: isPlaying,
+            reduceMotion: reduceMotion,
+            resetGeneration: replayDiscontinuityGeneration
+        )
     }
 
     // MARK: - Course Geometry

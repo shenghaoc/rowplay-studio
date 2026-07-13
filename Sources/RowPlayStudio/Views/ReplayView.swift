@@ -12,6 +12,9 @@ struct ReplayView: View {
     @State private var state: ReplayState
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
+    @State private var cameraPreset: ReplayCameraPreset = .chase
+    @State private var cameraResetGeneration = 0
+    @State private var replayDiscontinuityGeneration = 0
     @State private var strokePath = Path()
     @State private var canvasSize: CGSize = .zero
     @State private var cachedMachineColor: Color = .accentColor
@@ -50,9 +53,15 @@ struct ReplayView: View {
     // MARK: - Renderer Picker
 
     private var rendererPicker: some View {
-        HStack {
+        HStack(spacing: AppDesign.Spacing.medium) {
             Spacer()
-            Picker("Renderer", selection: $rendererMode) {
+            Picker("Renderer", selection: Binding(
+                get: { rendererMode },
+                set: { mode in
+                    lastTickDate = nil
+                    rendererMode = mode
+                }
+            )) {
                 ForEach(visibleRendererModes) { mode in
                     Text(mode.displayName).tag(mode)
                 }
@@ -60,6 +69,36 @@ struct ReplayView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .frame(maxWidth: 140)
+
+            if rendererMode == .threeD {
+                Divider()
+                    .frame(height: 20)
+
+                Picker(selection: $cameraPreset) {
+                    ForEach(ReplayCameraPreset.allCases, id: \.self) { preset in
+                        Text(preset.displayName).tag(preset)
+                    }
+                } label: {
+                    Label(cameraPreset.displayName, systemImage: cameraPreset.systemImage)
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Replay camera")
+                .accessibilityValue(cameraPreset.displayName)
+                #if os(macOS)
+                .help("Replay camera")
+                #endif
+
+                Button {
+                    cameraResetGeneration &+= 1
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Reset replay camera")
+                #if os(macOS)
+                .help("Reset replay camera")
+                #endif
+            }
             Spacer()
         }
         .padding(.vertical, 6)
@@ -83,8 +122,16 @@ struct ReplayView: View {
                 detail: detail,
                 state: $state,
                 reduceMotion: reduceMotion,
-                ghostDetail: ghostDetail
+                ghostDetail: ghostDetail,
+                cameraPreset: cameraPreset,
+                cameraResetGeneration: cameraResetGeneration,
+                replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
+            .id(Replay3DSceneIdentity(
+                workoutID: detail.id,
+                ghostWorkoutID: ghostDetail?.id,
+                sportRawValue: detail.workout.sport.rawValue
+            ))
             .frame(minHeight: 300)
         }
     }
@@ -236,7 +283,12 @@ struct ReplayView: View {
             Slider(
                 value: Binding(
                     get: { state.time },
-                    set: { state.seek(to: $0) }
+                    set: { newTime in
+                        if newTime != state.time {
+                            replayDiscontinuityGeneration &+= 1
+                        }
+                        state.seek(to: newTime)
+                    }
                 ),
                 in: 0...max(state.duration, 1),
                 onEditingChanged: { isEditing in
@@ -260,6 +312,12 @@ struct ReplayView: View {
         }
         .padding()
     }
+}
+
+private struct Replay3DSceneIdentity: Hashable {
+    let workoutID: Int
+    let ghostWorkoutID: Int?
+    let sportRawValue: String
 }
 
 // MARK: - Play/Pause Button
