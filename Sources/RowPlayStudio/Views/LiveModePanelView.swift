@@ -129,7 +129,7 @@ struct LiveModePanelView: View {
                 HStack(spacing: AppDesign.Spacing.small) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Polling...")
+                    Text("Polling for telemetry…")
                         .font(AppDesign.Typography.compactLabel)
                         .foregroundStyle(AppDesign.energeticGreen)
                 }
@@ -141,10 +141,10 @@ struct LiveModePanelView: View {
                     Spacer()
                     if let last = library.liveState.lastPollAt {
                         Text(last, style: .time)
-                            .font(AppDesign.Typography.compactMetric.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     } else {
                         Text("—")
-                            .font(AppDesign.Typography.compactMetric.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     }
                 }
                 HStack {
@@ -154,16 +154,16 @@ struct LiveModePanelView: View {
                     Spacer()
                     if let next = library.liveState.nextPollAt {
                         Text(next, style: .timer)
-                            .font(AppDesign.Typography.compactMetric.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     } else {
                         Text("—")
-                            .font(AppDesign.Typography.compactMetric.monospacedDigit())
+                            .font(AppDesign.Typography.metricLabel.monospacedDigit())
                     }
                 }
             }
 
             if library.liveState.status == .error {
-                Text("Polling error — retrying with backoff")
+                Text("Polling error — retrying automatically")
                     .font(AppDesign.Typography.compactLabel)
                     .foregroundStyle(AppDesign.alertRed)
             }
@@ -183,7 +183,7 @@ struct LiveModePanelView: View {
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(AppDesign.Typography.compactMetric.monospacedDigit())
+                .font(AppDesign.Typography.metricLabel.monospacedDigit())
                 .foregroundStyle(color)
         }
         .frame(minWidth: 64, alignment: .leading)

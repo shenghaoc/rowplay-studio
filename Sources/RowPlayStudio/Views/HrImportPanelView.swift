@@ -40,7 +40,7 @@ struct HrImportPanelView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .alert("HR Import Failed", isPresented: errorBinding) {
-            Button("OK", role: .cancel) {}
+            Button("Dismiss", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }

@@ -144,6 +144,7 @@ struct WorkoutDetailView: View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
             Text(label.uppercased())
                 .font(AppDesign.Typography.metricLabel)
+                .kerning(0.8)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(size: 18, weight: .semibold, design: .monospaced))
@@ -338,6 +339,7 @@ struct WorkoutDetailView: View {
     private func tableHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(AppDesign.Typography.metricLabel)
+            .kerning(0.8)
             .foregroundStyle(.secondary)
     }
 

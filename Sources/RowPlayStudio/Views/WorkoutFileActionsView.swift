@@ -33,6 +33,9 @@ struct WorkoutFileActionsView: View {
                         Label("Share Package", systemImage: "square.and.arrow.up")
                     }
                     .disabled(!detail.workout.hasStrokeData && detail.splits.isEmpty)
+                    .help(!detail.workout.hasStrokeData && detail.splits.isEmpty
+                          ? "Share Package requires stroke data or splits"
+                          : "Export a portable share package with workout data")
                 }
                 .buttonStyle(.bordered)
 
@@ -59,7 +62,7 @@ struct WorkoutFileActionsView: View {
             exportData = nil
         }
         .alert("Export Failed", isPresented: errorBinding) {
-            Button("OK", role: .cancel) {}
+            Button("Dismiss", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }

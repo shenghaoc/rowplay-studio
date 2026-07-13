@@ -100,22 +100,19 @@ enum AppDesign {
         static let heroMetric = Font.system(.title, design: .rounded, weight: .bold)
 
         /// Section headline — used for panel titles.
-        static let sectionHeadline = Font.system(.subheadline, design: .default, weight: .semibold)
+        static let sectionHeadline = Font.system(.headline, design: .default, weight: .semibold)
 
         /// Metric value — used for data values in badges and cards.
         static let metricValue = Font.system(.callout, design: .default, weight: .semibold)
 
-        /// Metric label — used for labels beneath values.
+        /// Metric label — used for labels beneath values and compact data displays.
         static let metricLabel = Font.system(.caption2, design: .default, weight: .medium)
 
-        /// Compact metric — used for tight spaces like comparison badges.
-        static let compactMetric = Font.system(size: 11, weight: .medium, design: .default)
+        /// Compact label — used for dense UI labels in sidebars, comparison grids, and live mode.
+        static let compactLabel = Font.system(size: 10, weight: .medium, design: .default)
 
-        /// Compact label — used for very tight label text.
-        static let compactLabel = Font.system(size: 9, weight: .medium, design: .default)
-
-        /// Compact icon — used for inline icons in tight spaces like sidebar rows.
-        static let compactIcon = Font.system(size: 8, weight: .medium)
+        /// Compact icon — used for inline SF Symbols in tight spaces like sidebar sort buttons.
+        static let compactIcon = Font.system(size: 10, weight: .medium)
     }
 
     // MARK: - Background Treatments

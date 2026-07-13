@@ -44,7 +44,7 @@ struct AnnotationPanelView: View {
                 Divider()
 
                 if annotations.isEmpty {
-                    ContentUnavailableView("No Annotations", systemImage: "text.bubble")
+                    ContentUnavailableView("No Annotations Yet", systemImage: "text.bubble", description: Text("Add your first note at any point in the workout timeline."))
                         .frame(maxWidth: .infinity, minHeight: 100)
                 } else {
                     VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
@@ -65,7 +65,7 @@ struct AnnotationPanelView: View {
             draftTimestamp = min(max(draftTimestamp, 0), maxTimestamp)
         }
         .alert("Annotation Failed", isPresented: errorBinding) {
-            Button("OK", role: .cancel) {}
+            Button("Dismiss", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }
@@ -161,7 +161,7 @@ private struct AnnotationRowView: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppDesign.Spacing.medium) {
             Text(RowPlayFormatting.time(annotation.timestamp, tenths: true))
-                .font(AppDesign.Typography.compactMetric.monospacedDigit().weight(.semibold))
+                .font(AppDesign.Typography.metricLabel.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 74, alignment: .leading)
 
@@ -187,9 +187,9 @@ private struct AnnotationRowView: View {
             .accessibilityHint("Deletes this annotation after confirmation")
             .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive, action: onDelete)
-                Button("Cancel", role: .cancel) {}
+                Button("Keep", role: .cancel) {}
             } message: {
-                Text("Are you sure you want to delete this annotation? This action cannot be undone.")
+                Text("This annotation will be permanently deleted.")
             }
         }
         .padding(.vertical, AppDesign.Spacing.xSmall)

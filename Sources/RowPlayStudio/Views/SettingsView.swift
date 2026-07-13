@@ -24,10 +24,10 @@ struct SettingsView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Label("Erg connection", systemImage: "dot.radiowaves.left.and.right")
                     Spacer()
-                    Text("Mock only")
+                    Text("Simulated")
                         .foregroundStyle(.secondary)
                 }
-                Text("Bluetooth devices are not available in this build.")
+                Text("Direct Bluetooth connection to Concept2 ergs is coming soon.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -42,6 +42,10 @@ struct SettingsView: View {
 
                 SecureField("Access token", text: $concept2Token)
                     .textFieldStyle(.roundedBorder)
+
+                Text("Create a token at log.concept2.com → Edit Profile → Applications.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 HStack {
                     Button {
@@ -75,7 +79,7 @@ struct SettingsView: View {
                     HStack {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Syncing")
+                        Text("Syncing with Concept2…")
                             .foregroundStyle(.secondary)
                     }
                 } else if let statusMessage = syncController.statusMessage {
@@ -105,9 +109,9 @@ struct SettingsView: View {
                     await syncController.disconnect(library: library)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Keep Connected", role: .cancel) {}
         } message: {
-            Text("This deletes the saved token, clears cached Concept2 workouts, and removes all local annotations from this Mac.")
+            Text("This removes your saved Concept2 token, clears cached workouts, and deletes all local annotations.")
         }
     }
 }

@@ -139,7 +139,7 @@ struct ContentView: View {
                     Text("Ready When You Are")
                         .font(.title.weight(.semibold))
 
-                    Text("Enable Demo Mode to explore sample workouts with seeded data, or connect your Concept2 logbook to sync your training history.")
+                    Text("Enable Demo Mode to explore sample workouts with preloaded data, or connect your Concept2 logbook to sync your training history.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
