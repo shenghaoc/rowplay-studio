@@ -4,6 +4,13 @@ import SwiftUI
 
 struct ContentView: View {
     private static let dashboardSelectionID = -1
+    private static let skeletonWorkouts = DemoWorkoutLibrary.details.map(\.workout)
+    private static let skeletonSummary = WorkoutAnalytics.dashboardSummary(for: skeletonWorkouts)
+    private static let skeletonPersonalBests = WorkoutAnalytics.dashboardPersonalBests(
+        for: skeletonWorkouts,
+        pbIds: PersonalBests.pbWorkoutIds(for: skeletonWorkouts)
+    )
+    private static let skeletonRecentPaceWorkouts = Array(skeletonWorkouts.prefix(10))
 
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
@@ -30,9 +37,9 @@ struct ContentView: View {
                     if syncController.isLoading {
                         DashboardView(
                             library: library,
-                            summary: library.filteredSummary,
-                            personalBests: [],
-                            recentPaceWorkouts: []
+                            summary: Self.skeletonSummary,
+                            personalBests: Self.skeletonPersonalBests,
+                            recentPaceWorkouts: Self.skeletonRecentPaceWorkouts
                         )
                         .redacted(reason: .placeholder)
                         .disabled(true)

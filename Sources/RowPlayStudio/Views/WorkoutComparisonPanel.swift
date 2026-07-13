@@ -212,7 +212,7 @@ struct WorkoutComparisonPanel: View {
                             Text(RowPlayFormatting.pace(row.paceA))
                             Text(RowPlayFormatting.pace(row.paceB))
                             Text("\(formatSigned(row.paceDelta)) sec/500m")
-                                .foregroundStyle(AppDesign.deltaColor(row.paceDelta))
+                                .foregroundStyle(AppDesign.deltaColor(row.paceDelta, threshold: 0.1))
                         }
                         .monospacedDigit()
                     }
