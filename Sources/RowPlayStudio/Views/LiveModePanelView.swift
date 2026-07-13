@@ -11,7 +11,7 @@ struct LiveModePanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             HStack {
-                Image(systemName: "dot.radiows.left.and.right")
+                Image(systemName: "dot.radiowaves.left.and.right")
                     .foregroundStyle(library.liveState.status == .polling ? AppDesign.energeticGreen : .secondary)
                     .accessibilityHidden(true)
                 Text("Live Mode")
