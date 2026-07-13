@@ -47,6 +47,11 @@
 - [x] Preserve duplicate split boundaries by position.
 - [x] Respect Reduce Motion and add native button styling/legends.
 - [x] Remove unused design-system components and centralize panel styling.
+- [x] Bound derived power before integer conversion and add regression coverage.
+- [x] Refresh replay path and sport color when the selected workout changes in-place.
+- [x] Consolidate replay path initialization with `onChange(of:initial:)`.
+- [x] Correct the Live Mode SF Symbol name.
+- [x] Verify the enumerated split-boundary identity compiles on the Swift 6.3 baseline.
 
 ## Documentation and Evidence
 

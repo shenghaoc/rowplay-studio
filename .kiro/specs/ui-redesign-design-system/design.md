@@ -56,6 +56,12 @@ In deterministic automation mode, workout tools start expanded so export, import
 
 The comparison overlay applies the same pace orientation and bounded-domain rule as detail charts, converts distance to the selected unit, and groups the visual series into one concise accessibility element.
 
+Derived power text validates pace and rejects non-finite, negative, or unrealistic watt values above 100,000 before converting to `Int`. This keeps corrupt inputs from becoming display crashes while remaining far above plausible ergometer output.
+
+## Replay Cached State
+
+The 2D replay path is regenerated from the selected workout whenever the canvas size changes and when `detail.id` changes in-place. The cached sport color refreshes for both color-scheme and workout-identity changes. This keeps SwiftUI `@State` caches aligned with navigation updates without recomputing the full path during every Canvas draw.
+
 ## Accessibility
 
 - Read-only visual metric groups use `.accessibilityElement(children: .ignore)` with explicit label and value.
@@ -71,5 +77,5 @@ SwiftUI `fileImporter` and `fileExporter` provide native document pickers while 
 
 - Platform: prove overlapping cache loads are rejected and `isLoading`/`canSync` return to the correct values.
 - Dashboard: prove accessibility summaries and pace domains change with units and input workouts.
-- Workout analysis: prove 501-999+ strokes are capped correctly, first/last samples survive, and split boundaries follow the selected distance transform.
+- Workout analysis: prove 501-999+ strokes are capped correctly, first/last samples survive, split boundaries follow the selected distance transform, and unrealistic derived power is rejected safely.
 - Full gate: SwiftPM tests/build, whitespace check, staged app launch, and current-run visual inspection of dashboard, workout detail, and the tools/replay entry points.

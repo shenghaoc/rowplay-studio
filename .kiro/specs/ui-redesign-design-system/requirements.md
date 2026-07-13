@@ -14,6 +14,7 @@
 - **R2.3** Workout detail prioritizes the workout header, metric strip, separate pace and power charts, split boundaries, and split table before secondary tools.
 - **R2.4** Workout tools remain reachable in one native disclosure group without duplicating export, HR import, comparison, or annotation systems.
 - **R2.5** Replay remains reachable from workout detail and keeps one shared playback clock and one shared control surface for 2D and 3D renderers.
+- **R2.6** Replay's cached 2D stroke path and sport theme refresh when canvas size, color scheme, or selected workout identity changes.
 
 ## R3: Loading, Empty, Error, and Repeated-Use States
 
@@ -41,6 +42,7 @@
 - **R5.5** Dashboard accessibility summaries and chart domains always reflect current filters and units rather than stale view state.
 - **R5.6** Split boundary marks use positional identities so zero-distance rest intervals cannot collapse duplicate boundaries.
 - **R5.7** Comparison pace charts use a bounded pace domain, plot faster pace higher, follow the selected distance unit, and expose an aggregate accessibility summary.
+- **R5.8** Derived power text rejects invalid or physically unrealistic values before integer conversion.
 
 ## R6: Architecture
 
@@ -52,7 +54,7 @@
 
 ## R7: Verification and Documentation
 
-- **R7.1** Pure dashboard and stroke-chart helpers have regression tests for unit changes, changing inputs, downsampling, endpoints, and split transforms.
+- **R7.1** Pure dashboard, power-formatting, and stroke-chart helpers have regression tests for invalid bounds, unit changes, changing inputs, downsampling, endpoints, and split transforms.
 - **R7.2** Loading-state overlap behavior has a Platform regression test.
 - **R7.3** `DESIGN.md`, `PRODUCT.md`, design QA evidence, this spec, and the PR body describe the final implementation without stale scope or test counts.
 - **R7.4** The final gate runs `swift test`, `swift build`, `git diff --check`, and `./script/build_and_run.sh --verify`, followed by a fresh staged-app UI inspection.

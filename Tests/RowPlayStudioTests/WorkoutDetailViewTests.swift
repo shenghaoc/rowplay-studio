@@ -51,6 +51,10 @@ final class WorkoutDetailViewTests: XCTestCase {
         XCTAssertEqual(WorkoutDetailView.powerText(for: .bike, pace: 120), "25")
     }
 
+    func testPowerTextRejectsUnrealisticDerivedPower() {
+        XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: 1), "-")
+    }
+
     private func makeStrokes(count: Int) -> [Stroke] {
         (0..<count).map { index in
             Stroke(
