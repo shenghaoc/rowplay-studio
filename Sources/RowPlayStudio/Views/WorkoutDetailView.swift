@@ -16,6 +16,14 @@ struct WorkoutDetailView: View {
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
+    private func chartDistance(_ meters: Double) -> Double {
+        unit == .imperial ? meters / 1_609.344 : meters / 1_000
+    }
+
+    private var chartDistanceAxisLabel: String {
+        unit == .imperial ? "Distance (mi)" : "Distance (km)"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
@@ -107,7 +115,7 @@ struct WorkoutDetailView: View {
             metricDivider
             performanceMetric(
                 "Avg Pace",
-                RowPlayFormatting.time(detail.workout.pace, tenths: true),
+                RowPlayFormatting.pace(detail.workout.pace),
                 color: AppDesign.MetricColor.pace
             )
             metricDivider
@@ -185,7 +193,7 @@ struct WorkoutDetailView: View {
                     chartLegend("Pace", color: AppDesign.MetricColor.pace)
                     chartLegend("Power", color: AppDesign.MetricColor.watts)
                     Spacer()
-                    Text("Distance (m)")
+                    Text(chartDistanceAxisLabel)
                         .font(AppDesign.Typography.metricLabel)
                         .foregroundStyle(.secondary)
                 }
@@ -203,7 +211,7 @@ struct WorkoutDetailView: View {
         Chart {
             ForEach(detail.strokes) { stroke in
                 LineMark(
-                    x: .value("Distance", stroke.d),
+                    x: .value("Distance", chartDistance(stroke.d)),
                     y: .value("Pace", -stroke.pace)
                 )
                 .foregroundStyle(AppDesign.MetricColor.pace)
@@ -233,7 +241,7 @@ struct WorkoutDetailView: View {
         Chart {
             ForEach(detail.strokes) { stroke in
                 LineMark(
-                    x: .value("Distance", stroke.d),
+                    x: .value("Distance", chartDistance(stroke.d)),
                     y: .value("Power", stroke.watts)
                 )
                 .foregroundStyle(AppDesign.MetricColor.watts)
@@ -245,7 +253,7 @@ struct WorkoutDetailView: View {
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
         }
         .chartYAxisLabel("Power (W)")
-        .chartXAxisLabel("Distance (m)")
+        .chartXAxisLabel(chartDistanceAxisLabel)
         .frame(height: 150)
     }
 
@@ -260,7 +268,7 @@ struct WorkoutDetailView: View {
 
     @ChartContentBuilder
     private var splitBoundaryMarks: some ChartContent {
-        ForEach(splitBoundaryDistances, id: \.self) { distance in
+        ForEach(Array(splitBoundaryDistances.enumerated()), id: \.offset) { _, distance in
             RuleMark(x: .value("Split", distance))
                 .foregroundStyle(.secondary.opacity(0.35))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
@@ -284,7 +292,7 @@ struct WorkoutDetailView: View {
         var cumulative = 0.0
         return detail.splits.dropLast().map { split in
             cumulative += split.distance
-            return cumulative
+            return chartDistance(cumulative)
         }
     }
 

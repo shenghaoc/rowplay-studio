@@ -15,6 +15,7 @@ struct ContentView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     @EnvironmentObject private var syncController: Concept2SyncController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
     @State private var detailNavigation = DetailNavigationState()
     @State private var showSettings = false
@@ -133,7 +134,7 @@ struct ContentView: View {
                 Image(systemName: "figure.rower")
                     .font(.system(size: 48, weight: .light))
                     .foregroundStyle(AppDesign.MetricColor.duration)
-                    .symbolEffect(.pulse, options: .repeating)
+                    .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
 
                 VStack(spacing: AppDesign.Spacing.small) {
                     Text("Ready When You Are")
