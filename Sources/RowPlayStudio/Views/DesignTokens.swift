@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Central design tokens for RowPlay Studio.
@@ -10,30 +11,30 @@ enum AppDesign {
     // MARK: - Color Palette
 
     /// Primary brand blue — used for primary actions, distance, key emphasis.
-    static let primaryBlue = Color(hex: 0x0A84FF)
+    static let primaryBlue = Color(lightHex: 0x0066CC, darkHex: 0x0A84FF)
 
     /// Warm comparison orange — used for watts, splits, secondary emphasis.
-    static let comparisonOrange = Color(hex: 0xFF9F0A)
+    static let comparisonOrange = Color(lightHex: 0x9A5700, darkHex: 0xFF9F0A)
 
     /// Energetic green — used for positive deltas, success states, cadence highlights.
-    static let energeticGreen = Color(hex: 0x30D158)
+    static let energeticGreen = Color(lightHex: 0x137333, darkHex: 0x30D158)
 
     /// Alert red — used for negative deltas, heart rate, finish markers.
-    static let alertRed = Color(hex: 0xFF453A)
+    static let alertRed = Color(lightHex: 0xB3261E, darkHex: 0xFF453A)
 
     /// Soft purple — used for elevation, descent, cadence accents.
-    static let softPurple = Color(hex: 0xBF5AF2)
+    static let softPurple = Color(lightHex: 0x7B2CBF, darkHex: 0xBF5AF2)
 
     /// Warm yellow — used for caution states, active indicators.
-    static let warmYellow = Color(hex: 0xFFD60A)
+    static let warmYellow = Color(lightHex: 0x7A5A00, darkHex: 0xFFD60A)
 
     // MARK: - Semantic Metric Colors
 
     enum MetricColor {
         static let distance = primaryBlue
-        static let duration = Color(hex: 0x64D2FF)
+        static let duration = Color(lightHex: 0x007A99, darkHex: 0x64D2FF)
         /// Slightly lighter blue than distance, so pace/distance are distinguishable.
-        static let pace = Color(hex: 0x409CFF)
+        static let pace = Color(lightHex: 0x0066CC, darkHex: 0x409CFF)
         static let speed = comparisonOrange
         static let watts = comparisonOrange
         static let heartRate = alertRed
@@ -136,14 +137,21 @@ enum AppDesign {
 // MARK: - Color Hex Initializer
 
 extension Color {
-    init(hex: UInt, opacity: Double = 1.0) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xFF) / 255.0,
-            green: Double((hex >> 8) & 0xFF) / 255.0,
-            blue: Double(hex & 0xFF) / 255.0,
-            opacity: opacity
-        )
+    init(lightHex: UInt, darkHex: UInt, opacity: Double = 1.0) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(hex: isDark ? darkHex : lightHex, opacity: opacity)
+        })
     }
 }
 
+private extension NSColor {
+    convenience init(hex: UInt, opacity: Double) {
+        self.init(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: opacity
+        )
+    }
+}
