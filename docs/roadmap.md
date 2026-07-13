@@ -273,15 +273,39 @@ Non-goals:
 - Hiding meaningful UI from VoiceOver.
 - Upgrading Swift, macOS deployment target, CI runners, or architecture layers.
 
-### Phase 8C+ - Future 3D Replay
+### Phase 8C - Replay Cameras and Sport Effects
 
-Status: not started.
+Status: implementation and automated validation complete; draft remains open for incomplete visual proof.
 
-Scope (future PRs):
+Scope:
 
-- Interactive orbit camera and camera presets.
-- Water/snow surface effects, catch spray, wake trails.
-- Imported USD/USDZ sport equipment assets.
+- Add renderer-neutral camera models and finite deterministic target-pose solving in `RowPlayCore` for chase, side, overhead, and orbit presets.
+- Add clamped orbit interaction, frame-rate-independent camera damping through `ReplayMotion.dampFactor(rate:dt:)`, a 46...51 degree speed-aware chase field of view, and fixed-FOV camera behavior under reduced motion.
+- Add compact 3D-only camera selection and reset controls, plus orbit-only drag, trackpad magnification, and double-click reset without changing the replay clock or existing 2D/playback behavior.
+- Add renderer-neutral sport-effect profiles, a fixed-capacity 48-droplet particle pool, deterministic catch-spray variation, and fixed-capacity 24-entry wake histories.
+- Render a restrained RowErg foam wake and blade-tip catch spray, a SkiErg snow trail and pole-basket spray, no wake or spray for BikeErg, and an independent lower-opacity ghost wake.
+- Reset transient effects on backward seeks, non-finite movement, jumps over 30 metres, scene identity changes, and reduced-motion/automation transitions. Paused frames preserve wake history and never emit catch spray.
+- Prebuild every RealityKit effect entity, mesh, and material with the scene; per-frame updates change only bounded state, transforms, visibility, scale, and opacity.
+- Add Linux-compatible Core camera/effect tests, macOS scene-effect tests, accessibility coverage, and synchronized roadmap/source-map/beta documentation.
+
+Exit criteria:
+
+- The complete SwiftPM build and test matrix passes without weakening existing replay, navigation, or rig assertions.
+- Core and Platform architecture scans contain no forbidden framework imports.
+- `./script/build_and_run.sh --verify`, `--automation`, and `--sign-verify` pass for the staged app bundle.
+- Visual QA covers all three sports, all four cameras, orbit gestures/reset, seek behavior, ghost trails, reduced motion, 2D fallback, and supported window sizes; any unavailable proof is reported explicitly.
+
+Branch validation:
+
+- The full SwiftPM build/test matrix, whitespace check, architecture scans, staged launch, automation launch, and bundle-signature verification pass.
+- Visual inspection covered all sport scenes, all camera presets, orbit drag and double-click reset, pause/resume, backward/forward seek, the 2D fallback, reduced-motion particle suppression, the 1000-point minimum-width layout, and the largest 1307x768 app window available in the validation environment. No control or text overlap was observed.
+- Trackpad magnification was unavailable through the Computer Use bridge. Ghost replay is not reachable through the production navigation route because it never supplies `ghostDetail`; ghost separation, translucency, and independent wake state remain covered by scene tests. Exact 1440x900 inspection was unavailable on the 1307x768 validation desktop. Phase 8C therefore remains in progress and its PR is not merge-ready rather than claiming complete visual proof.
+
+Non-goals for Phase 8C:
+
+- Quality tiers, quality preferences, `PerfGovernor`, adaptive degradation, or final production performance claims.
+- Imported USD/USDZ assets, custom shaders, Metal, SceneKit, or a second 3D renderer.
+- External dependencies, hardware transport, toolchain/deployment-target changes, new timers, or unrelated UI redesign.
 
 ### Phase 8D - Performance and Polish
 

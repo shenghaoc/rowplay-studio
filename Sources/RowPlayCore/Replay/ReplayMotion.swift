@@ -66,10 +66,23 @@ public enum ReplayMotion: Sendable {
     /// Used to trigger splash/spray exactly once per stroke. Jumps larger than
     /// `maxCycles` (seeks) report 0 so a scrub doesn't fire a burst of splashes.
     public static func catchEvents(prev: Double, next: Double, maxCycles: Int = 2) -> Int {
-        guard next > prev else { return 0 }
+        guard prev.isFinite, next.isFinite, maxCycles > 0, next > prev else { return 0 }
         let tau = Double.pi * 2
-        let crossings = Int(floor(next / tau)) - Int(floor(prev / tau))
-        guard crossings > 0, next - prev <= Double(maxCycles) * tau else { return 0 }
+        let phaseDelta = next - prev
+        let maximumDelta = Double(maxCycles) * tau
+        guard phaseDelta.isFinite, maximumDelta.isFinite, phaseDelta <= maximumDelta else {
+            return 0
+        }
+
+        // Keep the calculation in floating point until it has been range-checked.
+        // Converting `floor(.infinity)` or a finite Double outside Int's range traps.
+        let crossingCount = floor(next / tau) - floor(prev / tau)
+        guard crossingCount.isFinite,
+              crossingCount > 0,
+              crossingCount <= Double(maxCycles),
+              let crossings = Int(exactly: crossingCount) else {
+            return 0
+        }
         return crossings
     }
 }

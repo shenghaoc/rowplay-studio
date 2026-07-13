@@ -120,4 +120,25 @@ final class ReplayMotionTests: XCTestCase {
     func testCatchEventsIgnoresBackwardsMovement() {
         XCTAssertEqual(ReplayMotion.catchEvents(prev: 2 * tau, next: tau), 0)
     }
+
+    func testCatchEventsRejectsNonFiniteAndOutOfRangePhasesWithoutTrapping() {
+        XCTAssertEqual(ReplayMotion.catchEvents(prev: 0, next: .infinity), 0)
+        XCTAssertEqual(ReplayMotion.catchEvents(prev: -.infinity, next: 0), 0)
+        XCTAssertEqual(ReplayMotion.catchEvents(prev: .nan, next: tau), 0)
+        XCTAssertEqual(
+            ReplayMotion.catchEvents(
+                prev: -Double.greatestFiniteMagnitude,
+                next: Double.greatestFiniteMagnitude
+            ),
+            0
+        )
+    }
+
+    func testCatchEventsValidatesCycleLimitBeforeIntegerConversion() {
+        XCTAssertEqual(ReplayMotion.catchEvents(prev: 0.9 * tau, next: 1.1 * tau, maxCycles: 0), 0)
+        XCTAssertEqual(
+            ReplayMotion.catchEvents(prev: 0.9 * tau, next: 1.1 * tau, maxCycles: .max),
+            1
+        )
+    }
 }
