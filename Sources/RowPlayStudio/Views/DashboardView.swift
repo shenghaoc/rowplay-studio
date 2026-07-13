@@ -10,17 +10,13 @@ struct DashboardView: View {
     var personalBests: [DashboardPersonalBest]
     var recentPaceWorkouts: [Workout]
 
-    @State private var distanceBySportAccessibilityValue: String = ""
-    @State private var recentPaceAccessibilityValue: String = "No data"
-    @State private var recentPaceChartDomain: ClosedRange<Double> = -180 ... -60
-
     private var unit: DistanceUnit { preferences.distanceUnit }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
                 Text("Dashboard")
-                    .font(.largeTitle.weight(.semibold))
+                    .font(AppDesign.Typography.pageTitle)
 
                 LiveModePanelView(library: library)
 
@@ -44,30 +40,42 @@ struct DashboardView: View {
             .padding(AppDesign.Spacing.xxxLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onAppear {
-            recomputeCachedValues()
-        }
     }
 
-    private func recomputeCachedValues() {
-        distanceBySportAccessibilityValue = summary.bySport.map { item in
+    private var distanceBySportAccessibilityValue: String {
+        Self.distanceBySportAccessibilityDescription(summary.bySport, unit: unit)
+    }
+
+    private var recentPaceAccessibilityValue: String {
+        Self.recentPaceAccessibilityDescription(recentPaceWorkouts)
+    }
+
+    private var recentPaceChartDomain: ClosedRange<Double> {
+        Self.recentPaceChartDomain(for: recentPaceWorkouts)
+    }
+
+    static func distanceBySportAccessibilityDescription(
+        _ summaries: [SportSummary],
+        unit: DistanceUnit
+    ) -> String {
+        summaries.map { item in
             "\(item.sport.displayName): \(RowPlayFormatting.distance(item.distance, unit: unit))"
         }.joined(separator: ", ")
+    }
 
-        if recentPaceWorkouts.isEmpty {
-            recentPaceAccessibilityValue = "No data"
-        } else {
-            let paces = recentPaceWorkouts.map { RowPlayFormatting.pace($0.pace) }
-            recentPaceAccessibilityValue = "\(recentPaceWorkouts.count) workouts, paces: \(paces.joined(separator: ", "))"
-        }
+    static func recentPaceAccessibilityDescription(_ workouts: [Workout]) -> String {
+        guard !workouts.isEmpty else { return "No data" }
+        let paces = workouts.map { RowPlayFormatting.pace($0.pace) }
+        return "\(workouts.count) workouts, paces: \(paces.joined(separator: ", "))"
+    }
 
-        let paces = recentPaceWorkouts.map(\.pace).filter { $0.isFinite && $0 > 0 }
+    static func recentPaceChartDomain(for workouts: [Workout]) -> ClosedRange<Double> {
+        let paces = workouts.map(\.pace).filter { $0.isFinite && $0 > 0 }
         if let fastest = paces.min(), let slowest = paces.max() {
             let padding = max((slowest - fastest) * 0.12, 3)
-            recentPaceChartDomain = -(slowest + padding) ... -(fastest - padding)
-        } else {
-            recentPaceChartDomain = -180 ... -60
+            return -(slowest + padding) ... -(fastest - padding)
         }
+        return -180 ... -60
     }
 
     // MARK: - Charts
@@ -85,7 +93,7 @@ struct DashboardView: View {
                 .foregroundStyle(by: .value("Sport", item.sport.displayName))
             }
             .chartYAxisLabel(unit == .imperial ? "mi" : "km")
-            .frame(height: 220)
+            .frame(height: AppDesign.Chart.height)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Distance by Sport chart")
@@ -124,7 +132,7 @@ struct DashboardView: View {
                 }
             }
             .chartYScale(domain: recentPaceChartDomain)
-            .frame(height: 220)
+            .frame(height: AppDesign.Chart.height)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recent Pace chart")

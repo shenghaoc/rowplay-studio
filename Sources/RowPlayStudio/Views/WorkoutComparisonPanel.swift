@@ -244,7 +244,7 @@ struct WorkoutComparisonPanel: View {
                 ])
                 .chartXAxisLabel("metres")
                 .chartYAxisLabel("sec/500m")
-                .frame(height: 220)
+                .frame(height: AppDesign.Chart.height)
             }
         }
     }

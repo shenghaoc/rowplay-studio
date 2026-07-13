@@ -93,9 +93,21 @@ enum AppDesign {
         static let xLarge: CGFloat = 16
     }
 
+    // MARK: - Chart Sizing
+
+    enum Chart {
+        /// 220pt — dashboard-level chart height.
+        static let height: CGFloat = 220
+        /// 150pt — stroke-level chart height.
+        static let strokeHeight: CGFloat = 150
+    }
+
     // MARK: - Typography
 
     enum Typography {
+        /// Page title — used for main view headings (Dashboard, Workout Detail).
+        static let pageTitle = Font.system(.largeTitle, design: .default, weight: .semibold)
+
         /// Large hero metric — used for primary values in summary cards.
         static let heroMetric = Font.system(.title, design: .rounded, weight: .bold)
 
@@ -104,6 +116,9 @@ enum AppDesign {
 
         /// Metric value — used for data values in badges and cards.
         static let metricValue = Font.system(.callout, design: .default, weight: .semibold)
+
+        /// Strip metric — used for inline metric values in detail/replay metric strips.
+        static let stripMetric = Font.system(size: 18, weight: .semibold, design: .monospaced)
 
         /// Metric label — used for labels beneath values and compact data displays.
         static let metricLabel = Font.system(.caption2, design: .default, weight: .medium)

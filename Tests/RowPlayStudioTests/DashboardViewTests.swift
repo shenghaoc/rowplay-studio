@@ -19,6 +19,54 @@ final class DashboardViewTests: XCTestCase {
 
         XCTAssertTrue(value.contains("3.11 mi"))
     }
+
+    func testDistanceChartAccessibilityDescriptionTracksDistanceUnit() {
+        let summaries = [
+            SportSummary(
+                sport: .rower,
+                sessions: 1,
+                distance: 1_609.344,
+                time: 420,
+                averagePace: 130,
+                bestPace: 130,
+                longestDistance: 1_609.344
+            )
+        ]
+
+        let metric = DashboardView.distanceBySportAccessibilityDescription(summaries, unit: .metric)
+        let imperial = DashboardView.distanceBySportAccessibilityDescription(summaries, unit: .imperial)
+
+        XCTAssertTrue(metric.contains("km"))
+        XCTAssertTrue(imperial.contains("1.00 mi"))
+        XCTAssertNotEqual(metric, imperial)
+    }
+
+    func testRecentPaceDerivedValuesTrackCurrentWorkouts() {
+        let slowWorkout = makeWorkout(id: 1, pace: 180)
+        let fastWorkout = makeWorkout(id: 2, pace: 90)
+
+        let slowDescription = DashboardView.recentPaceAccessibilityDescription([slowWorkout])
+        let fastDescription = DashboardView.recentPaceAccessibilityDescription([fastWorkout])
+        let slowDomain = DashboardView.recentPaceChartDomain(for: [slowWorkout])
+        let fastDomain = DashboardView.recentPaceChartDomain(for: [fastWorkout])
+
+        XCTAssertNotEqual(slowDescription, fastDescription)
+        XCTAssertNotEqual(slowDomain, fastDomain)
+        XCTAssertEqual(DashboardView.recentPaceAccessibilityDescription([]), "No data")
+    }
+
+    private func makeWorkout(id: Int, pace: TimeInterval) -> Workout {
+        Workout(
+            id: id,
+            date: Date(timeIntervalSince1970: TimeInterval(id)),
+            sport: .rower,
+            distance: 2_000,
+            time: pace * 4,
+            pace: pace,
+            workoutType: "Test",
+            hasStrokeData: false
+        )
+    }
 }
 
 // MARK: - ReplayRendererMode Tests
