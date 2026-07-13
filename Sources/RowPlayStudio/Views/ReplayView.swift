@@ -133,6 +133,10 @@ struct ReplayView: View {
         .onChange(of: colorScheme) { _, scheme in
             cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: scheme)
         }
+        .onChange(of: detail.id) { _, _ in
+            strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
+            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
+        }
     }
 
     private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
