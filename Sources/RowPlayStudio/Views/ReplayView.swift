@@ -152,7 +152,8 @@ struct ReplayView: View {
         var playhead = Path()
         playhead.move(to: CGPoint(x: x, y: 0))
         playhead.addLine(to: CGPoint(x: x, y: size.height))
-        context.stroke(playhead, with: .color(.red), lineWidth: 1)
+        let playheadColor = AppDesign.alertRed
+        context.stroke(playhead, with: .color(playheadColor), lineWidth: 1)
 
         let dotSize: CGFloat = 8
         let dot = Path(ellipseIn: CGRect(
@@ -161,7 +162,7 @@ struct ReplayView: View {
             width: dotSize,
             height: dotSize
         ))
-        context.fill(dot, with: .color(.red))
+        context.fill(dot, with: .color(playheadColor))
     }
 
     private func unitFraction(_ numerator: Double, denominator: Double) -> CGFloat {
@@ -203,16 +204,12 @@ struct ReplayView: View {
         let playPauseLabel: LocalizedStringKey = state.playing ? "Pause replay" : "Play replay"
 
         return HStack(spacing: AppDesign.Spacing.xLarge) {
-            Button(action: { state.toggle() }) {
-                Image(systemName: state.playing ? "pause.fill" : "play.fill")
-                    .font(.title2)
-                    .frame(width: 36, height: 36)
-                    .background(AppDesign.activeCardBackground, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(playPauseLabel)
-            .help(playPauseLabel)
-            .keyboardShortcut(.space, modifiers: [])
+            PlayPauseButton(isPlaying: state.playing, action: { state.toggle() })
+                .accessibilityLabel(playPauseLabel)
+                #if os(macOS)
+                .help(playPauseLabel)
+                #endif
+                .keyboardShortcut(.space, modifiers: [])
 
             Slider(
                 value: Binding(
@@ -240,6 +237,35 @@ struct ReplayView: View {
             .frame(maxWidth: 200)
         }
         .padding()
+    }
+}
+
+// MARK: - Play/Pause Button
+
+private struct PlayPauseButton: View {
+    let isPlaying: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.title2)
+                .frame(width: 48, height: 48)
+                .background(
+                    Circle()
+                        .fill(isHovering ? Color.accentColor.opacity(0.16) : AppDesign.activeCardBackground)
+                )
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        #endif
     }
 }
 

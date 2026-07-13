@@ -95,7 +95,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 420)
+        .frame(minWidth: 400, idealWidth: 540, maxWidth: 640)
         .confirmationDialog(
             "Disconnect Concept2?",
             isPresented: $isConfirmingDisconnect

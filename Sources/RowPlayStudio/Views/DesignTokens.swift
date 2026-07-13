@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// Central design tokens for RowPlay Studio.
@@ -131,7 +130,11 @@ enum AppDesign {
     static let activeCardBackground = Color.accentColor.opacity(0.08)
 
     /// Overlay backdrop for map controls.
+    #if os(macOS)
     static let overlayBackground = Color(nsColor: .controlBackgroundColor).opacity(0.85)
+    #else
+    static let overlayBackground = Color(uiColor: .systemBackground).opacity(0.85)
+    #endif
 }
 
 extension View {
@@ -146,13 +149,21 @@ extension View {
 
 extension Color {
     init(lightHex: UInt, darkHex: UInt, opacity: Double = 1.0) {
+        #if os(macOS)
         self.init(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             return NSColor(hex: isDark ? darkHex : lightHex, opacity: opacity)
         })
+        #else
+        self.init(uiColor: UIColor { traitCollection in
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            return UIColor(hex: isDark ? darkHex : lightHex, opacity: opacity)
+        })
+        #endif
     }
 }
 
+#if os(macOS)
 private extension NSColor {
     convenience init(hex: UInt, opacity: Double) {
         self.init(
@@ -163,3 +174,15 @@ private extension NSColor {
         )
     }
 }
+#else
+private extension UIColor {
+    convenience init(hex: UInt, opacity: Double) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: opacity
+        )
+    }
+}
+#endif

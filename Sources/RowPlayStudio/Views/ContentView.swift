@@ -17,6 +17,7 @@ struct ContentView: View {
     @EnvironmentObject private var syncController: Concept2SyncController
     @SceneStorage("selectedWorkoutID") private var storedSelectedWorkoutID = DemoWorkoutLibrary.defaultWorkoutID
     @State private var detailNavigation = DetailNavigationState()
+    @State private var showSettings = false
 
     var body: some View {
         mainContent
@@ -67,6 +68,7 @@ struct ContentView: View {
             }
         }
         .searchable(text: searchTextBinding, placement: .sidebar)
+        #if os(macOS)
         .background {
             Button("Dashboard") {
                 storedSelectedWorkoutID = Self.dashboardSelectionID
@@ -75,6 +77,7 @@ struct ContentView: View {
             .opacity(0)
             .accessibilityHidden(true)
         }
+        #endif
         .toolbar {
             ToolbarItemGroup {
                 Picker("Sport", selection: sportBinding) {
@@ -150,13 +153,25 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
+                #if os(macOS)
                 SettingsLink {
                     Text("Open Settings")
                 }
+                #else
+                Button("Open Settings") {
+                    showSettings = true
+                }
+                .buttonStyle(.borderedProminent)
+                #endif
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(AppDesign.Spacing.xxxLarge)
+        #if !os(macOS)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
+        #endif
     }
 
     private var selectedWorkoutID: Int? {

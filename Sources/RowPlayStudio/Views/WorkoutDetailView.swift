@@ -36,6 +36,7 @@ struct WorkoutDetailView: View {
                         Label("Replay Workout", systemImage: "play.rectangle.fill")
                     }
                     .help("Replay workout with stroke data")
+                .accessibilityHint("Opens the workout replay viewer")
                     .keyboardShortcut("p", modifiers: [.command, .shift])
                 }
             }

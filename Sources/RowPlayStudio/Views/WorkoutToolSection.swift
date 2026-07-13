@@ -17,7 +17,7 @@ struct WorkoutToolSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Text(title)
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)

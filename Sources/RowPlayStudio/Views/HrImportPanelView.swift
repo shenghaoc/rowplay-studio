@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import RowPlayCore
 import SwiftUI
@@ -11,6 +10,7 @@ struct HrImportPanelView: View {
     @State private var offsetSec: TimeInterval = 0
     @State private var statusMessage: String?
     @State private var errorMessage: String?
+    @State private var showImporter = false
 
     var body: some View {
         WorkoutToolSection("Heart Rate Import") {
@@ -22,12 +22,13 @@ struct HrImportPanelView: View {
                     }
                     .frame(maxWidth: 260)
 
-                    Button(action: importSamples) {
+                    Button(action: { showImporter = true }) {
                         Label("Import HR Samples", systemImage: "heart.text.square")
                     }
                     .buttonStyle(.bordered)
                     .disabled(detail.strokes.isEmpty)
                     .help("Import JSON or CSV samples with elapsed seconds and heart rate columns")
+                    .accessibilityHint("Opens a file picker to select a heart rate data file")
                 }
 
                 if let statusMessage {
@@ -43,6 +44,14 @@ struct HrImportPanelView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .commaSeparatedText, .plainText]) { result in
+            switch result {
+            case .success(let url):
+                importSamples(from: url)
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private var errorBinding: Binding<Bool> {
@@ -55,14 +64,12 @@ struct HrImportPanelView: View {
         }
     }
 
-    private func importSamples() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.json, .commaSeparatedText, .plainText]
-        panel.title = "Import HR Samples"
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+    private func importSamples(from url: URL) {
+        guard url.startAccessingSecurityScopedResource() else {
+            errorMessage = "Could not access the selected file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
 
         do {
             let samples = try loadSamples(from: url)

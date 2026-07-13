@@ -38,6 +38,7 @@ struct AnnotationPanelView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(isDraftEmpty)
                     .help(isDraftEmpty ? "Enter text to save an annotation" : "Save annotation")
+                    .accessibilityHint(isDraftEmpty ? "Type annotation text before saving" : "Saves the annotation at the selected timestamp")
                 }
 
                 Divider()
@@ -46,7 +47,7 @@ struct AnnotationPanelView: View {
                     ContentUnavailableView("No Annotations", systemImage: "text.bubble")
                         .frame(maxWidth: .infinity, minHeight: 100)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
                         ForEach(annotations) { annotation in
                             AnnotationRowView(annotation: annotation) {
                                 delete(annotation)
@@ -183,6 +184,7 @@ private struct AnnotationRowView: View {
             .accessibilityLabel("Delete annotation")
             .accessibilityValue("at \(RowPlayFormatting.time(annotation.timestamp, tenths: true))")
             .help("Delete annotation")
+            .accessibilityHint("Deletes this annotation after confirmation")
             .confirmationDialog("Delete Annotation?", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive, action: onDelete)
                 Button("Cancel", role: .cancel) {}
@@ -190,7 +192,7 @@ private struct AnnotationRowView: View {
                 Text("Are you sure you want to delete this annotation? This action cannot be undone.")
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppDesign.Spacing.xSmall)
     }
 
     private var createdAtText: String {

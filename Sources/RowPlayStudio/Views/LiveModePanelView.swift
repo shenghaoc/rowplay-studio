@@ -21,6 +21,7 @@ struct LiveModePanelView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(AppDesign.warmYellow)
                         .help("\(library.liveState.consecutiveFailures) consecutive failures")
+                        .accessibilityHint("Shows the count of consecutive live polling failures")
                         .accessibilityLabel("\(library.liveState.consecutiveFailures) consecutive failures")
                 }
                 Toggle("Enable Live Mode", isOn: Binding(
@@ -63,7 +64,7 @@ struct LiveModePanelView: View {
                     VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
                         Text(sample.sport.displayName)
                             .font(AppDesign.Typography.metricValue)
-                        Text("Mock workout")
+                        Text("Demo sample")
                             .font(AppDesign.Typography.compactLabel)
                             .foregroundStyle(.secondary)
                     }
@@ -75,6 +76,7 @@ struct LiveModePanelView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Refresh demo sample")
+                    .accessibilityHint("Advances to the next simulated live telemetry sample")
                     .accessibilityLabel("Refresh demo sample")
                 }
 

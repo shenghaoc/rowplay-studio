@@ -21,7 +21,7 @@ struct DashboardView: View {
                 LiveModePanelView(library: library)
 
                 LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 140, maximum: 220))
+                    GridItem(.adaptive(minimum: 180, maximum: 240))
                 ], spacing: AppDesign.Spacing.large) {
                     MetricTile(title: "Sessions", value: "\(summary.sessions)", systemImage: "calendar")
                     MetricTile(title: "Distance", value: RowPlayFormatting.distance(summary.totalDistance, unit: unit), systemImage: "point.topleft.down.curvedto.point.bottomright.up", color: AppDesign.MetricColor.distance)
@@ -79,16 +79,29 @@ struct DashboardView: View {
             Chart(recentPaceWorkouts) { workout in
                 LineMark(
                     x: .value("Date", workout.date),
-                    y: .value("Pace", workout.pace)
+                    y: .value("Pace", -workout.pace)
                 )
                 .interpolationMethod(.catmullRom)
+                .foregroundStyle(AppDesign.MetricColor.pace)
 
                 PointMark(
                     x: .value("Date", workout.date),
-                    y: .value("Pace", workout.pace)
+                    y: .value("Pace", -workout.pace)
                 )
+                .foregroundStyle(AppDesign.MetricColor.pace)
+                .symbolSize(28)
             }
-            .chartYAxisLabel("sec/500m")
+            .chartYAxisLabel("Pace (/500m)")
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    if let seconds = value.as(Double.self) {
+                        AxisValueLabel(RowPlayFormatting.pace(abs(seconds)))
+                    }
+                }
+            }
+            .chartYScale(domain: recentPaceChartDomain)
             .frame(height: 220)
         }
         .accessibilityElement(children: .ignore)
@@ -101,6 +114,15 @@ struct DashboardView: View {
         guard !recentPaceWorkouts.isEmpty else { return "No data" }
         let paces = recentPaceWorkouts.map { RowPlayFormatting.pace($0.pace) }
         return "\(recentPaceWorkouts.count) workouts, paces: \(paces.joined(separator: ", "))"
+    }
+
+    private var recentPaceChartDomain: ClosedRange<Double> {
+        let paces = recentPaceWorkouts.map(\.pace).filter { $0.isFinite && $0 > 0 }
+        guard let fastest = paces.min(), let slowest = paces.max() else {
+            return -180 ... -60
+        }
+        let padding = max((slowest - fastest) * 0.12, 3)
+        return -(slowest + padding) ... -(fastest - padding)
     }
 
     // MARK: - Personal Bests
