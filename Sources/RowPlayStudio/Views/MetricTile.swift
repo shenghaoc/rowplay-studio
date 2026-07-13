@@ -4,16 +4,16 @@ struct MetricTile: View {
     var title: String
     var value: String
     var systemImage: String
-    var color: Color = .primary
+    var color: Color?
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.large) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(color == .primary ? .secondary : color.opacity(0.7))
+                .foregroundStyle(color?.opacity(0.7) ?? .secondary)
             Text(value)
                 .font(AppDesign.Typography.heroMetric)
-                .foregroundStyle(color)
+                .foregroundStyle(color ?? .primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(title)
@@ -28,4 +28,3 @@ struct MetricTile: View {
         .accessibilityValue(value)
     }
 }
-

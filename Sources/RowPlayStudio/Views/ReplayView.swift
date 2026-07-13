@@ -209,6 +209,7 @@ struct ReplayView: View {
                     .frame(width: 36, height: 36)
                     .background(AppDesign.activeCardBackground, in: Circle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(playPauseLabel)
             .help(playPauseLabel)
             .keyboardShortcut(.space, modifiers: [])

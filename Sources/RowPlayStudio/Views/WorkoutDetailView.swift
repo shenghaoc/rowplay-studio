@@ -114,14 +114,18 @@ struct WorkoutDetailView: View {
                         x: .value("Time", stroke.t),
                         y: .value("Pace", stroke.pace)
                     )
-                    .foregroundStyle(AppDesign.MetricColor.pace)
+                    .foregroundStyle(by: .value("Metric", "Pace"))
 
                     LineMark(
                         x: .value("Time", stroke.t),
                         y: .value("Watts", Double(stroke.watts))
                     )
-                    .foregroundStyle(AppDesign.MetricColor.watts)
+                    .foregroundStyle(by: .value("Metric", "Watts"))
                 }
+                .chartForegroundStyleScale([
+                    "Pace": AppDesign.MetricColor.pace,
+                    "Watts": AppDesign.MetricColor.watts
+                ])
                 .chartXAxisLabel("seconds")
                 .frame(height: 260)
             }
