@@ -52,7 +52,7 @@
 
 - [x] Synchronize `DESIGN.md`, `.impeccable/design.json`, and `PRODUCT.md` with the implementation.
 - [x] Replace stale design QA paths with current-run screenshots and notes.
-- [ ] Update PR title/body, exact validation, and known gaps.
+- [x] Update PR title/body, exact validation, and known gaps.
 
 ## Final Validation
 
@@ -63,4 +63,4 @@
 - [x] `git diff --check`.
 - [x] `./script/build_and_run.sh --verify`.
 - [x] Fresh staged-app UX/HIG inspection.
-- [ ] Final live GitHub checks, review-thread state, and mergeability recheck.
+- [x] Final live GitHub checks, review-thread state, and mergeability recheck.
