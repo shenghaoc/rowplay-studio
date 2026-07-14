@@ -27,7 +27,9 @@ struct HrImportPanelView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(detail.strokes.isEmpty)
-                    .help("Import JSON or CSV samples with elapsed seconds and heart rate columns")
+                    .help(detail.strokes.isEmpty
+                          ? "HR import requires stroke data"
+                          : "Import JSON or CSV samples with elapsed seconds and heart rate columns")
                     .accessibilityHint("Opens a file picker to select a heart rate data file")
                 }
 
