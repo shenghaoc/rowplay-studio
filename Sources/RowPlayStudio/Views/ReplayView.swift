@@ -297,11 +297,9 @@ struct ReplayView: View {
     private func gapSecondsLabel(seconds: Double) -> String {
         let safeS = seconds.isFinite ? seconds : 0
         let absS = abs(safeS)
-        let secs = Int(absS.rounded())
-        let tenths = Int((absS - Double(secs)) * 10)
-        if safeS == 0 { return "0.0 s" }
+        if absS < 0.05 { return "0.0 s" }
         let sign = safeS > 0 ? "+" : "-"
-        return "\(sign)\(secs).\(tenths) s"
+        return "\(sign)\(String(format: "%.1f", absS)) s"
     }
 
     private var visibleRendererModes: [ReplayRendererMode] {
@@ -575,7 +573,7 @@ struct ReplayView: View {
         playerStrokes: [Stroke],
         size: CGSize
     ) -> Path {
-        guard ghostStrokes.count > 1 else { return Path() }
+        guard ghostStrokes.count > 1, playerStrokes.count > 1 else { return Path() }
 
         let originT = playerStrokes[0].t
         let maxT = playerStrokes.last?.t ?? originT

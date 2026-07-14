@@ -38,11 +38,11 @@ public enum ReplayRaceGap: Sendable {
     /// Convert elapsed replay time (relative to first stroke) to absolute stroke time.
     /// Clamps to [first.t, last.t]. Returns 0 for empty arrays.
     public static func absoluteTime(elapsed: TimeInterval, strokes: [Stroke]) -> TimeInterval {
-        guard let first = strokes.first, let last = strokes.last else { return 0 }
+        guard let first = strokes.first?.t, let last = strokes.last?.t, first.isFinite, last.isFinite else { return 0 }
         let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
-        let duration = max(0, last.t - first.t)
+        let duration = max(0, last - first)
         let clamped = min(safeElapsed, duration)
-        return first.t + clamped
+        return first + clamped
     }
 
     // MARK: - Ghost Sampling
