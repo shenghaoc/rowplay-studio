@@ -72,7 +72,7 @@ final class WorkoutLibraryGhostCandidateTests: XCTestCase {
             makeDetail(id: 2, distance: 2_000, time: 480, pace: 130),
         ]
         let library = WorkoutLibrary(details: details)
-        let first = library.ghostCandidates(for: 1)
+        _ = library.ghostCandidates(for: 1)  // populate cache
 
         // Add a new detail
         library.details.append(makeDetail(id: 3, distance: 2_000, time: 480, pace: 110))
