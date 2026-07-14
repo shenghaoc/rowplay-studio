@@ -10,6 +10,14 @@ struct SettingsView: View {
     @State private var concept2Token = ""
     @State private var isConfirmingDisconnect = false
 
+    private var isTokenEmpty: Bool {
+        concept2Token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var cannotDisconnect: Bool {
+        !syncController.isConnected || syncController.isLoading
+    }
+
     var body: some View {
         Form {
             Section("Library") {
@@ -54,7 +62,10 @@ struct SettingsView: View {
                     } label: {
                         Label("Save Token", systemImage: "key")
                     }
-                    .disabled(concept2Token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isTokenEmpty)
+                    .help(isTokenEmpty
+                          ? "Enter a token to save"
+                          : "Save your Concept2 API access token to the keychain")
 
                     Button {
                         Task {
@@ -64,6 +75,9 @@ struct SettingsView: View {
                         Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(!syncController.canSync)
+                    .help(!syncController.canSync
+                          ? "Cannot sync right now"
+                          : "Sync workouts from your Concept2 Logbook")
 
                     Spacer()
 
@@ -72,7 +86,10 @@ struct SettingsView: View {
                     } label: {
                         Label("Disconnect", systemImage: "xmark.circle")
                     }
-                    .disabled(!syncController.isConnected || syncController.isLoading)
+                    .disabled(cannotDisconnect)
+                    .help(cannotDisconnect
+                          ? "Cannot disconnect right now"
+                          : "Disconnect your Concept2 account and delete local data")
                 }
 
                 if syncController.syncState.inProgress {

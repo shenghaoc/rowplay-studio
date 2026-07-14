@@ -96,6 +96,9 @@ struct ContentView: View {
                     Label("Reload Workout Library", systemImage: "arrow.clockwise")
                 }
                 .disabled(syncController.isLoading)
+                .help(syncController.isLoading
+                      ? "Cannot reload while syncing"
+                      : "Fetch the latest workouts from your Concept2 Logbook")
                 .keyboardShortcut("r", modifiers: .command)
             }
         }
