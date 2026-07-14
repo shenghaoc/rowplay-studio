@@ -13,6 +13,10 @@ struct WorkoutFileActionsView: View {
     @State private var exportContentType: UTType = .json
     @State private var showExporter = false
 
+    private var hasNoShareableData: Bool {
+        !detail.workout.hasStrokeData && detail.splits.isEmpty
+    }
+
     var body: some View {
         WorkoutToolSection("Export and Share") {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
@@ -32,8 +36,8 @@ struct WorkoutFileActionsView: View {
                     Button(action: { prepareExport(.sharePackage) }) {
                         Label("Share Package", systemImage: "square.and.arrow.up")
                     }
-                    .disabled(!detail.workout.hasStrokeData && detail.splits.isEmpty)
-                    .help(!detail.workout.hasStrokeData && detail.splits.isEmpty
+                    .disabled(hasNoShareableData)
+                    .help(hasNoShareableData
                           ? "Share Package requires stroke data or splits"
                           : "Export a portable share package with workout data")
                 }
