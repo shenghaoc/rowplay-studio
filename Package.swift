@@ -15,6 +15,7 @@ func makeCoreTestTarget(dependencies: [Target.Dependency] = ["RowPlayCore"]) -> 
             .copy("Fixtures/Concept2/bike-steady.fixture.json"),
             .copy("Fixtures/Concept2/REDACTION.md"),
             .copy("Fixtures/stroke-pose-parity.json"),
+            .copy("Fixtures/replay-race-gap-parity.json"),
         ]
     )
 }

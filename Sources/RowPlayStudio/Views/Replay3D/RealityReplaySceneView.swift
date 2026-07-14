@@ -84,6 +84,10 @@ struct RealityReplaySceneView: View {
             effectiveQuality = quality
             resetPerformanceTiming()
         }
+        .onChange(of: ghostDetail?.id) { _, _ in
+            sceneState.ghostPoseContext = nil
+            sceneState.ghostMedianHR = 0
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
         .accessibilityValue(accessibilityDescription)
@@ -282,7 +286,7 @@ struct RealityReplaySceneView: View {
     }
 
     private func ghostTimeAtCurrentElapsedTime(strokes: [Stroke]) -> TimeInterval {
-        Replay3DPlayback.absoluteTime(elapsed: state.time, strokes: strokes)
+        ReplayRaceGap.absoluteTime(elapsed: state.time, strokes: strokes)
     }
 
     private func stableFallbackPhase(distance: Double) -> Double {
@@ -384,15 +388,6 @@ struct RealityReplaySceneView: View {
         return "\(sportName) · \(cameraPreset.displayName) camera · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
     }
 
-}
-
-enum Replay3DPlayback {
-    static func absoluteTime(elapsed: TimeInterval, strokes: [Stroke]) -> TimeInterval {
-        guard let firstTime = strokes.first?.t, let lastTime = strokes.last?.t else { return 0 }
-        let duration = max(0, lastTime - firstTime)
-        let safeElapsed = elapsed.isFinite ? elapsed : 0
-        return firstTime + min(max(0, safeElapsed), duration)
-    }
 }
 
 /// Identity for the quality-sized RealityKit graph only. Replay, camera, and

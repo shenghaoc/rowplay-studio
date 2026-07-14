@@ -26,7 +26,8 @@ authoritative spec. Retired web surfaces are listed at the end of this file.
 | `src/lib/replay/engine.ts` | `Sources/RowPlayCore/Replay/ReplaySample.swift` + `ReplayState.swift` | Phase 3 ports `sampleAt`/`sampleIndexAt` interpolation and the `ReplayEngine` playback state machine. |
 | `src/lib/replay/motion.ts` | `Sources/RowPlayCore/Replay/ReplayMotion.swift` | Phase 3 ports animation timing helpers: clampDt, dampFactor, warpStrokePhase, strokeSurge, catchEvents. |
 | `src/lib/replay/comparabilityGuard.ts` | `Sources/RowPlayCore/Replay/ComparabilityGuard.swift` | Phase 3 ports axis classification and comparability predicate. |
-| `src/lib/replay/ghostPick.ts` | `Sources/RowPlayCore/Replay/GhostPick.swift` | Phase 3 ports ghost candidate selection logic. |
+| `src/lib/replay/ghostPick.ts` | `Sources/RowPlayCore/Replay/GhostPick.swift` | Phase 3 ports ghost candidate selection logic. Phase 10A adds `rankedGhostCandidates` with sanitizers and stable tie-break. |
+| `src/lib/replay/replayGap.ts` | `Sources/RowPlayCore/Replay/ReplayRaceGap.swift` | Phase 10A ports live gap helpers: raceGapMeters, raceGapSeconds, relativeDuration, absoluteTime, ghostFrame, ghostDistance. |
 | `src/lib/replay/sports.ts` | `Sources/RowPlayCore/Replay/ReplaySportTheme.swift` | Phase 3 ports sport labels and machine hex colors. |
 | `src/lib/replay/inspector.ts` | `Sources/RowPlayCore/Replay/ReplayInspector.swift` | Phase 3 ports distancePerStroke and splitIndexAt. |
 | `src/lib/replay/replayRenderer.ts` (`RenderQuality`, `QUALITY`) | `Sources/RowPlayCore/Replay/ReplayRenderQuality.swift` + `Sources/RowPlayPlatform/AppPreferences.swift` | Phase 8D ports the low/medium/high/ultra quality ceiling and persistence policy. Medium is the default. Exact course/marker/wake/spray/spray-per-side/timeline budgets are low 48/24/0/0/0/30, medium 72/48/16/40/4/60, high 96/64/28/48/4/60, and ultra 144/96/44/72/6/60. Browser DPR behavior is intentionally not ported. |

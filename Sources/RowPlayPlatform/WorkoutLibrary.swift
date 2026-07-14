@@ -40,6 +40,9 @@ public final class WorkoutLibrary: ObservableObject {
     /// Cached comparison candidates for the active workout, invalidated when `details` changes.
     private var cachedComparisonCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
 
+    /// Cached ghost candidates for replay rival selection, invalidated when `details` changes.
+    private var cachedGhostCandidates: (workoutID: Int, candidates: [WorkoutDetail])?
+
     /// Lightweight change token for views that must react to detail-content updates
     /// without comparing complete stroke and split histories during body evaluation.
     public private(set) var detailsRevision: UInt64 = 0
@@ -155,6 +158,42 @@ public final class WorkoutLibrary: ObservableObject {
 
         cachedComparisonCandidates = (workoutID, candidates)
         return candidates
+    }
+
+    /// Ranked comparable past-session candidates for ghost replay.
+    /// Uses ``GhostPick/rankedGhostCandidates(_:current:)`` and resolves
+    /// ranked ``Workout`` values back to ``WorkoutDetail`` through the detail
+    /// cache. Candidates with empty stroke arrays are excluded even if
+    /// `hasStrokeData` is true.
+    public func ghostCandidates(for workoutID: Int) -> [WorkoutDetail] {
+        if let cachedGhostCandidates,
+           cachedGhostCandidates.workoutID == workoutID {
+            return cachedGhostCandidates.candidates
+        }
+        guard let target = detailByID[workoutID] else { return [] }
+        let context = GhostPickContext(
+            id: target.id,
+            distance: target.workout.distance,
+            sport: target.workout.sport,
+            time: target.workout.time,
+            workoutType: target.workout.workoutType
+        )
+        let ranked = GhostPick.rankedGhostCandidates(
+            candidates: workouts,
+            current: context
+        )
+        let candidates = ranked.compactMap { w -> WorkoutDetail? in
+            guard let detail = detailByID[w.id], !detail.strokes.isEmpty else { return nil }
+            return detail
+        }
+        cachedGhostCandidates = (workoutID, candidates)
+        return candidates
+    }
+
+    /// The default ghost candidate (best match) for a workout, or nil when
+    /// no comparable past session exists.
+    public func defaultGhostCandidate(for workoutID: Int) -> WorkoutDetail? {
+        ghostCandidates(for: workoutID).first
     }
 
     public func reloadDemoData() {
@@ -352,6 +391,7 @@ public final class WorkoutLibrary: ObservableObject {
         summary = WorkoutAnalytics.dashboardSummary(for: workouts)
         availableWorkoutTypes = Array(Set(workouts.map(\.workoutType))).sorted()
         cachedComparisonCandidates = nil
+        cachedGhostCandidates = nil
         updateQueryDerivedData(sportChanged: true)
     }
 
