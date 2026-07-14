@@ -479,7 +479,18 @@ struct ReplayView: View {
         .onChange(of: detail.id) { _, _ in
             strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
             cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
+            if let selectedGhostID,
+               !ghostCandidates.contains(where: { $0.id == selectedGhostID }) {
+                self.selectedGhostID = nil
+            }
             ghostStrokePath = Path()
+            if canvasSize != .zero, let ghost = activeGhostDetail {
+                ghostStrokePath = makeGhostStrokePath(
+                    ghostStrokes: ghost.strokes,
+                    playerStrokes: detail.strokes,
+                    size: canvasSize
+                )
+            }
         }
     }
 

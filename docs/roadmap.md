@@ -348,7 +348,7 @@ Validation status:
 
 ### Phase 10A - Past-Session Ghost Replay
 
-Status: implementation complete on branch `codex/phase-10a-past-session-ghost-replay`; tests pass.
+Status: implementation complete on branch `codex/phase-10a-past-session-ghost-replay`; focused tests, full test/build matrix, architecture scans, and staged-bundle gates pass.
 
 Scope:
 
@@ -357,7 +357,7 @@ Scope:
 - Expose `WorkoutLibrary.ghostCandidates(for:)` and `defaultGhostCandidate(for:)` with cache invalidation.
 - Wire ghost candidate selection into `ReplayView` with a rival control band (Menu picker, live gap display, removal button).
 - Render 2D ghost stroke path on the replay canvas using the player's chart scales.
-- Update RealityReplaySceneView to use `ReplayRaceGap` helpers, clear ghost pose context on rival change.
+- Update RealityReplaySceneView to use `ReplayRaceGap` helpers and refresh ghost pose context on rival change.
 - Add parity fixture `replay-race-gap-parity.json` with 11 test cases.
 - Tests: `GhostPickTests` expanded with ranked ordering, sanitizer, and tie-break cases; `ReplayRaceGapTests` fixture-driven parity and degenerate input tests; `WorkoutLibraryGhostCandidateTests` caching and exclusion tests.
 

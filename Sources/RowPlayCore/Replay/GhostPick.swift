@@ -72,8 +72,9 @@ public enum GhostPick: Sendable {
         if ComparabilityGuard.classifyAxis(workoutType: current.workoutType) == .time {
             let target = sanitizedTime(current.time)
             return pool.sorted { a, b in
-                let dt = abs(sanitizedTime(a.time) - target) - abs(sanitizedTime(b.time) - target)
-                if dt != 0 { return dt < 0 }
+                let distanceA = abs(sanitizedTime(a.time) - target)
+                let distanceB = abs(sanitizedTime(b.time) - target)
+                if distanceA != distanceB { return distanceA < distanceB }
                 let paceA = sanitizedPace(a.pace)
                 let paceB = sanitizedPace(b.pace)
                 if paceA != paceB { return paceA < paceB }
@@ -89,9 +90,9 @@ public enum GhostPick: Sendable {
             WorkoutAnalytics.distanceBand(for: sanitizedDistance($0.distance)).key == band.key
         }
         let ranked = (inBand.isEmpty ? pool : inBand).sorted { a, b in
-            let distDiff = abs(sanitizedDistance(a.distance) - currentDistance)
-                - abs(sanitizedDistance(b.distance) - currentDistance)
-            if distDiff != 0 { return distDiff < 0 }
+            let distanceA = abs(sanitizedDistance(a.distance) - currentDistance)
+            let distanceB = abs(sanitizedDistance(b.distance) - currentDistance)
+            if distanceA != distanceB { return distanceA < distanceB }
             let paceA = sanitizedPace(a.pace)
             let paceB = sanitizedPace(b.pace)
             if paceA != paceB { return paceA < paceB }

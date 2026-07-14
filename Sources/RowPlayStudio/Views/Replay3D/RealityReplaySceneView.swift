@@ -85,8 +85,13 @@ struct RealityReplaySceneView: View {
             resetPerformanceTiming()
         }
         .onChange(of: ghostDetail?.id) { _, _ in
-            sceneState.ghostPoseContext = nil
-            sceneState.ghostMedianHR = 0
+            if let ghost = ghostDetail {
+                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
+            } else {
+                sceneState.ghostPoseContext = nil
+                sceneState.ghostMedianHR = 0
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
