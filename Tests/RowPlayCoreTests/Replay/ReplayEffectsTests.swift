@@ -2,10 +2,11 @@ import XCTest
 @testable import RowPlayCore
 
 final class ReplayEffectsTests: XCTestCase {
-    func testSportProfilesUseFixedPhaseLimits() {
+    func testSportProfilesDefaultToMediumQualityLimits() {
         let rower = ReplayEffectProfile.forSport(.rower)
         let skierg = ReplayEffectProfile.forSport(.skierg)
         let bike = ReplayEffectProfile.forSport(.bike)
+        let medium = ReplayRenderQuality.medium.configuration
 
         XCTAssertTrue(rower.wakeEnabled)
         XCTAssertTrue(rower.sprayEnabled)
@@ -18,9 +19,12 @@ final class ReplayEffectsTests: XCTestCase {
         XCTAssertNil(bike.sprayOffset)
 
         for profile in [rower, skierg, bike] {
-            XCTAssertEqual(profile.wakeCapacity, 24)
-            XCTAssertEqual(profile.sprayCapacity, 48)
-            XCTAssertEqual(profile.sprayPerCatchPerSide, 4)
+            XCTAssertEqual(profile.wakeCapacity, medium.wakeEntryCapacityPerParticipant)
+            XCTAssertEqual(profile.sprayCapacity, medium.sprayParticleCapacity)
+            XCTAssertEqual(
+                profile.sprayPerCatchPerSide,
+                medium.sprayDropletsPerSidePerCatch
+            )
         }
     }
 
@@ -34,9 +38,17 @@ final class ReplayEffectsTests: XCTestCase {
         XCTAssertEqual(pool.particle(at: 1)?.position.x, 2)
     }
 
-    func testEffectStorageClampsRequestedCapacityToPhaseBudget() {
-        XCTAssertEqual(ReplayParticlePool(capacity: .max).capacity, ReplayEffectProfile.sprayCapacity)
-        XCTAssertEqual(ReplayWakeHistory(capacity: .max).capacity, ReplayEffectProfile.wakeCapacity)
+    func testEffectStorageClampsRequestedCapacityToUltraMaximum() {
+        XCTAssertEqual(
+            ReplayParticlePool(capacity: .max).capacity,
+            ReplayParticlePool.maximumCapacity
+        )
+        XCTAssertEqual(
+            ReplayWakeHistory(capacity: .max).capacity,
+            ReplayWakeHistory.maximumCapacity
+        )
+        XCTAssertEqual(ReplayParticlePool.maximumCapacity, 72)
+        XCTAssertEqual(ReplayWakeHistory.maximumCapacity, 44)
     }
 
     func testParticlePoolRejectsParticleMutatedToNonFiniteState() {

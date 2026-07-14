@@ -15,6 +15,8 @@ struct RealityReplaySceneView: View {
     @Binding var state: ReplayState
     let reduceMotion: Bool
     let ghostDetail: WorkoutDetail?
+    let selectedQuality: ReplayRenderQuality
+    @Binding var effectiveQuality: ReplayRenderQuality
     let cameraPreset: ReplayCameraPreset
     let cameraResetGeneration: Int
     let replayDiscontinuityGeneration: Int
@@ -22,19 +24,65 @@ struct RealityReplaySceneView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var sceneState = Replay3DSceneState()
     @State private var cameraController = ReplayCameraController()
+    @State private var performanceController: ReplayPerformanceController
     @State private var lastTickDate: Date?
 
     private var sport: Sport { detail.workout.sport }
 
+    init(
+        detail: WorkoutDetail,
+        state: Binding<ReplayState>,
+        reduceMotion: Bool,
+        ghostDetail: WorkoutDetail?,
+        selectedQuality: ReplayRenderQuality,
+        effectiveQuality: Binding<ReplayRenderQuality>,
+        cameraPreset: ReplayCameraPreset,
+        cameraResetGeneration: Int,
+        replayDiscontinuityGeneration: Int
+    ) {
+        self.detail = detail
+        _state = state
+        self.reduceMotion = reduceMotion
+        self.ghostDetail = ghostDetail
+        self.selectedQuality = selectedQuality
+        _effectiveQuality = effectiveQuality
+        self.cameraPreset = cameraPreset
+        self.cameraResetGeneration = cameraResetGeneration
+        self.replayDiscontinuityGeneration = replayDiscontinuityGeneration
+        _performanceController = State(
+            initialValue: ReplayPerformanceController(selectedQuality: selectedQuality)
+        )
+    }
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !state.playing)) { timeline in
-            realityContent(timeline: timeline)
+        let configuration = performanceController.effectiveQuality.configuration
+        let interval = 1.0 / Double(configuration.targetFrameRate)
+        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
+            Replay3DQualityRebuildBoundary(
+                effectiveQuality: performanceController.effectiveQuality
+            ) {
+                realityContent(timeline: timeline, configuration: configuration)
+            }
         }
         .frame(minHeight: 300)
+        .onAppear {
+            performanceController.resetForNewScene(selectedQuality: selectedQuality)
+            effectiveQuality = performanceController.effectiveQuality
+            resetPerformanceTiming()
+        }
         .onChange(of: state.playing) { _, playing in
             if playing {
                 lastTickDate = nil
             }
+        }
+        .onChange(of: selectedQuality) { _, quality in
+            performanceController.selectQuality(quality)
+            effectiveQuality = performanceController.effectiveQuality
+            resetPerformanceTiming()
+        }
+        .onChange(of: performanceController.effectiveQuality) { _, quality in
+            effectiveQuality = quality
+            resetPerformanceTiming()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
@@ -51,25 +99,37 @@ struct RealityReplaySceneView: View {
     // MARK: - Reality Content
 
     @ViewBuilder
-    private func realityContent(timeline: TimelineViewDefaultContext) -> some View {
+    private func realityContent(
+        timeline: TimelineViewDefaultContext,
+        configuration: ReplayRenderConfiguration
+    ) -> some View {
         RealityView { make in
             // Precompute immutable aggregates once.
-            sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
-            sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
-            if let ghost = ghostDetail {
+            if sceneState.livePoseContext == nil {
+                sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
+                sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
+            }
+            if let ghost = ghostDetail, sceneState.ghostPoseContext == nil {
                 sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
                 sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
             }
 
             let container = Replay3DSceneBuilder.buildScene(
                 sport: sport,
-                colorScheme: colorScheme
+                colorScheme: colorScheme,
+                configuration: configuration
             )
             make.add(container.root)
             sceneState.container = container
             cameraController.resetSceneState()
         } update: { _ in
             guard let container = sceneState.container else { return }
+            let generation = sceneState.playbackTickGeneration
+            let shouldMeasure = performanceController.shouldMeasureSceneUpdate(
+                playbackTickGeneration: generation
+            )
+            let clock = ContinuousClock()
+            let updateStart = shouldMeasure ? clock.now : nil
             let pose = currentPose()
             let ghostSample = currentGhostSample()
 
@@ -90,6 +150,13 @@ struct RealityReplaySceneView: View {
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
+            if let updateStart {
+                let duration = updateStart.duration(to: clock.now)
+                performanceController.recordSceneUpdateDuration(
+                    milliseconds: Self.milliseconds(duration),
+                    playbackTickGeneration: generation
+                )
+            }
         }
         .onChange(of: timeline.date) { _, newDate in
             guard state.playing else {
@@ -104,8 +171,30 @@ struct RealityReplaySceneView: View {
             lastTickDate = tick.lastTickDate
             sceneState.lastFrameDelta = tick.delta
             sceneState.playbackTickGeneration &+= 1
+            if let frameIntervalMilliseconds = ReplayPerformanceSampling
+                .frameIntervalMilliseconds(
+                    rawDelta: tick.rawDelta,
+                    isPlaying: state.playing,
+                    rendererMode: .threeD
+                ) {
+                performanceController.recordFrameInterval(
+                    milliseconds: frameIntervalMilliseconds,
+                    playbackTickGeneration: sceneState.playbackTickGeneration
+                )
+            }
             state.tick(deltaTime: tick.delta)
         }
+    }
+
+    private func resetPerformanceTiming() {
+        lastTickDate = nil
+        sceneState.lastFrameDelta = 0
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Double {
+        let components = duration.components
+        return Double(components.seconds) * 1_000
+            + Double(components.attoseconds) / 1_000_000_000_000_000
     }
 
     // MARK: - Pose Computation
@@ -303,6 +392,31 @@ enum Replay3DPlayback {
         let duration = max(0, lastTime - firstTime)
         let safeElapsed = elapsed.isFinite ? elapsed : 0
         return firstTime + min(max(0, safeElapsed), duration)
+    }
+}
+
+/// Identity for the quality-sized RealityKit graph only. Replay, camera, and
+/// orbit owners intentionally live outside the view keyed by this value.
+struct Replay3DQualityGraphIdentity: Hashable {
+    let effectiveQuality: ReplayRenderQuality
+}
+
+/// Production identity boundary that limits a quality change to its content.
+/// The caller retains replay, camera, orbit, and performance state outside it.
+struct Replay3DQualityRebuildBoundary<Content: View>: View {
+    let effectiveQuality: ReplayRenderQuality
+    private let content: Content
+
+    init(
+        effectiveQuality: ReplayRenderQuality,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.effectiveQuality = effectiveQuality
+        self.content = content()
+    }
+
+    var body: some View {
+        content.id(Replay3DQualityGraphIdentity(effectiveQuality: effectiveQuality))
     }
 }
 

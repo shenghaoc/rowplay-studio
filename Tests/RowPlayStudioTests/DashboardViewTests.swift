@@ -115,6 +115,7 @@ final class ReplayRendererModeTests: XCTestCase {
         let now = Date(timeIntervalSinceReferenceDate: 1_000)
 
         let resumed = ReplayPlaybackClock.tick(lastTickDate: nil, currentDate: now)
+        XCTAssertNil(resumed.rawDelta)
         XCTAssertEqual(resumed.delta, 0)
         XCTAssertEqual(resumed.lastTickDate, now)
 
@@ -122,6 +123,19 @@ final class ReplayRendererModeTests: XCTestCase {
             lastTickDate: now,
             currentDate: now.addingTimeInterval(0.25)
         )
+        XCTAssertEqual(nextTick.rawDelta ?? -1, 0.25, accuracy: 0.0001)
         XCTAssertEqual(nextTick.delta, 0.1, accuracy: 0.0001)
+    }
+
+    func testReplayPlaybackClockKeepsRawDeltaSeparateFromPlaybackClamp() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        let backgroundSizedTick = ReplayPlaybackClock.tick(
+            lastTickDate: now,
+            currentDate: now.addingTimeInterval(0.4)
+        )
+
+        XCTAssertEqual(backgroundSizedTick.rawDelta ?? -1, 0.4, accuracy: 0.0001)
+        XCTAssertEqual(backgroundSizedTick.delta, 0.1, accuracy: 0.0001)
     }
 }

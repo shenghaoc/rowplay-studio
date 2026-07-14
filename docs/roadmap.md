@@ -275,7 +275,7 @@ Non-goals:
 
 ### Phase 8C - Replay Cameras and Sport Effects
 
-Status: implementation and automated validation complete; draft remains open for incomplete visual proof.
+Status: merged to `main` (PR #57).
 
 Scope:
 
@@ -299,7 +299,7 @@ Branch validation:
 
 - The full SwiftPM build/test matrix, whitespace check, architecture scans, staged launch, automation launch, and bundle-signature verification pass.
 - Visual inspection covered all sport scenes, all camera presets, orbit drag and double-click reset, pause/resume, backward/forward seek, the 2D fallback, reduced-motion particle suppression, the 1000-point minimum-width layout, and the largest 1307x768 app window available in the validation environment. No control or text overlap was observed.
-- Trackpad magnification was unavailable through the Computer Use bridge. Ghost replay is not reachable through the production navigation route because it never supplies `ghostDetail`; ghost separation, translucency, and independent wake state remain covered by scene tests. Exact 1440x900 inspection was unavailable on the 1307x768 validation desktop. Phase 8C therefore remains in progress and its PR is not merge-ready rather than claiming complete visual proof.
+- Trackpad magnification was unavailable through the Computer Use bridge. Ghost replay was not reachable through the production navigation route because it never supplied `ghostDetail`; ghost separation, translucency, and independent wake state remained covered by scene tests. Exact 1440x900 inspection was unavailable on the 1307x768 validation desktop. PR #57 merged with these limits recorded; the merge does not retroactively establish the unavailable visual proof.
 
 Non-goals for Phase 8C:
 
@@ -307,15 +307,44 @@ Non-goals for Phase 8C:
 - Imported USD/USDZ assets, custom shaders, Metal, SceneKit, or a second 3D renderer.
 - External dependencies, hardware transport, toolchain/deployment-target changes, new timers, or unrelated UI redesign.
 
-### Phase 8D - Performance and Polish
+### Phase 8D - Adaptive Replay Quality and Performance Profiling
 
-Status: not started.
+Status: implementation and the available validation matrix are complete on a focused draft branch; review is pending.
 
-Scope (future PRs):
+Scope:
 
-- Quality tiers (low/medium/high/ultra).
-- Performance governor and adaptive quality.
-- Extended profiling and polish.
+- Add persisted low, medium, high, and ultra 3D quality ceilings, with medium as the default and corrupt-preference fallback.
+- Configure exact, fixed RealityKit budgets per effective tier:
+
+  | Tier | Course ring segments | Lane markers | Wake entries per participant | Spray particles | Spray droplets per side per catch | Timeline target |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | Low | 48 | 24 | 0 | 0 | 0 | 30 Hz |
+  | Medium | 72 | 48 | 16 | 40 | 4 | 60 Hz |
+  | High | 96 | 64 | 28 | 48 | 4 | 60 Hz |
+  | Ultra | 144 | 96 | 44 | 72 | 6 | 60 Hz |
+
+- Treat the selected tier as a ceiling. Calibrate from raw, unclamped playback-frame intervals, then degrade by one sticky step after sustained over-budget samples: ultra to high to medium to low, high to medium to low, medium to low, and low remains low. Adaptive quality never upgrades during a replay scene; a manual selection resets calibration and begins at the selected tier.
+- Preserve the clamped delta for playback, camera, and effect motion while rejecting first-frame, paused, 2D, non-finite, non-positive, duplicate-generation, and app-background-sized performance samples.
+- Rebuild only the inner RealityKit graph when effective quality changes, preserving replay time, playing state, speed, camera preset, and orbit state while clearing transient effects.
+- Accumulate only scalar 120-sample performance windows and emit bounded unified-log events for quality selection, adaptive degradation, and completed windows. Telemetry contains public tier names, governor level, counts, and numeric timing measurements only; it excludes workout, account, token, filename, and stroke data and never logs per frame.
+- Keep quality policy, the calibrated governor, and bounded metrics in `RowPlayCore`; preference persistence in `RowPlayPlatform`; and SwiftUI, RealityKit, and OSLog integration in `RowPlayStudio`.
+
+Exit criteria:
+
+- Focused and complete SwiftPM build/test matrices pass without weakening Phase 8C replay, camera, effect, rig, navigation, accessibility, or 2D assertions.
+- Core and Platform architecture scans contain no forbidden imports.
+- Staged launch, automation launch, and signature verification pass.
+- Bounded telemetry is observed for a quality selection and completed metrics windows, with no sensitive fields or per-frame logging.
+- Required sport/tier/camera, quality-transition, seek, reduced-motion, 2D, and window-size visual checks are completed, with measured observations and unavailable checks reported explicitly.
+
+Validation status:
+
+- Focused tests and the complete SwiftPM matrix pass: 876 Core tests with the two expected authenticated-smoke skips, 56 Platform tests, and 81 Studio tests. Core and Platform forbidden-import scans returned no matches, `git diff --check` passed, and the staged `--verify`, `--automation`, and `--sign-verify` bundle gates passed.
+- The live `replay-performance` stream emitted bounded quality-selection and 120-sample window events. Representative RowErg observations from this machine were: low 34.167 ms average/100.000 ms worst frame interval and 0.067/0.190 ms average/worst scene update; medium 24.583/166.667 ms and 0.124/0.299 ms; ultra 27.222/216.666 ms and 0.191/0.360 ms. These measurements do not establish a universal tier-performance ordering.
+- A rebased-head schema recheck captured another RowErg low window: 120 samples, 37.778/166.667 ms average/worst frame interval, 0.064/0.154 ms average/worst scene update, and overBudget=35. The final event deliberately omits one budgetMs value because the window uses per-sample active budgets.
+- Visual QA covered RowErg low/medium/high/ultra, SkiErg low/ultra, BikeErg low/ultra, all camera presets, a live quality change, pause/resume, forward/backward seek, automation/reduced-motion suppression, unchanged 2D mode, the 1000x732 minimum window, and the largest available 1308x768 window without control/text overlap. Low showed no effects and BikeErg showed no effects at either inspected tier; enabled effects remained restrained.
+- Exact 1440x900 inspection, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. No degradation event was forced on the healthy machine; deterministic governor tests provide that proof.
+- No guaranteed frame rate, benchmark improvement, GPU resolution scaling, imported production asset, or final production-performance claim is made by the tier targets above.
 
 ## Review Strategy
 

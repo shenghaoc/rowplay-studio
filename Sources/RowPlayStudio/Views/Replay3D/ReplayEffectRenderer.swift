@@ -8,29 +8,41 @@ import SwiftUI
 /// the fixed Core pools and existing entity components/transforms.
 @MainActor
 final class ReplayEffectRenderer {
-    static let liveWakeCapacity = ReplayEffectProfile.wakeCapacity
-    static let ghostWakeCapacity = ReplayEffectProfile.wakeCapacity
-    static let sprayCapacity = ReplayEffectProfile.sprayCapacity
-
     let root = Entity()
     let liveWakeEntities: [ModelEntity]
     let ghostWakeEntities: [ModelEntity]
     let sprayEntities: [ModelEntity]
+    let configuration: ReplayRenderConfiguration
 
     private let profile: ReplayEffectProfile
-    private var liveWake = ReplayWakeHistory(capacity: ReplayEffectProfile.wakeCapacity)
-    private var ghostWake = ReplayWakeHistory(capacity: ReplayEffectProfile.wakeCapacity)
-    private var spray = ReplayParticlePool(capacity: ReplayEffectProfile.sprayCapacity)
+    private var liveWake: ReplayWakeHistory
+    private var ghostWake: ReplayWakeHistory
+    private var spray: ReplayParticlePool
     private var previousLiveDistance: Double?
     private var previousGhostDistance: Double?
     private var previousLivePhase: Double?
     private var appliedResetGeneration: Int?
     private var appliedPlaybackTickGeneration: UInt64?
+    private var previousRenderedLiveWakeCount = 0
+    private var previousRenderedGhostWakeCount = 0
+    private var previousRenderedSprayCount = 0
+
+    /// Non-observable test seam proving inactive tails are disabled only when
+    /// the active prefix shrinks.
+    private(set) var inactiveEntityDisableWriteCount = 0
 
     private static let gravity = ReplayEffectPoint(x: 0, y: -5.5, z: 0)
 
-    init(sport: Sport, parent: Entity) {
-        profile = ReplayEffectProfile.forSport(sport)
+    init(
+        sport: Sport,
+        configuration: ReplayRenderConfiguration,
+        parent: Entity
+    ) {
+        self.configuration = configuration
+        profile = ReplayEffectProfile.forSport(sport, configuration: configuration)
+        liveWake = ReplayWakeHistory(capacity: profile.wakeCapacity)
+        ghostWake = ReplayWakeHistory(capacity: profile.wakeCapacity)
+        spray = ReplayParticlePool(capacity: profile.sprayCapacity)
         root.name = "replay-effects"
 
         let wakeMesh = MeshResource.generateSphere(radius: 0.18)
@@ -60,19 +72,19 @@ final class ReplayEffectRenderer {
         )
 
         liveWakeEntities = Self.makeEntities(
-            count: Self.liveWakeCapacity,
+            count: profile.wakeCapacity,
             prefix: "live-wake",
             mesh: wakeMesh,
             material: liveWakeMaterial
         )
         ghostWakeEntities = Self.makeEntities(
-            count: Self.ghostWakeCapacity,
+            count: profile.wakeCapacity,
             prefix: "ghost-wake",
             mesh: wakeMesh,
             material: ghostWakeMaterial
         )
         sprayEntities = Self.makeEntities(
-            count: Self.sprayCapacity,
+            count: profile.sprayCapacity,
             prefix: "live-spray",
             mesh: sprayMesh,
             material: sprayMaterial
@@ -135,7 +147,7 @@ final class ReplayEffectRenderer {
                 || ghostDelta > 30
         )
 
-        if reduceMotion || !profile.wakeEnabled || resetChanged {
+        if reduceMotion || (!profile.wakeEnabled && !profile.sprayEnabled) || resetChanged {
             clearSimulation()
             seedPreviousValues(
                 liveDistance: safeLiveDistance,
@@ -245,9 +257,21 @@ final class ReplayEffectRenderer {
         previousLivePhase = livePhase.isFinite ? livePhase : nil
         appliedResetGeneration = resetGeneration
         appliedPlaybackTickGeneration = playbackTickGeneration
-        renderWake(liveWake, into: liveWakeEntities, opacityMultiplier: 1)
-        renderWake(ghostWake, into: ghostWakeEntities, opacityMultiplier: 0.42)
-        renderSpray()
+        previousRenderedLiveWakeCount = renderWake(
+            liveWake,
+            into: liveWakeEntities,
+            opacityMultiplier: 1,
+            previousRenderedCount: previousRenderedLiveWakeCount
+        )
+        previousRenderedGhostWakeCount = renderWake(
+            ghostWake,
+            into: ghostWakeEntities,
+            opacityMultiplier: 0.42,
+            previousRenderedCount: previousRenderedGhostWakeCount
+        )
+        previousRenderedSprayCount = renderSpray(
+            previousRenderedCount: previousRenderedSprayCount
+        )
     }
 
     func reset() {
@@ -305,13 +329,12 @@ final class ReplayEffectRenderer {
     private func renderWake(
         _ history: ReplayWakeHistory,
         into entities: [ModelEntity],
-        opacityMultiplier: Double
-    ) {
-        for index in entities.indices {
-            guard let entry = history.entry(at: index) else {
-                disable(entities[index])
-                continue
-            }
+        opacityMultiplier: Double,
+        previousRenderedCount: Int
+    ) -> Int {
+        let activeCount = min(history.count, entities.count)
+        for index in 0..<activeCount {
+            guard let entry = history.entry(at: index) else { continue }
             let entity = entities[index]
             let scale = history.scale(at: index)
             entity.position = SIMD3(
@@ -331,14 +354,18 @@ final class ReplayEffectRenderer {
             )
             entity.isEnabled = true
         }
+        disableNewlyInactiveTail(
+            in: entities,
+            activeCount: activeCount,
+            previousRenderedCount: previousRenderedCount
+        )
+        return activeCount
     }
 
-    private func renderSpray() {
-        for index in sprayEntities.indices {
-            guard let particle = spray.particle(at: index) else {
-                disable(sprayEntities[index])
-                continue
-            }
+    private func renderSpray(previousRenderedCount: Int) -> Int {
+        let activeCount = min(spray.aliveCount, sprayEntities.count)
+        for index in 0..<activeCount {
+            guard let particle = spray.particle(at: index) else { continue }
             let entity = sprayEntities[index]
             entity.position = SIMD3(
                 finiteFloat(particle.position.x),
@@ -354,6 +381,12 @@ final class ReplayEffectRenderer {
             setOpacity(finiteFloat(fade), on: entity)
             entity.isEnabled = true
         }
+        disableNewlyInactiveTail(
+            in: sprayEntities,
+            activeCount: activeCount,
+            previousRenderedCount: previousRenderedCount
+        )
+        return activeCount
     }
 
     private func wakeScale(ageScale: Double) -> SIMD3<Float> {
@@ -369,20 +402,49 @@ final class ReplayEffectRenderer {
     }
 
     private func renderDisabled() {
-        for entity in liveWakeEntities {
-            disable(entity)
+        disableRenderedPrefix(
+            in: liveWakeEntities,
+            renderedCount: previousRenderedLiveWakeCount
+        )
+        disableRenderedPrefix(
+            in: ghostWakeEntities,
+            renderedCount: previousRenderedGhostWakeCount
+        )
+        disableRenderedPrefix(
+            in: sprayEntities,
+            renderedCount: previousRenderedSprayCount
+        )
+        previousRenderedLiveWakeCount = 0
+        previousRenderedGhostWakeCount = 0
+        previousRenderedSprayCount = 0
+    }
+
+    private func disableNewlyInactiveTail(
+        in entities: [ModelEntity],
+        activeCount: Int,
+        previousRenderedCount: Int
+    ) {
+        let boundedPreviousCount = min(previousRenderedCount, entities.count)
+        guard activeCount < boundedPreviousCount else { return }
+        for index in activeCount..<boundedPreviousCount {
+            disable(entities[index])
         }
-        for entity in ghostWakeEntities {
-            disable(entity)
-        }
-        for entity in sprayEntities {
-            disable(entity)
+    }
+
+    private func disableRenderedPrefix(
+        in entities: [ModelEntity],
+        renderedCount: Int
+    ) {
+        for index in 0..<min(renderedCount, entities.count) {
+            disable(entities[index])
         }
     }
 
     private func disable(_ entity: ModelEntity) {
+        guard entity.isEnabled else { return }
         entity.isEnabled = false
         setOpacity(0, on: entity)
+        inactiveEntityDisableWriteCount &+= 1
     }
 
     private func setOpacity(_ opacity: Float, on entity: ModelEntity) {

@@ -4,6 +4,10 @@ import RowPlayPlatform
 import SwiftUI
 
 struct ReplayView: View {
+    static let qualityAccessibilityLabel = "3D replay quality"
+    static let qualityPickerHelp = "Choose the maximum 3D replay quality"
+    static let adaptiveQualityHelp = "Quality was reduced to maintain replay performance"
+
     let detail: WorkoutDetail
     let ghostDetail: WorkoutDetail?
     @Environment(\.colorScheme) private var colorScheme
@@ -13,6 +17,7 @@ struct ReplayView: View {
     @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
     @State private var cameraPreset: ReplayCameraPreset = .chase
+    @State private var effectiveReplayQuality: ReplayRenderQuality?
     @State private var cameraResetGeneration = 0
     @State private var replayDiscontinuityGeneration = 0
     @State private var strokePath = Path()
@@ -48,6 +53,9 @@ struct ReplayView: View {
         .onDisappear {
             state.pause()
         }
+        .onChange(of: preferences.replayRenderQuality) { _, quality in
+            effectiveReplayQuality = quality
+        }
     }
 
     // MARK: - Renderer Picker
@@ -70,7 +78,7 @@ struct ReplayView: View {
             .labelsHidden()
             .frame(maxWidth: 140)
 
-            if rendererMode == .threeD {
+            if Self.showsQualityControl(rendererMode: rendererMode) {
                 Divider()
                     .frame(height: 20)
 
@@ -88,6 +96,8 @@ struct ReplayView: View {
                 #if os(macOS)
                 .help("Replay camera")
                 #endif
+
+                qualityPicker
 
                 Button {
                     cameraResetGeneration &+= 1
@@ -124,6 +134,11 @@ struct ReplayView: View {
                 state: $state,
                 reduceMotion: reduceMotion,
                 ghostDetail: ghostDetail,
+                selectedQuality: preferences.replayRenderQuality,
+                effectiveQuality: Binding(
+                    get: { displayedEffectiveReplayQuality },
+                    set: { effectiveReplayQuality = $0 }
+                ),
                 cameraPreset: cameraPreset,
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
@@ -135,6 +150,89 @@ struct ReplayView: View {
             ))
             .frame(minHeight: 300)
         }
+    }
+
+    private var qualityPicker: some View {
+        HStack(spacing: AppDesign.Spacing.small) {
+            Picker(selection: Binding(
+                get: { preferences.replayRenderQuality.rawValue },
+                set: { rawValue in
+                    guard let quality = ReplayRenderQuality(rawValue: rawValue) else { return }
+                    effectiveReplayQuality = quality
+                    preferences.replayRenderQuality = quality
+                }
+            )) {
+                ForEach(ReplayRenderQuality.allCases, id: \.rawValue) { quality in
+                    Text(quality.replayDisplayName).tag(quality.rawValue)
+                }
+            } label: {
+                Label(Self.qualityAccessibilityLabel, systemImage: "slider.horizontal.3")
+            }
+            .pickerStyle(.menu)
+            .labelStyle(.iconOnly)
+            .accessibilityLabel(Self.qualityAccessibilityLabel)
+            .accessibilityValue(Self.qualityAccessibilityValue(
+                selected: preferences.replayRenderQuality,
+                effective: displayedEffectiveReplayQuality
+            ))
+            #if os(macOS)
+            .help(Self.qualityPickerHelp)
+            #endif
+
+            if Self.isAdaptiveReduction(
+                selected: preferences.replayRenderQuality,
+                effective: displayedEffectiveReplayQuality
+            ) {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(Self.adaptiveQualityAccessibilityLabel(
+                        effective: displayedEffectiveReplayQuality
+                    ))
+                    #if os(macOS)
+                    .help(Self.adaptiveQualityHelp)
+                    #endif
+            }
+        }
+    }
+
+    static func qualityAccessibilityValue(
+        selected: ReplayRenderQuality,
+        effective: ReplayRenderQuality
+    ) -> String {
+        "Selected \(selected.replayDisplayName), effective \(effective.replayDisplayName)"
+    }
+
+    static func adaptiveQualityAccessibilityLabel(
+        effective: ReplayRenderQuality
+    ) -> String {
+        "3D replay quality reduced to \(effective.replayDisplayName)"
+    }
+
+    static func showsQualityControl(rendererMode: ReplayRendererMode) -> Bool {
+        rendererMode == .threeD
+    }
+
+    static func isAdaptiveReduction(
+        selected: ReplayRenderQuality,
+        effective: ReplayRenderQuality
+    ) -> Bool {
+        // A stale report can briefly sit above a newly synchronized ceiling;
+        // only a strictly lower tier represents adaptive degradation.
+        effective.maximumDegradationLevel < selected.maximumDegradationLevel
+    }
+
+    static func effectiveQualityForDisplay(
+        selected: ReplayRenderQuality,
+        reportedEffective: ReplayRenderQuality?
+    ) -> ReplayRenderQuality {
+        reportedEffective ?? selected
+    }
+
+    private var displayedEffectiveReplayQuality: ReplayRenderQuality {
+        Self.effectiveQualityForDisplay(
+            selected: preferences.replayRenderQuality,
+            reportedEffective: effectiveReplayQuality
+        )
     }
 
     private var twoDReplaySurface: some View {
@@ -315,7 +413,7 @@ struct ReplayView: View {
     }
 }
 
-private struct Replay3DSceneIdentity: Hashable {
+struct Replay3DSceneIdentity: Hashable {
     let workoutID: Int
     let ghostWorkoutID: Int?
     let sportRawValue: String
@@ -353,12 +451,23 @@ private struct PlayPauseButton: View {
 /// Shared timeline clock for replay surfaces. Resetting the date on resume
 /// makes the first post-pause tick deterministic rather than including the
 /// elapsed wall-clock pause duration.
+struct ReplayPlaybackTick {
+    let rawDelta: TimeInterval?
+    let delta: TimeInterval
+    let lastTickDate: Date
+}
+
 enum ReplayPlaybackClock {
-    static func tick(lastTickDate: Date?, currentDate: Date) -> (delta: TimeInterval, lastTickDate: Date) {
-        let delta = lastTickDate.map {
-            ReplayMotion.clampDt(ms: currentDate.timeIntervalSince($0) * 1_000)
-        } ?? 0
-        return (delta, currentDate)
+    static func tick(lastTickDate: Date?, currentDate: Date) -> ReplayPlaybackTick {
+        guard let lastTickDate else {
+            return ReplayPlaybackTick(rawDelta: nil, delta: 0, lastTickDate: currentDate)
+        }
+        let rawDelta = currentDate.timeIntervalSince(lastTickDate)
+        return ReplayPlaybackTick(
+            rawDelta: rawDelta,
+            delta: ReplayMotion.clampDt(ms: rawDelta * 1_000),
+            lastTickDate: currentDate
+        )
     }
 }
 
@@ -397,5 +506,16 @@ private extension Color {
             green: Double((value >> 8) & 0xFF) / 255.0,
             blue: Double(value & 0xFF) / 255.0
         )
+    }
+}
+
+extension ReplayRenderQuality {
+    var replayDisplayName: String {
+        switch self {
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        case .ultra: "Ultra"
+        }
     }
 }
