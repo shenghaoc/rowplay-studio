@@ -22,15 +22,19 @@ struct HrImportPanelView: View {
                     }
                     .frame(maxWidth: 260)
 
-                    Button(action: { showImporter = true }) {
-                        Label("Import HR Samples", systemImage: "heart.text.square")
+                    Group {
+                        Button(action: { showImporter = true }) {
+                            Label("Import HR Samples", systemImage: "heart.text.square")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(detail.strokes.isEmpty)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(detail.strokes.isEmpty)
                     .help(detail.strokes.isEmpty
-                          ? "HR import requires stroke data"
-                          : "Import JSON or CSV samples with elapsed seconds and heart rate columns")
-                    .accessibilityHint("Opens a file picker to select a heart rate data file")
+                        ? "HR import requires stroke data"
+                        : "Import JSON or CSV samples with elapsed seconds and heart rate columns")
+                    .accessibilityHint(detail.strokes.isEmpty
+                        ? "HR import is unavailable because stroke data is required"
+                        : "Opens a file picker to select a heart rate data file")
                 }
 
                 if let statusMessage {
