@@ -575,16 +575,19 @@ struct ReplayView: View {
     ) -> Path {
         guard ghostStrokes.count > 1, playerStrokes.count > 1 else { return Path() }
 
-        let originT = playerStrokes[0].t
-        let maxT = playerStrokes.last?.t ?? originT
+        let playerOriginT = playerStrokes[0].t
+        let ghostOriginT = ghostStrokes[0].t
+        let maxT = playerStrokes.last?.t ?? playerOriginT
         let maxD = playerStrokes.last?.d ?? 1
-        let duration = maxT - originT
+        let duration = maxT - playerOriginT
         guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
 
         var path = Path()
         var firstPoint = true
         for stroke in ghostStrokes {
-            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
+            // Sessions have independent absolute timestamp origins. Plot the ghost
+            // by its elapsed time, using the player's duration only as the chart scale.
+            let x = unitFraction(stroke.t - ghostOriginT, denominator: duration) * size.width
             let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
             let clippedX = max(0, min(size.width, x))
             let clippedY = max(0, min(size.height, y))
