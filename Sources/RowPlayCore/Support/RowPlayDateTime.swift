@@ -148,12 +148,8 @@ public enum RowPlayDateTime: Sendable {
 
     // MARK: - ISO Helpers
 
-    /// Thread-safe ISO-8601 formatter.
-    private static let iso8601Formatter = Mutex({
-        let formatter = ISO8601DateFormatter()
-        // ISO8601DateFormatter defaults to GMT, which matches Date.ISO8601FormatStyle() behavior
-        return formatter
-    }())
+    /// Thread-safe ISO-8601 formatter (defaults to GMT).
+    private static let iso8601Formatter = Mutex(ISO8601DateFormatter())
 
     /// Current instant as an ISO-8601 string.
     public static func nowISOString() -> String {

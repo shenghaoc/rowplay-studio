@@ -17,16 +17,11 @@ public enum WorkoutExport: Sendable {
     // guard access with Mutex because DateFormatter is mutable and non-Sendable.
 
     /// Activity / lap timestamps: second-precision UTC ISO-8601.
-    private static let tcxISO8601Formatter = Mutex({
-        let formatter = ISO8601DateFormatter()
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }())
+    private static let tcxISO8601Formatter = Mutex(ISO8601DateFormatter())
 
     /// Trackpoint timestamps: fractional-second UTC ISO-8601.
     private static let tcxISO8601FractionalFormatter = Mutex({
         let formatter = ISO8601DateFormatter()
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }())
@@ -171,6 +166,8 @@ public enum WorkoutExport: Sendable {
     }
 
     /// Filter strokes for TCX export: validate, clamp, deduplicate, sort.
+    /// The `withLock` wraps the entire loop so the formatter lock is acquired
+    /// once rather than per-iteration, reducing contention on concurrent exports.
     private static func filterAndBuildTrackpoints(
         detail: WorkoutDetail
     ) -> [TrackpointData] {
@@ -180,53 +177,61 @@ public enum WorkoutExport: Sendable {
         guard workoutDuration.isFinite, workoutDuration > 0,
               workoutDistance.isFinite, workoutDistance > 0 else { return [] }
 
-        var seenOffsets = Set<TimeInterval>()
-        var result = [TrackpointData]()
-
         let sortedStrokes = detail.strokes.sorted { $0.t < $1.t }
 
-        for stroke in sortedStrokes {
-            // Reject non-finite or negative timestamps
-            guard stroke.t.isFinite, stroke.t >= 0 else { continue }
-            // Reject non-finite or negative distances
-            guard stroke.d.isFinite, stroke.d >= 0 else { continue }
+        return tcxISO8601FractionalFormatter.withLock { formatter in
+            var seenOffsets = Set<TimeInterval>()
+            var seenTimes = Set<String>()
+            var result = [TrackpointData]()
 
-            // Skip strokes beyond workout duration
-            guard stroke.t <= workoutDuration else { continue }
+            for stroke in sortedStrokes {
+                // Reject non-finite or negative timestamps
+                guard stroke.t.isFinite, stroke.t >= 0 else { continue }
+                // Reject non-finite or negative distances
+                guard stroke.d.isFinite, stroke.d >= 0 else { continue }
 
-            let absoluteDate = w.date.addingTimeInterval(stroke.t)
-            let timeString = tcxISO8601FractionalFormatter.withLock { $0.string(from: absoluteDate) }
+                // Skip strokes beyond workout duration
+                guard stroke.t <= workoutDuration else { continue }
 
-            // Deduplicate identical source timestamps without collapsing distinct
-            // sub-second samples that happen within the same wall-clock second.
-            guard seenOffsets.insert(stroke.t).inserted else { continue }
+                let absoluteDate = w.date.addingTimeInterval(stroke.t)
+                let timeString = formatter.string(from: absoluteDate)
 
-            // Clamp distance to workout distance
-            let clampedDistance = min(stroke.d, workoutDistance)
-            let distanceString = formatDecimal(clampedDistance)
+                // Deduplicate identical source timestamps without collapsing distinct
+                // sub-second samples that happen within the same wall-clock second.
+                guard seenOffsets.insert(stroke.t).inserted else { continue }
 
-            // Heart rate: only 1...255
-            var hr: Int? = nil
-            if let rawHR = stroke.heartRate, rawHR >= 1, rawHR <= 255 {
-                hr = rawHR
+                // ISO8601DateFormatter rounds to the nearest millisecond, so two
+                // distinct sub-millisecond offsets can collide into the same
+                // formatted string. Deduplicate on the formatted time as well.
+                guard seenTimes.insert(timeString).inserted else { continue }
+
+                // Clamp distance to workout distance
+                let clampedDistance = min(stroke.d, workoutDistance)
+                let distanceString = formatDecimal(clampedDistance)
+
+                // Heart rate: only 1...255
+                var hr: Int? = nil
+                if let rawHR = stroke.heartRate, rawHR >= 1, rawHR <= 255 {
+                    hr = rawHR
+                }
+
+                // Cadence: finite, non-negative, rounded and clamped to the
+                // TCX CadenceValue_t range 0...254 before converting to Int.
+                var cadence: Int? = nil
+                if stroke.cadence.isFinite, stroke.cadence >= 0 {
+                    cadence = Int(min(stroke.cadence.rounded(), 254))
+                }
+
+                result.append(TrackpointData(
+                    time: timeString,
+                    distance: distanceString,
+                    heartRate: hr,
+                    cadence: cadence
+                ))
             }
 
-            // Cadence: finite, non-negative, rounded and clamped to the
-            // TCX CadenceValue_t range 0...254 before converting to Int.
-            var cadence: Int? = nil
-            if stroke.cadence.isFinite, stroke.cadence >= 0 {
-                cadence = Int(min(stroke.cadence.rounded(), 254))
-            }
-
-            result.append(TrackpointData(
-                time: timeString,
-                distance: distanceString,
-                heartRate: hr,
-                cadence: cadence
-            ))
+            return result
         }
-
-        return result
     }
 
     /// Locale-independent integer formatting.
