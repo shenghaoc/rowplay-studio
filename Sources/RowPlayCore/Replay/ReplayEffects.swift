@@ -17,11 +17,21 @@ public struct ReplayEffectPoint: Equatable, Sendable {
     }
 }
 
-/// Fixed Phase 8C effect budget and sport behavior.
+/// Quality-aware effect budget and sport behavior.
 public struct ReplayEffectProfile: Equatable, Sendable {
-    public static let wakeCapacity = 24
-    public static let sprayCapacity = 48
-    public static let sprayPerCatchPerSide = 4
+    public static let maximumWakeCapacity =
+        ReplayRenderConfiguration.maximumWakeEntryCapacityPerParticipant
+    public static let maximumSprayCapacity =
+        ReplayRenderConfiguration.maximumSprayParticleCapacity
+    public static let maximumSprayPerCatchPerSide =
+        ReplayRenderConfiguration.maximumSprayDropletsPerSidePerCatch
+
+    // Compatibility aliases for existing scene code. These now describe the
+    // bounded storage maxima; each profile's instance properties carry its
+    // effective tier budget.
+    public static let wakeCapacity = maximumWakeCapacity
+    public static let sprayCapacity = maximumSprayCapacity
+    public static let sprayPerCatchPerSide = maximumSprayPerCatchPerSide
 
     public let sport: Sport
     public let wakeEnabled: Bool
@@ -31,25 +41,50 @@ public struct ReplayEffectProfile: Equatable, Sendable {
     public let sprayCapacity: Int
     public let sprayPerCatchPerSide: Int
 
-    public static func forSport(_ sport: Sport) -> ReplayEffectProfile {
-        switch sport {
-        case .rower:
-            ReplayEffectProfile(sport: sport, wakeEnabled: true, sprayEnabled: true, sprayOffset: 2.2)
-        case .skierg:
-            ReplayEffectProfile(sport: sport, wakeEnabled: true, sprayEnabled: true, sprayOffset: 0.4)
-        case .bike:
-            ReplayEffectProfile(sport: sport, wakeEnabled: false, sprayEnabled: false, sprayOffset: nil)
+    public static func forSport(
+        _ sport: Sport,
+        configuration: ReplayRenderConfiguration = ReplayRenderQuality.defaultQuality.configuration
+    ) -> ReplayEffectProfile {
+        let supportsEffects = sport != .bike
+        let sprayOffset: Double? = switch sport {
+        case .rower: 2.2
+        case .skierg: 0.4
+        case .bike: nil
         }
+        return ReplayEffectProfile(
+            sport: sport,
+            wakeEnabled: supportsEffects && configuration.wakeEntryCapacityPerParticipant > 0,
+            sprayEnabled: supportsEffects
+                && configuration.sprayParticleCapacity > 0
+                && configuration.sprayDropletsPerSidePerCatch > 0,
+            sprayOffset: sprayOffset,
+            configuration: configuration
+        )
     }
 
-    private init(sport: Sport, wakeEnabled: Bool, sprayEnabled: Bool, sprayOffset: Double?) {
+    private init(
+        sport: Sport,
+        wakeEnabled: Bool,
+        sprayEnabled: Bool,
+        sprayOffset: Double?,
+        configuration: ReplayRenderConfiguration
+    ) {
         self.sport = sport
         self.wakeEnabled = wakeEnabled
         self.sprayEnabled = sprayEnabled
         self.sprayOffset = sprayOffset
-        wakeCapacity = Self.wakeCapacity
-        sprayCapacity = Self.sprayCapacity
-        sprayPerCatchPerSide = Self.sprayPerCatchPerSide
+        wakeCapacity = min(
+            Self.maximumWakeCapacity,
+            max(0, configuration.wakeEntryCapacityPerParticipant)
+        )
+        sprayCapacity = min(
+            Self.maximumSprayCapacity,
+            max(0, configuration.sprayParticleCapacity)
+        )
+        sprayPerCatchPerSide = min(
+            Self.maximumSprayPerCatchPerSide,
+            max(0, configuration.sprayDropletsPerSidePerCatch)
+        )
     }
 }
 
@@ -96,12 +131,16 @@ public struct ReplayParticle: Equatable, Sendable {
 
 /// Fixed-capacity particle storage. The backing array never grows after init.
 public struct ReplayParticlePool: Equatable, Sendable {
+    public static let maximumCapacity = ReplayEffectProfile.maximumSprayCapacity
+
     public let capacity: Int
     public private(set) var aliveCount: Int
     private var storage: [ReplayParticle]
 
-    public init(capacity: Int = ReplayEffectProfile.sprayCapacity) {
-        let safeCapacity = min(ReplayEffectProfile.sprayCapacity, max(0, capacity))
+    public init(
+        capacity: Int = ReplayRenderQuality.defaultQuality.configuration.sprayParticleCapacity
+    ) {
+        let safeCapacity = min(Self.maximumCapacity, max(0, capacity))
         self.capacity = safeCapacity
         aliveCount = 0
         storage = Array(repeating: .inactive, count: safeCapacity)
@@ -323,12 +362,17 @@ public enum ReplayWakeUpdateResult: Equatable, Sendable {
 
 /// Fixed-capacity recent-path history for foam and snow wake entities.
 public struct ReplayWakeHistory: Equatable, Sendable {
+    public static let maximumCapacity = ReplayEffectProfile.maximumWakeCapacity
+
     public let capacity: Int
     public private(set) var count: Int
     private var storage: [ReplayWakeEntry]
 
-    public init(capacity: Int = ReplayEffectProfile.wakeCapacity) {
-        let safeCapacity = min(ReplayEffectProfile.wakeCapacity, max(0, capacity))
+    public init(
+        capacity: Int = ReplayRenderQuality.defaultQuality.configuration
+            .wakeEntryCapacityPerParticipant
+    ) {
+        let safeCapacity = min(Self.maximumCapacity, max(0, capacity))
         self.capacity = safeCapacity
         count = 0
         storage = Array(repeating: .inactive, count: safeCapacity)

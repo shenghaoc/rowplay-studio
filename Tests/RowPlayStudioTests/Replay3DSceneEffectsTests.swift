@@ -11,20 +11,34 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     func testEffectRendererPrebuildsFixedEntityBudgetForEverySport() {
         for sport: Sport in [.rower, .skierg, .bike] {
             let parent = Entity()
-            let renderer = ReplayEffectRenderer(sport: sport, parent: parent)
+            let configuration = ReplayRenderQuality.medium.configuration
+            let renderer = ReplayEffectRenderer(
+                sport: sport,
+                configuration: configuration,
+                parent: parent
+            )
 
-            XCTAssertEqual(renderer.liveWakeEntities.count, 24)
-            XCTAssertEqual(renderer.ghostWakeEntities.count, 24)
-            XCTAssertEqual(renderer.sprayEntities.count, 48)
-            XCTAssertEqual(renderer.fixedEntityCount, 96)
-            XCTAssertEqual(renderer.root.children.count, 96)
+            XCTAssertEqual(
+                renderer.liveWakeEntities.count,
+                configuration.wakeEntryCapacityPerParticipant
+            )
+            XCTAssertEqual(
+                renderer.ghostWakeEntities.count,
+                configuration.wakeEntryCapacityPerParticipant
+            )
+            XCTAssertEqual(renderer.sprayEntities.count, configuration.sprayParticleCapacity)
+            let expectedEntityCount = configuration.wakeEntryCapacityPerParticipant * 2
+                + configuration.sprayParticleCapacity
+            XCTAssertEqual(renderer.fixedEntityCount, expectedEntityCount)
+            XCTAssertEqual(renderer.root.children.count, expectedEntityCount)
         }
     }
 
     func testRepeatedSceneUpdatesDoNotIncreaseEntityCount() {
         let container = Replay3DSceneBuilder.buildScene(
             sport: .rower,
-            colorScheme: .dark
+            colorScheme: .dark,
+            configuration: ReplayRenderQuality.medium.configuration
         )
         let controller = ReplayCameraController()
         let initialCount = recursiveEntityCount(container.root)
@@ -53,11 +67,14 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         }
 
         XCTAssertEqual(recursiveEntityCount(container.root), initialCount)
-        XCTAssertLessThanOrEqual(container.effectRenderer.sprayCount, 48)
+        XCTAssertLessThanOrEqual(
+            container.effectRenderer.sprayCount,
+            ReplayRenderQuality.medium.configuration.sprayParticleCapacity
+        )
     }
 
     func testLiveAndGhostWakeHistoriesAdvanceIndependently() {
-        let renderer = ReplayEffectRenderer(sport: .skierg, parent: Entity())
+        let renderer = makeRenderer(sport: .skierg)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: true)
         update(renderer, liveDistance: 5, ghostDistance: 0, ghostVisible: true)
@@ -72,7 +89,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testBikeErgKeepsEveryEffectDisabled() {
-        let renderer = ReplayEffectRenderer(sport: .bike, parent: Entity())
+        let renderer = makeRenderer(sport: .bike)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: true, phase: 5.9)
         update(renderer, liveDistance: 8, ghostDistance: 7, ghostVisible: true, phase: 6.4)
@@ -84,7 +101,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testReducedMotionClearsWakeAndSpray() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: true, phase: 5.9)
         update(renderer, liveDistance: 5, ghostDistance: 4, ghostVisible: true, phase: 6.4)
@@ -109,7 +126,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testReplayDiscontinuityClearsWithoutSpawningCatch() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: false, phase: 5.9)
         update(renderer, liveDistance: 5, ghostDistance: 0, ghostVisible: false, phase: 6.4)
@@ -129,7 +146,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testGhostOnlyDiscontinuityDoesNotClearLiveEffects() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: true, phase: 5.9)
         update(renderer, liveDistance: 5, ghostDistance: 4, ghostVisible: true, phase: 6.4)
@@ -145,7 +162,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testPausedAndDuplicateTickUpdatesDoNotAdvanceParticles() throws {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: false, phase: 5.9)
         update(renderer, liveDistance: 5, ghostDistance: 0, ghostVisible: false, phase: 6.4)
@@ -177,7 +194,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testCatchVariationUsesStableStrokeOrdinal() throws {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
         let tau = Double.pi * 2
         let distance = 5.0
 
@@ -215,7 +232,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testNonFinitePhaseDoesNotSpawnOrCrash() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: false, phase: 5.9)
         update(
@@ -231,7 +248,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testWakeIsOffsetBehindAndAlignedWithCourseTangent() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: false)
         update(renderer, liveDistance: 1, ghostDistance: 0, ghostVisible: false)
@@ -248,7 +265,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
     }
 
     func testFinalPlaybackTickAdvancesEffectsEvenWhenStateAutoPauses() {
-        let renderer = ReplayEffectRenderer(sport: .rower, parent: Entity())
+        let renderer = makeRenderer(sport: .rower)
 
         update(renderer, liveDistance: 0, ghostDistance: 0, ghostVisible: false, phase: 5.9)
         update(
@@ -310,6 +327,17 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         )
 
         XCTAssertEqual(camera.camera.fieldOfViewInDegrees, fieldOfViewBeforePause, accuracy: 0.0001)
+    }
+
+    private func makeRenderer(
+        sport: Sport,
+        quality: ReplayRenderQuality = .medium
+    ) -> ReplayEffectRenderer {
+        ReplayEffectRenderer(
+            sport: sport,
+            configuration: quality.configuration,
+            parent: Entity()
+        )
     }
 
     private func update(

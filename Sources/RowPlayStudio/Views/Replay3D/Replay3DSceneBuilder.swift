@@ -19,6 +19,7 @@ final class Replay3DSceneContainer {
     let effectRenderer: ReplayEffectRenderer
     let sport: Sport
     let layout: ReplayCourseLayout
+    let configuration: ReplayRenderConfiguration
 
     init(
         root: Entity,
@@ -33,7 +34,8 @@ final class Replay3DSceneContainer {
         fillLight: DirectionalLight,
         effectRenderer: ReplayEffectRenderer,
         sport: Sport,
-        layout: ReplayCourseLayout
+        layout: ReplayCourseLayout,
+        configuration: ReplayRenderConfiguration
     ) {
         self.root = root
         self.camera = camera
@@ -48,6 +50,7 @@ final class Replay3DSceneContainer {
         self.effectRenderer = effectRenderer
         self.sport = sport
         self.layout = layout
+        self.configuration = configuration
     }
 }
 
@@ -60,7 +63,8 @@ enum Replay3DSceneBuilder {
 
     static func buildScene(
         sport: Sport,
-        colorScheme: ColorScheme
+        colorScheme: ColorScheme,
+        configuration: ReplayRenderConfiguration
     ) -> Replay3DSceneContainer {
         let root = Entity()
         root.name = "scene-root"
@@ -102,7 +106,13 @@ enum Replay3DSceneBuilder {
         let courseEntity = Entity()
         courseEntity.name = "course"
         root.addChild(courseEntity)
-        buildCourseRing(into: courseEntity, layout: layout, sport: sport, colorScheme: colorScheme)
+        buildCourseRing(
+            into: courseEntity,
+            layout: layout,
+            sport: sport,
+            colorScheme: colorScheme,
+            configuration: configuration
+        )
 
         // Start/finish marker
         buildStartFinishMarker(into: courseEntity, layout: layout, colorScheme: colorScheme)
@@ -128,6 +138,7 @@ enum Replay3DSceneBuilder {
         // Every wake and spray entity is allocated once with the scene.
         let effectRenderer = ReplayEffectRenderer(
             sport: sport,
+            configuration: configuration,
             parent: root
         )
 
@@ -144,7 +155,8 @@ enum Replay3DSceneBuilder {
             fillLight: fill,
             effectRenderer: effectRenderer,
             sport: sport,
-            layout: layout
+            layout: layout,
+            configuration: configuration
         )
     }
 
@@ -244,26 +256,31 @@ enum Replay3DSceneBuilder {
         into parent: Entity,
         layout: ReplayCourseLayout,
         sport: Sport,
-        colorScheme: ColorScheme
+        colorScheme: ColorScheme,
+        configuration: ReplayRenderConfiguration
     ) {
         let radius = Float(layout.loopRadius)
 
         // Main lane ring. Build a narrow annulus from tangent-aligned segments
         // rather than a single box, which would cover the entire course
         // interior and obscure the sport-specific ground surface.
-        let segmentCount = 160
-        let laneWidth: Float = 5
-        let segmentLength = (2 * Float.pi * radius) / Float(segmentCount) * 1.02
-        let ringMesh = MeshResource.generateBox(size: SIMD3(segmentLength, 0.06, laneWidth))
+        let segmentCount = configuration.courseRingSegmentCount
         let ringColor = laneColor(for: sport, colorScheme: colorScheme)
         let ringMat = SimpleMaterial(color: ringColor, roughness: 0.5, isMetallic: false)
-        for index in 0..<segmentCount {
-            let angle = Float(index) / Float(segmentCount) * Float.pi * 2
-            let ringSegment = ModelEntity(mesh: ringMesh, materials: [ringMat])
-            ringSegment.name = "lane-ring-segment-\(index)"
-            ringSegment.position = SIMD3(radius * sin(angle), 0.03, radius * cos(angle))
-            ringSegment.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
-            parent.addChild(ringSegment)
+        if segmentCount > 0 {
+            let laneWidth: Float = 5
+            let segmentLength = (2 * Float.pi * radius) / Float(segmentCount) * 1.02
+            let ringMesh = MeshResource.generateBox(
+                size: SIMD3(segmentLength, 0.06, laneWidth)
+            )
+            for index in 0..<segmentCount {
+                let angle = Float(index) / Float(segmentCount) * Float.pi * 2
+                let ringSegment = ModelEntity(mesh: ringMesh, materials: [ringMat])
+                ringSegment.name = "lane-ring-segment-\(index)"
+                ringSegment.position = SIMD3(radius * sin(angle), 0.03, radius * cos(angle))
+                ringSegment.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
+                parent.addChild(ringSegment)
+            }
         }
 
         // Use small boxes around the circle as lane markers
@@ -273,14 +290,18 @@ enum Replay3DSceneBuilder {
             : NSColor(calibratedRed: 0.2, green: 0.6, blue: 0.9, alpha: 1)
         let markerMat = SimpleMaterial(color: markerColor, roughness: 0.5, isMetallic: false)
 
-        for i in 0..<80 {
-            let angle = Float(i) / 80.0 * Float.pi * 2
-            let x = radius * sin(angle)
-            let z = radius * cos(angle)
-            let marker = ModelEntity(mesh: markerMesh, materials: [markerMat])
-            marker.position = SIMD3(x, 0.04, z)
-            marker.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
-            parent.addChild(marker)
+        let markerCount = configuration.laneMarkerCount
+        if markerCount > 0 {
+            for i in 0..<markerCount {
+                let angle = Float(i) / Float(markerCount) * Float.pi * 2
+                let x = radius * sin(angle)
+                let z = radius * cos(angle)
+                let marker = ModelEntity(mesh: markerMesh, materials: [markerMat])
+                marker.name = "lane-marker-\(i)"
+                marker.position = SIMD3(x, 0.04, z)
+                marker.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
+                parent.addChild(marker)
+            }
         }
 
         // Distance markers (every 50m)
@@ -290,6 +311,7 @@ enum Replay3DSceneBuilder {
             let dist = Double(i) * 50
             let pos = layout.position(at: dist, laneOffset: 2.5)
             let marker = ModelEntity(mesh: distMarkerMesh, materials: [distMarkerMat])
+            marker.name = "distance-marker-\(i)"
             marker.position = SIMD3(Float(pos.x), 0.04, Float(pos.z))
             parent.addChild(marker)
         }
@@ -301,6 +323,9 @@ enum Replay3DSceneBuilder {
         colorScheme: ColorScheme
     ) {
         // Checkerboard pattern across the lane at distance 0
+        let marker = Entity()
+        marker.name = "start-finish-marker"
+        parent.addChild(marker)
         let cellSize: Float = 0.8
         let darkColor = NSColor.black
         let lightColor = NSColor.white
@@ -321,7 +346,7 @@ enum Replay3DSceneBuilder {
                 let isDark = (row + col) % 2 == 0
                 let cell = ModelEntity(mesh: cellMesh, materials: [isDark ? darkMat : lightMat])
                 cell.position = SIMD3(x, 0.03, z)
-                parent.addChild(cell)
+                marker.addChild(cell)
             }
         }
     }
