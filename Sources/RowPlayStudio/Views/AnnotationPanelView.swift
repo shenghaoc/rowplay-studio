@@ -158,6 +158,11 @@ private struct AnnotationRowView: View {
 
     @State private var showDeleteConfirmation = false
 
+    // Cache the localized FormatStyle value to prevent repeated allocations
+    // during SwiftUI re-evaluations (especially when rendering many rows).
+    private static let createdAtStyle = Date.FormatStyle.dateTime.month(.abbreviated).day().hour().minute()
+        .locale(.autoupdatingCurrent)
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppDesign.Spacing.medium) {
             Text(RowPlayFormatting.time(annotation.timestamp, tenths: true))
@@ -197,6 +202,6 @@ private struct AnnotationRowView: View {
 
     private var createdAtText: String {
         Date(timeIntervalSince1970: Double(annotation.createdAt) / 1_000)
-            .formatted(.dateTime.month(.abbreviated).day().hour().minute())
+            .formatted(Self.createdAtStyle)
     }
 }
