@@ -79,6 +79,41 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertEqual(rival?.localFileName, "r.csv")
     }
 
+    func testImportLoaderReadsAndParsesSelectedFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-rival-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("time,distance\n0,0\n10,50\n".utf8).write(to: url)
+
+        let rival = try ReplayRivalImportLoader.loadRival(from: url, fileName: url.lastPathComponent)
+
+        XCTAssertEqual(rival.kind, .importedFile)
+        XCTAssertEqual(rival.strokes.count, 2)
+        XCTAssertEqual(rival.localFileName, url.lastPathComponent)
+    }
+
+    func testImportLoaderRejectsOversizedFileWithoutReadingItAll() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-rival-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(repeating: 0x41, count: 128).write(to: url)
+
+        XCTAssertThrowsError(
+            try ReplayRivalImportLoader.readData(from: url, maximumBytes: 32)
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .fileTooLarge)
+        }
+    }
+
+    func testFilePanelCancellationIsNotPresentedAsAnImportOrExportError() {
+        let cancellation = NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
+        let unrelated = NSError(domain: "example", code: NSUserCancelledError)
+
+        XCTAssertTrue(ReplayView.isUserCancellation(cancellation))
+        XCTAssertFalse(ReplayView.isUserCancellation(unrelated))
+        XCTAssertFalse(ReplayView.isUserCancellation(ReplayRivalFileParserError.malformed))
+    }
+
     func testSceneIdentityUsesGenericRivalID() {
         let noRival = Replay3DSceneIdentity(
             workoutID: 1,

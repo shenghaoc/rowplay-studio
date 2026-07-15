@@ -119,7 +119,10 @@ public enum ReplayRivalFactory: Sendable {
         guard strokes.count >= 2 else { return nil }
         let lastComponent = fileName.map(Self.lastPathComponent).flatMap { $0.isEmpty ? nil : $0 }
         let label = lastComponent ?? "Imported rival"
-        let idSuffix = lastComponent.map { Self.stableStringKey($0) } ?? UUID().uuidString
+        let sourceKey = lastComponent.map(Self.stableStringKey) ?? "anonymous"
+        // Include the normalized trace so replacing a same-named file refreshes
+        // SwiftUI/RealityKit identity and every derived race/share artifact.
+        let idSuffix = "\(sourceKey)-\(Self.stableTraceKey(strokes))"
         return ReplayRival(
             id: "file-\(idSuffix)",
             kind: .importedFile,
@@ -198,6 +201,31 @@ public enum ReplayRivalFactory: Sendable {
         var hash: UInt64 = 5381
         for unit in value.utf8 {
             hash = ((hash &<< 5) &+ hash) &+ UInt64(unit)
+        }
+        return String(hash, radix: 16)
+    }
+
+    private static func stableTraceKey(_ strokes: [Stroke]) -> String {
+        // Fixed FNV-1a over numeric bit patterns. Swift's Hasher is deliberately
+        // randomized and therefore unsuitable for stable view identity.
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let prime: UInt64 = 1_099_511_628_211
+
+        func mix(_ value: UInt64) {
+            for shift in stride(from: 0, through: 56, by: 8) {
+                hash ^= (value >> UInt64(shift)) & 0xFF
+                hash &*= prime
+            }
+        }
+
+        mix(UInt64(strokes.count))
+        for stroke in strokes {
+            mix(stroke.t.bitPattern)
+            mix(stroke.d.bitPattern)
+            mix(stroke.pace.bitPattern)
+            mix(stroke.cadence.bitPattern)
+            mix(stroke.heartRate.map { UInt64(bitPattern: Int64($0)) } ?? UInt64.max)
+            mix(UInt64(bitPattern: Int64(stroke.watts)))
         }
         return String(hash, radix: 16)
     }

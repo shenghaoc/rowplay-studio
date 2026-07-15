@@ -53,7 +53,6 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(decoded.rival.kind, .constantPace)
         XCTAssertEqual(decoded.rival.targetPace ?? -1, 120, accuracy: 0.001)
         XCTAssertEqual(decoded.rival.label, "Pace boat")
-        XCTAssertEqual(decoded.primary.workoutID, 7)
         XCTAssertEqual(decoded.sport, .rower)
     }
 
@@ -90,7 +89,6 @@ final class ReplayRaceReportTests: XCTestCase {
         let json = String(decoding: data, as: UTF8.self)
 
         XCTAssertEqual(report.rival.label, "Imported rival")
-        XCTAssertNil(report.rival.sessionWorkoutID)
         XCTAssertFalse(json.contains("secret-workout"))
         XCTAssertFalse(json.contains(".fit"))
         XCTAssertFalse(json.contains("localFileName"))
@@ -98,6 +96,8 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertFalse(json.contains("token"))
         XCTAssertFalse(json.contains("/Users/"))
         XCTAssertFalse(json.contains("http"))
+        XCTAssertFalse(json.contains("workoutID"))
+        XCTAssertFalse(json.contains("sessionWorkoutID"))
     }
 
     func testSessionReportUsesGenericLabel() throws {
@@ -136,7 +136,6 @@ final class ReplayRaceReportTests: XCTestCase {
             sessionDate: sessionDate
         )
         XCTAssertEqual(report.rival.label, "Past session")
-        XCTAssertEqual(report.rival.sessionWorkoutID, 9)
         XCTAssertEqual(report.rival.sessionDate, sessionDate)
     }
 }

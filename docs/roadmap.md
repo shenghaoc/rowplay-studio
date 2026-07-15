@@ -368,11 +368,11 @@ Status: complete on branch `codex/phase-10b-complete-rival-workflow` (this PR).
 Scope:
 
 - Generic `ReplayRival` model for past-session, constant-pace, and imported-file rivals.
-- `ReplayRivalFactory` for session conversion, constant-pace boats (distance- and time-axis), and imported traces.
-- Dependency-free `ReplayRivalFileParser` for CSV, TCX, and bounded FIT (25 MiB / 200k sample caps).
+- `ReplayRivalFactory` for session conversion, constant-pace boats (distance- and time-axis), and trace-aware imported identities that refresh same-named replacement files.
+- Dependency-free `ReplayRivalFileParser` for streaming quoted CSV, strict namespace-insensitive TCX XML without DTD/entity expansion, and bounded FIT with declared-payload truncation and field-bound checks (25 MiB / 200k sample caps); file reads stop at the cap before parsing.
 - `ReplayRaceResult` with interpolated target-distance crossing, time-axis distance comparison, DNF, and tie tolerances.
 - Finish verdict UI after primary finish; seek-back hides the banner until finish again.
-- Privacy-safe local `ReplayRaceReport` JSON export and native race-card PNG export/share (no public URL).
+- Privacy-safe local `ReplayRaceReport` JSON export and native race-card PNG export/share, omitting imported filenames and internal workout/session identifiers (no public URL).
 - 2D and 3D support for all rival kinds; constant-pace/imported use fallback 3D articulation.
 - Correct roadmap status for merged Phase 8D (PR #58) and Phase 10A (PR #61).
 

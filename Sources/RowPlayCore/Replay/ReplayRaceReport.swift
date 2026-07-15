@@ -59,20 +59,17 @@ public struct ReplayRaceReport: Codable, Equatable, Sendable {
     }
 
     public struct ParticipantSummary: Codable, Equatable, Sendable {
-        public var workoutID: Int
         public var date: Date
         public var distance: Double
         public var time: TimeInterval
         public var pace: TimeInterval
 
         public init(
-            workoutID: Int,
             date: Date,
             distance: Double,
             time: TimeInterval,
             pace: TimeInterval
         ) {
-            self.workoutID = workoutID
             self.date = date
             self.distance = distance
             self.time = time
@@ -83,7 +80,6 @@ public struct ReplayRaceReport: Codable, Equatable, Sendable {
     /// Sanitized rival kind and metrics only — never filenames or paths.
     public struct RivalSummary: Codable, Equatable, Sendable {
         public var kind: ReplayRivalKind
-        public var sessionWorkoutID: Int?
         public var sessionDate: Date?
         public var targetPace: TimeInterval?
         /// Generic label for reports ("Past session", "Pace boat", "Imported rival").
@@ -91,13 +87,11 @@ public struct ReplayRaceReport: Codable, Equatable, Sendable {
 
         public init(
             kind: ReplayRivalKind,
-            sessionWorkoutID: Int? = nil,
             sessionDate: Date? = nil,
             targetPace: TimeInterval? = nil,
             label: String
         ) {
             self.kind = kind
-            self.sessionWorkoutID = sessionWorkoutID
             self.sessionDate = sessionDate
             self.targetPace = targetPace
             self.label = label
@@ -128,7 +122,6 @@ public enum ReplayRaceReportBuilder: Sendable {
         case .session:
             rivalSummary = .init(
                 kind: .session,
-                sessionWorkoutID: rival.sessionWorkoutID,
                 sessionDate: sessionDate,
                 label: "Past session"
             )
@@ -151,7 +144,6 @@ public enum ReplayRaceReportBuilder: Sendable {
             sport: player.sport,
             target: target,
             primary: .init(
-                workoutID: player.id,
                 date: player.date,
                 distance: player.distance,
                 time: player.time,
@@ -167,24 +159,24 @@ public enum ReplayRaceReportBuilder: Sendable {
 }
 
 public enum ReplayRaceReportCodec: Sendable {
-    private static let encoder: JSONEncoder = {
+    private static func makeEncoder() -> JSONEncoder {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         e.outputFormatting = [.sortedKeys]
         return e
-    }()
+    }
 
-    private static let decoder: JSONDecoder = {
+    private static func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
-    }()
+    }
 
     public static func encode(_ report: ReplayRaceReport) throws -> Data {
-        try encoder.encode(report)
+        try makeEncoder().encode(report)
     }
 
     public static func decode(_ data: Data) throws -> ReplayRaceReport {
-        try decoder.decode(ReplayRaceReport.self, from: data)
+        try makeDecoder().decode(ReplayRaceReport.self, from: data)
     }
 }

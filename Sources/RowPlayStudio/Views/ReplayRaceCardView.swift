@@ -104,14 +104,20 @@ struct ReplayRaceCardView: View {
     }
 
     private var rivalLines: [String] {
-        var lines: [String] = [report.rival.kind.displayName]
-        if let pace = report.rival.targetPace {
-            lines.append(RowPlayFormatting.pace(pace))
+        switch report.rival.kind {
+        case .session:
+            if let date = report.rival.sessionDate {
+                return [date.formatted(.dateTime.year().month(.abbreviated).day())]
+            }
+            return []
+        case .constantPace:
+            if let pace = report.rival.targetPace {
+                return [RowPlayFormatting.pace(pace)]
+            }
+            return []
+        case .importedFile:
+            return []
         }
-        if report.rival.kind == .session, let id = report.rival.sessionWorkoutID {
-            lines.append("Session #\(id)")
-        }
-        return lines
     }
 
     private var marginLines: [String]? {
@@ -144,16 +150,6 @@ struct ReplayRaceCardView: View {
 
     private var accessibilitySummary: String {
         "\(outcomeLine). \(report.sport.displayName). \(targetLine)."
-    }
-}
-
-extension ReplayRivalKind {
-    var displayName: String {
-        switch self {
-        case .session: return "Past session"
-        case .constantPace: return "Constant pace"
-        case .importedFile: return "Imported rival"
-        }
     }
 }
 

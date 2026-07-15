@@ -76,6 +76,8 @@ final class ReplayRaceCardTests: XCTestCase {
         XCTAssertFalse(json.contains("token"))
         XCTAssertFalse(json.contains("http://"))
         XCTAssertFalse(json.contains("https://"))
+        XCTAssertFalse(json.contains("workoutID"))
+        XCTAssertFalse(json.contains("sessionWorkoutID"))
         XCTAssertEqual(report.rival.label, "Imported rival")
     }
 

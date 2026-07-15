@@ -13,6 +13,7 @@ struct ReplayView: View {
 
     let detail: WorkoutDetail
     let ghostCandidates: [WorkoutDetail]
+    private let ghostCandidateByID: [Int: WorkoutDetail]
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var currentLocale
     @EnvironmentObject private var preferences: AppPreferences
@@ -52,10 +53,14 @@ struct ReplayView: View {
     ) {
         self.detail = detail
         self.ghostCandidates = ghostCandidates
+        let candidateByID = ghostCandidates.reduce(into: [Int: WorkoutDetail]()) { result, candidate in
+            result[candidate.id] = candidate
+        }
+        self.ghostCandidateByID = candidateByID
         _state = State(initialValue: ReplayState(strokes: detail.strokes))
         let initialRival: ReplayRival? = {
             guard let id = initialGhostID,
-                  let candidate = ghostCandidates.first(where: { $0.id == id }) else {
+                  let candidate = candidateByID[id] else {
                 return nil
             }
             return ReplayRivalFactory.makeSessionRival(from: candidate)
@@ -111,13 +116,16 @@ struct ReplayView: View {
         .onChange(of: preferences.replayRenderQuality) { _, quality in
             effectiveReplayQuality = quality
         }
+        .onChange(of: colorScheme) { _, _ in
+            shareCardItem = nil
+            prepareShareCardIfFinished()
+        }
         .onChange(of: activeRival?.id) { _, _ in
             handleRivalChange()
         }
         .onChange(of: showsFinishVerdict) { _, isFinished in
-            guard isFinished, shareCardItem == nil,
-                  let rival = activeRival, let result = cachedRaceResult else { return }
-            prepareShareCard(rival: rival, result: result)
+            guard isFinished else { return }
+            prepareShareCardIfFinished()
         }
         .fileImporter(
             isPresented: $showFileImporter,
@@ -131,16 +139,22 @@ struct ReplayView: View {
             item: exportReportItem,
             contentTypes: [.json],
             defaultFilename: exportReportItem?.suggestedName ?? "race-report.json"
-        ) { _ in
+        ) { result in
             exportReportItem = nil
+            if case .failure(let error) = result, !Self.isUserCancellation(error) {
+                rivalErrorMessage = "Could not save race report"
+            }
         }
         .fileExporter(
             isPresented: $showCardExporter,
             item: exportCardItem,
             contentTypes: [.png],
             defaultFilename: exportCardItem?.suggestedName ?? "race-card.png"
-        ) { _ in
+        ) { result in
             exportCardItem = nil
+            if case .failure(let error) = result, !Self.isUserCancellation(error) {
+                rivalErrorMessage = "Could not save race card"
+            }
         }
         .popover(isPresented: $showPaceEditor, arrowEdge: .bottom) {
             paceEditorPopover
@@ -268,6 +282,11 @@ struct ReplayView: View {
                     showFileImporter = true
                 }
                 .disabled(isImportingRival)
+                #if os(macOS)
+                .help(isImportingRival
+                    ? "A rival file is already being imported"
+                    : "Choose a CSV, TCX, or FIT rival file")
+                #endif
             } label: {
                 Label("Replay rival", systemImage: "person.2.fill")
                     .labelStyle(.iconOnly)
@@ -363,7 +382,10 @@ struct ReplayView: View {
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let error):
-            rivalErrorMessage = error.localizedDescription
+            guard !Self.isUserCancellation(error) else { return }
+            // File-panel errors can contain a full local path. Keep the UI
+            // actionable without surfacing that path.
+            rivalErrorMessage = "Could not open the selected rival file"
         case .success(let urls):
             guard let url = urls.first else { return }
             isImportingRival = true
@@ -380,15 +402,10 @@ struct ReplayView: View {
                 }
                 do {
                     let rival = try await Task.detached(priority: .userInitiated) {
-                        let data = try Data(contentsOf: url)
-                        let parsed = try ReplayRivalFileParser.parse(data: data, fileName: lastComponent)
-                        guard let rival = ReplayRivalFactory.makeImportedRival(
-                            strokes: parsed.strokes,
-                            fileName: parsed.fileName
-                        ) else {
-                            throw ReplayRivalFileParserError.tooFewSamples
-                        }
-                        return rival
+                        try ReplayRivalImportLoader.loadRival(
+                            from: url,
+                            fileName: lastComponent
+                        )
                     }.value
                     activeRival = rival
                     isImportingRival = false
@@ -428,6 +445,7 @@ struct ReplayView: View {
         } else {
             cachedRaceResult = nil
         }
+        prepareShareCardIfFinished()
     }
 
     private func candidateLabel(for candidate: WorkoutDetail) -> some View {
@@ -446,7 +464,7 @@ struct ReplayView: View {
         switch active.kind {
         case .session:
             if let id = active.sessionWorkoutID,
-               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+               let candidate = ghostCandidateByID[id] {
                 let w = candidate.workout
                 let dist = RowPlayFormatting.distance(w.distance, unit: unit)
                 let pace = RowPlayFormatting.pace(w.pace)
@@ -506,7 +524,7 @@ struct ReplayView: View {
         switch rival.kind {
         case .session:
             if let id = rival.sessionWorkoutID,
-               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+               let candidate = ghostCandidateByID[id] {
                 return candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
             }
             return "Session"
@@ -608,7 +626,7 @@ struct ReplayView: View {
         switch rival.kind {
         case .session:
             if let id = rival.sessionWorkoutID,
-               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+               let candidate = ghostCandidateByID[id] {
                 let date = candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
                 return "your \(date) session"
             }
@@ -630,7 +648,7 @@ struct ReplayView: View {
     private func makeReport(rival: ReplayRival, result: ReplayRaceResult) -> ReplayRaceReport {
         let sessionDate: Date? = {
             guard let id = rival.sessionWorkoutID else { return nil }
-            return ghostCandidates.first(where: { $0.id == id })?.workout.date
+            return ghostCandidateByID[id]?.workout.date
         }()
         return ReplayRaceReportBuilder.build(
             player: detail.workout,
@@ -677,6 +695,21 @@ struct ReplayView: View {
             data: png,
             suggestedName: "rowplay-\(detail.id)-race-card.png"
         )
+    }
+
+    private func prepareShareCardIfFinished() {
+        guard showsFinishVerdict,
+              shareCardItem == nil,
+              let rival = activeRival,
+              let result = cachedRaceResult else {
+            return
+        }
+        prepareShareCard(rival: rival, result: result)
+    }
+
+    static func isUserCancellation(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError
     }
 
     // MARK: - Replay Surface
@@ -850,7 +883,7 @@ struct ReplayView: View {
             // Drop non-session or missing session rivals when the workout changes.
             if let rival = activeRival, rival.kind == .session {
                 if let id = rival.sessionWorkoutID,
-                   !ghostCandidates.contains(where: { $0.id == id }) {
+                   ghostCandidateByID[id] == nil {
                     activeRival = nil
                 }
             }

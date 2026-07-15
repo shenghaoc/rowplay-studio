@@ -204,4 +204,32 @@ final class ReplayRivalFactoryTests: XCTestCase {
         XCTAssertFalse(rival?.id.contains("Users") ?? true)
         XCTAssertFalse(rival?.id.contains("secret") ?? true)
     }
+
+    func testImportedRivalIdentityIncludesTraceContent() throws {
+        let firstTrace = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),
+            Stroke(t: 100, d: 400, pace: 125, cadence: 0, watts: 190),
+        ]
+        let replacementTrace = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),
+            Stroke(t: 90, d: 400, pace: 112.5, cadence: 0, watts: 220),
+        ]
+
+        let first = try XCTUnwrap(ReplayRivalFactory.makeImportedRival(
+            strokes: firstTrace,
+            fileName: "rival.csv"
+        ))
+        let same = try XCTUnwrap(ReplayRivalFactory.makeImportedRival(
+            strokes: firstTrace,
+            fileName: "rival.csv"
+        ))
+        let replacement = try XCTUnwrap(ReplayRivalFactory.makeImportedRival(
+            strokes: replacementTrace,
+            fileName: "rival.csv"
+        ))
+
+        XCTAssertEqual(first.id, same.id)
+        XCTAssertNotEqual(first.id, replacement.id)
+        XCTAssertFalse(first.id.contains("rival.csv"))
+    }
 }

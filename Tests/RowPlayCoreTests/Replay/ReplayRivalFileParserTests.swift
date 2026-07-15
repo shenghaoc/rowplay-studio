@@ -126,35 +126,97 @@ final class ReplayRivalFileParserTests: XCTestCase {
     }
 
     func testFITCompressedTimestampRecordsAreImported() throws {
-        var bytes: [UInt8] = [
-            14, 0x10, 0, 0,
-            0, 0, 0, 0,
-            0x2E, 0x46, 0x49, 0x54,
-            0, 0,
-        ]
-        let records: [UInt8] = [
-            // Local-message definition: record (20), timestamp then distance.
-            0x40, 0, 0, 20, 0, 2,
-            253, 4, 0x86,
-            5, 4, 0x86,
-            // Normal record at t=1_000 with distance 0 cm.
-            0x00, 0xE8, 0x03, 0, 0, 0, 0, 0, 0,
-            // Compressed timestamp offset 9 => t=1_001, distance 100 cm.
-            0x89, 0x64, 0, 0, 0,
-        ]
-        let dataSize = UInt32(records.count)
-        bytes[4] = UInt8(dataSize & 0xFF)
-        bytes[5] = UInt8((dataSize >> 8) & 0xFF)
-        bytes[6] = UInt8((dataSize >> 16) & 0xFF)
-        bytes[7] = UInt8((dataSize >> 24) & 0xFF)
-        bytes.append(contentsOf: records)
-
-        let parsed = try ReplayRivalFileParser.parse(data: Data(bytes), fileName: "compressed.fit")
+        let parsed = try ReplayRivalFileParser.parse(
+            data: makeCompressedTimestampFIT(),
+            fileName: "compressed.fit"
+        )
 
         XCTAssertEqual(parsed.strokes.count, 2)
         XCTAssertEqual(parsed.strokes[0].t, 0, accuracy: 0.001)
         XCTAssertEqual(parsed.strokes[1].t, 1, accuracy: 0.001)
         XCTAssertEqual(parsed.strokes[1].d, 1, accuracy: 0.001)
+    }
+
+    func testFITDeclaredPayloadTruncationIsRejected() {
+        var truncated = makeCompressedTimestampFIT()
+        truncated.removeLast()
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: truncated, fileName: "truncated.fit")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
+    }
+
+    func testTCXPrefixedTrackpointsAreNamespaceInsensitive() throws {
+        let tcx = """
+        <?xml version="1.0"?>
+        <tcx:TrainingCenterDatabase xmlns:tcx="urn:garmin:tcx">
+          <tcx:Trackpoint>
+            <tcx:Time>2026-07-15T10:00:00Z</tcx:Time>
+            <tcx:DistanceMeters>0</tcx:DistanceMeters>
+          </tcx:Trackpoint>
+          <tcx:Trackpoint>
+            <tcx:Time>2026-07-15T10:00:10Z</tcx:Time>
+            <tcx:DistanceMeters>50</tcx:DistanceMeters>
+          </tcx:Trackpoint>
+        </tcx:TrainingCenterDatabase>
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "prefixed.tcx")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testTCXOutOfOrderTrackpointsAreSortedBeforeNormalization() throws {
+        let tcx = """
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "unordered.tcx")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[0].t, 0, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[0].d, 0, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testMalformedTCXIsRejectedInsteadOfPartiallyImported() {
+        let tcx = """
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters>
+        </TrainingCenterDatabase>
+        """
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "broken.tcx")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
+    }
+
+    func testTCXDocumentTypeIsRejectedToPreventEntityExpansion() {
+        let tcx = """
+        <?xml version="1.0"?>
+        <!DOCTYPE TrainingCenterDatabase [<!ENTITY distance "50">]>
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>&distance;</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "entities.tcx")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
     }
 
     func testNormalizationParityCases() throws {
@@ -179,6 +241,20 @@ final class ReplayRivalFileParserTests: XCTestCase {
             try ReplayRivalFileParser.parse(data: oversize, fileName: "huge.csv")
         ) { error in
             XCTAssertEqual(error as? ReplayRivalFileParserError, .fileTooLarge)
+        }
+    }
+
+    func testCSVSampleLimitIsEnforcedDuringStreamingScan() {
+        var csv = "time,distance\n"
+        csv.reserveCapacity(3_000_000)
+        for index in 0...ReplayRivalFileParser.maximumAcceptedSamples {
+            csv.append("\(index),\(index)\n")
+        }
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "too-many.csv")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .tooManySamples)
         }
     }
 
@@ -213,6 +289,57 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes.count, 2)
         XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
         XCTAssertEqual(parsed.strokes[1].d, 1_000, accuracy: 0.001)
+    }
+
+    func testCSVQuotedNewlinePreservesRecordBoundaries() throws {
+        let csv = """
+        note,time,distance
+        "First
+        steady",0,0
+        "Finish",10,50
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "multiline.csv")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testCSVUnbalancedQuoteIsRejected() {
+        let csv = "time,distance,note\n0,0,\"unterminated\n10,50,still quoted\n"
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "broken.csv")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
+    }
+
+    private func makeCompressedTimestampFIT() -> Data {
+        var bytes: [UInt8] = [
+            14, 0x10, 0, 0,
+            0, 0, 0, 0,
+            0x2E, 0x46, 0x49, 0x54,
+            0, 0,
+        ]
+        let records: [UInt8] = [
+            // Local-message definition: record (20), timestamp then distance.
+            0x40, 0, 0, 20, 0, 2,
+            253, 4, 0x86,
+            5, 4, 0x86,
+            // Normal record at t=1_000 with distance 0 cm.
+            0x00, 0xE8, 0x03, 0, 0, 0, 0, 0, 0,
+            // Compressed timestamp offset 9 => t=1_001, distance 100 cm.
+            0x89, 0x64, 0, 0, 0,
+        ]
+        let dataSize = UInt32(records.count)
+        bytes[4] = UInt8(dataSize & 0xFF)
+        bytes[5] = UInt8((dataSize >> 8) & 0xFF)
+        bytes[6] = UInt8((dataSize >> 16) & 0xFF)
+        bytes[7] = UInt8((dataSize >> 24) & 0xFF)
+        bytes.append(contentsOf: records)
+        return Data(bytes)
     }
 
     private func assertOptionalExpectations(_ c: TextCase, strokes: [Stroke]) {

@@ -10,7 +10,7 @@ No network service or public share URL is required. “Share” means native loc
 
 ### R1: Generic Rival Model
 - Portable `ReplayRival` in RowPlayCore for past session, constant pace, and imported file.
-- Stable identifier suitable for SwiftUI and 3D scene identity.
+- Stable identifier suitable for SwiftUI and 3D scene identity; imported identity includes normalized trace content so replacing a same-named file refreshes derived state.
 - Rival kind, local display label, `[Stroke]`, genuine-stroke flag, optional session workout ID, optional target pace.
 - No tokens, full filesystem paths, hardware identifiers, or account data.
 - Imported filename (last path component only) may appear in local UI only.
@@ -28,9 +28,9 @@ No network service or public share URL is required. “Share” means native loc
 - Portable, dependency-free `ReplayRivalFileParser`.
 - Accept `Data` plus last path component; detect FIT by signature/extension, TCX by extension/XML, else CSV.
 - Limits: 25 MiB, 200_000 samples.
-- CSV: flexible headers, RFC 4180-style quoted fields, clock formats, derived pace/watts.
-- TCX: namespace-insensitive trackpoints; relative timestamps.
-- FIT: bounded record-message parser without external SDK.
+- CSV: flexible headers, streaming RFC 4180-style quoted fields (including embedded newlines), clock formats, derived pace/watts, and malformed-quote rejection.
+- TCX: namespace-aware XML parsing with namespace-insensitive trackpoints, DTD/entity rejection, strict malformed-document rejection, and relative timestamps after sorting.
+- FIT: bounded record-message parser without external SDK; declared payload truncation and unknown message definitions fail safely.
 - Normalize time to zero, remove invalid samples, require ≥2 samples.
 - Never log file contents or paths.
 
@@ -44,7 +44,7 @@ No network service or public share URL is required. “Share” means native loc
 - One generic active rival preserving Phase 10A past-session behavior.
 - Menu: No Rival, Best Match, ranked sessions, Set Constant Pace…, Import Rival File….
 - Pace editor uses `PaceInput`; invalid pace does not replace current rival.
-- File import via `.fileImporter` with security-scoped access; parse off main actor.
+- File import via `.fileImporter` with security-scoped access; bounded read and parse off main actor without first loading an oversized file in full.
 - Rival change preserves time, play/pause, speed, renderer, camera, quality; increments discontinuity; rebuilds 2D path; clears 3D rival effect state; caches race result once.
 
 ### R6: 2D and 3D Rendering
@@ -62,9 +62,11 @@ No network service or public share URL is required. “Share” means native loc
 
 ### R8: Race Export and Share
 - Versioned Codable `ReplayRaceReport` privacy-safe JSON.
+- Exported reports/cards omit imported filenames and internal workout/session identifiers; past-session cards use the session date.
 - Native race card PNG via ImageRenderer/AppKit in Studio.
 - Save Race Report…, Save Race Card…, Share Race Card (macOS share sheet).
 - Race-card share data is prepared when the verdict appears so Share Race Card opens in one action.
+- Rival and appearance changes invalidate and rebuild prepared share-card data.
 - No public URL or network work.
 
 ### R9: Architecture, Privacy, Performance, Accessibility

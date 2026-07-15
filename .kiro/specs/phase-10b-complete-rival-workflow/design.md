@@ -12,10 +12,10 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 ### ReplayRivalFactory
 - Session: from `WorkoutDetail` (≥2 strokes).
 - Constant pace: two-point trace; distance axis ends at player distance; time axis ends at player duration with derived distance; sport-aware watts.
-- Imported: from normalized strokes; non-genuine.
+- Imported: from normalized strokes; non-genuine; deterministic identity fingerprints both last-path-component and normalized trace so same-named replacement files invalidate cached UI/3D state.
 
 ### ReplayRivalFileParser
-Dependency-free CSV/TCX/FIT parser with size and sample caps. CSV uses a quote-aware state machine. FIT is a bounded record-message decoder, including compressed timestamps, with explicit buffer bounds checks. Returns strokes + last path component or typed error.
+Dependency-free CSV/TCX/FIT parser with size and sample caps. CSV uses a streaming quote-aware state machine with quoted-newline support and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, field, and buffer bounds checks. Returns strokes + last path component or typed error.
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
@@ -24,13 +24,13 @@ Dependency-free CSV/TCX/FIT parser with size and sample caps. CSV uses a quote-a
 - Outcomes playerWon / rivalWon / tie with finite non-negative margins.
 
 ### ReplayRaceReport
-Versioned Codable schema excluding tokens, comments, paths, filenames, hardware IDs, account IDs, logs, and public URLs. Builder maps imported rivals to the generic label “Imported rival”.
+Versioned Codable schema excluding tokens, comments, paths, filenames, internal workout/session IDs, hardware IDs, account IDs, logs, and public URLs. Builder maps imported rivals to the generic label “Imported rival”; session cards use a date rather than an identifier.
 
 ## UI Design
 
 ### ReplayView
 - `activeRival: ReplayRival?` replaces session-only `selectedGhostID`.
-- Menu adds constant-pace and import actions; pace popover; balanced main-actor security-scope lifetime around detached file reading and parsing.
+- Menu adds constant-pace and import actions; pace popover; balanced main-actor security-scope lifetime around detached bounded file reading and parsing.
 - `cachedRaceResult` recomputed only on rival (or detail) change.
 - Finish banner when `state.time >= duration - 0.05` with export/share actions.
 - Seeking before finish hides the banner without clearing the cache.
@@ -44,18 +44,19 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, hardware 
 ### Race Card
 - `ReplayRaceCardView` + `ReplayRaceCardRenderer` (ImageRenderer → PNG).
 - `ReplayRaceReportTransferItem` / `ReplayRaceCardTransferItem` for exporters and ShareLink.
-- Share-card data is pre-rendered when the finish verdict appears, making the native share sheet a single-click action.
+- Share-card data is pre-rendered when the finish verdict appears, making the native share sheet a single-click action; rival and appearance changes invalidate and regenerate it.
 
 ## Privacy
 
 - No new logs by default; if added, use `PrivacySafeLogger` + redaction.
 - Never log filenames, paths, contents, strokes, or report JSON bodies.
-- Export JSON omits `localFileName` and uses generic rival labels for imported files.
+- Export JSON omits `localFileName` and internal workout/session IDs and uses generic rival labels for imported files.
 
 ## Performance
 
-- File parse off main actor; 25 MiB / 200k sample caps.
+- File read and parse off main actor; read stops at 25 MiB + 1 byte and parsing enforces the 25 MiB / 200k sample caps.
 - Race calculation O(N) once per rival selection.
+- Past-session display/accessibility lookups use an initializer-built ID map rather than render-time array scans.
 - 2D paths precomputed; Canvas only strokes cached paths.
 - 3D pose contexts rebuilt only on rival identity change.
 
