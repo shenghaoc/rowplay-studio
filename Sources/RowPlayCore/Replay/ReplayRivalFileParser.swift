@@ -67,9 +67,20 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
     private var currentElement: String?
     private var textBuffer = ""
     private var isInsideHeartRate = false
+    private var elementStack: [String] = []
+    private var rootElementCount = 0
+    private var didReachEndDocument = false
 
     private(set) var samples: [RawRivalSample] = []
     private(set) var exceededSampleLimit = false
+    private(set) var isStructurallyMalformed = false
+
+    var isStructurallyComplete: Bool {
+        didReachEndDocument
+            && !isStructurallyMalformed
+            && rootElementCount == 1
+            && elementStack.isEmpty
+    }
 
     init(sampleLimit: Int) {
         self.sampleLimit = sampleLimit
@@ -85,6 +96,15 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         attributes attributeDict: [String: String] = [:]
     ) {
         let name = Self.localName(qName ?? elementName)
+        if elementStack.isEmpty {
+            rootElementCount += 1
+            if rootElementCount > 1 {
+                isStructurallyMalformed = true
+                parser.abortParsing()
+                return
+            }
+        }
+        elementStack.append(name)
         if name == "trackpoint" {
             pending = PendingTrackpoint()
         }
@@ -108,8 +128,14 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
-        guard var trackpoint = pending else { return }
         let name = Self.localName(qName ?? elementName)
+        guard elementStack.last == name else {
+            isStructurallyMalformed = true
+            parser.abortParsing()
+            return
+        }
+        elementStack.removeLast()
+        guard var trackpoint = pending else { return }
         let value = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch name {
@@ -156,6 +182,10 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         }
         currentElement = nil
         textBuffer.removeAll(keepingCapacity: true)
+    }
+
+    func parserDidEndDocument(_ parser: XMLParser) {
+        didReachEndDocument = true
     }
 
     private func secondsSinceEpoch(_ text: String) -> Double? {
@@ -540,7 +570,7 @@ public enum ReplayRivalFileParser: Sendable {
         if delegate.exceededSampleLimit {
             throw ReplayRivalFileParserError.tooManySamples
         }
-        guard succeeded else {
+        guard succeeded, delegate.isStructurallyComplete else {
             throw ReplayRivalFileParserError.malformed
         }
         return delegate.samples
