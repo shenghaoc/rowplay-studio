@@ -95,4 +95,52 @@ final class GhostPickTests: XCTestCase {
         ]
         XCTAssertEqual(GhostPick.pickDefaultGhostCandidate(candidates: candidates, current: current)?.id, 3)
     }
+
+    // MARK: - rankedGhostCandidates
+
+    func testRankedGhostCandidatesReturnsEmptyWhenNoMatching() {
+        let current = GhostPickContext(id: 1, distance: 2000, sport: .rower, time: 480)
+        let ranked = GhostPick.rankedGhostCandidates(candidates: [], current: current)
+        XCTAssertTrue(ranked.isEmpty)
+    }
+
+    func testRankedGhostCandidatesExcludesNoStrokeData() {
+        let current = GhostPickContext(id: 1, distance: 2000, sport: .rower, time: 480)
+        var noStroke = makeWorkout(id: 2, distance: 2000, pace: 120, date: date("2026-01-01"))
+        noStroke = Workout(id: 2, date: noStroke.date, sport: .rower, distance: 2000,
+                           time: 480, pace: 120, workoutType: "FixedDistance", source: "Test", hasStrokeData: false)
+        let ranked = GhostPick.rankedGhostCandidates(candidates: [noStroke], current: current)
+        XCTAssertTrue(ranked.isEmpty)
+    }
+
+    func testRankedGhostCandidatesExcludesDifferentSport() {
+        let current = GhostPickContext(id: 1, distance: 2000, sport: .rower, time: 480)
+        let skierg = makeWorkout(id: 2, distance: 2000, pace: 120, date: date("2026-01-01"), sport: .skierg)
+        let ranked = GhostPick.rankedGhostCandidates(candidates: [skierg], current: current)
+        XCTAssertTrue(ranked.isEmpty)
+    }
+
+    func testRankedGhostCandidatesStableIDTieBreak() {
+        let current = GhostPickContext(id: 1, distance: 2000, sport: .rower, time: 480)
+        let d = date("2026-01-01")
+        let candidates = [
+            makeWorkout(id: 5, distance: 2000, pace: 120, date: d),
+            makeWorkout(id: 3, distance: 2000, pace: 120, date: d),
+        ]
+        let ranked = GhostPick.rankedGhostCandidates(candidates: candidates, current: current)
+        XCTAssertEqual(ranked.map(\.id), [3, 5])
+    }
+
+    func testRankedGhostCandidatesSanitizesNonFiniteInputs() {
+        let current = GhostPickContext(id: 1, distance: 2000, sport: .rower, time: 480)
+        // Non-finite values are rejected by ComparabilityGuard's distance band check,
+        // so the bogus workout won't survive the pool filter.
+        let bogus = Workout(id: 2, date: date("2026-01-01"), sport: .rower, distance: .infinity,
+                            time: .nan, pace: .infinity, workoutType: "FixedDistance", source: "Test", hasStrokeData: true)
+        let valid = makeWorkout(id: 3, distance: 2000, pace: 120, date: date("2026-02-01"))
+        let ranked = GhostPick.rankedGhostCandidates(candidates: [bogus, valid], current: current)
+        // Only the valid workout should survive the pool filter.
+        XCTAssertEqual(ranked.count, 1)
+        XCTAssertEqual(ranked[0].id, 3)
+    }
 }

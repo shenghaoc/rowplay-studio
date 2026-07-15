@@ -53,7 +53,10 @@ struct ContentView: View {
                         switch route {
                         case .replay(let workoutID):
                             if let detail = library.detail(id: workoutID) {
-                                ReplayView(detail: detail)
+                                ReplayView(
+                                    detail: detail,
+                                    ghostCandidates: library.ghostCandidates(for: workoutID)
+                                )
                             } else {
                                 ContentUnavailableView(
                                     "Workout Unavailable",

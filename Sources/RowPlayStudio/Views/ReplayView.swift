@@ -9,7 +9,7 @@ struct ReplayView: View {
     static let adaptiveQualityHelp = "Quality was reduced to maintain replay performance"
 
     let detail: WorkoutDetail
-    let ghostDetail: WorkoutDetail?
+    let ghostCandidates: [WorkoutDetail]
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var preferences: AppPreferences
     @Environment(\.automationModeEnabled) private var automationModeEnabled
@@ -21,23 +21,38 @@ struct ReplayView: View {
     @State private var cameraResetGeneration = 0
     @State private var replayDiscontinuityGeneration = 0
     @State private var strokePath = Path()
+    @State private var ghostStrokePath = Path()
     @State private var canvasSize: CGSize = .zero
     @State private var cachedMachineColor: Color = .accentColor
+    @State private var selectedGhostID: Int?
 
     private var unit: DistanceUnit { preferences.distanceUnit }
     private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
 
-    init(detail: WorkoutDetail, ghostDetail: WorkoutDetail? = nil) {
+    /// The active ghost detail resolved from the fixed candidate snapshot.
+    private var activeGhostDetail: WorkoutDetail? {
+        guard let selectedGhostID else { return nil }
+        return ghostCandidates.first { $0.id == selectedGhostID }
+    }
+
+    init(
+        detail: WorkoutDetail,
+        ghostCandidates: [WorkoutDetail] = [],
+        initialGhostID: Int? = nil
+    ) {
         self.detail = detail
-        self.ghostDetail = ghostDetail
+        self.ghostCandidates = ghostCandidates
         _state = State(initialValue: ReplayState(strokes: detail.strokes))
+        let validID = initialGhostID.flatMap { id in
+            ghostCandidates.contains(where: { $0.id == id }) ? id : nil
+        }
+        _selectedGhostID = State(initialValue: validID)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Mode picker
             rendererPicker
-            // Replay surface
+            rivalControlBand
             replaySurface
             Divider()
             telemetryBar
@@ -55,6 +70,19 @@ struct ReplayView: View {
         }
         .onChange(of: preferences.replayRenderQuality) { _, quality in
             effectiveReplayQuality = quality
+        }
+        .onChange(of: selectedGhostID) { _, _ in
+            replayDiscontinuityGeneration &+= 1
+            ghostStrokePath = Path()
+            if canvasSize != .zero {
+                if let ghost = activeGhostDetail {
+                    ghostStrokePath = makeGhostStrokePath(
+                        ghostStrokes: ghost.strokes,
+                        playerStrokes: detail.strokes,
+                        size: canvasSize
+                    )
+                }
+            }
         }
     }
 
@@ -117,6 +145,163 @@ struct ReplayView: View {
         .background(.ultraThinMaterial)
     }
 
+    // MARK: - Rival Control Band
+
+    private var rivalControlBand: some View {
+        HStack(spacing: AppDesign.Spacing.medium) {
+            Menu {
+                Button {
+                    selectedGhostID = nil
+                } label: {
+                    HStack {
+                        Text("No Rival")
+                        if selectedGhostID == nil {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
+                if !ghostCandidates.isEmpty {
+                    Button {
+                        selectedGhostID = ghostCandidates.first?.id
+                    } label: {
+                        HStack {
+                            Text("Best Match")
+                            if selectedGhostID == ghostCandidates.first?.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                if !ghostCandidates.isEmpty {
+                    Divider()
+
+                    ForEach(ghostCandidates) { candidate in
+                        Button {
+                            selectedGhostID = candidate.id
+                        } label: {
+                            HStack {
+                                Text(candidateLabel(for: candidate))
+                                if selectedGhostID == candidate.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Replay rival", systemImage: "person.2.fill")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Replay rival")
+            .accessibilityValue(rivalAccessibilityValue)
+            #if os(macOS)
+            .help(ghostCandidates.isEmpty
+                  ? "No comparable workout with stroke data"
+                  : "Choose a past session to race against")
+            #endif
+            .disabled(ghostCandidates.isEmpty)
+
+            if let active = activeGhostDetail {
+                rivalGapDisplay(for: active)
+            }
+
+            Spacer()
+
+            if activeGhostDetail != nil {
+                Button {
+                    selectedGhostID = nil
+                } label: {
+                    Image(systemName: "xmark.circle")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove replay rival")
+                #if os(macOS)
+                .help("Remove replay rival")
+                #endif
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal)
+        .background(.ultraThinMaterial)
+    }
+
+    private func candidateLabel(for candidate: WorkoutDetail) -> String {
+        let w = candidate.workout
+        let dateStr = w.date.formatted(date: .abbreviated, time: .omitted)
+        let distStr = RowPlayFormatting.distance(w.distance, unit: unit)
+        let paceStr = RowPlayFormatting.pace(w.pace)
+        return "\(dateStr) · \(distStr) · \(paceStr)"
+    }
+
+    private var rivalAccessibilityValue: String {
+        if ghostCandidates.isEmpty {
+            return "No comparable workout available"
+        }
+        if let active = activeGhostDetail {
+            let w = active.workout
+            let dist = RowPlayFormatting.distance(w.distance, unit: unit)
+            let pace = RowPlayFormatting.pace(w.pace)
+            return "Rival: \(dist) at \(pace) from \(w.date.formatted(date: .abbreviated, time: .omitted))"
+        }
+        return "No rival selected"
+    }
+
+    @ViewBuilder
+    private func rivalGapDisplay(for ghost: WorkoutDetail) -> some View {
+        let frame = state.currentFrame
+        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+        let gapM = ReplayRaceGap.raceGapMeters(
+            playerDistance: frame.d,
+            ghostDistance: ghostDist
+        )
+        let gapS = ReplayRaceGap.raceGapSeconds(
+            gapMeters: gapM,
+            playerPacePer500m: frame.pace
+        )
+        let gapColor = AppDesign.deltaColor(gapM, higherIsBetter: true)
+
+        HStack(spacing: AppDesign.Spacing.small) {
+            Text(ghost.workout.date.formatted(date: .abbreviated, time: .omitted))
+                .font(AppDesign.Typography.compactLabel)
+                .foregroundStyle(.secondary)
+
+            Text(gapLabel(meters: gapM))
+                .font(AppDesign.Typography.compactLabel.monospacedDigit())
+                .foregroundStyle(gapColor)
+
+            Text("·")
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+
+            Text(gapSecondsLabel(seconds: gapS))
+                .font(AppDesign.Typography.compactLabel.monospacedDigit())
+                .foregroundStyle(gapColor)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Race gap")
+        .accessibilityValue("\(gapLabel(meters: gapM)), \(gapSecondsLabel(seconds: gapS))")
+    }
+
+    private func gapLabel(meters: Double) -> String {
+        let safeM = meters.isFinite ? meters : 0
+        if abs(safeM) < 0.5 { return "Level" }
+        let prefix = safeM > 0 ? "Ahead" : "Behind"
+        let dist = RowPlayFormatting.distance(abs(safeM), unit: unit)
+        return "\(prefix) \(dist)"
+    }
+
+    private func gapSecondsLabel(seconds: Double) -> String {
+        let safeS = seconds.isFinite ? seconds : 0
+        let absS = abs(safeS)
+        if absS < 0.05 { return "0.0 s" }
+        let sign = safeS > 0 ? "+" : "-"
+        return "\(sign)\(String(format: "%.1f", absS)) s"
+    }
+
     private var visibleRendererModes: [ReplayRendererMode] {
         ReplayRendererMode.allCases
     }
@@ -133,7 +318,7 @@ struct ReplayView: View {
                 detail: detail,
                 state: $state,
                 reduceMotion: reduceMotion,
-                ghostDetail: ghostDetail,
+                ghostDetail: activeGhostDetail,
                 selectedQuality: preferences.replayRenderQuality,
                 effectiveQuality: Binding(
                     get: { displayedEffectiveReplayQuality },
@@ -145,7 +330,7 @@ struct ReplayView: View {
             )
             .id(Replay3DSceneIdentity(
                 workoutID: detail.id,
-                ghostWorkoutID: ghostDetail?.id,
+                ghostWorkoutID: activeGhostDetail?.id,
                 sportRawValue: detail.workout.sport.rawValue
             ))
             .frame(minHeight: 300)
@@ -260,16 +445,28 @@ struct ReplayView: View {
 
     private var replayCanvas: some View {
         Canvas { context, size in
+            // Ghost path (behind live path)
+            context.stroke(ghostStrokePath, with: .color(AppDesign.softPurple.opacity(0.35)), lineWidth: 1.5)
+            // Live path (dominant)
             context.stroke(strokePath, with: .color(cachedMachineColor.opacity(0.7)), lineWidth: 2)
+            drawGhostPlayhead(in: &context, size: size)
             drawPlayhead(in: &context, size: size)
         }
         .accessibilityLabel("Workout replay timeline")
+        .accessibilityValue(canvasAccessibilityValue)
         .background(
             GeometryReader { proxy in
                 Color.clear
                     .onChange(of: proxy.size, initial: true) { _, newSize in
                         canvasSize = newSize
                         strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
+                        if let ghost = activeGhostDetail {
+                            ghostStrokePath = makeGhostStrokePath(
+                                ghostStrokes: ghost.strokes,
+                                playerStrokes: detail.strokes,
+                                size: newSize
+                            )
+                        }
                     }
             }
         )
@@ -282,6 +479,18 @@ struct ReplayView: View {
         .onChange(of: detail.id) { _, _ in
             strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
             cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
+            if let selectedGhostID,
+               !ghostCandidates.contains(where: { $0.id == selectedGhostID }) {
+                self.selectedGhostID = nil
+            }
+            ghostStrokePath = Path()
+            if canvasSize != .zero, let ghost = activeGhostDetail {
+                ghostStrokePath = makeGhostStrokePath(
+                    ghostStrokes: ghost.strokes,
+                    playerStrokes: detail.strokes,
+                    size: canvasSize
+                )
+            }
         }
     }
 
@@ -310,6 +519,36 @@ struct ReplayView: View {
         context.fill(dot, with: .color(playheadColor))
     }
 
+    private func drawGhostPlayhead(in context: inout GraphicsContext, size: CGSize) {
+        guard let ghost = activeGhostDetail, !ghost.strokes.isEmpty else { return }
+        let duration = state.duration
+        let maxD = detail.strokes.last?.d ?? 1
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
+
+        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+        guard ghostDist.isFinite, ghostDist >= 0 else { return }
+
+        let x = unitFraction(state.time, denominator: duration) * size.width
+        let y = size.height - unitFraction(ghostDist, denominator: maxD) * size.height
+
+        let ghostColor = AppDesign.softPurple
+        let dotSize: CGFloat = 8
+        let dot = Path(ellipseIn: CGRect(
+            x: x - dotSize / 2,
+            y: y - dotSize / 2,
+            width: dotSize,
+            height: dotSize
+        ))
+        let strokeDot = Path(ellipseIn: CGRect(
+            x: x - dotSize / 2 - 1,
+            y: y - dotSize / 2 - 1,
+            width: dotSize + 2,
+            height: dotSize + 2
+        ))
+        context.stroke(strokeDot, with: .color(cachedMachineColor.opacity(0.3)), lineWidth: 1)
+        context.fill(dot, with: .color(ghostColor.opacity(0.8)))
+    }
+
     private func unitFraction(_ numerator: Double, denominator: Double) -> CGFloat {
         guard numerator.isFinite, denominator.isFinite, denominator > 0 else { return 0 }
         return CGFloat(max(0, min(1, numerator / denominator)))
@@ -336,6 +575,55 @@ struct ReplayView: View {
             }
         }
         return path
+    }
+
+    /// Precomputes the ghost stroke trail path using player chart scales
+    /// for direct comparability.
+    func makeGhostStrokePath(
+        ghostStrokes: [Stroke],
+        playerStrokes: [Stroke],
+        size: CGSize
+    ) -> Path {
+        guard ghostStrokes.count > 1, playerStrokes.count > 1 else { return Path() }
+
+        let playerOriginT = playerStrokes[0].t
+        let ghostOriginT = ghostStrokes[0].t
+        let maxT = playerStrokes.last?.t ?? playerOriginT
+        let maxD = playerStrokes.last?.d ?? 1
+        let duration = maxT - playerOriginT
+        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
+
+        var path = Path()
+        var firstPoint = true
+        for stroke in ghostStrokes {
+            // Sessions have independent absolute timestamp origins. Plot the ghost
+            // by its elapsed time, using the player's duration only as the chart scale.
+            let x = unitFraction(stroke.t - ghostOriginT, denominator: duration) * size.width
+            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
+            let clippedX = max(0, min(size.width, x))
+            let clippedY = max(0, min(size.height, y))
+            if firstPoint {
+                path.move(to: CGPoint(x: clippedX, y: clippedY))
+                firstPoint = false
+            } else {
+                path.addLine(to: CGPoint(x: clippedX, y: clippedY))
+            }
+        }
+        return path
+    }
+
+    private var canvasAccessibilityValue: String {
+        let frame = state.currentFrame
+        var parts: [String] = [
+            "Time \(RowPlayFormatting.time(frame.t, tenths: true))",
+            "Distance \(RowPlayFormatting.distance(frame.d, unit: unit))"
+        ]
+        if let ghost = activeGhostDetail {
+            let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+            let gapM = ReplayRaceGap.raceGapMeters(playerDistance: frame.d, ghostDistance: ghostDist)
+            parts.append(gapLabel(meters: gapM))
+        }
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Telemetry

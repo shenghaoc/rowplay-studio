@@ -107,8 +107,8 @@ final class ReplayRendererModeTests: XCTestCase {
             Stroke(t: 20, d: 100, pace: 120, cadence: 28, watts: 170),
         ]
 
-        XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 4, strokes: strokes), 14)
-        XCTAssertEqual(Replay3DPlayback.absoluteTime(elapsed: 50, strokes: strokes), 20)
+        XCTAssertEqual(ReplayRaceGap.absoluteTime(elapsed: 4, strokes: strokes), 14)
+        XCTAssertEqual(ReplayRaceGap.absoluteTime(elapsed: 50, strokes: strokes), 20)
     }
 
     func testReplayPlaybackClockStartsAtZeroAfterResume() {
