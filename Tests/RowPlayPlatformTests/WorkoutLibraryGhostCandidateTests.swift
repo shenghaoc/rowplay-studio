@@ -82,6 +82,34 @@ final class WorkoutLibraryGhostCandidateTests: XCTestCase {
         XCTAssertTrue(second.contains(where: { $0.id == 3 }))
     }
 
+    func testGhostCandidateCacheInvalidatesAfterUpdateDetail() {
+        let details = [
+            makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
+            makeDetail(id: 2, distance: 2_000, time: 480, pace: 130),
+            makeDetail(id: 3, distance: 2_000, time: 480, pace: 125),
+        ]
+        let library = WorkoutLibrary(details: details)
+        XCTAssertEqual(library.defaultGhostCandidate(for: 1)?.id, 3)
+
+        var updated = details[1]
+        updated.workout.pace = 110
+        library.updateDetail(updated)
+
+        XCTAssertEqual(library.defaultGhostCandidate(for: 1)?.id, 2)
+    }
+
+    func testGhostCandidatesUseFullLibraryDespiteActiveFilters() {
+        let details = [
+            makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
+            makeDetail(id: 2, distance: 2_000, time: 480, pace: 115),
+        ]
+        let library = WorkoutLibrary(details: details)
+        library.query = WorkoutListQuery(sport: .bike)
+
+        XCTAssertTrue(library.filteredWorkouts.isEmpty)
+        XCTAssertEqual(library.ghostCandidates(for: 1).map(\.id), [2])
+    }
+
     // MARK: - Default Ghost Candidate
 
     func testDefaultGhostCandidateReturnsFirstRanked() {
