@@ -15,7 +15,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 - Imported: from normalized strokes; non-genuine.
 
 ### ReplayRivalFileParser
-Dependency-free CSV/TCX/FIT parser with size and sample caps. Returns strokes + last path component or typed error. FIT is a bounded record-message decoder ported from web `sources.ts` with explicit buffer bounds checks.
+Dependency-free CSV/TCX/FIT parser with size and sample caps. CSV uses a quote-aware state machine. FIT is a bounded record-message decoder, including compressed timestamps, with explicit buffer bounds checks. Returns strokes + last path component or typed error.
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
@@ -30,7 +30,7 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, hardware 
 
 ### ReplayView
 - `activeRival: ReplayRival?` replaces session-only `selectedGhostID`.
-- Menu adds constant-pace and import actions; pace popover; security-scoped file import on a background task.
+- Menu adds constant-pace and import actions; pace popover; balanced main-actor security-scope lifetime around detached file reading and parsing.
 - `cachedRaceResult` recomputed only on rival (or detail) change.
 - Finish banner when `state.time >= duration - 0.05` with export/share actions.
 - Seeking before finish hides the banner without clearing the cache.
@@ -44,6 +44,7 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, hardware 
 ### Race Card
 - `ReplayRaceCardView` + `ReplayRaceCardRenderer` (ImageRenderer → PNG).
 - `ReplayRaceReportTransferItem` / `ReplayRaceCardTransferItem` for exporters and ShareLink.
+- Share-card data is pre-rendered when the finish verdict appears, making the native share sheet a single-click action.
 
 ## Privacy
 

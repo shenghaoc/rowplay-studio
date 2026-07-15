@@ -114,6 +114,11 @@ struct ReplayView: View {
         .onChange(of: activeRival?.id) { _, _ in
             handleRivalChange()
         }
+        .onChange(of: showsFinishVerdict) { _, isFinished in
+            guard isFinished, shareCardItem == nil,
+                  let rival = activeRival, let result = cachedRaceResult else { return }
+            prepareShareCard(rival: rival, result: result)
+        }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: Self.rivalImportTypes,
@@ -364,37 +369,37 @@ struct ReplayView: View {
             isImportingRival = true
             rivalErrorMessage = nil
             let lastComponent = url.lastPathComponent
-            // Security-scoped access must begin on the authorizing (main/UI) thread.
-            let accessed = url.startAccessingSecurityScopedResource()
-            Task.detached(priority: .userInitiated) {
+            Task { @MainActor in
+                // Keep the balanced security-scope lifetime on the main actor,
+                // while the potentially expensive read and parse stay detached.
+                let accessed = url.startAccessingSecurityScopedResource()
                 defer {
                     if accessed {
                         url.stopAccessingSecurityScopedResource()
                     }
                 }
                 do {
-                    let data = try Data(contentsOf: url)
-                    let parsed = try ReplayRivalFileParser.parse(data: data, fileName: lastComponent)
-                    guard let rival = ReplayRivalFactory.makeImportedRival(
-                        strokes: parsed.strokes,
-                        fileName: parsed.fileName
-                    ) else {
-                        throw ReplayRivalFileParserError.tooFewSamples
-                    }
-                    await MainActor.run {
-                        activeRival = rival
-                        isImportingRival = false
-                        rivalErrorMessage = nil
-                    }
-                } catch {
-                    await MainActor.run {
-                        // Preserve current rival on failure.
-                        isImportingRival = false
-                        if let parserError = error as? ReplayRivalFileParserError {
-                            rivalErrorMessage = parserError.errorDescription
-                        } else {
-                            rivalErrorMessage = "Could not import rival file"
+                    let rival = try await Task.detached(priority: .userInitiated) {
+                        let data = try Data(contentsOf: url)
+                        let parsed = try ReplayRivalFileParser.parse(data: data, fileName: lastComponent)
+                        guard let rival = ReplayRivalFactory.makeImportedRival(
+                            strokes: parsed.strokes,
+                            fileName: parsed.fileName
+                        ) else {
+                            throw ReplayRivalFileParserError.tooFewSamples
                         }
+                        return rival
+                    }.value
+                    activeRival = rival
+                    isImportingRival = false
+                    rivalErrorMessage = nil
+                } catch {
+                    // Preserve current rival on failure.
+                    isImportingRival = false
+                    if let parserError = error as? ReplayRivalFileParserError {
+                        rivalErrorMessage = parserError.errorDescription
+                    } else {
+                        rivalErrorMessage = "Could not import rival file"
                     }
                 }
             }
@@ -404,6 +409,7 @@ struct ReplayView: View {
     private func handleRivalChange() {
         // Preserve replay time, play/pause, speed, renderer, camera, quality.
         replayDiscontinuityGeneration &+= 1
+        shareCardItem = nil
         ghostStrokePath = Path()
         if canvasSize != .zero, let rival = activeRival {
             ghostStrokePath = makeGhostStrokePath(
@@ -557,51 +563,13 @@ struct ReplayView: View {
     @ViewBuilder
     private func finishVerdictBanner(rival: ReplayRival, result: ReplayRaceResult) -> some View {
         let text = verdictText(rival: rival, result: result)
-        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
-            Text("Race Finished")
-                .font(AppDesign.Typography.compactLabel.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(text)
-                .font(AppDesign.Typography.compactLabel)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: AppDesign.Spacing.medium) {
-                Button("Save Race Report…") {
-                    saveRaceReport(rival: rival, result: result)
-                }
-                .accessibilityLabel("Save Race Report")
-
-                Button("Save Race Card…") {
-                    saveRaceCard(rival: rival, result: result)
-                }
-                .accessibilityLabel("Save Race Card")
-
-                if let shareCardItem {
-                    ShareLink(
-                        item: shareCardItem,
-                        preview: SharePreview("Race Card", image: Image(systemName: "flag.checkered"))
-                    ) {
-                        Label("Share Race Card", systemImage: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Share Race Card")
-                } else {
-                    Button("Share Race Card") {
-                        prepareShareCard(rival: rival, result: result)
-                    }
-                    .accessibilityLabel("Share Race Card")
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .padding(.horizontal)
-        .padding(.vertical, AppDesign.Spacing.medium)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Race finished")
-        .accessibilityValue(text)
+        ReplayFinishVerdictView(
+            verdict: text,
+            shareItem: shareCardItem,
+            saveReport: { saveRaceReport(rival: rival, result: result) },
+            saveCard: { saveRaceCard(rival: rival, result: result) },
+            retrySharePreparation: { prepareShareCard(rival: rival, result: result) }
+        )
     }
 
     private func verdictText(rival: ReplayRival, result: ReplayRaceResult) -> String {

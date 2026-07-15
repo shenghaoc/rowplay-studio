@@ -228,14 +228,31 @@ public enum ReplayRivalFileParser: Sendable {
     }
 
     private static func splitCsv(_ line: String) -> [String] {
-        line.split(separator: ",", omittingEmptySubsequences: false).map { cell in
-            var s = cell.trimmingCharacters(in: .whitespaces)
-            if s.hasPrefix("\""), s.hasSuffix("\""), s.count >= 2 {
-                s.removeFirst()
-                s.removeLast()
+        var cells: [String] = []
+        var cell = ""
+        var isQuoted = false
+        var index = line.startIndex
+
+        while index < line.endIndex {
+            let character = line[index]
+            if character == "\"" {
+                let next = line.index(after: index)
+                if isQuoted, next < line.endIndex, line[next] == "\"" {
+                    cell.append("\"")
+                    index = line.index(after: next)
+                    continue
+                }
+                isQuoted.toggle()
+            } else if character == ",", !isQuoted {
+                cells.append(cell.trimmingCharacters(in: .whitespaces))
+                cell.removeAll(keepingCapacity: true)
+            } else {
+                cell.append(character)
             }
-            return s
+            index = line.index(after: index)
         }
+        cells.append(cell.trimmingCharacters(in: .whitespaces))
+        return cells
     }
 
     /// Numeric seconds, or M:SS / H:MM:SS clock string.
@@ -248,7 +265,7 @@ public enum ReplayRivalFileParser: Sendable {
             guard parts.allSatisfy({ $0?.isFinite == true }) else { return .nan }
             return parts.compactMap { $0 }.reduce(0) { $0 * 60 + $1 }
         }
-        return Double(s) ?? .nan
+        return Double(normalizedNumberString(s)) ?? .nan
     }
 
     private static func col(_ cols: [String], _ index: Int) -> String? {
@@ -257,14 +274,18 @@ public enum ReplayRivalFileParser: Sendable {
     }
 
     private static func numOrNaN(_ value: String?) -> Double {
-        guard let value, let n = Double(value.trimmingCharacters(in: .whitespaces)), n.isFinite else {
+        guard let value,
+              let n = Double(normalizedNumberString(value)),
+              n.isFinite else {
             return .nan
         }
         return n
     }
 
     private static func numOrUndef(_ value: String?) -> Double? {
-        guard let value, let n = Double(value.trimmingCharacters(in: .whitespaces)), n.isFinite else {
+        guard let value,
+              let n = Double(normalizedNumberString(value)),
+              n.isFinite else {
             return nil
         }
         return n
@@ -274,6 +295,10 @@ public enum ReplayRivalFileParser: Sendable {
         guard let n = numOrUndef(value) else { return nil }
         guard n > 0, n <= Double(Int.max) else { return nil }
         return Int(n.rounded())
+    }
+
+    private static func normalizedNumberString(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "")
     }
 
     // MARK: - TCX

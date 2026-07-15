@@ -28,7 +28,7 @@ No network service or public share URL is required. “Share” means native loc
 - Portable, dependency-free `ReplayRivalFileParser`.
 - Accept `Data` plus last path component; detect FIT by signature/extension, TCX by extension/XML, else CSV.
 - Limits: 25 MiB, 200_000 samples.
-- CSV: flexible headers, clock formats, derived pace/watts.
+- CSV: flexible headers, RFC 4180-style quoted fields, clock formats, derived pace/watts.
 - TCX: namespace-insensitive trackpoints; relative timestamps.
 - FIT: bounded record-message parser without external SDK.
 - Normalize time to zero, remove invalid samples, require ≥2 samples.
@@ -64,6 +64,7 @@ No network service or public share URL is required. “Share” means native loc
 - Versioned Codable `ReplayRaceReport` privacy-safe JSON.
 - Native race card PNG via ImageRenderer/AppKit in Studio.
 - Save Race Report…, Save Race Card…, Share Race Card (macOS share sheet).
+- Race-card share data is prepared when the verdict appears so Share Race Card opens in one action.
 - No public URL or network work.
 
 ### R9: Architecture, Privacy, Performance, Accessibility

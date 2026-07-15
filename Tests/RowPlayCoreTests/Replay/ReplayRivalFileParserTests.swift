@@ -191,6 +191,15 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes[2].cadence, 32, accuracy: 0.001)
     }
 
+    func testCSVQuotedCommasAndEscapedQuotesPreserveColumns() throws {
+        let csv = "note,time,distance\n\"First, steady\",0,0\n\"He said \"\"go\"\"\",10,\"1,000\"\n"
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "quoted.csv")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 1_000, accuracy: 0.001)
+    }
+
     private func assertOptionalExpectations(_ c: TextCase, strokes: [Stroke]) {
         if let t0 = c.expectedTimeAtIndex0 {
             XCTAssertEqual(strokes[0].t, t0, accuracy: 0.001, c.label)
