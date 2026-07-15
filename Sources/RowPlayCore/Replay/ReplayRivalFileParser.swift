@@ -470,6 +470,7 @@ public enum ReplayRivalFileParser: Sendable {
 
             var defs: [Int: FitMsgDef] = [:]
             var records: [FitRecord] = []
+            var lastTimestamp: UInt32?
             var pos = headerSize
 
             while pos < end {
@@ -478,12 +479,45 @@ public enum ReplayRivalFileParser: Sendable {
                 pos += 1
 
                 if header & 0x80 != 0 {
-                    // Compressed-timestamp data message — skip payload.
                     let local = (header >> 5) & 0x3
-                    guard let def = defs[local] else { break }
-                    let payload = def.fields.reduce(0) { $0 + $1.size }
-                    guard pos + payload <= end else { throw ReplayRivalFileParserError.malformed }
-                    pos += payload
+                    let timeOffset = UInt32(header & 0x1F)
+                    guard let def = defs[local], let previousTimestamp = lastTimestamp else {
+                        throw ReplayRivalFileParserError.malformed
+                    }
+
+                    // A compressed timestamp header replaces both the normal
+                    // data header and field 253 in the record payload.
+                    var rec = FitRecord()
+                    var timestamp = (previousTimestamp & ~UInt32(0x1F)) | timeOffset
+                    if timestamp <= previousTimestamp {
+                        timestamp &+= 0x20
+                    }
+                    rec.ts = timestamp
+
+                    for field in def.fields where field.num != 253 {
+                        guard field.size >= 0, pos + field.size <= end else {
+                            throw ReplayRivalFileParserError.malformed
+                        }
+                        if def.global == fitRecordGlobal, field.num >= 0,
+                           let value = readBase(
+                               base,
+                               offset: pos,
+                               baseType: field.baseType,
+                               littleEndian: def.littleEndian,
+                               end: end
+                           ) {
+                            assignRecordField(&rec, num: field.num, value: value)
+                        }
+                        pos += field.size
+                    }
+
+                    lastTimestamp = timestamp
+                    if def.global == fitRecordGlobal {
+                        records.append(rec)
+                        if records.count > maximumAcceptedSamples {
+                            throw ReplayRivalFileParserError.tooManySamples
+                        }
+                    }
                     continue
                 }
 
@@ -544,6 +578,7 @@ public enum ReplayRivalFileParser: Sendable {
                     }
                     if def.global == fitRecordGlobal, rec.ts != nil {
                         records.append(rec)
+                        lastTimestamp = rec.ts
                         if records.count > maximumAcceptedSamples {
                             throw ReplayRivalFileParserError.tooManySamples
                         }
