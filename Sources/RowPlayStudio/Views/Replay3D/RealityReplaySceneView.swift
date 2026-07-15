@@ -390,7 +390,7 @@ struct RealityReplaySceneView: View {
         let cadence = state.currentFrame.cadence.isFinite ? String(Int(state.currentFrame.cadence.rounded())) : "-"
         let unit = sport.cadenceUnit
         let ghost = ghostDetail != nil ? "ghost present" : "no ghost"
-        return "\(sportName) · \(cameraPreset.displayName) camera · \(progress)% · \(pace) · \(cadence) \(unit) · \(ghost)"
+        return "\(sportName), \(cameraPreset.displayName) camera, \(progress)%, \(pace), \(cadence) \(unit), \(ghost)"
     }
 
 }

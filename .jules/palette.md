@@ -5,3 +5,7 @@
 ## 2026-07-12 - Slider and Button Accessibility
 **Learning:** Bare Sliders in SwiftUI require explicit `.accessibilityLabel` and `.accessibilityValue` to be usable by VoiceOver. Additionally, disabled buttons should use the `.help` modifier to explain *why* they are disabled, providing a better experience for mouse users.
 **Action:** When adding interactive elements like Sliders, ensure VoiceOver context is provided. When disabling buttons, add a dynamic `.help` tooltip explaining the required action to enable it.
+
+## 2026-07-15 - Hide decorative text separators from VoiceOver
+**Learning:** Screen readers will read out decorative text characters (like bullet points or "·" separators), creating a noisy and poor auditory experience for visually impaired users.
+**Action:** When using decorative characters to separate elements visually in a `Text` view, apply a custom `.accessibilityLabel` that uses commas for natural VoiceOver pauses instead of wrapping separators in individual `Text("·").accessibilityHidden(true)` views. The single-`Text` approach keeps the view hierarchy flat and performant while achieving the same visual and auditory result.

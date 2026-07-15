@@ -182,7 +182,7 @@ struct ReplayView: View {
                             selectedGhostID = candidate.id
                         } label: {
                             HStack {
-                                Text(candidateLabel(for: candidate))
+                                candidateLabel(for: candidate)
                                 if selectedGhostID == candidate.id {
                                     Image(systemName: "checkmark")
                                 }
@@ -229,12 +229,13 @@ struct ReplayView: View {
         .background(.ultraThinMaterial)
     }
 
-    private func candidateLabel(for candidate: WorkoutDetail) -> String {
+    private func candidateLabel(for candidate: WorkoutDetail) -> some View {
         let w = candidate.workout
         let dateStr = w.date.formatted(date: .abbreviated, time: .omitted)
         let distStr = RowPlayFormatting.distance(w.distance, unit: unit)
         let paceStr = RowPlayFormatting.pace(w.pace)
-        return "\(dateStr) · \(distStr) · \(paceStr)"
+        return Text("\(dateStr) · \(distStr) · \(paceStr)")
+            .accessibilityLabel("\(dateStr), \(distStr), \(paceStr)")
     }
 
     private var rivalAccessibilityValue: String {

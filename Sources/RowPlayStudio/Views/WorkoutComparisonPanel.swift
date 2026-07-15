@@ -131,13 +131,9 @@ struct WorkoutComparisonPanel: View {
     private func candidateLabel(_ candidate: WorkoutDetail) -> some View {
         let date = candidate.workout.date.formatted(Self.candidateDateFormatStyle)
         let pace = RowPlayFormatting.pace(candidate.workout.pace)
-        return HStack(spacing: 0) {
-            Text(date)
-            Text(" · ").accessibilityHidden(true)
-            Text(candidate.workout.workoutType)
-            Text(" · ").accessibilityHidden(true)
-            Text(pace)
-        }
+        let type = candidate.workout.workoutType
+        return Text("\(date) · \(type) · \(pace)")
+            .accessibilityLabel("\(date), \(type), \(pace)")
     }
 
     private func verdictText(_ verdict: CompareVerdict) -> String {
