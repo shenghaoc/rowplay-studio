@@ -196,7 +196,11 @@ public enum ReplayRivalFileParser: Sendable {
         let hi = find("heart", "hr", "bpm")
         var si = find("stroke rate", "strokerate", "spm", "cadence")
         if si < 0 {
-            if let rateIdx = header.firstIndex(where: { $0.contains("rate") }), rateIdx != hi {
+            // Skip heart_rate (and any other column already bound as HR) when
+            // falling back to a generic "rate" header match.
+            if let rateIdx = header.enumerated().first(where: {
+                $0.offset != hi && $0.element.contains("rate")
+            })?.offset {
                 si = rateIdx
             }
         }
@@ -274,6 +278,36 @@ public enum ReplayRivalFileParser: Sendable {
 
     // MARK: - TCX
 
+    /// Precompiled TCX patterns — never rebuild regexes per trackpoint.
+    private static let trackpointRegex = try? NSRegularExpression(
+        pattern: #"<Trackpoint\b[^>]*>([\s\S]*?)</Trackpoint>"#,
+        options: [.caseInsensitive]
+    )
+    private static let timeTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?Time\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?Time>"#,
+        options: [.caseInsensitive]
+    )
+    private static let distanceMetersTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?DistanceMeters\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?DistanceMeters>"#,
+        options: [.caseInsensitive]
+    )
+    private static let cadenceTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?Cadence\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?Cadence>"#,
+        options: [.caseInsensitive]
+    )
+    private static let heartRateBpmTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?HeartRateBpm\b[^>]*>([\s\S]*?)</([A-Za-z0-9_]+:)?HeartRateBpm>"#,
+        options: [.caseInsensitive]
+    )
+    private static let valueTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?Value\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?Value>"#,
+        options: [.caseInsensitive]
+    )
+    private static let wattsTagRegex = try? NSRegularExpression(
+        pattern: #"<([A-Za-z0-9_]+:)?Watts\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?Watts>"#,
+        options: [.caseInsensitive]
+    )
+
     private static func looksLikeTcx(_ data: Data) -> Bool {
         guard let text = String(data: data.prefix(4096), encoding: .utf8)
                 ?? String(data: data.prefix(4096), encoding: .isoLatin1) else {
@@ -285,13 +319,7 @@ public enum ReplayRivalFileParser: Sendable {
 
     private static func parseTcx(_ text: String) -> [RawRivalSample] {
         // Lightweight namespace-insensitive regex extraction (no XML framework dependency).
-        // Matches <Trackpoint ...>...</Trackpoint> blocks.
-        guard let trackpointRegex = try? NSRegularExpression(
-            pattern: #"<Trackpoint\b[^>]*>([\s\S]*?)</Trackpoint>"#,
-            options: [.caseInsensitive]
-        ) else {
-            return []
-        }
+        guard let trackpointRegex else { return [] }
 
         let ns = text as NSString
         let full = NSRange(location: 0, length: ns.length)
@@ -303,7 +331,7 @@ public enum ReplayRivalFileParser: Sendable {
         for match in matches {
             guard match.numberOfRanges >= 2 else { continue }
             let body = ns.substring(with: match.range(at: 1))
-            let timeText = firstTagText(body, name: "Time") ?? ""
+            let timeText = extractTagText(body, regex: timeTagRegex) ?? ""
             var ms = parseInstantMillis(timeText)
             if !ms.isFinite,
                timeText.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"#, options: .regularExpression) != nil {
@@ -319,14 +347,17 @@ public enum ReplayRivalFileParser: Sendable {
             } else {
                 t = .nan
             }
-            let d = Double(firstTagText(body, name: "DistanceMeters") ?? "") ?? .nan
+            let d = Double(extractTagText(body, regex: distanceMetersTagRegex) ?? "") ?? .nan
             guard t.isFinite, d.isFinite else { continue }
 
-            let cadence = Double(firstTagText(body, name: "Cadence") ?? "")
-            let hrValue = firstNestedTagText(body, outer: "HeartRateBpm", inner: "Value")
-                .flatMap { Double($0) }
-            let watts = firstTagText(body, name: "Watts").flatMap { Double($0) }
-                ?? firstTagText(body, name: "ns3:Watts").flatMap { Double($0) }
+            let cadence = Double(extractTagText(body, regex: cadenceTagRegex) ?? "")
+            let hrValue = extractNestedTagText(
+                body,
+                outerRegex: heartRateBpmTagRegex,
+                innerRegex: valueTagRegex
+            ).flatMap { Double($0) }
+            // Namespace-insensitive Watts also matches ns3:Watts.
+            let watts = extractTagText(body, regex: wattsTagRegex).flatMap { Double($0) }
 
             out.append(RawRivalSample(
                 t: t,
@@ -340,13 +371,8 @@ public enum ReplayRivalFileParser: Sendable {
         return out
     }
 
-    private static func firstTagText(_ body: String, name: String) -> String? {
-        // Namespace-insensitive: optional prefix before local name.
-        let pattern = #"<([A-Za-z0-9_]+:)?"# + NSRegularExpression.escapedPattern(for: name)
-            + #"\b[^>]*>([^<]*)</([A-Za-z0-9_]+:)?"# + NSRegularExpression.escapedPattern(for: name) + #">"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            return nil
-        }
+    private static func extractTagText(_ body: String, regex: NSRegularExpression?) -> String? {
+        guard let regex else { return nil }
         let ns = body as NSString
         let range = NSRange(location: 0, length: ns.length)
         guard let match = regex.firstMatch(in: body, range: range), match.numberOfRanges >= 3 else {
@@ -356,19 +382,19 @@ public enum ReplayRivalFileParser: Sendable {
         return value.isEmpty ? nil : value
     }
 
-    private static func firstNestedTagText(_ body: String, outer: String, inner: String) -> String? {
-        let pattern = #"<([A-Za-z0-9_]+:)?"# + NSRegularExpression.escapedPattern(for: outer)
-            + #"\b[^>]*>([\s\S]*?)</([A-Za-z0-9_]+:)?"# + NSRegularExpression.escapedPattern(for: outer) + #">"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            return nil
-        }
+    private static func extractNestedTagText(
+        _ body: String,
+        outerRegex: NSRegularExpression?,
+        innerRegex: NSRegularExpression?
+    ) -> String? {
+        guard let outerRegex else { return nil }
         let ns = body as NSString
         let range = NSRange(location: 0, length: ns.length)
-        guard let match = regex.firstMatch(in: body, range: range), match.numberOfRanges >= 3 else {
+        guard let match = outerRegex.firstMatch(in: body, range: range), match.numberOfRanges >= 3 else {
             return nil
         }
         let outerBody = ns.substring(with: match.range(at: 2))
-        return firstTagText(outerBody, name: inner)
+        return extractTagText(outerBody, regex: innerRegex)
     }
 
     /// Parse ISO-8601 instant to milliseconds since epoch.

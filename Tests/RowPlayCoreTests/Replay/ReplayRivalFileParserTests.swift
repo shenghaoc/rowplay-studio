@@ -150,6 +150,15 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertGreaterThan(parsed.strokes[1].watts, 0)
     }
 
+    func testCSVStrokeRateNotMaskedByHeartRateColumn() throws {
+        // heart_rate appears before a generic "rate" column; stroke rate must still bind.
+        let csv = "time,distance,heart_rate,rate\n0,0,140,28\n10,50,145,30\n20,100,150,32\n"
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "rate.csv")
+        XCTAssertEqual(parsed.strokes[1].heartRate, 145)
+        XCTAssertEqual(parsed.strokes[1].cadence, 30, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[2].cadence, 32, accuracy: 0.001)
+    }
+
     private func assertOptionalExpectations(_ c: TextCase, strokes: [Stroke]) {
         if let t0 = c.expectedTimeAtIndex0 {
             XCTAssertEqual(strokes[0].t, t0, accuracy: 0.001, c.label)

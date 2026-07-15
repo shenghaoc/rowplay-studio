@@ -364,8 +364,9 @@ struct ReplayView: View {
             isImportingRival = true
             rivalErrorMessage = nil
             let lastComponent = url.lastPathComponent
+            // Security-scoped access must begin on the authorizing (main/UI) thread.
+            let accessed = url.startAccessingSecurityScopedResource()
             Task.detached(priority: .userInitiated) {
-                let accessed = url.startAccessingSecurityScopedResource()
                 defer {
                     if accessed {
                         url.stopAccessingSecurityScopedResource()
