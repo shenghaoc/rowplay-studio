@@ -2,6 +2,27 @@ import XCTest
 @testable import RowPlayCore
 
 final class ReplayRivalFactoryTests: XCTestCase {
+    func testConstantPaceRivalIdentityUsesPOSIXDecimalSeparators() throws {
+        let player = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_000.5,
+            time: 480,
+            pace: 120,
+            workoutType: "FixedDistance",
+            hasStrokeData: true
+        )
+
+        let rival = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 120.25,
+            player: player
+        ))
+
+        XCTAssertEqual(rival.id, "pace-120.2500-d-2000.500")
+        XCTAssertFalse(rival.id.contains(","))
+    }
+
     private struct FixtureFile: Decodable {
         let constantPace: [ConstantPaceCase]
     }

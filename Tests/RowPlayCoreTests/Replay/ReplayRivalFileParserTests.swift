@@ -77,6 +77,21 @@ final class ReplayRivalFileParserTests: XCTestCase {
         }
     }
 
+    func testTCXTimezoneLessTimestampIsTreatedAsUTC() throws {
+        let tcx = """
+        <TrainingCenterDatabase><Activities><Activity><Lap><Track>
+        <Trackpoint><Time>2026-07-15T10:00:00</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+        <Trackpoint><Time>2026-07-15T10:00:10</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+        </Track></Lap></Activity></Activities></TrainingCenterDatabase>
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "naive.tcx")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[0].t, 0, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+    }
+
     func testFITParityCases() throws {
         let fixture = try Self.fixtureResult.get()
         for c in fixture.fit {

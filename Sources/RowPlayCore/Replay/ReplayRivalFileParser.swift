@@ -358,8 +358,7 @@ public enum ReplayRivalFileParser: Sendable {
             let body = ns.substring(with: match.range(at: 1))
             let timeText = extractTagText(body, regex: timeTagRegex) ?? ""
             var ms = parseInstantMillis(timeText)
-            if !ms.isFinite,
-               timeText.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"#, options: .regularExpression) != nil {
+            if !ms.isFinite, looksLikeNaiveISO8601(timeText) {
                 // Timezone-less ISO → treat as UTC.
                 ms = parseInstantMillis(timeText.hasSuffix("Z") ? timeText : timeText + "Z")
             }
@@ -439,6 +438,22 @@ public enum ReplayRivalFileParser: Sendable {
             return date.timeIntervalSince1970 * 1000
         }
         return .nan
+    }
+
+    private static func looksLikeNaiveISO8601(_ text: String) -> Bool {
+        guard text.utf8.count >= 19 else { return false }
+        return text.utf8.prefix(19).enumerated().allSatisfy { index, byte in
+            switch index {
+            case 4, 7:
+                return byte == 0x2D // -
+            case 10:
+                return byte == 0x54 // T
+            case 13, 16:
+                return byte == 0x3A // :
+            default:
+                return byte >= 0x30 && byte <= 0x39
+            }
+        }
     }
 
     // MARK: - FIT

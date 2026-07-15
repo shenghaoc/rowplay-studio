@@ -182,15 +182,15 @@ public enum ReplayRivalFactory: Sendable {
     }
 
     private static func stablePaceKey(_ pace: TimeInterval) -> String {
-        String(format: "%.4f", pace)
+        String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), pace)
     }
 
     private static func stableDistanceKey(_ distance: Double) -> String {
-        String(format: "%.3f", distance)
+        String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), distance)
     }
 
     private static func stableTimeKey(_ time: TimeInterval) -> String {
-        String(format: "%.3f", time)
+        String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), time)
     }
 
     private static func stableStringKey(_ value: String) -> String {
