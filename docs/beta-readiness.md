@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), and Phase 8D adaptive replay quality (PR #58). Phase 10A past-session ghost replay is implemented on branch `codex/phase-10a-past-session-ghost-replay` with tests passing.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), and Phase 10A past-session ghost replay (PR #61). Phase 10B complete rival workflow (constant pace, imported CSV/TCX/FIT rivals, finish verdict, local race report/card export) is implemented on branch `codex/phase-10b-complete-rival-workflow`.
 
 ### What Is Implemented
 
@@ -18,7 +18,8 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 - **3D replay foundation**: `ReplayStrokePose` (renderer-neutral pose model), `ReplayCourseLayout` (400m loop), `RealityReplaySceneView` (RealityKit scene), articulated sport rigs with joint hierarchies and contact invariants (RowErg, SkiErg, BikeErg), and a 2D/3D mode selector in replay view.
 - **Phase 8C replay cameras and sport effects — merged as PR #57**: Renderer-neutral chase, side, overhead, and orbit camera solving; accessible 3D camera selection/reset and orbit gestures; fixed-capacity deterministic RowErg foam/blade-spray and SkiErg snow/pole-spray effects; lower-opacity ghost wakes; BikeErg effect suppression; and reduced-motion/seek resets. The unavailable trackpad-magnification, production-route ghost, and exact-1440x900 proof remains documented rather than rewritten as complete.
 - **Phase 8D adaptive replay quality — merged as PR #58**: Persisted low, medium, high, and ultra quality ceilings with medium as the default; exact quality-specific course/effect entity budgets; calibrated sticky one-tier degradation with no automatic upgrade; raw-before-clamp sampling; stable inner-scene rebuilds; a bounded 120-sample metrics accumulator; and privacy-safe selection, degradation, and window telemetry. Available runtime evidence is recorded below without claiming universal or final production performance.
-- **Phase 10A past-session ghost replay — implementation complete on branch**: Ranked ghost candidate selection with user-visible rival picker; `ReplayRaceGap` live gap helpers (metres, seconds, absolute time, ghost sampling); `WorkoutLibrary` ghost candidate caching; 2D ghost stroke path on replay canvas; live ahead/behind gap display; 3D ghost pose integration with context clearing on rival change.
+- **Phase 10A past-session ghost replay — merged as PR #61**: Ranked ghost candidate selection with user-visible rival picker; `ReplayRaceGap` live gap helpers (metres, seconds, absolute time, ghost sampling); `WorkoutLibrary` ghost candidate caching; 2D ghost stroke path on replay canvas; live ahead/behind gap display; 3D ghost pose integration with context clearing on rival change.
+- **Phase 10B complete rival workflow — implementation complete on branch**: Generic `ReplayRival` for past-session, constant-pace, and imported CSV/TCX/FIT rivals; `ReplayRaceResult` finish/winner/tie/DNF semantics with interpolated distance crossings; finish verdict UI; privacy-safe local race report JSON and race-card PNG export/share (no public URL); 2D/3D support for all rival kinds with fallback articulation for non-genuine traces.
 - **Native shell**: `NavigationSplitView` layout, sidebar with sort/sport pickers, dashboard with metric tiles and PB highlights, workout detail with replay/tools, settings with mock-only hardware status.
 - **Settings wiring**: `demoModeEnabled` controls demo data loading, `reduceReplayMotion` lowers replay animation frame rate, `preferredDistanceUnit` switches distance formatting between metric and imperial, `replayRenderQuality` persists the selected 3D ceiling with a medium fallback, and the Concept2 section manages token save/sync/disconnect. Effective quality and performance state are never persisted.
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
@@ -79,7 +80,7 @@ The items below describe the merged baseline, the validation completed for Phase
 
 ### Should-Fix
 
-1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers.
+1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
 2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
 3. **3D assets remain procedural**: No imported USD/USDZ athlete or equipment assets exist. Phase 8C does not claim final production asset fidelity.
 

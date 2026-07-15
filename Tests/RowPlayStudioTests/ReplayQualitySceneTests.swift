@@ -391,7 +391,7 @@ final class ReplayQualitySceneTests: XCTestCase {
         let performanceController = ReplayPerformanceController(selectedQuality: .ultra)
         let outerIdentityBefore = Replay3DSceneIdentity(
             workoutID: 1,
-            ghostWorkoutID: 2,
+            rivalID: "session-2",
             sportRawValue: Sport.rower.rawValue
         )
         let graphIdentityBefore = Replay3DQualityGraphIdentity(effectiveQuality: .ultra)
@@ -420,7 +420,7 @@ final class ReplayQualitySceneTests: XCTestCase {
         performanceController.selectQuality(.low)
         let outerIdentityAfter = Replay3DSceneIdentity(
             workoutID: 1,
-            ghostWorkoutID: 2,
+            rivalID: "session-2",
             sportRawValue: Sport.rower.rawValue
         )
         let graphIdentityAfter = Replay3DQualityGraphIdentity(

@@ -309,7 +309,7 @@ Non-goals for Phase 8C:
 
 ### Phase 8D - Adaptive Replay Quality and Performance Profiling
 
-Status: implementation and the available validation matrix are complete on a focused draft branch; review is pending.
+Status: merged to `main` (PR #58).
 
 Scope:
 
@@ -348,7 +348,7 @@ Validation status:
 
 ### Phase 10A - Past-Session Ghost Replay
 
-Status: implementation complete on branch `codex/phase-10a-past-session-ghost-replay`; focused tests, full test/build matrix, architecture scans, and staged-bundle gates pass.
+Status: merged to `main` (PR #61).
 
 Scope:
 
@@ -360,6 +360,34 @@ Scope:
 - Update RealityReplaySceneView to use `ReplayRaceGap` helpers and refresh ghost pose context on rival change.
 - Add parity fixture `replay-race-gap-parity.json` with 11 test cases.
 - Tests: `GhostPickTests` expanded with ranked ordering, sanitizer, and tie-break cases; `ReplayRaceGapTests` fixture-driven parity and degenerate input tests; `WorkoutLibraryGhostCandidateTests` caching and exclusion tests.
+
+### Phase 10B - Complete Rival Workflow
+
+Status: complete on branch `codex/phase-10b-complete-rival-workflow` (this PR).
+
+Scope:
+
+- Generic `ReplayRival` model for past-session, constant-pace, and imported-file rivals.
+- `ReplayRivalFactory` for session conversion, constant-pace boats (distance- and time-axis), and imported traces.
+- Dependency-free `ReplayRivalFileParser` for CSV, TCX, and bounded FIT (25 MiB / 200k sample caps).
+- `ReplayRaceResult` with interpolated target-distance crossing, time-axis distance comparison, DNF, and tie tolerances.
+- Finish verdict UI after primary finish; seek-back hides the banner until finish again.
+- Privacy-safe local `ReplayRaceReport` JSON export and native race-card PNG export/share (no public URL).
+- 2D and 3D support for all rival kinds; constant-pace/imported use fallback 3D articulation.
+- Correct roadmap status for merged Phase 8D (PR #58) and Phase 10A (PR #61).
+
+Non-goals:
+
+- Public share URLs, network rivals, persisted rival selection, deep links, leaderboards, OAuth, Bluetooth, external dependencies, full FIT SDK, GPX, new 3D assets.
+
+### Phase 11 - Production-Quality Bundled 3D Assets
+
+Status: planned follow-up.
+
+Scope:
+
+- Bundle production-quality 3D athlete/equipment assets while retaining the procedural renderer as fallback.
+- Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
 
 ## Review Strategy
 

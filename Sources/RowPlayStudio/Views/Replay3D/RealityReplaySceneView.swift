@@ -14,7 +14,8 @@ struct RealityReplaySceneView: View {
     let detail: WorkoutDetail
     @Binding var state: ReplayState
     let reduceMotion: Bool
-    let ghostDetail: WorkoutDetail?
+    /// Generic rival (past session, constant pace, or imported). Nil = no rival.
+    let rival: ReplayRival?
     let selectedQuality: ReplayRenderQuality
     @Binding var effectiveQuality: ReplayRenderQuality
     let cameraPreset: ReplayCameraPreset
@@ -33,7 +34,7 @@ struct RealityReplaySceneView: View {
         detail: WorkoutDetail,
         state: Binding<ReplayState>,
         reduceMotion: Bool,
-        ghostDetail: WorkoutDetail?,
+        rival: ReplayRival?,
         selectedQuality: ReplayRenderQuality,
         effectiveQuality: Binding<ReplayRenderQuality>,
         cameraPreset: ReplayCameraPreset,
@@ -43,7 +44,7 @@ struct RealityReplaySceneView: View {
         self.detail = detail
         _state = state
         self.reduceMotion = reduceMotion
-        self.ghostDetail = ghostDetail
+        self.rival = rival
         self.selectedQuality = selectedQuality
         _effectiveQuality = effectiveQuality
         self.cameraPreset = cameraPreset
@@ -84,11 +85,13 @@ struct RealityReplaySceneView: View {
             effectiveQuality = quality
             resetPerformanceTiming()
         }
-        .onChange(of: ghostDetail?.id) { _, _ in
-            if let ghost = ghostDetail {
-                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
+        .onChange(of: rival?.id) { _, _ in
+            // Clear old 3D rival pose/effect aggregates on rival change.
+            if let rival, rival.hasGenuineStrokeData {
+                sceneState.ghostPoseContext = computePoseContext(strokes: rival.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: rival.strokes)
             } else {
+                // Constant-pace and imported rivals use fallback articulation.
                 sceneState.ghostPoseContext = nil
                 sceneState.ghostMedianHR = 0
             }
@@ -118,9 +121,9 @@ struct RealityReplaySceneView: View {
                 sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
                 sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
             }
-            if let ghost = ghostDetail, sceneState.ghostPoseContext == nil {
-                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
+            if let rival, rival.hasGenuineStrokeData, sceneState.ghostPoseContext == nil {
+                sceneState.ghostPoseContext = computePoseContext(strokes: rival.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: rival.strokes)
             }
 
             let container = Replay3DSceneBuilder.buildScene(
@@ -149,7 +152,7 @@ struct RealityReplaySceneView: View {
                 sport: sport,
                 ghostPose: ghostSample.pose,
                 ghostDistance: ghostSample.distance,
-                ghostVisible: ghostDetail != nil,
+                ghostVisible: rival != nil,
                 reduceMotion: reduceMotion,
                 deltaTime: sceneState.lastFrameDelta,
                 playbackTickGeneration: sceneState.playbackTickGeneration,
@@ -256,11 +259,21 @@ struct RealityReplaySceneView: View {
     }
 
     private func currentGhostSample() -> (pose: ReplayStrokePose?, distance: Double) {
-        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return (nil, 0) }
-        guard let context = sceneState.ghostPoseContext else { return (nil, 0) }
-        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
-        let ghostFrame = ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime)
-        let strokeIndex = ReplaySample.sampleIndexAt(strokes: ghost.strokes, t: ghostTime)
+        guard let rival, !rival.strokes.isEmpty else { return (nil, 0) }
+        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: rival.strokes)
+        let ghostFrame = ReplaySample.sampleAt(strokes: rival.strokes, t: ghostTime)
+
+        // Constant-pace and imported rivals: deterministic fallback articulation.
+        guard rival.hasGenuineStrokeData, let context = sceneState.ghostPoseContext else {
+            let fallback = ReplayStrokePose.fallback(
+                sport: sport,
+                phase: stableFallbackPhase(distance: ghostFrame.d),
+                rate: ghostFrame.cadence > 0 ? ghostFrame.cadence : defaultFallbackRate
+            )
+            return (reduceMotion ? .reducedMotion(fallback) : fallback, ghostFrame.d)
+        }
+
+        let strokeIndex = ReplaySample.sampleIndexAt(strokes: rival.strokes, t: ghostTime)
         guard strokeIndex >= 0 else {
             let fallback = ReplayStrokePose.fallback(
                 sport: sport,
@@ -270,11 +283,13 @@ struct RealityReplaySceneView: View {
             return (reduceMotion ? .reducedMotion(fallback) : fallback, ghostFrame.d)
         }
 
-        let strokes = ghost.strokes
+        let strokes = rival.strokes
         let startD = strokes[strokeIndex].d
         let endD = strokeIndex + 1 < strokes.count ? strokes[strokeIndex + 1].d : startD
         let startT = strokes[strokeIndex].t
         let endT = strokeIndex + 1 < strokes.count ? strokes[strokeIndex + 1].t : startT
+        let originT = strokes.first?.t ?? 0
+        let relativeDuration = max(0, (strokes.last?.t ?? originT) - originT)
 
         let pose = ReplayStrokePose.computeAtTime(
             frame: ghostFrame,
@@ -285,9 +300,17 @@ struct RealityReplaySceneView: View {
             strokeIndex: strokeIndex,
             context: context,
             medianHR: sceneState.ghostMedianHR,
-            duration: ghost.strokes.last?.t ?? 1
+            duration: relativeDuration > 0 ? relativeDuration : 1
         )
         return (reduceMotion ? .reducedMotion(pose) : pose, ghostFrame.d)
+    }
+
+    private var defaultFallbackRate: Double {
+        switch sport {
+        case .rower: return 28
+        case .skierg: return 30
+        case .bike: return 80
+        }
     }
 
     private func ghostTimeAtCurrentElapsedTime(strokes: [Stroke]) -> TimeInterval {
@@ -389,7 +412,7 @@ struct RealityReplaySceneView: View {
         let pace = RowPlayFormatting.pace(state.currentFrame.pace)
         let cadence = state.currentFrame.cadence.isFinite ? String(Int(state.currentFrame.cadence.rounded())) : "-"
         let unit = sport.cadenceUnit
-        let ghost = ghostDetail != nil ? "ghost present" : "no ghost"
+        let ghost = rival != nil ? "ghost present" : "no ghost"
         return "\(sportName), \(cameraPreset.displayName) camera, \(progress)%, \(pace), \(cadence) \(unit), \(ghost)"
     }
 

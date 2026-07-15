@@ -2,12 +2,14 @@ import Foundation
 import RowPlayCore
 import RowPlayPlatform
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ReplayView: View {
     static let qualityAccessibilityLabel = "3D replay quality"
     static let qualityPickerHelp = "Choose the maximum 3D replay quality"
     static let adaptiveQualityHelp = "Quality was reduced to maintain replay performance"
     private static let candidateDateStyle = Date.FormatStyle(date: .abbreviated, time: .omitted).locale(.autoupdatingCurrent)
+    private static let finishEpsilon: TimeInterval = 0.05
 
     let detail: WorkoutDetail
     let ghostCandidates: [WorkoutDetail]
@@ -26,16 +28,22 @@ struct ReplayView: View {
     @State private var ghostStrokePath = Path()
     @State private var canvasSize: CGSize = .zero
     @State private var cachedMachineColor: Color = .accentColor
-    @State private var selectedGhostID: Int?
+    @State private var activeRival: ReplayRival?
+    @State private var cachedRaceResult: ReplayRaceResult?
+    @State private var showPaceEditor = false
+    @State private var paceInputText = ""
+    @State private var paceValidationError: String?
+    @State private var showFileImporter = false
+    @State private var isImportingRival = false
+    @State private var rivalErrorMessage: String?
+    @State private var showReportExporter = false
+    @State private var showCardExporter = false
+    @State private var exportReportItem: ReplayRaceReportTransferItem?
+    @State private var exportCardItem: ReplayRaceCardTransferItem?
+    @State private var shareCardItem: ReplayRaceCardTransferItem?
 
     private var unit: DistanceUnit { preferences.distanceUnit }
     private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
-
-    /// The active ghost detail resolved from the fixed candidate snapshot.
-    private var activeGhostDetail: WorkoutDetail? {
-        guard let selectedGhostID else { return nil }
-        return ghostCandidates.first { $0.id == selectedGhostID }
-    }
 
     init(
         detail: WorkoutDetail,
@@ -45,17 +53,47 @@ struct ReplayView: View {
         self.detail = detail
         self.ghostCandidates = ghostCandidates
         _state = State(initialValue: ReplayState(strokes: detail.strokes))
-        let validID = initialGhostID.flatMap { id in
-            ghostCandidates.contains(where: { $0.id == id }) ? id : nil
+        let initialRival: ReplayRival? = {
+            guard let id = initialGhostID,
+                  let candidate = ghostCandidates.first(where: { $0.id == id }) else {
+                return nil
+            }
+            return ReplayRivalFactory.makeSessionRival(from: candidate)
+        }()
+        _activeRival = State(initialValue: initialRival)
+        if let rival = initialRival {
+            _cachedRaceResult = State(initialValue: ReplayRaceResultCalculator.result(
+                playerStrokes: detail.strokes,
+                rivalStrokes: rival.strokes,
+                workout: detail.workout
+            ))
         }
-        _selectedGhostID = State(initialValue: validID)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             rendererPicker
             rivalControlBand
+            if let error = rivalErrorMessage {
+                Text(error)
+                    .font(AppDesign.Typography.compactLabel)
+                    .foregroundStyle(AppDesign.alertRed)
+                    .padding(.horizontal)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Rival error")
+                    .accessibilityValue(error)
+            }
+            if isImportingRival {
+                ProgressView("Importing rival…")
+                    .controlSize(.small)
+                    .padding(.vertical, 4)
+                    .accessibilityLabel("Importing rival")
+            }
             replaySurface
+            if showsFinishVerdict, let rival = activeRival, let result = cachedRaceResult {
+                finishVerdictBanner(rival: rival, result: result)
+            }
             Divider()
             telemetryBar
             Divider()
@@ -73,18 +111,34 @@ struct ReplayView: View {
         .onChange(of: preferences.replayRenderQuality) { _, quality in
             effectiveReplayQuality = quality
         }
-        .onChange(of: selectedGhostID) { _, _ in
-            replayDiscontinuityGeneration &+= 1
-            ghostStrokePath = Path()
-            if canvasSize != .zero {
-                if let ghost = activeGhostDetail {
-                    ghostStrokePath = makeGhostStrokePath(
-                        ghostStrokes: ghost.strokes,
-                        playerStrokes: detail.strokes,
-                        size: canvasSize
-                    )
-                }
-            }
+        .onChange(of: activeRival?.id) { _, _ in
+            handleRivalChange()
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: Self.rivalImportTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            handleFileImport(result)
+        }
+        .fileExporter(
+            isPresented: $showReportExporter,
+            item: exportReportItem,
+            contentTypes: [.json],
+            defaultFilename: exportReportItem?.suggestedName ?? "race-report.json"
+        ) { _ in
+            exportReportItem = nil
+        }
+        .fileExporter(
+            isPresented: $showCardExporter,
+            item: exportCardItem,
+            contentTypes: [.png],
+            defaultFilename: exportCardItem?.suggestedName ?? "race-card.png"
+        ) { _ in
+            exportCardItem = nil
+        }
+        .popover(isPresented: $showPaceEditor, arrowEdge: .bottom) {
+            paceEditorPopover
         }
     }
 
@@ -153,11 +207,11 @@ struct ReplayView: View {
         HStack(spacing: AppDesign.Spacing.medium) {
             Menu {
                 Button {
-                    selectedGhostID = nil
+                    activeRival = nil
                 } label: {
                     HStack {
                         Text("No Rival")
-                        if selectedGhostID == nil {
+                        if activeRival == nil {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -165,11 +219,14 @@ struct ReplayView: View {
 
                 if !ghostCandidates.isEmpty {
                     Button {
-                        selectedGhostID = ghostCandidates.first?.id
+                        if let best = ghostCandidates.first,
+                           let rival = ReplayRivalFactory.makeSessionRival(from: best) {
+                            activeRival = rival
+                        }
                     } label: {
                         HStack {
                             Text("Best Match")
-                            if selectedGhostID == ghostCandidates.first?.id {
+                            if isBestMatchSelected {
                                 Image(systemName: "checkmark")
                             }
                         }
@@ -178,20 +235,34 @@ struct ReplayView: View {
 
                 if !ghostCandidates.isEmpty {
                     Divider()
-
                     ForEach(ghostCandidates) { candidate in
                         Button {
-                            selectedGhostID = candidate.id
+                            if let rival = ReplayRivalFactory.makeSessionRival(from: candidate) {
+                                activeRival = rival
+                            }
                         } label: {
                             HStack {
                                 candidateLabel(for: candidate)
-                                if selectedGhostID == candidate.id {
+                                if activeRival?.sessionWorkoutID == candidate.id {
                                     Image(systemName: "checkmark")
                                 }
                             }
                         }
                     }
                 }
+
+                Divider()
+
+                Button("Set Constant Pace…") {
+                    paceInputText = PaceInput.formatPaceInput(detail.workout.pace)
+                    paceValidationError = nil
+                    showPaceEditor = true
+                }
+
+                Button("Import Rival File…") {
+                    showFileImporter = true
+                }
+                .disabled(isImportingRival)
             } label: {
                 Label("Replay rival", systemImage: "person.2.fill")
                     .labelStyle(.iconOnly)
@@ -201,21 +272,18 @@ struct ReplayView: View {
             .accessibilityLabel("Replay rival")
             .accessibilityValue(rivalAccessibilityValue)
             #if os(macOS)
-            .help(ghostCandidates.isEmpty
-                  ? "No comparable workout with stroke data"
-                  : "Choose a past session to race against")
+            .help("Choose a past session, constant pace, or imported file rival")
             #endif
-            .disabled(ghostCandidates.isEmpty)
 
-            if let active = activeGhostDetail {
+            if let active = activeRival {
                 rivalGapDisplay(for: active)
             }
 
             Spacer()
 
-            if activeGhostDetail != nil {
+            if activeRival != nil {
                 Button {
-                    selectedGhostID = nil
+                    activeRival = nil
                 } label: {
                     Image(systemName: "xmark.circle")
                 }
@@ -231,6 +299,130 @@ struct ReplayView: View {
         .background(.ultraThinMaterial)
     }
 
+    private var isBestMatchSelected: Bool {
+        guard let bestID = ghostCandidates.first?.id else { return false }
+        return activeRival?.sessionWorkoutID == bestID
+    }
+
+    private var paceEditorPopover: some View {
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
+            Text("Constant pace")
+                .font(AppDesign.Typography.compactLabel)
+                .foregroundStyle(.secondary)
+            TextField("M:SS", text: $paceInputText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 120)
+                .accessibilityLabel("Constant pace input")
+                .onSubmit { applyConstantPace() }
+            if let paceValidationError {
+                Text(paceValidationError)
+                    .font(AppDesign.Typography.compactLabel)
+                    .foregroundStyle(AppDesign.alertRed)
+                    .accessibilityLabel("Pace validation error")
+                    .accessibilityValue(paceValidationError)
+            }
+            HStack {
+                Button("Cancel") {
+                    showPaceEditor = false
+                    paceValidationError = nil
+                }
+                Button("Set Pace") {
+                    applyConstantPace()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(minWidth: 200)
+    }
+
+    private func applyConstantPace() {
+        guard let pace = PaceInput.parsePaceInput(paceInputText) else {
+            paceValidationError = "Enter a valid pace such as 1:52"
+            // Do not replace the current rival when invalid.
+            return
+        }
+        guard let rival = ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: pace,
+            player: detail.workout
+        ) else {
+            paceValidationError = "Could not create a pace boat for this workout"
+            return
+        }
+        paceValidationError = nil
+        showPaceEditor = false
+        activeRival = rival
+        rivalErrorMessage = nil
+    }
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            rivalErrorMessage = error.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            isImportingRival = true
+            rivalErrorMessage = nil
+            let lastComponent = url.lastPathComponent
+            Task.detached(priority: .userInitiated) {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer {
+                    if accessed {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+                do {
+                    let data = try Data(contentsOf: url)
+                    let parsed = try ReplayRivalFileParser.parse(data: data, fileName: lastComponent)
+                    guard let rival = ReplayRivalFactory.makeImportedRival(
+                        strokes: parsed.strokes,
+                        fileName: parsed.fileName
+                    ) else {
+                        throw ReplayRivalFileParserError.tooFewSamples
+                    }
+                    await MainActor.run {
+                        activeRival = rival
+                        isImportingRival = false
+                        rivalErrorMessage = nil
+                    }
+                } catch {
+                    await MainActor.run {
+                        // Preserve current rival on failure.
+                        isImportingRival = false
+                        if let parserError = error as? ReplayRivalFileParserError {
+                            rivalErrorMessage = parserError.errorDescription
+                        } else {
+                            rivalErrorMessage = "Could not import rival file"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleRivalChange() {
+        // Preserve replay time, play/pause, speed, renderer, camera, quality.
+        replayDiscontinuityGeneration &+= 1
+        ghostStrokePath = Path()
+        if canvasSize != .zero, let rival = activeRival {
+            ghostStrokePath = makeGhostStrokePath(
+                ghostStrokes: rival.strokes,
+                playerStrokes: detail.strokes,
+                size: canvasSize
+            )
+        }
+        // Cache race result once rather than recomputing every frame.
+        if let rival = activeRival {
+            cachedRaceResult = ReplayRaceResultCalculator.result(
+                playerStrokes: detail.strokes,
+                rivalStrokes: rival.strokes,
+                workout: detail.workout
+            )
+        } else {
+            cachedRaceResult = nil
+        }
+    }
+
     private func candidateLabel(for candidate: WorkoutDetail) -> some View {
         let w = candidate.workout
         let dateStr = w.date.formatted(Self.candidateDateStyle.locale(currentLocale))
@@ -241,22 +433,36 @@ struct ReplayView: View {
     }
 
     private var rivalAccessibilityValue: String {
-        if ghostCandidates.isEmpty {
-            return "No comparable workout available"
+        guard let active = activeRival else {
+            return "No rival selected"
         }
-        if let active = activeGhostDetail {
-            let w = active.workout
-            let dist = RowPlayFormatting.distance(w.distance, unit: unit)
-            let pace = RowPlayFormatting.pace(w.pace)
-            return "Rival: \(dist) at \(pace) from \(w.date.formatted(Self.candidateDateStyle.locale(currentLocale)))"
+        switch active.kind {
+        case .session:
+            if let id = active.sessionWorkoutID,
+               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+                let w = candidate.workout
+                let dist = RowPlayFormatting.distance(w.distance, unit: unit)
+                let pace = RowPlayFormatting.pace(w.pace)
+                return "Rival: \(dist) at \(pace) from \(w.date.formatted(Self.candidateDateStyle.locale(currentLocale)))"
+            }
+            return "Past session rival"
+        case .constantPace:
+            if let pace = active.targetPace {
+                return "Pace boat \(RowPlayFormatting.pace(pace))"
+            }
+            return "Pace boat"
+        case .importedFile:
+            if let name = active.localFileName {
+                return "Imported rival \(name)"
+            }
+            return "Imported rival"
         }
-        return "No rival selected"
     }
 
     @ViewBuilder
-    private func rivalGapDisplay(for ghost: WorkoutDetail) -> some View {
+    private func rivalGapDisplay(for rival: ReplayRival) -> some View {
         let frame = state.currentFrame
-        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
         let gapM = ReplayRaceGap.raceGapMeters(
             playerDistance: frame.d,
             ghostDistance: ghostDist
@@ -268,7 +474,7 @@ struct ReplayView: View {
         let gapColor = AppDesign.deltaColor(gapM, higherIsBetter: true)
 
         HStack(spacing: AppDesign.Spacing.small) {
-            Text(ghost.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale)))
+            Text(rivalShortLabel(rival))
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
 
@@ -287,6 +493,21 @@ struct ReplayView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Race gap")
         .accessibilityValue("\(gapLabel(meters: gapM)), \(gapSecondsLabel(seconds: gapS))")
+    }
+
+    private func rivalShortLabel(_ rival: ReplayRival) -> String {
+        switch rival.kind {
+        case .session:
+            if let id = rival.sessionWorkoutID,
+               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+                return candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
+            }
+            return "Session"
+        case .constantPace:
+            return rival.displayLabel
+        case .importedFile:
+            return rival.localFileName ?? "Imported"
+        }
     }
 
     private func gapLabel(meters: Double) -> String {
@@ -309,6 +530,186 @@ struct ReplayView: View {
         ReplayRendererMode.allCases
     }
 
+    private static var rivalImportTypes: [UTType] {
+        var types: [UTType] = [.commaSeparatedText, .xml, .data]
+        if let tcx = UTType(filenameExtension: "tcx") {
+            types.append(tcx)
+        }
+        if let fit = UTType(filenameExtension: "fit") {
+            types.append(fit)
+        }
+        if let csv = UTType(filenameExtension: "csv") {
+            types.append(csv)
+        }
+        return types
+    }
+
+    // MARK: - Finish Verdict
+
+    private var showsFinishVerdict: Bool {
+        guard activeRival != nil, cachedRaceResult != nil else { return false }
+        let duration = state.duration
+        guard duration.isFinite, duration > 0 else { return false }
+        return state.time >= duration - Self.finishEpsilon
+    }
+
+    @ViewBuilder
+    private func finishVerdictBanner(rival: ReplayRival, result: ReplayRaceResult) -> some View {
+        let text = verdictText(rival: rival, result: result)
+        VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
+            Text("Race Finished")
+                .font(AppDesign.Typography.compactLabel.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(AppDesign.Typography.compactLabel)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: AppDesign.Spacing.medium) {
+                Button("Save Race Report…") {
+                    saveRaceReport(rival: rival, result: result)
+                }
+                .accessibilityLabel("Save Race Report")
+
+                Button("Save Race Card…") {
+                    saveRaceCard(rival: rival, result: result)
+                }
+                .accessibilityLabel("Save Race Card")
+
+                if let shareCardItem {
+                    ShareLink(
+                        item: shareCardItem,
+                        preview: SharePreview("Race Card", image: Image(systemName: "flag.checkered"))
+                    ) {
+                        Label("Share Race Card", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share Race Card")
+                } else {
+                    Button("Share Race Card") {
+                        prepareShareCard(rival: rival, result: result)
+                    }
+                    .accessibilityLabel("Share Race Card")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, AppDesign.Spacing.medium)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Race finished")
+        .accessibilityValue(text)
+    }
+
+    private func verdictText(rival: ReplayRival, result: ReplayRaceResult) -> String {
+        let rivalDescription = verdictRivalDescription(rival)
+        if result.rivalDidNotFinish {
+            let shortfall = result.distanceMargin.map {
+                RowPlayFormatting.distance($0, unit: unit)
+            } ?? "—"
+            return "You win against \(rivalDescription). Rival did not finish (\(shortfall) short)."
+        }
+
+        let timePart: String = {
+            if let t = result.timeMargin, t > Self.finishEpsilon {
+                return " by \(String(format: "%.1f", t))s"
+            }
+            return ""
+        }()
+        let distancePart: String = {
+            if let d = result.distanceMargin, d > 0.5 {
+                return " (\(RowPlayFormatting.distance(d, unit: unit)))"
+            }
+            return ""
+        }()
+
+        switch result.outcome {
+        case .playerWon:
+            return "You beat \(rivalDescription)\(timePart)\(distancePart)."
+        case .rivalWon:
+            return "\(rivalDescription) beat you\(timePart)\(distancePart)."
+        case .tie:
+            return "Tie with \(rivalDescription)."
+        }
+    }
+
+    private func verdictRivalDescription(_ rival: ReplayRival) -> String {
+        switch rival.kind {
+        case .session:
+            if let id = rival.sessionWorkoutID,
+               let candidate = ghostCandidates.first(where: { $0.id == id }) {
+                let date = candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
+                return "your \(date) session"
+            }
+            return "your past session"
+        case .constantPace:
+            if let pace = rival.targetPace {
+                return "the \(RowPlayFormatting.pace(pace)) pace boat"
+            }
+            return "the pace boat"
+        case .importedFile:
+            // Live UI may show filename; exported wording uses "Imported rival".
+            if let name = rival.localFileName {
+                return name
+            }
+            return "the imported rival"
+        }
+    }
+
+    private func makeReport(rival: ReplayRival, result: ReplayRaceResult) -> ReplayRaceReport {
+        let sessionDate: Date? = {
+            guard let id = rival.sessionWorkoutID else { return nil }
+            return ghostCandidates.first(where: { $0.id == id })?.workout.date
+        }()
+        return ReplayRaceReportBuilder.build(
+            player: detail.workout,
+            rival: rival,
+            result: result,
+            sessionDate: sessionDate
+        )
+    }
+
+    private func saveRaceReport(rival: ReplayRival, result: ReplayRaceResult) {
+        do {
+            let report = makeReport(rival: rival, result: result)
+            let data = try ReplayRaceReportCodec.encode(report)
+            exportReportItem = ReplayRaceReportTransferItem(
+                data: data,
+                suggestedName: "rowplay-\(detail.id)-race-report.json"
+            )
+            showReportExporter = true
+        } catch {
+            rivalErrorMessage = "Could not encode race report"
+        }
+    }
+
+    private func saveRaceCard(rival: ReplayRival, result: ReplayRaceResult) {
+        let report = makeReport(rival: rival, result: result)
+        guard let png = ReplayRaceCardRenderer.renderPNG(report: report, colorScheme: colorScheme) else {
+            rivalErrorMessage = "Could not render race card"
+            return
+        }
+        exportCardItem = ReplayRaceCardTransferItem(
+            data: png,
+            suggestedName: "rowplay-\(detail.id)-race-card.png"
+        )
+        showCardExporter = true
+    }
+
+    private func prepareShareCard(rival: ReplayRival, result: ReplayRaceResult) {
+        let report = makeReport(rival: rival, result: result)
+        guard let png = ReplayRaceCardRenderer.renderPNG(report: report, colorScheme: colorScheme) else {
+            rivalErrorMessage = "Could not render race card"
+            return
+        }
+        shareCardItem = ReplayRaceCardTransferItem(
+            data: png,
+            suggestedName: "rowplay-\(detail.id)-race-card.png"
+        )
+    }
+
     // MARK: - Replay Surface
 
     @ViewBuilder
@@ -321,7 +722,7 @@ struct ReplayView: View {
                 detail: detail,
                 state: $state,
                 reduceMotion: reduceMotion,
-                ghostDetail: activeGhostDetail,
+                rival: activeRival,
                 selectedQuality: preferences.replayRenderQuality,
                 effectiveQuality: Binding(
                     get: { displayedEffectiveReplayQuality },
@@ -333,7 +734,7 @@ struct ReplayView: View {
             )
             .id(Replay3DSceneIdentity(
                 workoutID: detail.id,
-                ghostWorkoutID: activeGhostDetail?.id,
+                rivalID: activeRival?.id,
                 sportRawValue: detail.workout.sport.rawValue
             ))
             .frame(minHeight: 300)
@@ -404,8 +805,6 @@ struct ReplayView: View {
         selected: ReplayRenderQuality,
         effective: ReplayRenderQuality
     ) -> Bool {
-        // A stale report can briefly sit above a newly synchronized ceiling;
-        // only a strictly lower tier represents adaptive degradation.
         effective.maximumDegradationLevel < selected.maximumDegradationLevel
     }
 
@@ -424,7 +823,6 @@ struct ReplayView: View {
     }
 
     private var twoDReplaySurface: some View {
-        // Reduce Motion lowers the replay tick rate while keeping playback controls functional.
         let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
         return TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
             replayCanvas
@@ -448,9 +846,7 @@ struct ReplayView: View {
 
     private var replayCanvas: some View {
         Canvas { context, size in
-            // Ghost path (behind live path)
             context.stroke(ghostStrokePath, with: .color(AppDesign.softPurple.opacity(0.35)), lineWidth: 1.5)
-            // Live path (dominant)
             context.stroke(strokePath, with: .color(cachedMachineColor.opacity(0.7)), lineWidth: 2)
             drawGhostPlayhead(in: &context, size: size)
             drawPlayhead(in: &context, size: size)
@@ -463,9 +859,9 @@ struct ReplayView: View {
                     .onChange(of: proxy.size, initial: true) { _, newSize in
                         canvasSize = newSize
                         strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
-                        if let ghost = activeGhostDetail {
+                        if let rival = activeRival {
                             ghostStrokePath = makeGhostStrokePath(
-                                ghostStrokes: ghost.strokes,
+                                ghostStrokes: rival.strokes,
                                 playerStrokes: detail.strokes,
                                 size: newSize
                             )
@@ -482,17 +878,29 @@ struct ReplayView: View {
         .onChange(of: detail.id) { _, _ in
             strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
             cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
-            if let selectedGhostID,
-               !ghostCandidates.contains(where: { $0.id == selectedGhostID }) {
-                self.selectedGhostID = nil
+            // Drop non-session or missing session rivals when the workout changes.
+            if let rival = activeRival, rival.kind == .session {
+                if let id = rival.sessionWorkoutID,
+                   !ghostCandidates.contains(where: { $0.id == id }) {
+                    activeRival = nil
+                }
             }
             ghostStrokePath = Path()
-            if canvasSize != .zero, let ghost = activeGhostDetail {
+            if canvasSize != .zero, let rival = activeRival {
                 ghostStrokePath = makeGhostStrokePath(
-                    ghostStrokes: ghost.strokes,
+                    ghostStrokes: rival.strokes,
                     playerStrokes: detail.strokes,
                     size: canvasSize
                 )
+            }
+            if let rival = activeRival {
+                cachedRaceResult = ReplayRaceResultCalculator.result(
+                    playerStrokes: detail.strokes,
+                    rivalStrokes: rival.strokes,
+                    workout: detail.workout
+                )
+            } else {
+                cachedRaceResult = nil
             }
         }
     }
@@ -523,12 +931,12 @@ struct ReplayView: View {
     }
 
     private func drawGhostPlayhead(in context: inout GraphicsContext, size: CGSize) {
-        guard let ghost = activeGhostDetail, !ghost.strokes.isEmpty else { return }
+        guard let rival = activeRival, !rival.strokes.isEmpty else { return }
         let duration = state.duration
         let maxD = detail.strokes.last?.d ?? 1
         guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
 
-        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
         guard ghostDist.isFinite, ghostDist >= 0 else { return }
 
         let x = unitFraction(state.time, denominator: duration) * size.width
@@ -581,7 +989,7 @@ struct ReplayView: View {
     }
 
     /// Precomputes the ghost stroke trail path using player chart scales
-    /// for direct comparability.
+    /// for direct comparability. Clamps shorter and longer imported traces.
     func makeGhostStrokePath(
         ghostStrokes: [Stroke],
         playerStrokes: [Stroke],
@@ -599,8 +1007,6 @@ struct ReplayView: View {
         var path = Path()
         var firstPoint = true
         for stroke in ghostStrokes {
-            // Sessions have independent absolute timestamp origins. Plot the ghost
-            // by its elapsed time, using the player's duration only as the chart scale.
             let x = unitFraction(stroke.t - ghostOriginT, denominator: duration) * size.width
             let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
             let clippedX = max(0, min(size.width, x))
@@ -621,8 +1027,8 @@ struct ReplayView: View {
             "Time \(RowPlayFormatting.time(frame.t, tenths: true))",
             "Distance \(RowPlayFormatting.distance(frame.d, unit: unit))"
         ]
-        if let ghost = activeGhostDetail {
-            let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: ghost.strokes)
+        if let rival = activeRival {
+            let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
             let gapM = ReplayRaceGap.raceGapMeters(playerDistance: frame.d, ghostDistance: ghostDist)
             parts.append(gapLabel(meters: gapM))
         }
@@ -706,7 +1112,7 @@ struct ReplayView: View {
 
 struct Replay3DSceneIdentity: Hashable {
     let workoutID: Int
-    let ghostWorkoutID: Int?
+    let rivalID: String?
     let sportRawValue: String
 }
 
