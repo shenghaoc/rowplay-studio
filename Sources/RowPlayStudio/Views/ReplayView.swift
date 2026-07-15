@@ -12,6 +12,7 @@ struct ReplayView: View {
     let detail: WorkoutDetail
     let ghostCandidates: [WorkoutDetail]
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var currentLocale
     @EnvironmentObject private var preferences: AppPreferences
     @Environment(\.automationModeEnabled) private var automationModeEnabled
     @State private var state: ReplayState
@@ -232,7 +233,7 @@ struct ReplayView: View {
 
     private func candidateLabel(for candidate: WorkoutDetail) -> String {
         let w = candidate.workout
-        let dateStr = w.date.formatted(Self.candidateDateStyle)
+        let dateStr = w.date.formatted(Self.candidateDateStyle.locale(currentLocale))
         let distStr = RowPlayFormatting.distance(w.distance, unit: unit)
         let paceStr = RowPlayFormatting.pace(w.pace)
         return "\(dateStr) · \(distStr) · \(paceStr)"
@@ -246,7 +247,7 @@ struct ReplayView: View {
             let w = active.workout
             let dist = RowPlayFormatting.distance(w.distance, unit: unit)
             let pace = RowPlayFormatting.pace(w.pace)
-            return "Rival: \(dist) at \(pace) from \(w.date.formatted(Self.candidateDateStyle))"
+            return "Rival: \(dist) at \(pace) from \(w.date.formatted(Self.candidateDateStyle.locale(currentLocale)))"
         }
         return "No rival selected"
     }
@@ -266,7 +267,7 @@ struct ReplayView: View {
         let gapColor = AppDesign.deltaColor(gapM, higherIsBetter: true)
 
         HStack(spacing: AppDesign.Spacing.small) {
-            Text(ghost.workout.date.formatted(Self.candidateDateStyle))
+            Text(ghost.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale)))
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
 
