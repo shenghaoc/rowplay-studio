@@ -73,6 +73,11 @@ public func redact(_ value: Any) -> String {
         input = String(describing: value)
     }
 
+    // Bound the input length to prevent ReDoS on excessively large payloads
+    guard input.utf16.count <= 16384 else {
+        return "[REDACTED_OVERSIZE]"
+    }
+
     var result = input
     for rule in sensitivePatterns {
         let range = NSRange(result.startIndex..., in: result)
