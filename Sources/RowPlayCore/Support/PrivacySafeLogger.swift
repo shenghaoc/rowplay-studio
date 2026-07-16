@@ -73,7 +73,12 @@ public func redact(_ value: Any) -> String {
         input = String(describing: value)
     }
 
+    // Bound the input length to prevent ReDoS on excessively large payloads
     var result = input
+    if result.utf16.count > 16384 {
+        let index = result.index(result.startIndex, offsetBy: 16384, limitedBy: result.endIndex) ?? result.endIndex
+        result = String(result[..<index]) + " [TRUNCATED]"
+    }
     for rule in sensitivePatterns {
         let range = NSRange(result.startIndex..., in: result)
         result = rule.regex.stringByReplacingMatches(
