@@ -19,10 +19,9 @@ struct ReplayRivalImportGeneration: Equatable, Sendable {
 
 /// Bounded file-I/O boundary for the user-selected rival import workflow.
 enum ReplayRivalImportLoader {
-    /// Acquires the security scope, then runs `body`. Callers that already hold
-    /// a grant (for example after starting access in a `fileImporter` callback)
-    /// should use ``loadRival(from:fileName:)`` / ``makeRival(from:fileName:)``
-    /// directly and balance `stopAccessingSecurityScopedResource()` themselves.
+    /// Acquires the security scope, then runs `body`. Keeping acquisition, file
+    /// I/O, and release in one synchronous worker operation prevents the grant
+    /// lifetime from drifting across actor or task boundaries.
     static func withSecurityScopedAccess<T>(
         to url: URL,
         _ body: () throws -> T

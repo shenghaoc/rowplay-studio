@@ -54,6 +54,7 @@
       "expectSuccess": true,
       "minStrokes": 3,
       "expectDerivedPace": true,
+      "expectDerivedWatts": true,
       "expectedPaceAtIndex1": 100
     },
     {
@@ -120,6 +121,7 @@
       "expectedTimeAtIndex1": 10,
       "expectedDistanceAtIndex1": 50,
       "expectDerivedPace": true,
+      "expectDerivedWatts": true,
       "expectHr": true
     },
     {

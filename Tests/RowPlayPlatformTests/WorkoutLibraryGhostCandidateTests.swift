@@ -98,6 +98,25 @@ final class WorkoutLibraryGhostCandidateTests: XCTestCase {
         XCTAssertEqual(library.defaultGhostCandidate(for: 1)?.id, 2)
     }
 
+    func testReplayContentIdentityTracksOnlySelectedWorkoutContent() throws {
+        let details = [
+            makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
+            makeDetail(id: 2, distance: 2_000, time: 480, pace: 130),
+        ]
+        let library = WorkoutLibrary(details: details)
+        let original = try XCTUnwrap(library.replayContentIdentity(for: 1))
+
+        var unrelatedUpdate = details[1]
+        unrelatedUpdate.strokes[unrelatedUpdate.strokes.count - 1].d += 1
+        library.updateDetail(unrelatedUpdate)
+        XCTAssertEqual(library.replayContentIdentity(for: 1), original)
+
+        var selectedUpdate = details[0]
+        selectedUpdate.strokes[selectedUpdate.strokes.count - 1].d += 1
+        library.updateDetail(selectedUpdate)
+        XCTAssertNotEqual(library.replayContentIdentity(for: 1), original)
+    }
+
     func testGhostCandidatesUseFullLibraryDespiteActiveFilters() {
         let details = [
             makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
@@ -149,6 +168,17 @@ final class WorkoutLibraryGhostCandidateTests: XCTestCase {
         let library = WorkoutLibrary(details: details)
         let candidates = library.ghostCandidates(for: 1)
         XCTAssertTrue(candidates.isEmpty, "Should exclude candidates with empty strokes even when hasStrokeData is true")
+    }
+
+    func testGhostCandidatesExcludesSingleStrokeDetails() {
+        let details = [
+            makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
+            makeDetail(id: 2, distance: 2_000, time: 480, pace: 120, strokeCount: 1),
+        ]
+        let library = WorkoutLibrary(details: details)
+
+        XCTAssertTrue(library.ghostCandidates(for: 1).isEmpty)
+        XCTAssertNil(library.defaultGhostCandidate(for: 1))
     }
 
     // MARK: - Helpers

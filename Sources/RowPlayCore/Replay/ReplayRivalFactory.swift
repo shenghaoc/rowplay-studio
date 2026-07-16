@@ -14,7 +14,7 @@ public enum ReplayRivalFactory: Sendable {
         let dateLabel = Self.sessionDateLabel(detail.workout.date)
         // Include a content fingerprint so a library refresh of the same workout
         // ID rebuilds SwiftUI/RealityKit identity and cached race artifacts.
-        let id = "session-\(detail.workout.id)-\(Self.stableTraceKey(strokes))"
+        let id = "session-\(detail.workout.id)-\(Self.traceIdentity(for: strokes))"
         return ReplayRival(
             id: id,
             kind: .session,
@@ -53,7 +53,9 @@ public enum ReplayRivalFactory: Sendable {
             guard isValidPositiveFinite(distance) else { return nil }
             let totalTime = (distance / 500.0) * pacePer500m
             guard isValidPositiveFinite(totalTime), totalTime < 1e12 else { return nil }
-            let watts = Self.safeWatts(for: resolvedSport, pacePer500m: pacePer500m)
+            guard let watts = Self.safeWatts(for: resolvedSport, pacePer500m: pacePer500m) else {
+                return nil
+            }
             let strokes = twoPointTrace(
                 endTime: totalTime,
                 endDistance: distance,
@@ -75,7 +77,9 @@ public enum ReplayRivalFactory: Sendable {
             // distance = 500 * duration / pace
             let distance = (500.0 * duration) / pacePer500m
             guard isValidPositiveFinite(distance), distance < 1e12 else { return nil }
-            let watts = Self.safeWatts(for: resolvedSport, pacePer500m: pacePer500m)
+            guard let watts = Self.safeWatts(for: resolvedSport, pacePer500m: pacePer500m) else {
+                return nil
+            }
             let strokes = twoPointTrace(
                 endTime: duration,
                 endDistance: distance,
@@ -104,7 +108,7 @@ public enum ReplayRivalFactory: Sendable {
         }
         let totalTime = (totalDistance / 500.0) * pacePer500m
         guard isValidPositiveFinite(totalTime), totalTime < 1e12 else { return [] }
-        let watts = safeWatts(for: sport, pacePer500m: pacePer500m)
+        guard let watts = safeWatts(for: sport, pacePer500m: pacePer500m) else { return [] }
         return twoPointTrace(
             endTime: totalTime,
             endDistance: totalDistance,
@@ -128,7 +132,7 @@ public enum ReplayRivalFactory: Sendable {
         let sourceKey = lastComponent.map(Self.stableStringKey) ?? "anonymous"
         // Include the normalized trace so replacing a same-named file refreshes
         // SwiftUI/RealityKit identity and every derived race/share artifact.
-        let idSuffix = "\(sourceKey)-\(Self.stableTraceKey(strokes))"
+        let idSuffix = "\(sourceKey)-\(Self.traceIdentity(for: strokes))"
         return ReplayRival(
             id: "file-\(idSuffix)",
             kind: .importedFile,
@@ -153,11 +157,12 @@ public enum ReplayRivalFactory: Sendable {
         ]
     }
 
-    private static func safeWatts(for sport: Sport, pacePer500m: TimeInterval) -> Int {
+    private static func safeWatts(for sport: Sport, pacePer500m: TimeInterval) -> Int? {
         let watts = RowPlayFormatting.paceToWatts(for: sport, pacePer500m: pacePer500m)
         guard watts.isFinite, watts > 0,
-              let roundedWatts = Int(exactly: watts.rounded()) else {
-            return 0
+              let roundedWatts = Int(exactly: watts.rounded()),
+              roundedWatts > 0 else {
+            return nil
         }
         return roundedWatts
     }
@@ -197,7 +202,10 @@ public enum ReplayRivalFactory: Sendable {
         return String(hash, radix: 16)
     }
 
-    private static func stableTraceKey(_ strokes: [Stroke]) -> String {
+    /// Exact deterministic identity for a normalized replay trace. UI owners
+    /// use this to reset all playback-derived state when a same-ID workout's
+    /// stroke content changes after a library refresh.
+    public static func traceIdentity(for strokes: [Stroke]) -> String {
         // Fixed FNV-1a over numeric bit patterns. Swift's Hasher is deliberately
         // randomized and therefore unsuitable for stable view identity.
         var hash: UInt64 = 14_695_981_039_346_656_037
@@ -220,5 +228,26 @@ public enum ReplayRivalFactory: Sendable {
             mix(UInt64(bitPattern: Int64(stroke.watts)))
         }
         return String(hash, radix: 16)
+    }
+}
+
+/// Race-defining identity for the primary replay workout. Constructing it is
+/// O(N) in the stroke count, so platform state caches it when workout details
+/// change and SwiftUI only performs an O(1) lookup during body evaluation.
+public struct ReplayPrimaryContentIdentity: Hashable, Sendable {
+    public let workoutID: Int
+    public let traceIdentity: String
+    public let sportRawValue: String
+    public let workoutType: String
+    public let targetDistanceBits: UInt64
+    public let targetDurationBits: UInt64
+
+    public init(detail: WorkoutDetail) {
+        workoutID = detail.id
+        traceIdentity = ReplayRivalFactory.traceIdentity(for: detail.strokes)
+        sportRawValue = detail.workout.sport.rawValue
+        workoutType = detail.workout.workoutType
+        targetDistanceBits = detail.workout.distance.bitPattern
+        targetDurationBits = detail.workout.time.bitPattern
     }
 }

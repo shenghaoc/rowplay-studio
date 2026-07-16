@@ -148,8 +148,8 @@ struct ReplayRaceCardView: View {
         if let time = report.timeMargin, time > 0.05 {
             lines.append("Time margin \(String(format: "%.1f", time)) s")
         }
-        if let distance = report.distanceMargin, distance > 0.5 {
-            lines.append("Distance margin \(RowPlayFormatting.distance(distance))")
+        if let distance = report.distanceMargin, distance > 0 {
+            lines.append("Distance margin \(RowPlayFormatting.distanceMargin(distance))")
         }
         if report.rivalDidNotFinish {
             lines.append("Rival did not finish")

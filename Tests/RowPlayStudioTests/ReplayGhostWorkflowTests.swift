@@ -16,6 +16,125 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         _ = ReplayView(detail: detail, ghostCandidates: [detail], initialGhostID: -1)
     }
 
+    func testPrimaryContentIdentityChangesWithTraceAndRaceSemantics() {
+        guard let detail = DemoWorkoutLibrary.details.first,
+              !detail.strokes.isEmpty else {
+            return XCTFail("Demo data must include replay strokes")
+        }
+        let original = ReplayPrimaryContentIdentity(detail: detail)
+        var changedTrace = detail
+        changedTrace.strokes[changedTrace.strokes.count - 1].d += 1
+        var changedTarget = detail
+        changedTarget.workout.time += 1
+
+        XCTAssertNotEqual(ReplayPrimaryContentIdentity(detail: changedTrace), original)
+        XCTAssertNotEqual(ReplayPrimaryContentIdentity(detail: changedTarget), original)
+        XCTAssertEqual(ReplayPrimaryContentIdentity(detail: detail), original)
+    }
+
+    func testTelemetryIntegerFormattingRejectsExtremeFiniteValues() {
+        XCTAssertEqual(ReplayTelemetryFormatting.roundedInteger(28.4), "28")
+        XCTAssertEqual(ReplayTelemetryFormatting.roundedInteger(1e308), "-")
+        XCTAssertEqual(ReplayTelemetryFormatting.roundedInteger(.infinity), "-")
+    }
+
+    func testSessionRivalReconciliationRefreshesChangedTraceForSameWorkoutID() throws {
+        guard let detail = DemoWorkoutLibrary.details.first,
+              detail.strokes.count >= 2 else {
+            return XCTFail("Demo data must include a replayable workout")
+        }
+        let originalRival = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: detail))
+        var refreshedDetail = detail
+        refreshedDetail.strokes[refreshedDetail.strokes.count - 1].d += 1
+
+        let reconciled = try XCTUnwrap(ReplaySessionRivalReconciler.reconcile(
+            activeRival: originalRival,
+            candidates: [refreshedDetail]
+        ))
+
+        XCTAssertEqual(reconciled.sessionWorkoutID, originalRival.sessionWorkoutID)
+        XCTAssertEqual(reconciled.strokes, refreshedDetail.strokes)
+        XCTAssertNotEqual(reconciled.id, originalRival.id)
+    }
+
+    func testSessionRivalReconciliationRemovesMissingWorkout() throws {
+        guard let detail = DemoWorkoutLibrary.details.first else {
+            return XCTFail("Demo data must include a replayable workout")
+        }
+        let originalRival = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: detail))
+
+        let reconciled = ReplaySessionRivalReconciler.reconcile(
+            activeRival: originalRival,
+            candidates: []
+        )
+
+        XCTAssertNil(reconciled)
+    }
+
+    func testSessionRivalReconciliationPreservesImportedSelection() {
+        let imported = ReplayRival(
+            id: "file-user-import",
+            kind: .importedFile,
+            displayLabel: "Imported",
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 200),
+                Stroke(t: 10, d: 50, pace: 120, cadence: 28, watts: 200),
+            ],
+            hasGenuineStrokeData: false,
+            localFileName: "rival.csv"
+        )
+
+        XCTAssertEqual(
+            ReplaySessionRivalReconciler.reconcile(activeRival: imported, candidates: []),
+            imported
+        )
+    }
+
+    func testFinishGateAcceptsZeroSecondDistanceFinishButRequiresPositiveTimeHorizon() {
+        XCTAssertTrue(ReplayFinishGate.shouldShowVerdict(
+            axis: .distance,
+            playerFinishTime: 0,
+            workoutTargetDuration: 0,
+            replayDuration: 0,
+            playbackTime: 0
+        ))
+        XCTAssertFalse(ReplayFinishGate.shouldShowVerdict(
+            axis: .time,
+            playerFinishTime: 0,
+            workoutTargetDuration: 0,
+            replayDuration: 0,
+            playbackTime: 0
+        ))
+        XCTAssertFalse(ReplayFinishGate.shouldShowVerdict(
+            axis: .time,
+            playerFinishTime: 0,
+            workoutTargetDuration: 10,
+            replayDuration: 0,
+            playbackTime: 9.999
+        ))
+        XCTAssertTrue(ReplayFinishGate.shouldShowVerdict(
+            axis: .time,
+            playerFinishTime: 0,
+            workoutTargetDuration: 10,
+            replayDuration: 0,
+            playbackTime: 10
+        ))
+        XCTAssertFalse(ReplayFinishGate.shouldShowVerdict(
+            axis: .time,
+            playerFinishTime: 600,
+            workoutTargetDuration: 600,
+            replayDuration: 599.5,
+            playbackTime: 599.499
+        ))
+        XCTAssertTrue(ReplayFinishGate.shouldShowVerdict(
+            axis: .time,
+            playerFinishTime: 600,
+            workoutTargetDuration: 600,
+            replayDuration: 599.5,
+            playbackTime: 599.5
+        ))
+    }
+
     func testGhostPathUsesGhostElapsedTimeWithPlayerChartScale() {
         guard let detail = DemoWorkoutLibrary.details.first else {
             return XCTFail("Demo data must include a replayable workout")
@@ -292,6 +411,46 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         }
     }
 
+    func test3DSessionRivalUsesGenuineArticulationWhileSyntheticRivalsUseFallback() throws {
+        guard let detail = DemoWorkoutLibrary.details.first(where: {
+            $0.workout.hasStrokeData && $0.strokes.count >= 2
+        }) else {
+            return XCTFail("Demo data must include a genuine session rival")
+        }
+        let context = makeGhostPoseContext(peakWatts: 240)
+        let session = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: detail))
+        let pace = try XCTUnwrap(
+            ReplayRivalFactory.makeConstantPaceRival(pacePer500m: 120, player: detail.workout)
+        )
+        let parsed = try ReplayRivalFileParser.parse(
+            data: Data("time,distance\n0,0\n10,50\n20,100\n".utf8),
+            fileName: "rival.csv"
+        )
+        let imported = try XCTUnwrap(
+            ReplayRivalFactory.makeImportedRival(
+                strokes: parsed.strokes,
+                fileName: parsed.fileName
+            )
+        )
+
+        XCTAssertEqual(
+            Replay3DGhostArticulation.select(rival: session, poseContext: context),
+            .genuine(context)
+        )
+        XCTAssertEqual(
+            Replay3DGhostArticulation.select(rival: pace, poseContext: context),
+            .fallback
+        )
+        XCTAssertEqual(
+            Replay3DGhostArticulation.select(rival: imported, poseContext: context),
+            .fallback
+        )
+        XCTAssertEqual(
+            Replay3DGhostArticulation.select(rival: session, poseContext: nil),
+            .fallback
+        )
+    }
+
     func testRivalChangeIdentityDiffersAcrossKinds() {
         let session = Replay3DSceneIdentity(
             workoutID: 1,
@@ -313,23 +472,61 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertNotEqual(session.rivalID, imported.rivalID)
     }
 
-    func testSceneStateGhostPoseIdentityTracksRivalReplacement() {
+    func testSceneStateGhostPoseAggregatesRecomputeForRivalReplacement() {
         let state = Replay3DSceneState()
-        state.ghostPoseRivalID = "session-a"
-        state.ghostMedianHR = 140
+        let first = makeGhostPoseContext(peakWatts: 200)
+        let replacement = makeGhostPoseContext(peakWatts: 300)
 
-        // Simulate the replacement rule used by RealityReplaySceneView:
-        // a different rival id must not keep the previous aggregates.
-        let nextRivalID = "session-b"
-        if state.ghostPoseRivalID != nextRivalID {
-            state.ghostPoseContext = nil
-            state.ghostMedianHR = 0
-            state.ghostPoseRivalID = nextRivalID
+        XCTAssertEqual(
+            state.updateGhostPoseAggregates(for: "session-a") {
+                (context: first, medianHR: 140)
+            },
+            .recomputed
+        )
+        XCTAssertEqual(
+            state.updateGhostPoseAggregates(for: "session-b") {
+                (context: replacement, medianHR: 155)
+            },
+            .recomputed
+        )
+
+        XCTAssertEqual(state.ghostPoseContext, replacement)
+        XCTAssertEqual(state.ghostMedianHR, 155)
+        XCTAssertEqual(state.ghostPoseRivalID, "session-b")
+    }
+
+    func testSceneStateGhostPoseAggregatesClearForFallbackRival() {
+        let state = Replay3DSceneState()
+        state.updateGhostPoseAggregates(for: "session-a") {
+            (context: makeGhostPoseContext(peakWatts: 200), medianHR: 140)
         }
 
-        XCTAssertEqual(state.ghostPoseRivalID, "session-b")
-        XCTAssertEqual(state.ghostMedianHR, 0)
+        XCTAssertEqual(state.clearGhostPoseAggregates(), .cleared)
+
+        XCTAssertNil(state.ghostPoseRivalID)
         XCTAssertNil(state.ghostPoseContext)
+        XCTAssertEqual(state.ghostMedianHR, 0)
+        XCTAssertEqual(state.clearGhostPoseAggregates(), .unchanged)
+    }
+
+    func testSceneStateGhostPoseAggregatesPreserveSameRivalWithoutRecompute() {
+        let state = Replay3DSceneState()
+        let original = makeGhostPoseContext(peakWatts: 200)
+        state.updateGhostPoseAggregates(for: "session-a") {
+            (context: original, medianHR: 140)
+        }
+        var recomputeCount = 0
+
+        let update = state.updateGhostPoseAggregates(for: "session-a") {
+            recomputeCount += 1
+            return (context: makeGhostPoseContext(peakWatts: 999), medianHR: 199)
+        }
+
+        XCTAssertEqual(update, .unchanged)
+        XCTAssertEqual(recomputeCount, 0)
+        XCTAssertEqual(state.ghostPoseContext, original)
+        XCTAssertEqual(state.ghostMedianHR, 140)
+        XCTAssertEqual(state.ghostPoseRivalID, "session-a")
     }
 
     func testImportLoaderParsesPreloadedBytesWithoutURLAccess() throws {
@@ -338,5 +535,15 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertEqual(rival.kind, .importedFile)
         XCTAssertEqual(rival.strokes.count, 2)
         XCTAssertEqual(rival.localFileName, "preloaded.csv")
+    }
+
+    private func makeGhostPoseContext(peakWatts: Int) -> ReplayStrokePoseContext {
+        ReplayStrokePoseContext(
+            sport: .rower,
+            peakWatts: peakWatts,
+            medianWatts: peakWatts - 20,
+            medianDPS: 10,
+            maxHR: 180
+        )
     }
 }

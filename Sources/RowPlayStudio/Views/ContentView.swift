@@ -55,8 +55,10 @@ struct ContentView: View {
                             if let detail = library.detail(id: workoutID) {
                                 ReplayView(
                                     detail: detail,
-                                    ghostCandidates: library.ghostCandidates(for: workoutID)
+                                    ghostCandidates: library.ghostCandidates(for: workoutID),
+                                    ghostCandidatesRevision: library.detailsRevision
                                 )
+                                .id(library.replayContentIdentity(for: workoutID))
                             } else {
                                 ContentUnavailableView(
                                     "Workout Unavailable",

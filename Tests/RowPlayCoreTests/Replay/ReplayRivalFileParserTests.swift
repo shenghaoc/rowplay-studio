@@ -16,6 +16,7 @@ final class ReplayRivalFileParserTests: XCTestCase {
         let expectSuccess: Bool
         let minStrokes: Int?
         let expectDerivedPace: Bool?
+        let expectDerivedWatts: Bool?
         let expectHr: Bool?
         let expectCadence: Bool?
         let expectWatts: Bool?
@@ -35,6 +36,7 @@ final class ReplayRivalFileParserTests: XCTestCase {
         let expectedTimeAtIndex1: Double?
         let expectedDistanceAtIndex1: Double?
         let expectDerivedPace: Bool?
+        let expectDerivedWatts: Bool?
         let expectHr: Bool?
     }
 
@@ -113,6 +115,9 @@ final class ReplayRivalFileParserTests: XCTestCase {
                 if c.expectDerivedPace == true {
                     XCTAssertGreaterThan(parsed.strokes[1].pace, 0, c.label)
                 }
+                if c.expectDerivedWatts == true {
+                    XCTAssertTrue(parsed.strokes.dropFirst().allSatisfy { $0.watts > 0 }, c.label)
+                }
                 if c.expectHr == true {
                     XCTAssertTrue(parsed.strokes.contains { $0.heartRate != nil }, c.label)
                 }
@@ -147,6 +152,41 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes.count, 2)
         XCTAssertEqual(finalStroke.t, 31, accuracy: 0.001)
         XCTAssertEqual(finalStroke.d, 2, accuracy: 0.001)
+    }
+
+    func testFITCompressedTimestampUsesBaseFromNonRecordMessage() throws {
+        let parsed = try ReplayRivalFileParser.parse(
+            data: makeNonRecordTimestampBaseFIT(),
+            fileName: "non-record-base.fit"
+        )
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[0].t, 0, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[0].d, 1, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].t, 1, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 2, accuracy: 0.001)
+    }
+
+    func testFITContentDetectionOverridesMisleadingCSVExtension() throws {
+        let parsed = try ReplayRivalFileParser.parse(
+            data: makeCompressedTimestampFIT(),
+            fileName: "misleading.csv"
+        )
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 1, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 1, accuracy: 0.001)
+    }
+
+    func testFITContentDetectionOverridesMisleadingTCXExtension() throws {
+        let parsed = try ReplayRivalFileParser.parse(
+            data: makeCompressedTimestampFIT(),
+            fileName: "misleading.tcx"
+        )
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 1, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 1, accuracy: 0.001)
     }
 
     func testFITSignatureDetectionSupportsNonzeroDataStartIndex() throws {
@@ -222,6 +262,42 @@ final class ReplayRivalFileParserTests: XCTestCase {
         """
 
         let parsed = try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "rival")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testTCXContentDetectionOverridesMisleadingCSVExtension() throws {
+        let tcx = """
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(
+            data: Data(tcx.utf8),
+            fileName: "misleading.csv"
+        )
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testTCXContentDetectionOverridesMisleadingFITExtension() throws {
+        let tcx = """
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(
+            data: Data(tcx.utf8),
+            fileName: "misleading.fit"
+        )
 
         XCTAssertEqual(parsed.strokes.count, 2)
         XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
@@ -512,6 +588,24 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes.map(\.d), [0, 50, 100])
     }
 
+    func testCSVAcceptsCommonCompoundHeaders() throws {
+        let csv = """
+        elapsedTime,distanceMeters,avgPace,strokeRate,heartRate,powerWatts,timestamp,parameter
+        0,0,2:00,28,140,200,2026-01-01T00:00:00Z,999
+        10,50,1:59,29,141,210,2026-01-01T00:00:10Z,999
+        """
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "compound.csv")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].pace, 119, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].cadence, 29, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].heartRate, 141)
+        XCTAssertEqual(parsed.strokes[1].watts, 210)
+    }
+
     func testCSVEuropeanDecimalCommaIsAccepted() throws {
         let csv = "time,distance\n0,0\n10,\"1,5\"\n20,\"3,0\"\n"
         let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "eu.csv")
@@ -527,8 +621,8 @@ final class ReplayRivalFileParserTests: XCTestCase {
     }
 
     func testCSVExtensionIsNotHijackedByEmbeddedFITSignature() throws {
-        // Bytes 8-11 of the whole payload are ".FIT". Extension-first dispatch
-        // must still parse this as CSV rather than a truncated FIT file.
+        // Bytes 8-11 of the whole payload are ".FIT", but the surrounding
+        // bytes do not form a structurally plausible FIT header.
         let csv = "noteXXXX.FIT,time,distance\nx,0,0\nx,10,50\n"
         let bytes = Array(csv.utf8)
         XCTAssertEqual(Array(bytes[8..<12]), [0x2E, 0x46, 0x49, 0x54])
@@ -632,6 +726,17 @@ final class ReplayRivalFileParserTests: XCTestCase {
             try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "broken.csv")
         ) { error in
             XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
+    }
+
+    func testCSVHeaderOnlyReportsNoUsableSamples() {
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(
+                data: Data("time,distance\n".utf8),
+                fileName: "header-only.csv"
+            )
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .unsupportedOrEmpty)
         }
     }
 
@@ -749,6 +854,36 @@ final class ReplayRivalFileParserTests: XCTestCase {
         return Data(bytes)
     }
 
+    private func makeNonRecordTimestampBaseFIT() -> Data {
+        var bytes: [UInt8] = [
+            14, 0x10, 0, 0,
+            0, 0, 0, 0,
+            0x2E, 0x46, 0x49, 0x54,
+            0, 0,
+        ]
+        let records: [UInt8] = [
+            // Local 0 is a non-record message whose timestamp establishes the
+            // compressed timestamp base shared by subsequent local messages.
+            0x40, 0, 0, 21, 0, 1,
+            253, 4, 0x86,
+            0x00, 0xE8, 0x03, 0, 0,
+            // Local 1 is a record message. Compressed records omit field 253.
+            0x41, 0, 0, 20, 0, 2,
+            253, 4, 0x86,
+            5, 4, 0x86,
+            // Offsets 9 and 10 resolve to timestamps 1_001 and 1_002.
+            0xA9, 0x64, 0, 0, 0,
+            0xAA, 0xC8, 0, 0, 0,
+        ]
+        let dataSize = UInt32(records.count)
+        bytes[4] = UInt8(dataSize & 0xFF)
+        bytes[5] = UInt8((dataSize >> 8) & 0xFF)
+        bytes[6] = UInt8((dataSize >> 16) & 0xFF)
+        bytes[7] = UInt8((dataSize >> 24) & 0xFF)
+        bytes.append(contentsOf: records)
+        return Data(bytes)
+    }
+
     private func makeCancellationFIT() -> Data {
         let definition: [UInt8] = [
             0x40, 0, 0, 20, 0, 2,
@@ -814,6 +949,9 @@ final class ReplayRivalFileParserTests: XCTestCase {
             for s in strokes.dropFirst() {
                 XCTAssertTrue(s.pace.isFinite, c.label)
             }
+        }
+        if c.expectDerivedWatts == true {
+            XCTAssertTrue(strokes.dropFirst().allSatisfy { $0.watts > 0 }, c.label)
         }
         if c.expectHr == true {
             XCTAssertTrue(strokes.contains { $0.heartRate != nil }, c.label)

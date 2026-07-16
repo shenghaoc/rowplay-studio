@@ -108,15 +108,18 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(report.rival.distance ?? -1, 1000, accuracy: 0.001)
         XCTAssertEqual(report.rival.time ?? -1, 230, accuracy: 0.001)
         XCTAssertEqual(report.rival.pace ?? -1, 115, accuracy: 0.001)
+        XCTAssertEqual(report.primary.distance, 1000, accuracy: 0.001)
+        XCTAssertEqual(report.primary.time, 240, accuracy: 0.001)
+        XCTAssertEqual(report.primary.pace, 120, accuracy: 0.001)
     }
 
-    func testPrimaryMetricsPreferRaceDecisionPointOverWorkoutSummary() throws {
+    func testDistancePrimaryMetricsUsePlayerCompletionNotWinnerDecisionSnapshot() throws {
         let player = Workout(
             id: 3,
             date: Date(timeIntervalSince1970: 0),
             sport: .rower,
-            distance: 5_000, // summary disagrees with the race decision
-            time: 1_200,
+            distance: 2_000,
+            time: 480,
             pace: 120,
             workoutType: "FixedDistanceIntervals",
             hasStrokeData: true
@@ -133,14 +136,14 @@ final class ReplayRaceReportTests: XCTestCase {
             targetPace: 120
         )
         let result = ReplayRaceResult(
-            outcome: .playerWon,
+            outcome: .rivalWon,
             axis: .distance,
             timeMargin: 20,
             distanceMargin: 80,
             playerFinishTime: 480,
-            rivalFinishTime: 500,
-            playerDistance: 2_000,
-            rivalDistance: 1_920
+            rivalFinishTime: 460,
+            playerDistance: 1_920,
+            rivalDistance: 2_000
         )
 
         let report = ReplayRaceReportBuilder.build(player: player, rival: rival, result: result)
@@ -148,6 +151,45 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(report.primary.distance, 2_000, accuracy: 0.001)
         XCTAssertEqual(report.primary.time, 480, accuracy: 0.001)
         XCTAssertEqual(report.primary.pace, 120, accuracy: 0.001)
+    }
+
+    func testTimePrimaryMetricsUseTargetDurationSnapshot() throws {
+        let player = Workout(
+            id: 4,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_600,
+            time: 600,
+            pace: 600 * 500 / 2_600,
+            workoutType: "FixedTimeIntervals",
+            hasStrokeData: true
+        )
+        let rival = ReplayRival(
+            id: "pace-120",
+            kind: .constantPace,
+            displayLabel: "2:00/500m",
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),
+                Stroke(t: 600, d: 2_500, pace: 120, cadence: 0, watts: 200),
+            ],
+            hasGenuineStrokeData: false,
+            targetPace: 120
+        )
+        let result = ReplayRaceResult(
+            outcome: .playerWon,
+            axis: .time,
+            distanceMargin: 100,
+            playerFinishTime: 600,
+            rivalFinishTime: 600,
+            playerDistance: 2_600,
+            rivalDistance: 2_500
+        )
+
+        let report = ReplayRaceReportBuilder.build(player: player, rival: rival, result: result)
+
+        XCTAssertEqual(report.primary.distance, 2_600, accuracy: 0.001)
+        XCTAssertEqual(report.primary.time, 600, accuracy: 0.001)
+        XCTAssertEqual(report.primary.pace, 600 * 500 / 2_600, accuracy: 0.001)
     }
 
     func testSessionReportUsesGenericLabel() throws {

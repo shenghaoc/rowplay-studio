@@ -9,26 +9,22 @@ struct ReplayView: View {
     static let qualityPickerHelp = "Choose the maximum 3D replay quality"
     static let adaptiveQualityHelp = "Quality was reduced to maintain replay performance"
     private static let candidateDateStyle = Date.FormatStyle(date: .abbreviated, time: .omitted).locale(.autoupdatingCurrent)
-    private static let finishEpsilon: TimeInterval = 0.05
+    private static let tieEpsilon: TimeInterval = 0.05
 
     let detail: WorkoutDetail
     let ghostCandidates: [WorkoutDetail]
+    let ghostCandidatesRevision: UInt64
     private let ghostCandidateByID: [Int: WorkoutDetail]
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var currentLocale
     @EnvironmentObject private var preferences: AppPreferences
     @Environment(\.automationModeEnabled) private var automationModeEnabled
     @State private var state: ReplayState
-    @State private var lastTickDate: Date?
     @State private var rendererMode: ReplayRendererMode = .threeD
     @State private var cameraPreset: ReplayCameraPreset = .chase
     @State private var effectiveReplayQuality: ReplayRenderQuality?
     @State private var cameraResetGeneration = 0
     @State private var replayDiscontinuityGeneration = 0
-    @State private var strokePath = Path()
-    @State private var ghostStrokePath = Path()
-    @State private var canvasSize: CGSize = .zero
-    @State private var cachedMachineColor: Color = .accentColor
     @State private var activeRival: ReplayRival?
     @State private var cachedRaceResult: ReplayRaceResult?
     @State private var showPaceEditor = false
@@ -51,10 +47,12 @@ struct ReplayView: View {
     init(
         detail: WorkoutDetail,
         ghostCandidates: [WorkoutDetail] = [],
+        ghostCandidatesRevision: UInt64 = 0,
         initialGhostID: Int? = nil
     ) {
         self.detail = detail
         self.ghostCandidates = ghostCandidates
+        self.ghostCandidatesRevision = ghostCandidatesRevision
         let candidateByID = ghostCandidates.reduce(into: [Int: WorkoutDetail]()) { result, candidate in
             result[candidate.id] = candidate
         }
@@ -80,23 +78,7 @@ struct ReplayView: View {
     var body: some View {
         VStack(spacing: 0) {
             rendererPicker
-            rivalControlBand
-            if let error = rivalErrorMessage {
-                Text(error)
-                    .font(AppDesign.Typography.compactLabel)
-                    .foregroundStyle(AppDesign.alertRed)
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Rival error")
-                    .accessibilityValue(error)
-            }
-            if isImportingRival {
-                ProgressView("Importing rival…")
-                    .controlSize(.small)
-                    .padding(.vertical, 4)
-                    .accessibilityLabel("Importing rival")
-            }
+            rivalControl
             replaySurface
             if showsFinishVerdict, let rival = activeRival, let result = cachedRaceResult {
                 finishVerdictBanner(rival: rival, result: result)
@@ -107,11 +89,6 @@ struct ReplayView: View {
             playbackControls
         }
         .navigationTitle("Replay")
-        .onChange(of: state.playing) { _, playing in
-            if playing {
-                lastTickDate = nil
-            }
-        }
         .onDisappear {
             cancelRivalImport()
             state.pause()
@@ -125,6 +102,12 @@ struct ReplayView: View {
         }
         .onChange(of: activeRival?.id) { _, _ in
             handleRivalChange()
+        }
+        .onChange(of: ghostCandidatesRevision) { _, _ in
+            reconcileSelectedSessionRival()
+        }
+        .onChange(of: detail.id) { _, _ in
+            reconcileSelectedSessionRival()
         }
         .onChange(of: showsFinishVerdict) { _, isFinished in
             guard isFinished else { return }
@@ -159,9 +142,6 @@ struct ReplayView: View {
                 rivalErrorMessage = "Could not save race card"
             }
         }
-        .popover(isPresented: $showPaceEditor, arrowEdge: .bottom) {
-            paceEditorPopover
-        }
     }
 
     // MARK: - Renderer Picker
@@ -172,7 +152,6 @@ struct ReplayView: View {
             Picker("Renderer", selection: Binding(
                 get: { rendererMode },
                 set: { mode in
-                    lastTickDate = nil
                     rendererMode = mode
                 }
             )) {
@@ -225,142 +204,25 @@ struct ReplayView: View {
 
     // MARK: - Rival Control Band
 
-    private var rivalControlBand: some View {
-        HStack(spacing: AppDesign.Spacing.medium) {
-            Menu {
-                Button {
-                    selectRival(nil)
-                } label: {
-                    HStack {
-                        Text("No Rival")
-                        if activeRival == nil {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-
-                if !ghostCandidates.isEmpty {
-                    Button {
-                        if let best = ghostCandidates.first,
-                           let rival = ReplayRivalFactory.makeSessionRival(from: best) {
-                            selectRival(rival)
-                        }
-                    } label: {
-                        HStack {
-                            Text("Best Match")
-                            if isBestMatchSelected {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-
-                if !ghostCandidates.isEmpty {
-                    Divider()
-                    ForEach(ghostCandidates) { candidate in
-                        Button {
-                            if let rival = ReplayRivalFactory.makeSessionRival(from: candidate) {
-                                selectRival(rival)
-                            }
-                        } label: {
-                            HStack {
-                                candidateLabel(for: candidate)
-                                if activeRival?.sessionWorkoutID == candidate.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button("Set Constant Pace…") {
-                    paceInputText = PaceInput.formatPaceInput(detail.workout.pace)
-                    paceValidationError = nil
-                    showPaceEditor = true
-                }
-
-                Button("Import Rival File…") {
-                    showFileImporter = true
-                }
-                .disabled(isImportingRival)
-                #if os(macOS)
-                .help(isImportingRival
-                    ? "A rival file is already being imported"
-                    : "Choose a CSV, TCX, or FIT rival file")
-                #endif
-            } label: {
-                Label("Replay rival", systemImage: "person.2.fill")
-                    .labelStyle(.iconOnly)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .accessibilityLabel("Replay rival")
-            .accessibilityValue(rivalAccessibilityValue)
-            #if os(macOS)
-            .help("Choose a past session, constant pace, or imported file rival")
-            #endif
-
-            if let active = activeRival {
-                rivalGapDisplay(for: active)
-            }
-
-            Spacer()
-
-            if activeRival != nil {
-                Button {
-                    selectRival(nil)
-                } label: {
-                    Image(systemName: "xmark.circle")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove replay rival")
-                #if os(macOS)
-                .help("Remove replay rival")
-                #endif
-            }
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal)
-        .background(.ultraThinMaterial)
-    }
-
-    private var isBestMatchSelected: Bool {
-        guard let bestID = ghostCandidates.first?.id else { return false }
-        return activeRival?.sessionWorkoutID == bestID
-    }
-
-    private var paceEditorPopover: some View {
-        VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
-            Text("Constant pace")
-                .font(AppDesign.Typography.compactLabel)
-                .foregroundStyle(.secondary)
-            TextField("M:SS", text: $paceInputText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 120)
-                .accessibilityLabel("Constant pace input")
-                .onSubmit { applyConstantPace() }
-            if let paceValidationError {
-                Text(paceValidationError)
-                    .font(AppDesign.Typography.compactLabel)
-                    .foregroundStyle(AppDesign.alertRed)
-                    .accessibilityLabel("Pace validation error")
-                    .accessibilityValue(paceValidationError)
-            }
-            HStack {
-                Button("Cancel") {
-                    showPaceEditor = false
-                    paceValidationError = nil
-                }
-                Button("Set Pace") {
-                    applyConstantPace()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding()
-        .frame(minWidth: 200)
+    private var rivalControl: some View {
+        ReplayRivalControlView(
+            detail: detail,
+            ghostCandidates: ghostCandidates,
+            ghostCandidateByID: ghostCandidateByID,
+            activeRival: activeRival,
+            currentFrame: state.currentFrame,
+            replayTime: state.time,
+            distanceUnit: unit,
+            locale: currentLocale,
+            isImportingRival: isImportingRival,
+            showPaceEditor: $showPaceEditor,
+            paceInputText: $paceInputText,
+            paceValidationError: $paceValidationError,
+            showFileImporter: $showFileImporter,
+            rivalErrorMessage: $rivalErrorMessage,
+            selectRival: selectRival,
+            applyConstantPace: applyConstantPace
+        )
     }
 
     private func applyConstantPace() {
@@ -389,6 +251,29 @@ struct ReplayView: View {
         rivalErrorMessage = nil
     }
 
+    private func reconcileSelectedSessionRival() {
+        let reconciled = ReplaySessionRivalReconciler.reconcile(
+            activeRival: activeRival,
+            candidates: ghostCandidates
+        )
+        guard reconciled != activeRival else {
+            shareCardItem = nil
+            refreshCachedRaceResult()
+            prepareShareCardIfFinished()
+            return
+        }
+        // This is a library-driven refresh, not a direct selection. Do not call
+        // selectRival(_:): an in-flight user import must remain authoritative
+        // when it completes.
+        let identityChanged = reconciled?.id != activeRival?.id
+        activeRival = reconciled
+        if !identityChanged {
+            // A session's display metadata can change without changing its
+            // trace-derived ID, so explicitly invalidate derived artifacts.
+            handleRivalChange()
+        }
+    }
+
     private func cancelRivalImport() {
         _ = rivalImportGeneration.advance()
         rivalImportTask?.cancel()
@@ -410,18 +295,9 @@ struct ReplayView: View {
             isImportingRival = true
             rivalErrorMessage = nil
             let lastComponent = url.lastPathComponent
-            // Acquire the powerbox grant in the fileImporter callback before any
-            // actor hop. Sandbox extensions are easiest to claim in that window;
-            // the detached worker only reads/parses and then balances the stop.
-            let accessed = url.startAccessingSecurityScopedResource()
             rivalImportTask = Task { @MainActor in
                 let worker = Task.detached(priority: .userInitiated) {
-                    defer {
-                        if accessed {
-                            url.stopAccessingSecurityScopedResource()
-                        }
-                    }
-                    return try ReplayRivalImportLoader.loadRival(
+                    try ReplayRivalImportLoader.loadSecurityScopedRival(
                         from: url,
                         fileName: lastComponent
                     )
@@ -457,14 +333,11 @@ struct ReplayView: View {
         // Preserve replay time, play/pause, speed, renderer, camera, quality.
         replayDiscontinuityGeneration &+= 1
         shareCardItem = nil
-        ghostStrokePath = Path()
-        if canvasSize != .zero, let rival = activeRival {
-            ghostStrokePath = makeGhostStrokePath(
-                ghostStrokes: rival.strokes,
-                playerStrokes: detail.strokes,
-                size: canvasSize
-            )
-        }
+        refreshCachedRaceResult()
+        prepareShareCardIfFinished()
+    }
+
+    private func refreshCachedRaceResult() {
         // Cache race result once rather than recomputing every frame.
         if let rival = activeRival {
             cachedRaceResult = ReplayRaceResultCalculator.result(
@@ -475,110 +348,6 @@ struct ReplayView: View {
         } else {
             cachedRaceResult = nil
         }
-        prepareShareCardIfFinished()
-    }
-
-    private func candidateLabel(for candidate: WorkoutDetail) -> some View {
-        let w = candidate.workout
-        let dateStr = w.date.formatted(Self.candidateDateStyle.locale(currentLocale))
-        let distStr = RowPlayFormatting.distance(w.distance, unit: unit)
-        let paceStr = RowPlayFormatting.pace(w.pace)
-        return Text("\(dateStr) · \(distStr) · \(paceStr)")
-            .accessibilityLabel("\(dateStr), \(distStr), \(paceStr)")
-    }
-
-    private var rivalAccessibilityValue: String {
-        guard let active = activeRival else {
-            return "No rival selected"
-        }
-        switch active.kind {
-        case .session:
-            if let id = active.sessionWorkoutID,
-               let candidate = ghostCandidateByID[id] {
-                let w = candidate.workout
-                let dist = RowPlayFormatting.distance(w.distance, unit: unit)
-                let pace = RowPlayFormatting.pace(w.pace)
-                return "Rival: \(dist) at \(pace) from \(w.date.formatted(Self.candidateDateStyle.locale(currentLocale)))"
-            }
-            return "Past session rival"
-        case .constantPace:
-            if let pace = active.targetPace {
-                return "Pace boat \(RowPlayFormatting.pace(pace))"
-            }
-            return "Pace boat"
-        case .importedFile:
-            if let name = active.localFileName {
-                return "Imported rival \(name)"
-            }
-            return "Imported rival"
-        }
-    }
-
-    @ViewBuilder
-    private func rivalGapDisplay(for rival: ReplayRival) -> some View {
-        let frame = state.currentFrame
-        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
-        let gapM = ReplayRaceGap.raceGapMeters(
-            playerDistance: frame.d,
-            ghostDistance: ghostDist
-        )
-        let gapS = ReplayRaceGap.raceGapSeconds(
-            gapMeters: gapM,
-            playerPacePer500m: frame.pace
-        )
-        let gapColor = AppDesign.deltaColor(gapM, higherIsBetter: true)
-
-        HStack(spacing: AppDesign.Spacing.small) {
-            Text(rivalShortLabel(rival))
-                .font(AppDesign.Typography.compactLabel)
-                .foregroundStyle(.secondary)
-
-            Text(gapLabel(meters: gapM))
-                .font(AppDesign.Typography.compactLabel.monospacedDigit())
-                .foregroundStyle(gapColor)
-
-            Text("·")
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
-
-            Text(gapSecondsLabel(seconds: gapS))
-                .font(AppDesign.Typography.compactLabel.monospacedDigit())
-                .foregroundStyle(gapColor)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Race gap against \(rivalShortLabel(rival))")
-        .accessibilityValue("\(gapLabel(meters: gapM)), \(gapSecondsLabel(seconds: gapS))")
-    }
-
-    private func rivalShortLabel(_ rival: ReplayRival) -> String {
-        switch rival.kind {
-        case .session:
-            if let id = rival.sessionWorkoutID,
-               let candidate = ghostCandidateByID[id] {
-                return candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
-            }
-            return "Session"
-        case .constantPace:
-            return rival.displayLabel
-        case .importedFile:
-            return rival.localFileName ?? "Imported"
-        }
-    }
-
-    private func gapLabel(meters: Double) -> String {
-        let safeM = meters.isFinite ? meters : 0
-        if abs(safeM) < 0.5 { return "Level" }
-        let prefix = safeM > 0 ? "Ahead" : "Behind"
-        let dist = RowPlayFormatting.distance(abs(safeM), unit: unit)
-        return "\(prefix) \(dist)"
-    }
-
-    private func gapSecondsLabel(seconds: Double) -> String {
-        let safeS = seconds.isFinite ? seconds : 0
-        let absS = abs(safeS)
-        if absS < 0.05 { return "0.0 s" }
-        let sign = safeS > 0 ? "+" : "-"
-        return "\(sign)\(String(format: "%.1f", absS)) s"
     }
 
     private var visibleRendererModes: [ReplayRendererMode] {
@@ -603,25 +372,13 @@ struct ReplayView: View {
 
     private var showsFinishVerdict: Bool {
         guard activeRival != nil, let result = cachedRaceResult else { return false }
-        // Gate on the race decision horizon, not merely the stroke-array span.
-        // Distance races finish at the interpolated target crossing; time races
-        // finish at the workout target duration captured in the result.
-        let horizon: TimeInterval
-        switch result.axis {
-        case .distance:
-            horizon = result.playerFinishTime ?? state.duration
-        case .time:
-            let target = detail.workout.time
-            if let finish = result.playerFinishTime, finish.isFinite, finish > 0 {
-                horizon = finish
-            } else if target.isFinite, target > 0 {
-                horizon = target
-            } else {
-                horizon = state.duration
-            }
-        }
-        guard horizon.isFinite, horizon > 0 else { return false }
-        return state.time >= horizon - Self.finishEpsilon
+        return ReplayFinishGate.shouldShowVerdict(
+            axis: result.axis,
+            playerFinishTime: result.playerFinishTime,
+            workoutTargetDuration: detail.workout.time,
+            replayDuration: state.duration,
+            playbackTime: state.time
+        )
     }
 
     @ViewBuilder
@@ -640,20 +397,20 @@ struct ReplayView: View {
         let rivalDescription = verdictRivalDescription(rival)
         if result.rivalDidNotFinish {
             let shortfall = result.distanceMargin.map {
-                RowPlayFormatting.distance($0, unit: unit)
+                RowPlayFormatting.distanceMargin($0, unit: unit)
             } ?? "—"
             return "You win against \(rivalDescription). Rival did not finish (\(shortfall) short)."
         }
 
         let timePart: String = {
-            if let t = result.timeMargin, t > Self.finishEpsilon {
+            if let t = result.timeMargin, t > Self.tieEpsilon {
                 return " by \(String(format: "%.1f", t))s"
             }
             return ""
         }()
         let distancePart: String = {
-            if let d = result.distanceMargin, d > 0.5 {
-                return " (\(RowPlayFormatting.distance(d, unit: unit)))"
+            if let d = result.distanceMargin, d > 0 {
+                return " (\(RowPlayFormatting.distanceMargin(d, unit: unit)))"
             }
             return ""
         }()
@@ -770,7 +527,14 @@ struct ReplayView: View {
     private var replaySurface: some View {
         switch rendererMode {
         case .twoD:
-            twoDReplaySurface
+            Replay2DSceneView(
+                detail: detail,
+                state: $state,
+                rival: activeRival,
+                distanceUnit: unit,
+                reduceMotion: reduceMotion,
+                contentRevision: ghostCandidatesRevision
+            )
         case .threeD:
             RealityReplaySceneView(
                 detail: detail,
@@ -875,172 +639,6 @@ struct ReplayView: View {
         )
     }
 
-    private var twoDReplaySurface: some View {
-        let interval = reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0
-        return TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timelineContext in
-            replayCanvas
-                .onChange(of: timelineContext.date) { oldDate, newDate in
-                    guard state.playing else {
-                        lastTickDate = newDate
-                        return
-                    }
-                    let tick = ReplayPlaybackClock.tick(
-                        lastTickDate: lastTickDate,
-                        currentDate: newDate
-                    )
-                    lastTickDate = tick.lastTickDate
-                    state.tick(deltaTime: tick.delta)
-                }
-        }
-        .frame(minHeight: 300)
-    }
-
-    // MARK: - Canvas
-
-    private var replayCanvas: some View {
-        Canvas { context, size in
-            context.stroke(ghostStrokePath, with: .color(AppDesign.softPurple.opacity(0.35)), lineWidth: 1.5)
-            context.stroke(strokePath, with: .color(cachedMachineColor.opacity(0.7)), lineWidth: 2)
-            drawGhostPlayhead(in: &context, size: size)
-            drawPlayhead(in: &context, size: size)
-        }
-        .accessibilityLabel("Workout replay timeline")
-        .accessibilityValue(canvasAccessibilityValue)
-        .background(
-            GeometryReader { proxy in
-                Color.clear
-                    .onChange(of: proxy.size, initial: true) { _, newSize in
-                        canvasSize = newSize
-                        strokePath = self.makeStrokePath(strokes: detail.strokes, size: newSize)
-                        if let rival = activeRival {
-                            ghostStrokePath = makeGhostStrokePath(
-                                ghostStrokes: rival.strokes,
-                                playerStrokes: detail.strokes,
-                                size: newSize
-                            )
-                        }
-                    }
-            }
-        )
-        .onAppear {
-            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
-        }
-        .onChange(of: colorScheme) { _, scheme in
-            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: scheme)
-        }
-        .onChange(of: detail.id) { _, _ in
-            strokePath = self.makeStrokePath(strokes: detail.strokes, size: canvasSize)
-            cachedMachineColor = Self.machineColor(for: detail.workout.sport, colorScheme: colorScheme)
-            // Drop non-session or missing session rivals when the workout changes.
-            if let rival = activeRival, rival.kind == .session {
-                if let id = rival.sessionWorkoutID,
-                   ghostCandidateByID[id] == nil {
-                    selectRival(nil)
-                }
-            }
-            ghostStrokePath = Path()
-            if canvasSize != .zero, let rival = activeRival {
-                ghostStrokePath = makeGhostStrokePath(
-                    ghostStrokes: rival.strokes,
-                    playerStrokes: detail.strokes,
-                    size: canvasSize
-                )
-            }
-            if let rival = activeRival {
-                cachedRaceResult = ReplayRaceResultCalculator.result(
-                    playerStrokes: detail.strokes,
-                    rivalStrokes: rival.strokes,
-                    workout: detail.workout
-                )
-            } else {
-                cachedRaceResult = nil
-            }
-        }
-    }
-
-    private func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
-        let duration = state.duration
-        let maxD = detail.strokes.last?.d ?? 1
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
-        let frame = state.currentFrame
-
-        let x = unitFraction(frame.t, denominator: duration) * size.width
-        let y = size.height - unitFraction(frame.d, denominator: maxD) * size.height
-
-        var playhead = Path()
-        playhead.move(to: CGPoint(x: x, y: 0))
-        playhead.addLine(to: CGPoint(x: x, y: size.height))
-        let playheadColor = AppDesign.alertRed
-        context.stroke(playhead, with: .color(playheadColor), lineWidth: 1)
-
-        let dotSize: CGFloat = 8
-        let dot = Path(ellipseIn: CGRect(
-            x: x - dotSize / 2,
-            y: y - dotSize / 2,
-            width: dotSize,
-            height: dotSize
-        ))
-        context.fill(dot, with: .color(playheadColor))
-    }
-
-    private func drawGhostPlayhead(in context: inout GraphicsContext, size: CGSize) {
-        guard let rival = activeRival, !rival.strokes.isEmpty else { return }
-        let duration = state.duration
-        let maxD = detail.strokes.last?.d ?? 1
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return }
-
-        let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
-        guard ghostDist.isFinite, ghostDist >= 0 else { return }
-
-        let x = unitFraction(state.time, denominator: duration) * size.width
-        let y = size.height - unitFraction(ghostDist, denominator: maxD) * size.height
-
-        let ghostColor = AppDesign.softPurple
-        let dotSize: CGFloat = 8
-        let dot = Path(ellipseIn: CGRect(
-            x: x - dotSize / 2,
-            y: y - dotSize / 2,
-            width: dotSize,
-            height: dotSize
-        ))
-        let strokeDot = Path(ellipseIn: CGRect(
-            x: x - dotSize / 2 - 1,
-            y: y - dotSize / 2 - 1,
-            width: dotSize + 2,
-            height: dotSize + 2
-        ))
-        context.stroke(strokeDot, with: .color(cachedMachineColor.opacity(0.3)), lineWidth: 1)
-        context.fill(dot, with: .color(ghostColor.opacity(0.8)))
-    }
-
-    private func unitFraction(_ numerator: Double, denominator: Double) -> CGFloat {
-        guard numerator.isFinite, denominator.isFinite, denominator > 0 else { return 0 }
-        return CGFloat(max(0, min(1, numerator / denominator)))
-    }
-
-    /// Precomputes the full stroke trail path so the Canvas draw closure only strokes it.
-    func makeStrokePath(strokes: [Stroke], size: CGSize) -> Path {
-        guard strokes.count > 1 else { return Path() }
-
-        let originT = strokes[0].t
-        let maxT = strokes.last?.t ?? originT
-        let maxD = strokes.last?.d ?? 1
-        let duration = maxT - originT
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
-
-        var path = Path()
-        for (i, stroke) in strokes.enumerated() {
-            let x = unitFraction(stroke.t - originT, denominator: duration) * size.width
-            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
-            if i == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-        }
-        return path
-    }
-
     /// Precomputes the ghost stroke trail path using player chart scales
     /// for direct comparability.
     func makeGhostStrokePath(
@@ -1048,25 +646,11 @@ struct ReplayView: View {
         playerStrokes: [Stroke],
         size: CGSize
     ) -> Path {
-        ReplayRivalPathBuilder.makePath(
+        Replay2DSceneView.makeGhostStrokePath(
             ghostStrokes: ghostStrokes,
             playerStrokes: playerStrokes,
             size: size
         )
-    }
-
-    private var canvasAccessibilityValue: String {
-        let frame = state.currentFrame
-        var parts: [String] = [
-            "Time \(RowPlayFormatting.time(frame.t, tenths: true))",
-            "Distance \(RowPlayFormatting.distance(frame.d, unit: unit))"
-        ]
-        if let rival = activeRival {
-            let ghostDist = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
-            let gapM = ReplayRaceGap.raceGapMeters(playerDistance: frame.d, ghostDistance: ghostDist)
-            parts.append(gapLabel(meters: gapM))
-        }
-        return parts.joined(separator: ", ")
     }
 
     // MARK: - Telemetry
@@ -1088,8 +672,7 @@ struct ReplayView: View {
     }
 
     private var cadenceText: String {
-        guard state.currentFrame.cadence.isFinite else { return "-" }
-        return String(Int(state.currentFrame.cadence.rounded()))
+        ReplayTelemetryFormatting.roundedInteger(state.currentFrame.cadence)
     }
 
     static func machineColor(for sport: Sport, colorScheme: ColorScheme) -> Color {
@@ -1207,6 +790,77 @@ enum ReplayPlaybackClock {
             delta: ReplayMotion.clampDt(ms: rawDelta * 1_000),
             lastTickDate: currentDate
         )
+    }
+}
+
+/// Pure verdict gate shared by the replay UI and regression tests.
+enum ReplayFinishGate {
+    static func shouldShowVerdict(
+        axis: ComparabilityAxis,
+        playerFinishTime: TimeInterval?,
+        workoutTargetDuration: TimeInterval,
+        replayDuration: TimeInterval,
+        playbackTime: TimeInterval
+    ) -> Bool {
+        guard playbackTime.isFinite, playbackTime >= 0 else {
+            return false
+        }
+
+        let horizon: TimeInterval?
+        switch axis {
+        case .distance:
+            // Reaching the distance target in the first sample is a valid
+            // zero-second finish, not a missing race horizon.
+            if let playerFinishTime,
+               playerFinishTime.isFinite,
+               playerFinishTime >= 0 {
+                horizon = playerFinishTime
+            } else if replayDuration.isFinite, replayDuration > 0 {
+                horizon = replayDuration
+            } else {
+                horizon = nil
+            }
+        case .time:
+            // Time races only complete against a meaningful positive duration.
+            let targetHorizon: TimeInterval?
+            if let playerFinishTime,
+               playerFinishTime.isFinite,
+               playerFinishTime > 0 {
+                targetHorizon = playerFinishTime
+            } else if workoutTargetDuration.isFinite, workoutTargetDuration > 0 {
+                targetHorizon = workoutTargetDuration
+            } else if replayDuration.isFinite, replayDuration > 0 {
+                targetHorizon = replayDuration
+            } else {
+                targetHorizon = nil
+            }
+            // Summary duration can be fractionally longer than the final
+            // recorded sample. In that case the replay's reachable end is the
+            // primary finish surface; otherwise the verdict could never show.
+            if let targetHorizon,
+               replayDuration.isFinite,
+               replayDuration > 0 {
+                horizon = min(targetHorizon, replayDuration)
+            } else {
+                horizon = targetHorizon
+            }
+        }
+
+        guard let horizon else { return false }
+        return playbackTime >= horizon
+    }
+}
+
+/// Checked telemetry conversion shared by 2D controls and the 3D accessibility
+/// summary. Imported files may contain any finite cadence, including values
+/// outside Swift's integer range, which must never trap the UI.
+enum ReplayTelemetryFormatting {
+    static func roundedInteger(_ value: Double, fallback: String = "-") -> String {
+        guard value.isFinite,
+              let integer = Int(exactly: value.rounded()) else {
+            return fallback
+        }
+        return String(integer)
     }
 }
 

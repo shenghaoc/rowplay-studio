@@ -2,6 +2,28 @@ import XCTest
 @testable import RowPlayCore
 
 final class ReplayRivalFactoryTests: XCTestCase {
+    func testConstantPaceRejectsUnrepresentableDerivedWatts() {
+        let player = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_000,
+            time: 480,
+            pace: 120,
+            workoutType: "FixedDistance",
+            hasStrokeData: true
+        )
+
+        XCTAssertNil(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 0.000_000_1,
+            player: player
+        ))
+        XCTAssertTrue(ReplayRivalFactory.constantPaceStrokes(
+            pacePer500m: 0.000_000_1,
+            totalDistance: 2_000
+        ).isEmpty)
+    }
+
     func testConstantPaceRivalIdentityUsesExactStableDoubleKeys() throws {
         let player = Workout(
             id: 1,

@@ -148,6 +148,12 @@ final class RowPlayFormattingTests: XCTestCase {
         XCTAssertEqual(RowPlayFormatting.distance(5_000), RowPlayFormatting.distance(5_000, unit: .metric))
     }
 
+    func testDistanceMarginPreservesPositiveSubMetreValue() {
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.3), "0.3 m")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.1, unit: .imperial), "0.3 ft")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(12), "12 m")
+    }
+
     // MARK: - DistanceUnit
 
     func testDistanceUnitRawValueMetric() {

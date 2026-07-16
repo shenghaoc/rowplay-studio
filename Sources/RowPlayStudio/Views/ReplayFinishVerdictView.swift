@@ -10,13 +10,18 @@ struct ReplayFinishVerdictView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.small) {
-            Text("Race Finished")
-                .font(AppDesign.Typography.compactLabel.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(verdict)
-                .font(AppDesign.Typography.compactLabel)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
+                Text("Race Finished")
+                    .font(AppDesign.Typography.compactLabel.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(verdict)
+                    .font(AppDesign.Typography.compactLabel)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Race finished")
+            .accessibilityValue(verdict)
 
             HStack(spacing: AppDesign.Spacing.medium) {
                 Button("Save Race Report…", action: saveReport)
@@ -44,8 +49,5 @@ struct ReplayFinishVerdictView: View {
         .padding(.vertical, AppDesign.Spacing.medium)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Race finished")
-        .accessibilityValue(verdict)
     }
 }

@@ -53,6 +53,8 @@ public final class WorkoutLibrary: ObservableObject {
 
     /// Cached lookup from workout ID → WorkoutDetail, rebuilt when `details` changes.
     private var detailByID: [Int: WorkoutDetail] = [:]
+    /// Cached O(N) replay trace/target identities for O(1) SwiftUI lookups.
+    private var replayContentIdentityByWorkoutID: [Int: ReplayPrimaryContentIdentity] = [:]
     /// Cached stroke summaries for detail accessibility labels and metrics.
     private var strokeSummaryByWorkoutID: [Int: StrokeSummary] = [:]
     private let defaults: UserDefaults
@@ -103,6 +105,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     public func detail(id: Int) -> WorkoutDetail? {
         detailByID[id]
+    }
+
+    public func replayContentIdentity(for workoutID: Int) -> ReplayPrimaryContentIdentity? {
+        replayContentIdentityByWorkoutID[workoutID]
     }
 
     public func strokeSummary(for workoutID: Int) -> StrokeSummary {
@@ -163,8 +169,8 @@ public final class WorkoutLibrary: ObservableObject {
     /// Ranked comparable past-session candidates for ghost replay.
     /// Uses ``GhostPick/rankedGhostCandidates(_:current:)`` and resolves
     /// ranked ``Workout`` values back to ``WorkoutDetail`` through the detail
-    /// cache. Candidates with empty stroke arrays are excluded even if
-    /// `hasStrokeData` is true.
+    /// cache. Candidates with fewer than two strokes are excluded because they
+    /// cannot produce a session rival even when `hasStrokeData` is true.
     public func ghostCandidates(for workoutID: Int) -> [WorkoutDetail] {
         if let cachedGhostCandidates,
            cachedGhostCandidates.workoutID == workoutID {
@@ -183,7 +189,7 @@ public final class WorkoutLibrary: ObservableObject {
             current: context
         )
         let candidates = ranked.compactMap { w -> WorkoutDetail? in
-            guard let detail = detailByID[w.id], !detail.strokes.isEmpty else { return nil }
+            guard let detail = detailByID[w.id], detail.strokes.count >= 2 else { return nil }
             return detail
         }
         cachedGhostCandidates = (workoutID, candidates)
@@ -383,6 +389,10 @@ public final class WorkoutLibrary: ObservableObject {
 
     private func updateAllDerivedData() {
         detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        replayContentIdentityByWorkoutID = Dictionary(
+            details.map { ($0.id, ReplayPrimaryContentIdentity(detail: $0)) },
+            uniquingKeysWith: { first, _ in first }
+        )
         strokeSummaryByWorkoutID = Dictionary(
             details.map { ($0.id, WorkoutAnalytics.strokeSummary(for: $0.strokes)) },
             uniquingKeysWith: { first, _ in first }

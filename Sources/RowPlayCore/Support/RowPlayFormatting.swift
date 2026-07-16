@@ -42,14 +42,38 @@ public enum RowPlayFormatting: Sendable {
             if abs(metres) >= 1_000 {
                 return "\(String(format: "%.2f", metres / 1_000)) km"
             }
-            return "\(Int(metres.rounded())) m"
+            guard let roundedMetres = Int(exactly: metres.rounded()) else { return "--" }
+            return "\(roundedMetres) m"
         case .imperial:
             if abs(metres) >= feetThreshold {
                 let miles = metres / 1_609.344
                 return "\(String(format: "%.2f", miles)) mi"
             }
             let feet = metres * 3.28084
-            return "\(Int(feet.rounded())) ft"
+            guard let roundedFeet = Int(exactly: feet.rounded()) else { return "--" }
+            return "\(roundedFeet) ft"
+        }
+    }
+
+    /// Distance formatting for race margins. Unlike general workout distance,
+    /// positive sub-unit margins retain one decimal so a non-tie never renders
+    /// as a misleading zero.
+    public static func distanceMargin(
+        _ metres: Double,
+        unit: DistanceUnit = .metric
+    ) -> String {
+        guard metres.isFinite, metres >= 0 else { return "--" }
+        switch unit {
+        case .metric where metres > 0 && metres < 1:
+            return "\(String(format: "%.1f", metres)) m"
+        case .imperial:
+            let feet = metres * 3.28084
+            if feet > 0, feet < 1 {
+                return "\(String(format: "%.1f", feet)) ft"
+            }
+            return distance(metres, unit: unit)
+        case .metric:
+            return distance(metres, unit: unit)
         }
     }
 

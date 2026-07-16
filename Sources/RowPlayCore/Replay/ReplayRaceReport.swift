@@ -199,13 +199,23 @@ public enum ReplayRaceReportBuilder: Sendable {
         )
     }
 
-    /// Prefer the race decision point over raw workout-summary fields so the
-    /// card "You" block agrees with margins and the finish verdict.
+    /// Build the primary participant's completed race summary. A distance race
+    /// uses the target distance and the player's own crossing time; the
+    /// decision-point distance stored for a rival win is reserved for the
+    /// shortfall margin. A time race uses the distance sampled at the target
+    /// duration.
     private static func primaryMetrics(
         player: Workout,
         result: ReplayRaceResult
     ) -> (distance: Double, time: TimeInterval, pace: TimeInterval) {
-        let distance = result.playerDistance ?? player.distance
+        let distance: Double
+        switch result.axis {
+        case .distance:
+            distance = player.distance
+        case .time:
+            distance = result.playerDistance ?? player.distance
+        }
+
         let time = result.playerFinishTime ?? player.time
         let derivedPace: TimeInterval? = {
             guard distance.isFinite, distance > 0, time.isFinite, time > 0 else { return nil }
