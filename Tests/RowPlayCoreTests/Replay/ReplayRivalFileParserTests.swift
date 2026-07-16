@@ -316,6 +316,33 @@ final class ReplayRivalFileParserTests: XCTestCase {
         }
     }
 
+    func testCSVInvalidClockShapesAreRejected() {
+        let invalidClocks = [
+            ":",
+            "::",
+            "1:",
+            ":30",
+            "1::2",
+            "1:2:3:4",
+            "-1:30",
+            "1.5:30",
+            "1:2.5:30",
+            "1:60",
+            "1:60:00",
+            "1:02:60",
+        ]
+
+        for clock in invalidClocks {
+            let csv = "time,distance\n\(clock),0\n0:10,50\n"
+            XCTAssertThrowsError(
+                try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "invalid-clock.csv"),
+                clock
+            ) { error in
+                XCTAssertEqual(error as? ReplayRivalFileParserError, .tooFewSamples, clock)
+            }
+        }
+    }
+
     private func makeCompressedTimestampFIT() -> Data {
         var bytes: [UInt8] = [
             14, 0x10, 0, 0,

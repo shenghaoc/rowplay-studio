@@ -501,9 +501,31 @@ public enum ReplayRivalFileParser: Sendable {
         let s = value.trimmingCharacters(in: .whitespaces)
         guard !s.isEmpty else { return .nan }
         if s.contains(":") {
-            let parts = s.split(separator: ":").map { Double($0.trimmingCharacters(in: .whitespaces)) }
-            guard parts.allSatisfy({ $0?.isFinite == true }) else { return .nan }
-            return parts.compactMap { $0 }.reduce(0) { $0 * 60 + $1 }
+            let rawParts = s.split(separator: ":", omittingEmptySubsequences: false)
+            guard (2...3).contains(rawParts.count) else { return .nan }
+
+            let parts = rawParts.compactMap { part -> Double? in
+                let component = part.trimmingCharacters(in: .whitespaces)
+                guard !component.isEmpty,
+                      let value = Double(component),
+                      value.isFinite,
+                      value >= 0 else {
+                    return nil
+                }
+                return value
+            }
+            guard parts.count == rawParts.count,
+                  parts.dropLast().allSatisfy({ $0.rounded(.towardZero) == $0 }),
+                  let seconds = parts.last,
+                  seconds < 60 else {
+                return .nan
+            }
+            if parts.count == 3, parts[1] >= 60 {
+                return .nan
+            }
+
+            let total = parts.reduce(0) { $0 * 60 + $1 }
+            return total.isFinite ? total : .nan
         }
         return Double(normalizedNumberString(s)) ?? .nan
     }
