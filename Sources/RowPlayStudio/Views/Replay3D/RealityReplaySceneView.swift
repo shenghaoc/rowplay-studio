@@ -91,15 +91,7 @@ struct RealityReplaySceneView: View {
             resetPerformanceTiming()
         }
         .onChange(of: rival?.id) { _, _ in
-            // Clear old 3D rival pose/effect aggregates on rival change.
-            if let rival, rival.hasGenuineStrokeData {
-                sceneState.ghostPoseContext = computePoseContext(strokes: rival.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: rival.strokes)
-            } else {
-                // Constant-pace and imported rivals use fallback articulation.
-                sceneState.ghostPoseContext = nil
-                sceneState.ghostMedianHR = 0
-            }
+            refreshGhostPoseAggregates()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
@@ -121,15 +113,13 @@ struct RealityReplaySceneView: View {
         configuration: ReplayRenderConfiguration
     ) -> some View {
         RealityView { make in
-            // Precompute immutable aggregates once.
+            // Precompute immutable aggregates once per live workout, and per
+            // rival identity so session A → session B cannot reuse A's pose/HR.
             if sceneState.livePoseContext == nil {
                 sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
                 sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
             }
-            if let rival, rival.hasGenuineStrokeData, sceneState.ghostPoseContext == nil {
-                sceneState.ghostPoseContext = computePoseContext(strokes: rival.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: rival.strokes)
-            }
+            refreshGhostPoseAggregates()
 
             let container = Replay3DSceneBuilder.buildScene(
                 sport: sport,
@@ -330,6 +320,23 @@ struct RealityReplaySceneView: View {
 
     // MARK: - Context Builders (called once)
 
+    /// Rebuild ghost pose/HR aggregates whenever the active rival identity
+    /// changes. `sceneState` outlives the RealityView remake boundary, so a
+    /// nil-check alone would leave session A's context articulating session B.
+    private func refreshGhostPoseAggregates() {
+        if let rival, rival.hasGenuineStrokeData {
+            if sceneState.ghostPoseRivalID != rival.id {
+                sceneState.ghostPoseContext = computePoseContext(strokes: rival.strokes)
+                sceneState.ghostMedianHR = computeMedianHR(strokes: rival.strokes)
+                sceneState.ghostPoseRivalID = rival.id
+            }
+        } else {
+            sceneState.ghostPoseContext = nil
+            sceneState.ghostMedianHR = 0
+            sceneState.ghostPoseRivalID = nil
+        }
+    }
+
     /// Proper median matching the web `median()` helper: averages the two
     /// middle values for even-length arrays.
     private func computePoseContext(strokes: [Stroke]) -> ReplayStrokePoseContext {
@@ -477,4 +484,7 @@ final class Replay3DSceneState {
     var ghostPoseContext: ReplayStrokePoseContext?
     /// Precomputed ghost median HR (immutable during replay).
     var ghostMedianHR: Int = 0
+    /// Rival identity that produced `ghostPoseContext` / `ghostMedianHR`.
+    /// Prevents session A aggregates from articulating session B after a rebuild.
+    var ghostPoseRivalID: String?
 }

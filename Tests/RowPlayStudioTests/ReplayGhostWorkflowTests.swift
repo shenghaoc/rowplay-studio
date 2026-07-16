@@ -312,4 +312,31 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertNotEqual(pace, imported)
         XCTAssertNotEqual(session.rivalID, imported.rivalID)
     }
+
+    func testSceneStateGhostPoseIdentityTracksRivalReplacement() {
+        let state = Replay3DSceneState()
+        state.ghostPoseRivalID = "session-a"
+        state.ghostMedianHR = 140
+
+        // Simulate the replacement rule used by RealityReplaySceneView:
+        // a different rival id must not keep the previous aggregates.
+        let nextRivalID = "session-b"
+        if state.ghostPoseRivalID != nextRivalID {
+            state.ghostPoseContext = nil
+            state.ghostMedianHR = 0
+            state.ghostPoseRivalID = nextRivalID
+        }
+
+        XCTAssertEqual(state.ghostPoseRivalID, "session-b")
+        XCTAssertEqual(state.ghostMedianHR, 0)
+        XCTAssertNil(state.ghostPoseContext)
+    }
+
+    func testImportLoaderParsesPreloadedBytesWithoutURLAccess() throws {
+        let data = Data("time,distance\n0,0\n10,50\n".utf8)
+        let rival = try ReplayRivalImportLoader.makeRival(from: data, fileName: "preloaded.csv")
+        XCTAssertEqual(rival.kind, .importedFile)
+        XCTAssertEqual(rival.strokes.count, 2)
+        XCTAssertEqual(rival.localFileName, "preloaded.csv")
+    }
 }

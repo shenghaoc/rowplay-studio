@@ -179,21 +179,44 @@ public enum ReplayRaceReportBuilder: Sendable {
             )
         }
 
+        let primaryMetrics = primaryMetrics(player: player, result: result)
+
         return ReplayRaceReport(
             exportedAt: exportedAt,
             sport: player.sport,
             target: target,
             primary: .init(
                 date: player.date,
-                distance: player.distance,
-                time: player.time,
-                pace: player.pace
+                distance: primaryMetrics.distance,
+                time: primaryMetrics.time,
+                pace: primaryMetrics.pace
             ),
             rival: rivalSummary,
             outcome: result.outcome,
             timeMargin: result.timeMargin,
             distanceMargin: result.distanceMargin,
             rivalDidNotFinish: result.rivalDidNotFinish
+        )
+    }
+
+    /// Prefer the race decision point over raw workout-summary fields so the
+    /// card "You" block agrees with margins and the finish verdict.
+    private static func primaryMetrics(
+        player: Workout,
+        result: ReplayRaceResult
+    ) -> (distance: Double, time: TimeInterval, pace: TimeInterval) {
+        let distance = result.playerDistance ?? player.distance
+        let time = result.playerFinishTime ?? player.time
+        let derivedPace: TimeInterval? = {
+            guard distance.isFinite, distance > 0, time.isFinite, time > 0 else { return nil }
+            let value = time * 500.0 / distance
+            return value.isFinite && value > 0 ? value : nil
+        }()
+        let pace = derivedPace ?? player.pace
+        return (
+            distance: distance.isFinite && distance >= 0 ? distance : player.distance,
+            time: time.isFinite && time >= 0 ? time : player.time,
+            pace: pace.isFinite && pace > 0 ? pace : player.pace
         )
     }
 

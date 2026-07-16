@@ -189,8 +189,45 @@ final class ReplayRivalFactoryTests: XCTestCase {
         XCTAssertEqual(rival?.kind, .session)
         XCTAssertEqual(rival?.sessionWorkoutID, 42)
         XCTAssertEqual(rival?.hasGenuineStrokeData, true)
-        XCTAssertEqual(rival?.id, "session-42")
+        XCTAssertTrue(rival?.id.hasPrefix("session-42-") == true)
         XCTAssertEqual(rival?.strokes.count, 2)
+    }
+
+    func testSessionRivalIdentityChangesWhenStrokeContentChanges() throws {
+        let workout = Workout(
+            id: 42,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 100,
+            time: 30,
+            pace: 150,
+            workoutType: "FixedDistanceIntervals",
+            hasStrokeData: true
+        )
+        let firstDetail = WorkoutDetail(
+            workout: workout,
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 150, cadence: 24, watts: 150),
+                Stroke(t: 30, d: 100, pace: 150, cadence: 24, watts: 150),
+            ],
+            splits: []
+        )
+        let refreshedDetail = WorkoutDetail(
+            workout: workout,
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 140, cadence: 26, watts: 180),
+                Stroke(t: 28, d: 100, pace: 140, cadence: 26, watts: 180),
+            ],
+            splits: []
+        )
+
+        let first = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: firstDetail))
+        let same = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: firstDetail))
+        let refreshed = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: refreshedDetail))
+
+        XCTAssertEqual(first.id, same.id)
+        XCTAssertNotEqual(first.id, refreshed.id)
+        XCTAssertEqual(first.sessionWorkoutID, refreshed.sessionWorkoutID)
     }
 
     func testSessionRivalRejectsSingleStroke() {

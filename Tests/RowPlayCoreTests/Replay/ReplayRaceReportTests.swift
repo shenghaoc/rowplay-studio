@@ -110,6 +110,46 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(report.rival.pace ?? -1, 115, accuracy: 0.001)
     }
 
+    func testPrimaryMetricsPreferRaceDecisionPointOverWorkoutSummary() throws {
+        let player = Workout(
+            id: 3,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 5_000, // summary disagrees with the race decision
+            time: 1_200,
+            pace: 120,
+            workoutType: "FixedDistanceIntervals",
+            hasStrokeData: true
+        )
+        let rival = ReplayRival(
+            id: "pace-120",
+            kind: .constantPace,
+            displayLabel: "2:00/500m",
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),
+                Stroke(t: 500, d: 2_000, pace: 120, cadence: 0, watts: 200),
+            ],
+            hasGenuineStrokeData: false,
+            targetPace: 120
+        )
+        let result = ReplayRaceResult(
+            outcome: .playerWon,
+            axis: .distance,
+            timeMargin: 20,
+            distanceMargin: 80,
+            playerFinishTime: 480,
+            rivalFinishTime: 500,
+            playerDistance: 2_000,
+            rivalDistance: 1_920
+        )
+
+        let report = ReplayRaceReportBuilder.build(player: player, rival: rival, result: result)
+
+        XCTAssertEqual(report.primary.distance, 2_000, accuracy: 0.001)
+        XCTAssertEqual(report.primary.time, 480, accuracy: 0.001)
+        XCTAssertEqual(report.primary.pace, 120, accuracy: 0.001)
+    }
+
     func testSessionReportUsesGenericLabel() throws {
         let player = Workout(
             id: 1,

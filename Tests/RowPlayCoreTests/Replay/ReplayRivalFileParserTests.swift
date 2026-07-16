@@ -374,6 +374,42 @@ final class ReplayRivalFileParserTests: XCTestCase {
         }
     }
 
+    func testTCXDocumentTypeScanSupportsNonzeroDataStartIndex() throws {
+        let encodings: [(name: String, declaration: String, encoding: String.Encoding, bom: [UInt8])] = [
+            ("utf8", "UTF-8", .utf8, []),
+            ("utf16-le", "UTF-16", .utf16LittleEndian, [0xFF, 0xFE]),
+            ("utf16-be", "UTF-16", .utf16BigEndian, [0xFE, 0xFF]),
+            ("utf32-le", "UTF-32", .utf32LittleEndian, [0xFF, 0xFE, 0x00, 0x00]),
+            ("utf32-be", "UTF-32", .utf32BigEndian, [0x00, 0x00, 0xFE, 0xFF]),
+        ]
+
+        for candidate in encodings {
+            let tcx = """
+            <?xml version="1.0" encoding="\(candidate.declaration)"?>
+            <!DOCTYPE TrainingCenterDatabase>
+            <TrainingCenterDatabase>
+              <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+              <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+            </TrainingCenterDatabase>
+            """
+            var wrapped = Data([0xAA, 0xBB, 0xCC])
+            wrapped.append(contentsOf: candidate.bom)
+            wrapped.append(try XCTUnwrap(tcx.data(using: candidate.encoding)))
+            let slice = wrapped.dropFirst(3)
+            XCTAssertNotEqual(slice.startIndex, 0, candidate.name)
+
+            XCTAssertThrowsError(
+                try ReplayRivalFileParser.parse(
+                    data: slice,
+                    fileName: "sliced-doctype-\(candidate.name).tcx"
+                ),
+                candidate.name
+            ) { error in
+                XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed, candidate.name)
+            }
+        }
+    }
+
     func testNormalizationParityCases() throws {
         let fixture = try Self.fixtureResult.get()
         for c in fixture.normalization {
@@ -462,6 +498,67 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes[1].heartRate, 145)
         XCTAssertEqual(parsed.strokes[1].cadence, 30, accuracy: 0.001)
         XCTAssertEqual(parsed.strokes[2].cadence, 32, accuracy: 0.001)
+    }
+
+    func testCSVPrefersElapsedOverTimestampAndAcceptsDistAlias() throws {
+        let csv = """
+        timestamp,elapsed,dist,parameter
+        2026-01-01T00:00:00Z,0,0,999
+        2026-01-01T00:00:10Z,10,50,999
+        2026-01-01T00:00:20Z,20,100,999
+        """
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "aliases.csv")
+        XCTAssertEqual(parsed.strokes.map(\.t), [0, 10, 20])
+        XCTAssertEqual(parsed.strokes.map(\.d), [0, 50, 100])
+    }
+
+    func testCSVEuropeanDecimalCommaIsAccepted() throws {
+        let csv = "time,distance\n0,0\n10,\"1,5\"\n20,\"3,0\"\n"
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "eu.csv")
+        XCTAssertEqual(parsed.strokes[1].d, 1.5, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[2].d, 3.0, accuracy: 0.001)
+    }
+
+    func testCSVUSThousandsCommaStillParsesAsIntegerDistance() throws {
+        let csv = "time,distance\n0,0\n10,\"1,000\"\n20,\"2,000\"\n"
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "us.csv")
+        XCTAssertEqual(parsed.strokes[1].d, 1_000, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[2].d, 2_000, accuracy: 0.001)
+    }
+
+    func testCSVExtensionIsNotHijackedByEmbeddedFITSignature() throws {
+        // Bytes 8-11 of the whole payload are ".FIT". Extension-first dispatch
+        // must still parse this as CSV rather than a truncated FIT file.
+        let csv = "noteXXXX.FIT,time,distance\nx,0,0\nx,10,50\n"
+        let bytes = Array(csv.utf8)
+        XCTAssertEqual(Array(bytes[8..<12]), [0x2E, 0x46, 0x49, 0x54])
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "trap.csv")
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
+    func testDOCTYPEScanAcceptsSlicedDataWithNonzeroStartIndex() throws {
+        let tcx = """
+        <?xml version="1.0"?>
+        <!DOCTYPE TrainingCenterDatabase>
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+        var padded = Data(repeating: 0x20, count: 32)
+        padded.append(contentsOf: tcx.utf8)
+        // Range-subscript slices preserve the base startIndex; subdata does not.
+        let sliced = padded[32..<padded.count]
+        XCTAssertNotEqual(sliced.startIndex, 0)
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: sliced, fileName: "slice.tcx")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
     }
 
     func testCSVOutOfRangeOptionalMetricsAreSanitized() throws {

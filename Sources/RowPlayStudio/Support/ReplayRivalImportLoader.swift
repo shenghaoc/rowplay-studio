@@ -19,10 +19,14 @@ struct ReplayRivalImportGeneration: Equatable, Sendable {
 
 /// Bounded file-I/O boundary for the user-selected rival import workflow.
 enum ReplayRivalImportLoader {
-    /// Keeps the balanced security-scope lifetime in the same synchronous
-    /// operation as the file read. Call this from the detached import task so
-    /// security-scope acquisition, I/O, parsing, and release cannot drift apart.
-    static func loadSecurityScopedRival(from url: URL, fileName: String) throws -> ReplayRival {
+    /// Acquires the security scope, then runs `body`. Callers that already hold
+    /// a grant (for example after starting access in a `fileImporter` callback)
+    /// should use ``loadRival(from:fileName:)`` / ``makeRival(from:fileName:)``
+    /// directly and balance `stopAccessingSecurityScopedResource()` themselves.
+    static func withSecurityScopedAccess<T>(
+        to url: URL,
+        _ body: () throws -> T
+    ) throws -> T {
         try Task.checkCancellation()
         let accessed = url.startAccessingSecurityScopedResource()
         defer {
@@ -30,12 +34,26 @@ enum ReplayRivalImportLoader {
                 url.stopAccessingSecurityScopedResource()
             }
         }
-        return try loadRival(from: url, fileName: fileName)
+        return try body()
+    }
+
+    /// Combined acquire → read → parse → release helper for tests and any
+    /// caller that does not pre-acquire the powerbox grant.
+    static func loadSecurityScopedRival(from url: URL, fileName: String) throws -> ReplayRival {
+        try withSecurityScopedAccess(to: url) {
+            try loadRival(from: url, fileName: fileName)
+        }
     }
 
     static func loadRival(from url: URL, fileName: String) throws -> ReplayRival {
         try Task.checkCancellation()
         let data = try readData(from: url)
+        return try makeRival(from: data, fileName: fileName)
+    }
+
+    /// Parse already-read bytes into a rival. Prefer this when the security
+    /// scope was used only to load `data`, so parsing no longer needs the URL.
+    static func makeRival(from data: Data, fileName: String) throws -> ReplayRival {
         try Task.checkCancellation()
         let parsed = try ReplayRivalFileParser.parse(data: data, fileName: fileName)
         try Task.checkCancellation()

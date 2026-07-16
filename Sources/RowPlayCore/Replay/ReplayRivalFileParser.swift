@@ -338,26 +338,46 @@ public enum ReplayRivalFileParser: Sendable {
             throw ReplayRivalFileParserError.fileTooLarge
         }
 
+        // Normalize sliced `Data` (non-zero `startIndex`) so every internal
+        // byte walk can use zero-based offsets safely.
+        let data = data.startIndex == 0 ? data : Data(data)
+
         let lastComponent = ReplayPathUtilities.lastPathComponent(fileName)
         let ext = (lastComponent as NSString).pathExtension.lowercased()
 
+        // Extension wins for known rival types so a 4-byte `.FIT` coincidence
+        // inside CSV/TCX text cannot hijack dispatch. Signature sniffing is
+        // reserved for empty/unknown extensions.
         let raw: [RawRivalSample]
-        if ext == "fit" || isFitSignature(data) {
+        switch ext {
+        case "fit":
             raw = try parseFit(data)
-        } else if try (ext == "tcx" || looksLikeTcx(data)) {
+        case "tcx":
             raw = try parseTcx(data)
-        } else {
-            guard let text = String(data: data, encoding: .utf8)
-                    ?? String(data: data, encoding: .isoLatin1) else {
-                throw ReplayRivalFileParserError.unreadable
+        case "csv", "txt", "text":
+            raw = try parseCsvData(data)
+        default:
+            if isFitSignature(data) {
+                raw = try parseFit(data)
+            } else if try looksLikeTcx(data) {
+                raw = try parseTcx(data)
+            } else {
+                raw = try parseCsvData(data)
             }
-            try checkReplayImportCancellation()
-            raw = try parseCsv(text)
         }
 
         try checkReplayImportCancellation()
         let strokes = try finalize(raw)
         return ParsedTrace(strokes: strokes, fileName: lastComponent)
+    }
+
+    private static func parseCsvData(_ data: Data) throws -> [RawRivalSample] {
+        guard let text = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1) else {
+            throw ReplayRivalFileParserError.unreadable
+        }
+        try checkReplayImportCancellation()
+        return try parseCsv(text)
     }
 
     // MARK: - Normalization
@@ -497,24 +517,33 @@ public enum ReplayRivalFileParser: Sendable {
                 let header = columns.map {
                     $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 }
-                func find(_ names: String...) -> Int {
-                    header.firstIndex { value in
-                        names.contains(where: { value.contains($0) })
-                    } ?? -1
-                }
-
-                ti = find("time", "seconds", "elapsed")
-                di = find("distance", "meter", "metre")
-                pi = find("pace")
-                hi = find("heart", "hr", "bpm")
-                si = find("stroke rate", "strokerate", "spm", "cadence")
+                // Prefer exact/token matches so "timestamp" does not steal
+                // elapsed time and "parameter" does not steal distance.
+                ti = findHeader(
+                    header,
+                    names: ["elapsed", "seconds", "timer", "time"],
+                    rejectedTokens: ["stamp", "date", "day", "zone", "clock", "local", "utc"]
+                )
+                di = findHeader(
+                    header,
+                    names: ["distance", "dist", "meters", "metres", "meter", "metre"],
+                    rejectedTokens: ["parameter", "diameter"]
+                )
+                pi = findHeader(header, names: ["pace"])
+                hi = findHeader(header, names: ["heart_rate", "heartrate", "hr", "bpm", "heart"])
+                si = findHeader(
+                    header,
+                    names: ["stroke_rate", "strokerate", "stroke rate", "spm", "cadence"]
+                )
                 if si < 0,
-                   let rateIndex = header.enumerated().first(where: {
-                       $0.offset != hi && $0.element.contains("rate")
+                   let rateIndex = header.enumerated().first(where: { entry in
+                       entry.offset != hi
+                           && headerTokens(entry.element).contains("rate")
+                           && !headerTokens(entry.element).contains("heart")
                    })?.offset {
                     si = rateIndex
                 }
-                wi = find("watt", "power")
+                wi = findHeader(header, names: ["watts", "watt", "power"])
                 didReadHeader = true
                 return
             }
@@ -679,7 +708,82 @@ public enum ReplayRivalFileParser: Sendable {
     }
 
     private static func normalizedNumberString(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "")
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return trimmed }
+
+        // Support both "1,000.5" (US) and "1.000,5" (EU) thousand/decimal forms
+        // without treating a lone European decimal comma as a thousands mark.
+        let hasDot = trimmed.contains(".")
+        let hasComma = trimmed.contains(",")
+        if hasDot && hasComma {
+            if let lastDot = trimmed.lastIndex(of: "."),
+               let lastComma = trimmed.lastIndex(of: ",") {
+                if lastComma > lastDot {
+                    // 1.000,5 → 1000.5
+                    return trimmed
+                        .replacingOccurrences(of: ".", with: "")
+                        .replacingOccurrences(of: ",", with: ".")
+                }
+                // 1,000.5 → 1000.5
+                return trimmed.replacingOccurrences(of: ",", with: "")
+            }
+        }
+        if hasComma && !hasDot {
+            let parts = trimmed.split(separator: ",", omittingEmptySubsequences: false)
+            // Only 1–2 fractional digits count as a European decimal ("1,5",
+            // "1,50"). Three digits are treated as a thousands group ("1,000").
+            if parts.count == 2,
+               (1...2).contains(parts[1].count),
+               parts[0].allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" }),
+               parts[1].allSatisfy(\.isNumber) {
+                return "\(parts[0]).\(parts[1])"
+            }
+            // Thousands groups: 1,000 → 1000
+            return trimmed.replacingOccurrences(of: ",", with: "")
+        }
+        return trimmed
+    }
+
+    /// Exact match first, then token match. Rejects columns that also carry
+    /// disambiguating tokens (for example `timestamp` when looking for `time`).
+    private static func findHeader(
+        _ header: [String],
+        names: [String],
+        rejectedTokens: [String] = []
+    ) -> Int {
+        for name in names {
+            if let index = header.firstIndex(of: name) {
+                return index
+            }
+        }
+        for name in names {
+            if let index = header.firstIndex(where: { column in
+                let tokens = headerTokens(column)
+                guard tokens.contains(name) || column == name else { return false }
+                if rejectedTokens.contains(where: { tokens.contains($0) || column.contains($0) }) {
+                    return false
+                }
+                return true
+            }) {
+                return index
+            }
+        }
+        // Last resort: multi-word phrase containment (e.g. "stroke rate").
+        for name in names where name.contains(" ") || name.contains("_") {
+            let needle = name.replacingOccurrences(of: "_", with: " ")
+            if let index = header.firstIndex(where: {
+                $0.replacingOccurrences(of: "_", with: " ").contains(needle)
+            }) {
+                return index
+            }
+        }
+        return -1
+    }
+
+    private static func headerTokens(_ column: String) -> [String] {
+        column.split { character in
+            !character.isLetter && !character.isNumber
+        }.map(String.init)
     }
 
     // MARK: - TCX
@@ -853,6 +957,9 @@ public enum ReplayRivalFileParser: Sendable {
     }
 
     /// Case-insensitive search for an ASCII needle encoded with fixed-width units.
+    ///
+    /// Uses `withUnsafeBytes` so sliced `Data` (non-zero `startIndex`) cannot
+    /// trap on integer subscripts.
     private static func containsASCIISequence(
         _ data: Data,
         ascii: String,
@@ -864,59 +971,65 @@ public enum ReplayRivalFileParser: Sendable {
             return false
         }
 
-        var matched = 0
-        var offset = 0
-        while offset + unitWidth <= data.count {
-            if offset.isMultiple(of: 4_096) {
-                try checkReplayImportCancellation()
+        return try data.withUnsafeBytes { buffer -> Bool in
+            guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return false
             }
-
-            let codeUnit: UInt32
-            switch unitWidth {
-            case 1:
-                codeUnit = UInt32(data[offset])
-            case 2:
-                let b0 = UInt32(data[offset])
-                let b1 = UInt32(data[offset + 1])
-                codeUnit = littleEndian ? (b0 | (b1 &<< 8)) : ((b0 &<< 8) | b1)
-            default:
-                let b0 = UInt32(data[offset])
-                let b1 = UInt32(data[offset + 1])
-                let b2 = UInt32(data[offset + 2])
-                let b3 = UInt32(data[offset + 3])
-                codeUnit = littleEndian
-                    ? (b0 | (b1 &<< 8) | (b2 &<< 16) | (b3 &<< 24))
-                    : ((b0 &<< 24) | (b1 &<< 16) | (b2 &<< 8) | b3)
-            }
-
-            // Only pure ASCII code units participate; multi-byte content resets.
-            if codeUnit <= 0x7F {
-                var normalized = UInt8(codeUnit)
-                if normalized >= 0x61 && normalized <= 0x7A {
-                    normalized -= 0x20
+            let count = buffer.count
+            var matched = 0
+            var offset = 0
+            while offset + unitWidth <= count {
+                if offset.isMultiple(of: 4_096) {
+                    try checkReplayImportCancellation()
                 }
-                if normalized == needle[matched] {
-                    matched += 1
-                    if matched == needle.count {
-                        return true
+
+                let codeUnit: UInt32
+                switch unitWidth {
+                case 1:
+                    codeUnit = UInt32(base[offset])
+                case 2:
+                    let b0 = UInt32(base[offset])
+                    let b1 = UInt32(base[offset + 1])
+                    codeUnit = littleEndian ? (b0 | (b1 &<< 8)) : ((b0 &<< 8) | b1)
+                default:
+                    let b0 = UInt32(base[offset])
+                    let b1 = UInt32(base[offset + 1])
+                    let b2 = UInt32(base[offset + 2])
+                    let b3 = UInt32(base[offset + 3])
+                    codeUnit = littleEndian
+                        ? (b0 | (b1 &<< 8) | (b2 &<< 16) | (b3 &<< 24))
+                        : ((b0 &<< 24) | (b1 &<< 16) | (b2 &<< 8) | b3)
+                }
+
+                // Only pure ASCII code units participate; multi-byte content resets.
+                if codeUnit <= 0x7F {
+                    var normalized = UInt8(codeUnit)
+                    if normalized >= 0x61 && normalized <= 0x7A {
+                        normalized -= 0x20
+                    }
+                    if normalized == needle[matched] {
+                        matched += 1
+                        if matched == needle.count {
+                            return true
+                        }
+                    } else {
+                        matched = normalized == needle[0] ? 1 : 0
                     }
                 } else {
-                    matched = normalized == needle[0] ? 1 : 0
+                    matched = 0
                 }
-            } else {
-                matched = 0
-            }
 
-            offset += unitWidth
+                offset += unitWidth
+            }
+            return false
         }
-        return false
     }
 
     private static func parseTcx(_ data: Data) throws -> [RawRivalSample] {
         try checkReplayImportCancellation()
         // A bare DOCTYPE may not emit an XMLParser delegate callback. Reject it
-        // up front with a zero-stripped probe that also recognizes UTF-16/32;
-        // the delegate callbacks remain defense in depth for declarations.
+        // up front with multi-encoding raw scans; the delegate callbacks remain
+        // defense in depth for declarations.
         guard try !containsDocumentTypeDeclaration(data) else {
             throw ReplayRivalFileParserError.malformed
         }
@@ -1104,7 +1217,9 @@ public enum ReplayRivalFileParser: Sendable {
                         guard field.size >= 0, pos + field.size <= end else {
                             throw ReplayRivalFileParserError.malformed
                         }
-                        if def.global == fitRecordGlobal, field.num >= 0 {
+                        // Timestamp (field 253) can appear on any global message
+                        // and is the basis for later compressed-timestamp records.
+                        if field.num >= 0 {
                             if let v = readBase(
                                 base,
                                 offset: pos,
@@ -1112,14 +1227,21 @@ public enum ReplayRivalFileParser: Sendable {
                                 littleEndian: def.littleEndian,
                                 end: pos + field.size
                             ) {
-                                assignRecordField(&rec, num: field.num, value: v)
+                                if field.num == 253 {
+                                    assignRecordField(&rec, num: field.num, value: v)
+                                } else if def.global == fitRecordGlobal {
+                                    assignRecordField(&rec, num: field.num, value: v)
+                                }
                             }
                         }
                         pos += field.size
                     }
+                    // Always advance the compressed-timestamp base when present.
+                    if let timestamp = rec.ts {
+                        lastTimestamp = timestamp
+                    }
                     if def.global == fitRecordGlobal, rec.ts != nil {
                         records.append(rec)
-                        lastTimestamp = rec.ts
                         if records.count > maximumAcceptedSamples {
                             throw ReplayRivalFileParserError.tooManySamples
                         }

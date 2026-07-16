@@ -410,9 +410,18 @@ struct ReplayView: View {
             isImportingRival = true
             rivalErrorMessage = nil
             let lastComponent = url.lastPathComponent
+            // Acquire the powerbox grant in the fileImporter callback before any
+            // actor hop. Sandbox extensions are easiest to claim in that window;
+            // the detached worker only reads/parses and then balances the stop.
+            let accessed = url.startAccessingSecurityScopedResource()
             rivalImportTask = Task { @MainActor in
                 let worker = Task.detached(priority: .userInitiated) {
-                    try ReplayRivalImportLoader.loadSecurityScopedRival(
+                    defer {
+                        if accessed {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    return try ReplayRivalImportLoader.loadRival(
                         from: url,
                         fileName: lastComponent
                     )
@@ -537,7 +546,7 @@ struct ReplayView: View {
                 .foregroundStyle(gapColor)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Race gap")
+        .accessibilityLabel("Race gap against \(rivalShortLabel(rival))")
         .accessibilityValue("\(gapLabel(meters: gapM)), \(gapSecondsLabel(seconds: gapS))")
     }
 
@@ -593,10 +602,26 @@ struct ReplayView: View {
     // MARK: - Finish Verdict
 
     private var showsFinishVerdict: Bool {
-        guard activeRival != nil, cachedRaceResult != nil else { return false }
-        let duration = state.duration
-        guard duration.isFinite, duration > 0 else { return false }
-        return state.time >= duration - Self.finishEpsilon
+        guard activeRival != nil, let result = cachedRaceResult else { return false }
+        // Gate on the race decision horizon, not merely the stroke-array span.
+        // Distance races finish at the interpolated target crossing; time races
+        // finish at the workout target duration captured in the result.
+        let horizon: TimeInterval
+        switch result.axis {
+        case .distance:
+            horizon = result.playerFinishTime ?? state.duration
+        case .time:
+            let target = detail.workout.time
+            if let finish = result.playerFinishTime, finish.isFinite, finish > 0 {
+                horizon = finish
+            } else if target.isFinite, target > 0 {
+                horizon = target
+            } else {
+                horizon = state.duration
+            }
+        }
+        guard horizon.isFinite, horizon > 0 else { return false }
+        return state.time >= horizon - Self.finishEpsilon
     }
 
     @ViewBuilder

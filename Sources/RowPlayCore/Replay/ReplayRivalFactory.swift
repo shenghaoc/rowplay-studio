@@ -12,8 +12,11 @@ public enum ReplayRivalFactory: Sendable {
         let strokes = detail.strokes
         guard strokes.count >= 2 else { return nil }
         let dateLabel = Self.sessionDateLabel(detail.workout.date)
+        // Include a content fingerprint so a library refresh of the same workout
+        // ID rebuilds SwiftUI/RealityKit identity and cached race artifacts.
+        let id = "session-\(detail.workout.id)-\(Self.stableTraceKey(strokes))"
         return ReplayRival(
-            id: "session-\(detail.workout.id)",
+            id: id,
             kind: .session,
             displayLabel: dateLabel,
             strokes: strokes,
