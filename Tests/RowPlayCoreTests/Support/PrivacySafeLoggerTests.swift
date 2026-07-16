@@ -184,9 +184,10 @@ final class PrivacySafeLoggerTests: XCTestCase {
     }
 
     func testRedactsOversizeString() {
-        let longString = String(repeating: "a", count: 16385)
+        let longString = String(repeating: "z", count: 16385)
         let result = redact(longString)
-        XCTAssertEqual(result, "[REDACTED_OVERSIZE]")
+        let expected = String(repeating: "z", count: 16384) + " [TRUNCATED]"
+        XCTAssertEqual(result, expected)
     }
 
     // MARK: - redact() — non-string values
