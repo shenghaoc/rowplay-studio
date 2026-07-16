@@ -2,6 +2,11 @@ import CoreTransferable
 import Foundation
 import UniformTypeIdentifiers
 
+enum ReplayRaceSuggestedFilename {
+    static let report = "rowplay-race-report.json"
+    static let card = "rowplay-race-card.png"
+}
+
 /// Transferable wrapper for a local race-report JSON export.
 struct ReplayRaceReportTransferItem: Transferable {
     let data: Data

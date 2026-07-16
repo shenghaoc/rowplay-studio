@@ -22,6 +22,7 @@ No network service or public share URL is required. “Share” means native loc
 - Two samples for constant pace (interpolation).
 - Sport-aware watts via `RowPlayFormatting.paceToWatts(for:pacePer500m:)`.
 - Constant-pace and imported rivals mark `hasGenuineStrokeData = false`.
+- Constant-pace identity preserves the exact accepted pace and target so nearby valid inputs cannot reuse stale derived UI or 3D state.
 - Reject zero, negative, NaN, infinite, or overflowing inputs.
 
 ### R3: CSV / TCX / FIT Import
@@ -29,9 +30,9 @@ No network service or public share URL is required. “Share” means native loc
 - Accept `Data` plus last path component; detect FIT by signature/extension, TCX by extension/XML, else CSV.
 - Limits: 25 MiB, 200_000 samples.
 - CSV: flexible headers, streaming RFC 4180-style quoted fields (including embedded newlines), clock formats, derived pace/watts, and malformed-quote rejection.
-- TCX: namespace-aware XML parsing with namespace-insensitive trackpoints, DTD/entity rejection, strict malformed-document rejection, and relative timestamps after sorting.
-- FIT: bounded record-message parser without external SDK; declared payload truncation and unknown message definitions fail safely.
-- Normalize time to zero, remove invalid samples, require ≥2 samples.
+- TCX: namespace-aware XML parsing with namespace-insensitive trackpoints, encoding-independent DTD/entity rejection, strict malformed-document rejection, and relative timestamps after sorting.
+- FIT: bounded record-message parser without external SDK; declared payload truncation, invalid definition architectures, and unknown message definitions fail safely.
+- Normalize time to zero, collapse equal timestamps deterministically, remove invalid samples, require ≥2 samples.
 - Never log file contents or paths.
 
 ### R4: Race Target and Result Semantics
@@ -44,13 +45,14 @@ No network service or public share URL is required. “Share” means native loc
 - One generic active rival preserving Phase 10A past-session behavior.
 - Menu: No Rival, Best Match, ranked sessions, Set Constant Pace…, Import Rival File….
 - Pace editor uses `PaceInput`; invalid pace does not replace current rival.
-- File import via `.fileImporter` with security-scoped access; bounded read and parse off main actor without first loading an oversized file in full.
+- File import via `.fileImporter` with balanced security-scoped access in the detached bounded read/parse operation, without first loading an oversized file in full.
+- A newer manual rival choice cancels the detached worker and invalidates any older in-flight import completion.
 - Rival change preserves time, play/pause, speed, renderer, camera, quality; increments discontinuity; rebuilds 2D path; clears 3D rival effect state; caches race result once.
 
 ### R6: 2D and 3D Rendering
-- 2D uses generic rival strokes; live path dominant; path derivation outside Canvas.
+- 2D uses generic rival strokes; live path dominant; path derivation outside Canvas; shorter traces hold their endpoint, longer traces interpolate at the player finish, and dense visual paths are bounded without changing race math.
 - 3D accepts generic rival; genuine stroke data uses stroke-accurate articulation; others use fallback.
-- Scene identity includes generic rival ID.
+- The inner RealityKit graph identity includes the generic rival ID while camera, orbit, and adaptive-quality owners remain outside that rebuild boundary; the stable outer owner is keyed by workout and sport so cached live aggregates cannot cross workouts.
 - No second replay clock or renderer.
 
 ### R7: Finish Verdict
@@ -62,8 +64,10 @@ No network service or public share URL is required. “Share” means native loc
 
 ### R8: Race Export and Share
 - Versioned Codable `ReplayRaceReport` privacy-safe JSON.
-- Exported reports/cards omit imported filenames and internal workout/session identifiers; past-session cards use the session date.
+- Rival summaries include finite, non-negative distance/time and a finite positive pace when derivable from the completed result; these are additive optional version-1 fields so reports written before the fields existed remain decodable.
+- Exported reports/cards and their suggested filenames omit imported filenames and internal workout/session identifiers; past-session cards use the session date.
 - Native race card PNG via ImageRenderer/AppKit in Studio.
+- Metric-rich race cards keep the accent, content, and footer inside the fixed export canvas and omit decorative separators from their explicit accessibility summary.
 - Save Race Report…, Save Race Card…, Share Race Card (macOS share sheet).
 - Race-card share data is prepared when the verdict appears so Share Race Card opens in one action.
 - Rival and appearance changes invalidate and rebuild prepared share-card data.

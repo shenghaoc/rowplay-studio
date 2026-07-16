@@ -2,7 +2,7 @@ import XCTest
 @testable import RowPlayCore
 
 final class ReplayRivalFactoryTests: XCTestCase {
-    func testConstantPaceRivalIdentityUsesPOSIXDecimalSeparators() throws {
+    func testConstantPaceRivalIdentityUsesExactStableDoubleKeys() throws {
         let player = Workout(
             id: 1,
             date: Date(timeIntervalSince1970: 0),
@@ -19,8 +19,89 @@ final class ReplayRivalFactoryTests: XCTestCase {
             player: player
         ))
 
-        XCTAssertEqual(rival.id, "pace-120.2500-d-2000.500")
-        XCTAssertFalse(rival.id.contains(","))
+        XCTAssertEqual(rival.id, "pace-405e100000000000-d-409f420000000000")
+    }
+
+    func testConstantPaceRivalIdentityDistinguishesClosePaces() throws {
+        let player = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_000,
+            time: 480,
+            pace: 120,
+            workoutType: "FixedDistance",
+            hasStrokeData: true
+        )
+
+        let slower = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 120.000_01,
+            player: player
+        ))
+        let faster = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 120.000_02,
+            player: player
+        ))
+
+        XCTAssertNotEqual(slower.id, faster.id)
+        XCTAssertNotEqual(slower.strokes, faster.strokes)
+        XCTAssertNotEqual(slower.strokes.last?.t, faster.strokes.last?.t)
+    }
+
+    func testConstantPaceRivalIdentityDistinguishesCloseTargetDistances() throws {
+        let firstPlayer = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_000.000_1,
+            time: 480,
+            pace: 120,
+            workoutType: "FixedDistance",
+            hasStrokeData: true
+        )
+        var secondPlayer = firstPlayer
+        secondPlayer.distance = 2_000.000_2
+
+        let first = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 120,
+            player: firstPlayer
+        ))
+        let second = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 120,
+            player: secondPlayer
+        ))
+
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertNotEqual(first.strokes, second.strokes)
+        XCTAssertNotEqual(first.strokes.last?.d, second.strokes.last?.d)
+    }
+
+    func testConstantPaceRivalIdentityDistinguishesCloseTargetDurations() throws {
+        let firstPlayer = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 1_000,
+            time: 300.000_1,
+            pace: 120,
+            workoutType: "JustRow",
+            hasStrokeData: true
+        )
+        var secondPlayer = firstPlayer
+        secondPlayer.time = 300.000_2
+
+        let first = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 100,
+            player: firstPlayer
+        ))
+        let second = try XCTUnwrap(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: 100,
+            player: secondPlayer
+        ))
+
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertNotEqual(first.strokes, second.strokes)
+        XCTAssertNotEqual(first.strokes.last?.t, second.strokes.last?.t)
     }
 
     private struct FixtureFile: Decodable {
@@ -185,6 +266,10 @@ final class ReplayRivalFactoryTests: XCTestCase {
         XCTAssertNil(ReplayRivalFactory.makeConstantPaceRival(pacePer500m: -1, player: workout))
         XCTAssertNil(ReplayRivalFactory.makeConstantPaceRival(pacePer500m: .nan, player: workout))
         XCTAssertNil(ReplayRivalFactory.makeConstantPaceRival(pacePer500m: .infinity, player: workout))
+        XCTAssertNil(ReplayRivalFactory.makeConstantPaceRival(
+            pacePer500m: .greatestFiniteMagnitude,
+            player: workout
+        ))
     }
 
     func testImportedRivalMarksNonGenuine() {

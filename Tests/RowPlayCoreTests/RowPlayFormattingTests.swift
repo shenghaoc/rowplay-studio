@@ -41,6 +41,10 @@ final class RowPlayFormattingTests: XCTestCase {
         XCTAssertEqual(RowPlayFormatting.time(.nan), "--:--")
     }
 
+    func testTimeUnrepresentableFiniteValueReturnsPlaceholder() {
+        XCTAssertEqual(RowPlayFormatting.time(.greatestFiniteMagnitude), "--:--")
+    }
+
     // MARK: - pace()
 
     func testPaceNormal() {

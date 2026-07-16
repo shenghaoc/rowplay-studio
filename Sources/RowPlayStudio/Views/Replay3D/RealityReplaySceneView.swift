@@ -60,7 +60,12 @@ struct RealityReplaySceneView: View {
         let interval = 1.0 / Double(configuration.targetFrameRate)
         TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
             Replay3DQualityRebuildBoundary(
-                effectiveQuality: performanceController.effectiveQuality
+                effectiveQuality: performanceController.effectiveQuality,
+                sceneIdentity: Replay3DSceneIdentity(
+                    workoutID: detail.id,
+                    rivalID: rival?.id,
+                    sportRawValue: sport.rawValue
+                )
             ) {
                 realityContent(timeline: timeline, configuration: configuration)
             }
@@ -418,28 +423,36 @@ struct RealityReplaySceneView: View {
 
 }
 
-/// Identity for the quality-sized RealityKit graph only. Replay, camera, and
-/// orbit owners intentionally live outside the view keyed by this value.
+/// Identity for the RealityKit graph only. Replay, camera, orbit, and adaptive
+/// performance owners intentionally live outside the view keyed by this value.
 struct Replay3DQualityGraphIdentity: Hashable {
     let effectiveQuality: ReplayRenderQuality
+    let sceneIdentity: Replay3DSceneIdentity
 }
 
-/// Production identity boundary that limits a quality change to its content.
-/// The caller retains replay, camera, orbit, and performance state outside it.
+/// Production identity boundary that limits quality and rival changes to the
+/// RealityKit graph. The caller retains replay, camera, orbit, and adaptive
+/// performance state outside it.
 struct Replay3DQualityRebuildBoundary<Content: View>: View {
     let effectiveQuality: ReplayRenderQuality
+    let sceneIdentity: Replay3DSceneIdentity
     private let content: Content
 
     init(
         effectiveQuality: ReplayRenderQuality,
+        sceneIdentity: Replay3DSceneIdentity,
         @ViewBuilder content: () -> Content
     ) {
         self.effectiveQuality = effectiveQuality
+        self.sceneIdentity = sceneIdentity
         self.content = content()
     }
 
     var body: some View {
-        content.id(Replay3DQualityGraphIdentity(effectiveQuality: effectiveQuality))
+        content.id(Replay3DQualityGraphIdentity(
+            effectiveQuality: effectiveQuality,
+            sceneIdentity: sceneIdentity
+        ))
     }
 }
 

@@ -36,6 +36,8 @@ struct ReplayView: View {
     @State private var paceValidationError: String?
     @State private var showFileImporter = false
     @State private var isImportingRival = false
+    @State private var rivalImportGeneration = ReplayRivalImportGeneration()
+    @State private var rivalImportTask: Task<Void, Never>?
     @State private var rivalErrorMessage: String?
     @State private var showReportExporter = false
     @State private var showCardExporter = false
@@ -111,6 +113,7 @@ struct ReplayView: View {
             }
         }
         .onDisappear {
+            cancelRivalImport()
             state.pause()
         }
         .onChange(of: preferences.replayRenderQuality) { _, quality in
@@ -138,7 +141,7 @@ struct ReplayView: View {
             isPresented: $showReportExporter,
             item: exportReportItem,
             contentTypes: [.json],
-            defaultFilename: exportReportItem?.suggestedName ?? "race-report.json"
+            defaultFilename: exportReportItem?.suggestedName ?? ReplayRaceSuggestedFilename.report
         ) { result in
             exportReportItem = nil
             if case .failure(let error) = result, !Self.isUserCancellation(error) {
@@ -149,7 +152,7 @@ struct ReplayView: View {
             isPresented: $showCardExporter,
             item: exportCardItem,
             contentTypes: [.png],
-            defaultFilename: exportCardItem?.suggestedName ?? "race-card.png"
+            defaultFilename: exportCardItem?.suggestedName ?? ReplayRaceSuggestedFilename.card
         ) { result in
             exportCardItem = nil
             if case .failure(let error) = result, !Self.isUserCancellation(error) {
@@ -226,7 +229,7 @@ struct ReplayView: View {
         HStack(spacing: AppDesign.Spacing.medium) {
             Menu {
                 Button {
-                    activeRival = nil
+                    selectRival(nil)
                 } label: {
                     HStack {
                         Text("No Rival")
@@ -240,7 +243,7 @@ struct ReplayView: View {
                     Button {
                         if let best = ghostCandidates.first,
                            let rival = ReplayRivalFactory.makeSessionRival(from: best) {
-                            activeRival = rival
+                            selectRival(rival)
                         }
                     } label: {
                         HStack {
@@ -257,7 +260,7 @@ struct ReplayView: View {
                     ForEach(ghostCandidates) { candidate in
                         Button {
                             if let rival = ReplayRivalFactory.makeSessionRival(from: candidate) {
-                                activeRival = rival
+                                selectRival(rival)
                             }
                         } label: {
                             HStack {
@@ -307,7 +310,7 @@ struct ReplayView: View {
 
             if activeRival != nil {
                 Button {
-                    activeRival = nil
+                    selectRival(nil)
                 } label: {
                     Image(systemName: "xmark.circle")
                 }
@@ -375,8 +378,22 @@ struct ReplayView: View {
         }
         paceValidationError = nil
         showPaceEditor = false
+        selectRival(rival)
+    }
+
+    /// Every direct selection invalidates any detached import that was already
+    /// in flight, so an older completion cannot replace the user's newer choice.
+    private func selectRival(_ rival: ReplayRival?) {
+        cancelRivalImport()
         activeRival = rival
         rivalErrorMessage = nil
+    }
+
+    private func cancelRivalImport() {
+        _ = rivalImportGeneration.advance()
+        rivalImportTask?.cancel()
+        rivalImportTask = nil
+        isImportingRival = false
     }
 
     private func handleFileImport(_ result: Result<[URL], Error>) {
@@ -388,31 +405,35 @@ struct ReplayView: View {
             rivalErrorMessage = "Could not open the selected rival file"
         case .success(let urls):
             guard let url = urls.first else { return }
+            rivalImportTask?.cancel()
+            let importToken = rivalImportGeneration.advance()
             isImportingRival = true
             rivalErrorMessage = nil
             let lastComponent = url.lastPathComponent
-            Task { @MainActor in
-                // Keep the balanced security-scope lifetime on the main actor,
-                // while the potentially expensive read and parse stay detached.
-                let accessed = url.startAccessingSecurityScopedResource()
-                defer {
-                    if accessed {
-                        url.stopAccessingSecurityScopedResource()
-                    }
+            rivalImportTask = Task { @MainActor in
+                let worker = Task.detached(priority: .userInitiated) {
+                    try ReplayRivalImportLoader.loadSecurityScopedRival(
+                        from: url,
+                        fileName: lastComponent
+                    )
                 }
                 do {
-                    let rival = try await Task.detached(priority: .userInitiated) {
-                        try ReplayRivalImportLoader.loadRival(
-                            from: url,
-                            fileName: lastComponent
-                        )
-                    }.value
-                    activeRival = rival
+                    let rival = try await withTaskCancellationHandler {
+                        try await worker.value
+                    } onCancel: {
+                        worker.cancel()
+                    }
+                    guard rivalImportGeneration.accepts(importToken) else { return }
+                    rivalImportTask = nil
                     isImportingRival = false
+                    activeRival = rival
                     rivalErrorMessage = nil
                 } catch {
-                    // Preserve current rival on failure.
+                    guard rivalImportGeneration.accepts(importToken) else { return }
+                    rivalImportTask = nil
                     isImportingRival = false
+                    guard !Self.isUserCancellation(error) else { return }
+                    // Preserve current rival on failure.
                     if let parserError = error as? ReplayRivalFileParserError {
                         rivalErrorMessage = parserError.errorDescription
                     } else {
@@ -664,8 +685,9 @@ struct ReplayView: View {
             let data = try ReplayRaceReportCodec.encode(report)
             exportReportItem = ReplayRaceReportTransferItem(
                 data: data,
-                suggestedName: "rowplay-\(detail.id)-race-report.json"
+                suggestedName: ReplayRaceSuggestedFilename.report
             )
+            rivalErrorMessage = nil
             showReportExporter = true
         } catch {
             rivalErrorMessage = "Could not encode race report"
@@ -680,8 +702,9 @@ struct ReplayView: View {
         }
         exportCardItem = ReplayRaceCardTransferItem(
             data: png,
-            suggestedName: "rowplay-\(detail.id)-race-card.png"
+            suggestedName: ReplayRaceSuggestedFilename.card
         )
+        rivalErrorMessage = nil
         showCardExporter = true
     }
 
@@ -693,8 +716,9 @@ struct ReplayView: View {
         }
         shareCardItem = ReplayRaceCardTransferItem(
             data: png,
-            suggestedName: "rowplay-\(detail.id)-race-card.png"
+            suggestedName: ReplayRaceSuggestedFilename.card
         )
+        rivalErrorMessage = nil
     }
 
     private func prepareShareCardIfFinished() {
@@ -708,6 +732,9 @@ struct ReplayView: View {
     }
 
     static func isUserCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
         let nsError = error as NSError
         return nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError
     }
@@ -734,9 +761,8 @@ struct ReplayView: View {
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
-            .id(Replay3DSceneIdentity(
+            .id(Replay3DViewIdentity(
                 workoutID: detail.id,
-                rivalID: activeRival?.id,
                 sportRawValue: detail.workout.sport.rawValue
             ))
             .frame(minHeight: 300)
@@ -884,7 +910,7 @@ struct ReplayView: View {
             if let rival = activeRival, rival.kind == .session {
                 if let id = rival.sessionWorkoutID,
                    ghostCandidateByID[id] == nil {
-                    activeRival = nil
+                    selectRival(nil)
                 }
             }
             ghostStrokePath = Path()
@@ -991,36 +1017,17 @@ struct ReplayView: View {
     }
 
     /// Precomputes the ghost stroke trail path using player chart scales
-    /// for direct comparability. Clamps shorter and longer imported traces.
+    /// for direct comparability.
     func makeGhostStrokePath(
         ghostStrokes: [Stroke],
         playerStrokes: [Stroke],
         size: CGSize
     ) -> Path {
-        guard ghostStrokes.count > 1, playerStrokes.count > 1 else { return Path() }
-
-        let playerOriginT = playerStrokes[0].t
-        let ghostOriginT = ghostStrokes[0].t
-        let maxT = playerStrokes.last?.t ?? playerOriginT
-        let maxD = playerStrokes.last?.d ?? 1
-        let duration = maxT - playerOriginT
-        guard duration.isFinite, duration > 0, maxD.isFinite, maxD > 0 else { return Path() }
-
-        var path = Path()
-        var firstPoint = true
-        for stroke in ghostStrokes {
-            let x = unitFraction(stroke.t - ghostOriginT, denominator: duration) * size.width
-            let y = size.height - unitFraction(stroke.d, denominator: maxD) * size.height
-            let clippedX = max(0, min(size.width, x))
-            let clippedY = max(0, min(size.height, y))
-            if firstPoint {
-                path.move(to: CGPoint(x: clippedX, y: clippedY))
-                firstPoint = false
-            } else {
-                path.addLine(to: CGPoint(x: clippedX, y: clippedY))
-            }
-        }
-        return path
+        ReplayRivalPathBuilder.makePath(
+            ghostStrokes: ghostStrokes,
+            playerStrokes: playerStrokes,
+            size: size
+        )
     }
 
     private var canvasAccessibilityValue: String {
@@ -1115,6 +1122,14 @@ struct ReplayView: View {
 struct Replay3DSceneIdentity: Hashable {
     let workoutID: Int
     let rivalID: String?
+    let sportRawValue: String
+}
+
+/// Stable owner identity for camera, orbit, adaptive-quality, and cached live
+/// workout aggregates. Rival changes intentionally do not replace this owner;
+/// a different workout or sport does.
+struct Replay3DViewIdentity: Hashable {
+    let workoutID: Int
     let sportRawValue: String
 }
 

@@ -36,7 +36,10 @@ public enum ReplayRivalFactory: Sendable {
         player: Workout,
         sport: Sport? = nil
     ) -> ReplayRival? {
-        guard isValidPositiveFinite(pacePer500m) else { return nil }
+        guard isValidPositiveFinite(pacePer500m),
+              Int(exactly: pacePer500m.rounded()) != nil else {
+            return nil
+        }
         let resolvedSport = sport ?? player.sport
         let axis = ComparabilityGuard.classifyAxis(workoutType: player.workoutType)
         let paceLabel = Self.paceLabel(pacePer500m)
@@ -55,7 +58,7 @@ public enum ReplayRivalFactory: Sendable {
                 watts: watts
             )
             return ReplayRival(
-                id: "pace-\(Self.stablePaceKey(pacePer500m))-d-\(Self.stableDistanceKey(distance))",
+                id: "pace-\(Self.stableDoubleKey(pacePer500m))-d-\(Self.stableDoubleKey(distance))",
                 kind: .constantPace,
                 displayLabel: paceLabel,
                 strokes: strokes,
@@ -77,7 +80,7 @@ public enum ReplayRivalFactory: Sendable {
                 watts: watts
             )
             return ReplayRival(
-                id: "pace-\(Self.stablePaceKey(pacePer500m))-t-\(Self.stableTimeKey(duration))",
+                id: "pace-\(Self.stableDoubleKey(pacePer500m))-t-\(Self.stableDoubleKey(duration))",
                 kind: .constantPace,
                 displayLabel: paceLabel,
                 strokes: strokes,
@@ -149,8 +152,11 @@ public enum ReplayRivalFactory: Sendable {
 
     private static func safeWatts(for sport: Sport, pacePer500m: TimeInterval) -> Int {
         let watts = RowPlayFormatting.paceToWatts(for: sport, pacePer500m: pacePer500m)
-        guard watts.isFinite, watts > 0, watts <= Double(Int.max) else { return 0 }
-        return Int(watts.rounded())
+        guard watts.isFinite, watts > 0,
+              let roundedWatts = Int(exactly: watts.rounded()) else {
+            return 0
+        }
+        return roundedWatts
     }
 
     private static func isValidPositiveFinite(_ value: Double) -> Bool {
@@ -184,16 +190,10 @@ public enum ReplayRivalFactory: Sendable {
         return path
     }
 
-    private static func stablePaceKey(_ pace: TimeInterval) -> String {
-        String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), pace)
-    }
-
-    private static func stableDistanceKey(_ distance: Double) -> String {
-        String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), distance)
-    }
-
-    private static func stableTimeKey(_ time: TimeInterval) -> String {
-        String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), time)
+    private static func stableDoubleKey(_ value: Double) -> String {
+        // Every accepted value is finite and positive, so its IEEE 754 bit
+        // pattern is an exact, deterministic identity without decimal rounding.
+        String(value.bitPattern, radix: 16)
     }
 
     private static func stableStringKey(_ value: String) -> String {

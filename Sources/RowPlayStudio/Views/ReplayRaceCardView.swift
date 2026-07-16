@@ -22,7 +22,7 @@ struct ReplayRaceCardView: View {
                 .fill(live)
                 .frame(height: 8)
 
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("RowPlay Studio")
                     .font(.system(size: 36, weight: .black))
                     .foregroundStyle(ink)
@@ -65,7 +65,7 @@ struct ReplayRaceCardView: View {
                     .font(.system(size: 14, weight: .medium).monospaced())
                     .foregroundStyle(ink2)
             }
-            .padding(40)
+            .padding(32)
         }
         .frame(width: 540, height: 720)
         .background(bg)
@@ -104,20 +104,43 @@ struct ReplayRaceCardView: View {
     }
 
     private var rivalLines: [String] {
+        Self.rivalLines(for: report)
+    }
+
+    /// Privacy-safe card copy derived only from the exported report. Keeping
+    /// this formatter testable prevents a filename or internal identifier from
+    /// accidentally replacing the generic imported-rival metrics.
+    static func rivalLines(for report: ReplayRaceReport) -> [String] {
+        var lines: [String] = []
         switch report.rival.kind {
         case .session:
             if let date = report.rival.sessionDate {
-                return [date.formatted(.dateTime.year().month(.abbreviated).day())]
+                lines.append(date.formatted(.dateTime.year().month(.abbreviated).day()))
             }
-            return []
         case .constantPace:
             if let pace = report.rival.targetPace {
-                return [RowPlayFormatting.pace(pace)]
+                lines.append("Target \(RowPlayFormatting.pace(pace))")
             }
-            return []
         case .importedFile:
-            return []
+            break
         }
+
+        var resultMetrics: [String] = []
+        if let distance = report.rival.distance {
+            resultMetrics.append(RowPlayFormatting.distance(distance))
+        }
+        if let time = report.rival.time {
+            resultMetrics.append(RowPlayFormatting.time(time, tenths: true))
+        }
+        if !resultMetrics.isEmpty {
+            lines.append(resultMetrics.joined(separator: " · "))
+        }
+
+        if report.rival.kind != .constantPace,
+           let pace = report.rival.pace {
+            lines.append("Average \(RowPlayFormatting.pace(pace))")
+        }
+        return lines
     }
 
     private var marginLines: [String]? {
@@ -143,13 +166,34 @@ struct ReplayRaceCardView: View {
                 Text(line)
                     .font(.system(size: 28, weight: .bold).monospacedDigit())
                     .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
         }
         .padding(.vertical, 8)
     }
 
     private var accessibilitySummary: String {
-        "\(outcomeLine). \(report.sport.displayName). \(targetLine)."
+        let playerMetrics = playerLines
+            .map(Self.accessibilityText)
+            .joined(separator: ", ")
+        let rivalMetrics = rivalLines
+            .map(Self.accessibilityText)
+            .joined(separator: ", ")
+        let rivalSummary = rivalMetrics.isEmpty
+            ? report.rival.label
+            : "\(report.rival.label), \(rivalMetrics)"
+        let margins = marginLines?
+            .map(Self.accessibilityText)
+            .joined(separator: ", ")
+        let marginSummary = margins.flatMap { $0.isEmpty ? nil : $0 }
+            .map { " \($0)." } ?? ""
+        return "\(outcomeLine). \(report.sport.displayName). \(targetLine). "
+            + "You, \(playerMetrics). \(rivalSummary).\(marginSummary)"
+    }
+
+    static func accessibilityText(_ text: String) -> String {
+        text.replacingOccurrences(of: " · ", with: ", ")
     }
 }
 

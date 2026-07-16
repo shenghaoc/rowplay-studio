@@ -33,6 +33,9 @@ final class ReplayRaceCardTests: XCTestCase {
         XCTAssertEqual(decoded.outcome, .rivalWon)
         XCTAssertEqual(decoded.rival.kind, .importedFile)
         XCTAssertEqual(decoded.rival.label, "Imported rival")
+        XCTAssertNotNil(decoded.rival.distance)
+        XCTAssertNotNil(decoded.rival.time)
+        XCTAssertNotNil(decoded.rival.pace)
     }
 
     func testForbiddenPrivacyFieldsAbsentFromEncodedReport() throws {
@@ -99,6 +102,64 @@ final class ReplayRaceCardTests: XCTestCase {
         XCTAssertEqual(Array(cardItem.data.prefix(8)), Array(pngSignature))
     }
 
+    func testSuggestedExportFilenamesDoNotContainWorkoutIdentifiers() {
+        XCTAssertEqual(ReplayRaceSuggestedFilename.report, "rowplay-race-report.json")
+        XCTAssertEqual(ReplayRaceSuggestedFilename.card, "rowplay-race-card.png")
+    }
+
+    func testImportedRaceCardShowsSanitizedRivalPerformanceMetrics() {
+        let report = makeReport(kind: .importedFile, outcome: .rivalWon)
+
+        let lines = ReplayRaceCardView.rivalLines(for: report)
+
+        XCTAssertTrue(lines.contains { $0.contains("2.00 km") && $0.contains("8:10.0") })
+        XCTAssertTrue(lines.contains { $0.contains("Average") && $0.contains("/500m") })
+        XCTAssertFalse(lines.joined().contains("should-not-appear"))
+        XCTAssertFalse(lines.joined().contains(".fit"))
+    }
+
+    func testMetricRichCardKeepsAccentAndFooterInsideCanvas() throws {
+        // A session result has the maximum rival-line count (date, result,
+        // average pace), while a non-tie also renders both margin lines.
+        let report = makeReport(kind: .session, outcome: .rivalWon)
+        let png = try XCTUnwrap(ReplayRaceCardRenderer.renderPNG(
+            report: report,
+            colorScheme: .light
+        ))
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: png))
+
+        let hasTopAccent = (0..<min(24, bitmap.pixelsHigh)).contains { y in
+            return stride(from: 0, to: bitmap.pixelsWide, by: 8).contains { x in
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    return false
+                }
+                return color.redComponent > 0.5
+                    && color.redComponent > color.greenComponent * 2
+            }
+        }
+        let footerStart = max(0, bitmap.pixelsHigh - 180)
+        let hasFooterInk = stride(from: footerStart, to: bitmap.pixelsHigh, by: 2).contains { y in
+            stride(from: 0, to: bitmap.pixelsWide, by: 4).contains { x in
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    return false
+                }
+                return color.redComponent < 0.7
+                    && color.greenComponent < 0.7
+                    && color.blueComponent < 0.7
+            }
+        }
+
+        XCTAssertTrue(hasTopAccent, "The top accent must not be clipped")
+        XCTAssertTrue(hasFooterInk, "The footer must remain inside the fixed card canvas")
+    }
+
+    func testAccessibilityMetricsDoNotSpeakDecorativeSeparator() {
+        XCTAssertEqual(
+            ReplayRaceCardView.accessibilityText("2.00 km · 8:10.0"),
+            "2.00 km, 8:10.0"
+        )
+    }
+
     private func makeReport(
         kind: ReplayRivalKind,
         outcome: ReplayRaceOutcome
@@ -152,12 +213,21 @@ final class ReplayRaceCardTests: XCTestCase {
                 localFileName: "should-not-appear.fit"
             )
         }
+        let rivalFinishTime: TimeInterval = switch kind {
+        case .session: 500
+        case .constantPace: 520
+        case .importedFile: 490
+        }
         let result = ReplayRaceResult(
             outcome: outcome,
             axis: .distance,
             timeMargin: outcome == .tie ? 0 : 15,
             distanceMargin: outcome == .tie ? 0 : 50,
-            rivalDidNotFinish: false
+            rivalDidNotFinish: false,
+            playerFinishTime: 480,
+            rivalFinishTime: rivalFinishTime,
+            playerDistance: 2000,
+            rivalDistance: 2000
         )
         return ReplayRaceReportBuilder.build(
             player: player,

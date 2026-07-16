@@ -52,6 +52,9 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(decoded.distanceMargin ?? -1, 80, accuracy: 0.001)
         XCTAssertEqual(decoded.rival.kind, .constantPace)
         XCTAssertEqual(decoded.rival.targetPace ?? -1, 120, accuracy: 0.001)
+        XCTAssertEqual(decoded.rival.distance ?? -1, 2000, accuracy: 0.001)
+        XCTAssertEqual(decoded.rival.time ?? -1, 500, accuracy: 0.001)
+        XCTAssertEqual(decoded.rival.pace ?? -1, 120, accuracy: 0.001)
         XCTAssertEqual(decoded.rival.label, "Pace boat")
         XCTAssertEqual(decoded.sport, .rower)
     }
@@ -82,7 +85,11 @@ final class ReplayRaceReportTests: XCTestCase {
             outcome: .rivalWon,
             axis: .distance,
             timeMargin: 10,
-            distanceMargin: 40
+            distanceMargin: 40,
+            playerFinishTime: 240,
+            rivalFinishTime: 230,
+            playerDistance: 960,
+            rivalDistance: 1000
         )
         let report = ReplayRaceReportBuilder.build(player: player, rival: rival, result: result)
         let data = try ReplayRaceReportCodec.encode(report)
@@ -98,6 +105,9 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertFalse(json.contains("http"))
         XCTAssertFalse(json.contains("workoutID"))
         XCTAssertFalse(json.contains("sessionWorkoutID"))
+        XCTAssertEqual(report.rival.distance ?? -1, 1000, accuracy: 0.001)
+        XCTAssertEqual(report.rival.time ?? -1, 230, accuracy: 0.001)
+        XCTAssertEqual(report.rival.pace ?? -1, 115, accuracy: 0.001)
     }
 
     func testSessionReportUsesGenericLabel() throws {
@@ -126,7 +136,11 @@ final class ReplayRaceReportTests: XCTestCase {
             outcome: .tie,
             axis: .distance,
             timeMargin: 0,
-            distanceMargin: 0
+            distanceMargin: 0,
+            playerFinishTime: 600,
+            rivalFinishTime: 600,
+            playerDistance: 5000,
+            rivalDistance: 5000
         )
         let sessionDate = Date(timeIntervalSince1970: 1_000)
         let report = ReplayRaceReportBuilder.build(
@@ -137,5 +151,53 @@ final class ReplayRaceReportTests: XCTestCase {
         )
         XCTAssertEqual(report.rival.label, "Past session")
         XCTAssertEqual(report.rival.sessionDate, sessionDate)
+        XCTAssertEqual(report.rival.distance ?? -1, 5000, accuracy: 0.001)
+        XCTAssertEqual(report.rival.time ?? -1, 600, accuracy: 0.001)
+        XCTAssertEqual(report.rival.pace ?? -1, 60, accuracy: 0.001)
+    }
+
+    func testVersionOneReportWithoutAdditiveRivalMetricsStillDecodes() throws {
+        let legacyJSON = Data("""
+        {
+          "schema": "rowplay-race-report",
+          "version": 1,
+          "exportedAt": "2026-07-16T00:00:00Z",
+          "sport": "rower",
+          "target": { "axis": "distance", "distance": 2000 },
+          "primary": {
+            "date": "2026-07-15T00:00:00Z",
+            "distance": 2000,
+            "time": 480,
+            "pace": 120
+          },
+          "rival": { "kind": "importedFile", "label": "Imported rival" },
+          "outcome": "playerWon",
+          "rivalDidNotFinish": false
+        }
+        """.utf8)
+
+        let report = try ReplayRaceReportCodec.decode(legacyJSON)
+
+        XCTAssertEqual(report.version, 1)
+        XCTAssertEqual(report.rival.kind, .importedFile)
+        XCTAssertNil(report.rival.distance)
+        XCTAssertNil(report.rival.time)
+        XCTAssertNil(report.rival.pace)
+    }
+
+    func testRivalSummaryRejectsNonFiniteOrNegativeMetrics() {
+        let summary = ReplayRaceReport.RivalSummary(
+            kind: .importedFile,
+            targetPace: 0,
+            distance: .infinity,
+            time: -1,
+            pace: .nan,
+            label: "Imported rival"
+        )
+
+        XCTAssertNil(summary.targetPace)
+        XCTAssertNil(summary.distance)
+        XCTAssertNil(summary.time)
+        XCTAssertNil(summary.pace)
     }
 }

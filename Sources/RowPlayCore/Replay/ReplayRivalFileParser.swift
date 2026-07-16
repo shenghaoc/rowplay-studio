@@ -40,6 +40,19 @@ private struct RawRivalSample {
     var watts: Double?
 }
 
+/// Convert an optional positive metric to the nearest `Int` without relying on
+/// `Double(Int.max)`, which rounds up to an unrepresentable value on 64-bit
+/// platforms.
+private func checkedPositiveRoundedInt(_ value: Double) -> Int? {
+    guard value.isFinite, value > 0 else { return nil }
+    return Int(exactly: value.rounded())
+}
+
+@inline(__always)
+private func checkReplayImportCancellation() throws {
+    try Task<Never, Never>.checkCancellation()
+}
+
 /// Stateful XMLParser delegate scoped to one TCX import. The parser and its
 /// formatters are never shared across tasks.
 private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
@@ -74,6 +87,7 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
     private(set) var samples: [RawRivalSample] = []
     private(set) var exceededSampleLimit = false
     private(set) var isStructurallyMalformed = false
+    private(set) var wasCancelled = false
 
     var isStructurallyComplete: Bool {
         didReachEndDocument
@@ -95,6 +109,7 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
+        guard !abortIfCancelled(parser) else { return }
         let name = Self.localName(qName ?? elementName)
         if elementStack.isEmpty {
             rootElementCount += 1
@@ -118,6 +133,7 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard !abortIfCancelled(parser) else { return }
         guard pending != nil, currentElement != nil else { return }
         textBuffer.append(string)
     }
@@ -128,6 +144,7 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
+        guard !abortIfCancelled(parser) else { return }
         let name = Self.localName(qName ?? elementName)
         guard elementStack.last == name else {
             isStructurallyMalformed = true
@@ -146,8 +163,9 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
         case "cadence":
             trackpoint.cadence = Self.finiteDouble(value)
         case "value" where isInsideHeartRate:
-            if let heartRate = Self.finiteDouble(value), heartRate > 0, heartRate <= Double(Int.max) {
-                trackpoint.heartRate = Int(heartRate.rounded())
+            if let heartRate = Self.finiteDouble(value),
+               let roundedHeartRate = checkedPositiveRoundedInt(heartRate) {
+                trackpoint.heartRate = roundedHeartRate
             }
         case "watts":
             trackpoint.watts = Self.finiteDouble(value)
@@ -185,7 +203,75 @@ private final class ReplayTcxParserDelegate: NSObject, XMLParserDelegate {
     }
 
     func parserDidEndDocument(_ parser: XMLParser) {
+        guard !abortIfCancelled(parser) else { return }
         didReachEndDocument = true
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundInternalEntityDeclarationWithName name: String,
+        value: String?
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundExternalEntityDeclarationWithName name: String,
+        publicID: String?,
+        systemID: String?
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundUnparsedEntityDeclarationWithName name: String,
+        publicID: String?,
+        systemID: String?,
+        notationName: String?
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundNotationDeclarationWithName name: String,
+        publicID: String?,
+        systemID: String?
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundElementDeclarationWithName elementName: String,
+        model: String
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        foundAttributeDeclarationWithName attributeName: String,
+        forElement elementName: String,
+        type: String?,
+        defaultValue: String?
+    ) {
+        rejectDocumentType(parser)
+    }
+
+    private func rejectDocumentType(_ parser: XMLParser) {
+        guard !abortIfCancelled(parser) else { return }
+        isStructurallyMalformed = true
+        parser.abortParsing()
+    }
+
+    private func abortIfCancelled(_ parser: XMLParser) -> Bool {
+        guard Task<Never, Never>.isCancelled else { return false }
+        wasCancelled = true
+        parser.abortParsing()
+        return true
     }
 
     private func secondsSinceEpoch(_ text: String) -> Double? {
@@ -247,6 +333,7 @@ public enum ReplayRivalFileParser: Sendable {
 
     /// Parse rival file data using the selected file's last path component for type hints.
     public static func parse(data: Data, fileName: String) throws -> ParsedTrace {
+        try checkReplayImportCancellation()
         guard data.count <= maximumFileSizeBytes else {
             throw ReplayRivalFileParserError.fileTooLarge
         }
@@ -257,16 +344,18 @@ public enum ReplayRivalFileParser: Sendable {
         let raw: [RawRivalSample]
         if ext == "fit" || isFitSignature(data) {
             raw = try parseFit(data)
-        } else if ext == "tcx" || looksLikeTcx(data) {
+        } else if try (ext == "tcx" || looksLikeTcx(data)) {
             raw = try parseTcx(data)
         } else {
             guard let text = String(data: data, encoding: .utf8)
                     ?? String(data: data, encoding: .isoLatin1) else {
                 throw ReplayRivalFileParserError.unreadable
             }
+            try checkReplayImportCancellation()
             raw = try parseCsv(text)
         }
 
+        try checkReplayImportCancellation()
         let strokes = try finalize(raw)
         return ParsedTrace(strokes: strokes, fileName: lastComponent)
     }
@@ -274,21 +363,44 @@ public enum ReplayRivalFileParser: Sendable {
     // MARK: - Normalization
 
     private static func finalize(_ raw: [RawRivalSample]) throws -> [Stroke] {
-        var pts = raw.filter { sample in
-            sample.t.isFinite && sample.d.isFinite && sample.d >= 0 && sample.t >= 0
+        var pts: [(offset: Int, element: RawRivalSample)] = []
+        pts.reserveCapacity(raw.count)
+        for (offset, sample) in raw.enumerated() {
+            if offset.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
+            if sample.t.isFinite && sample.d.isFinite && sample.d >= 0 && sample.t >= 0 {
+                pts.append((offset: offset, element: sample))
+            }
         }
-        pts.sort { $0.t < $1.t }
 
-        // Remove backward / duplicate-invalid samples (non-increasing time after first).
+        var comparisonCount = 0
+        try pts.sort { lhs, rhs in
+            comparisonCount &+= 1
+            if comparisonCount.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
+            if lhs.element.t != rhs.element.t {
+                return lhs.element.t < rhs.element.t
+            }
+            if lhs.element.d != rhs.element.d {
+                return lhs.element.d > rhs.element.d
+            }
+            return lhs.offset < rhs.offset
+        }
+
+        // Keep one deterministic, farthest-distance sample per timestamp, then
+        // remove backward distance so output time is strictly increasing.
         var cleaned: [RawRivalSample] = []
         cleaned.reserveCapacity(min(pts.count, maximumAcceptedSamples + 1))
-        for sample in pts {
+        for (index, point) in pts.enumerated() {
+            if index.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
+            let sample = point.element
             if let last = cleaned.last {
-                if sample.t < last.t { continue }
-                // Drop exact duplicate timestamps with lower or equal distance (invalid).
-                if sample.t == last.t && sample.d <= last.d { continue }
-                // Drop backward distance at strictly later time.
-                if sample.t > last.t && sample.d < last.d { continue }
+                if sample.t == last.t { continue }
+                if sample.d < last.d { continue }
             }
             cleaned.append(sample)
             if cleaned.count > maximumAcceptedSamples {
@@ -306,6 +418,9 @@ public enum ReplayRivalFileParser: Sendable {
         out.reserveCapacity(cleaned.count)
 
         for i in 0..<cleaned.count {
+            if i.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
             let s = cleaned[i]
             let t = s.t - t0
             guard t.isFinite, t >= 0 else { continue }
@@ -332,13 +447,11 @@ public enum ReplayRivalFileParser: Sendable {
 
             let safePace = resolvedPace.isFinite && resolvedPace >= 0 ? resolvedPace : 0
             let watts: Int
-            if let w = s.watts, w.isFinite, w > 0, w <= Double(Int.max) {
-                watts = Int(w.rounded())
+            if let w = s.watts, let importedWatts = checkedPositiveRoundedInt(w) {
+                watts = importedWatts
             } else {
                 let derived = RowPlayFormatting.paceToWatts(safePace)
-                watts = derived.isFinite && derived > 0 && derived <= Double(Int.max)
-                    ? Int(derived.rounded())
-                    : 0
+                watts = checkedPositiveRoundedInt(derived) ?? 0
             }
 
             let cadence = s.spm.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil } ?? 0
@@ -367,6 +480,7 @@ public enum ReplayRivalFileParser: Sendable {
     // MARK: - CSV
 
     private static func parseCsv(_ text: String) throws -> [RawRivalSample] {
+        try checkReplayImportCancellation()
         var didReadHeader = false
         var ti = -1
         var di = -1
@@ -378,6 +492,7 @@ public enum ReplayRivalFileParser: Sendable {
         out.reserveCapacity(min(maximumAcceptedSamples, 4_096))
 
         try forEachCsvRow(in: text) { columns in
+            try checkReplayImportCancellation()
             if !didReadHeader {
                 let header = columns.map {
                     $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -436,6 +551,7 @@ public enum ReplayRivalFileParser: Sendable {
         var isQuoted = false
         var didCloseQuote = false
         var index = text.startIndex
+        var scannedCharacters = 0
 
         func finishField() {
             row.append(field.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -452,6 +568,10 @@ public enum ReplayRivalFileParser: Sendable {
         }
 
         while index < text.endIndex {
+            if scannedCharacters.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
+            scannedCharacters &+= 1
             let character = text[index]
             if isQuoted {
                 if character == "\"" {
@@ -555,8 +675,7 @@ public enum ReplayRivalFileParser: Sendable {
 
     private static func intOrUndef(_ value: String?) -> Int? {
         guard let n = numOrUndef(value) else { return nil }
-        guard n > 0, n <= Double(Int.max) else { return nil }
-        return Int(n.rounded())
+        return checkedPositiveRoundedInt(n)
     }
 
     private static func normalizedNumberString(_ value: String) -> String {
@@ -565,20 +684,156 @@ public enum ReplayRivalFileParser: Sendable {
 
     // MARK: - TCX
 
-    private static func looksLikeTcx(_ data: Data) -> Bool {
-        guard let text = String(data: data.prefix(4096), encoding: .utf8)
-                ?? String(data: data.prefix(4096), encoding: .isoLatin1) else {
+    private static func looksLikeTcx(_ data: Data) throws -> Bool {
+        try checkReplayImportCancellation()
+        guard let text = xmlProbeText(data) else {
             return false
         }
-        return text.range(of: "TrainingCenterDatabase", options: .caseInsensitive) != nil
-            || text.range(of: "Trackpoint", options: .caseInsensitive) != nil
+
+        func index(after terminator: String, from start: String.Index) -> String.Index? {
+            text.range(of: terminator, range: start..<text.endIndex)?.upperBound
+        }
+
+        func indexAfterTag(from start: String.Index) throws -> String.Index? {
+            var cursor = start
+            var quote: Character?
+            var scannedCharacters = 0
+            while cursor < text.endIndex {
+                if scannedCharacters.isMultiple(of: 1_024) {
+                    try checkReplayImportCancellation()
+                }
+                scannedCharacters &+= 1
+                let character = text[cursor]
+                if let activeQuote = quote {
+                    if character == activeQuote {
+                        quote = nil
+                    }
+                } else if character == "\"" || character == "'" {
+                    quote = character
+                } else if character == ">" {
+                    return text.index(after: cursor)
+                }
+                cursor = text.index(after: cursor)
+            }
+            return nil
+        }
+
+        var documentStart = text.startIndex
+        while documentStart < text.endIndex,
+              text[documentStart].isWhitespace || text[documentStart] == "\u{FEFF}" {
+            documentStart = text.index(after: documentStart)
+        }
+        guard documentStart < text.endIndex, text[documentStart] == "<" else {
+            return false
+        }
+
+        var searchStart = documentStart
+        while searchStart < text.endIndex,
+              let openingBracket = text[searchStart...].firstIndex(of: "<") {
+            try checkReplayImportCancellation()
+            let nameStart = text.index(after: openingBracket)
+            guard nameStart < text.endIndex else { return false }
+
+            let marker = text[nameStart]
+            let remainder = text[nameStart...]
+            if remainder.hasPrefix("!--") {
+                guard let end = index(after: "-->", from: nameStart) else { return false }
+                searchStart = end
+                continue
+            }
+            if remainder.hasPrefix("![CDATA[") {
+                guard let end = index(after: "]]>", from: nameStart) else { return false }
+                searchStart = end
+                continue
+            }
+            if marker == "?" {
+                guard let end = index(after: "?>", from: nameStart) else { return false }
+                searchStart = end
+                continue
+            }
+            if marker == "/" || marker == "!" {
+                guard let end = try indexAfterTag(from: nameStart) else { return false }
+                searchStart = end
+                continue
+            }
+            if marker.isWhitespace {
+                return false
+            }
+
+            let nameEnd = text[nameStart...].firstIndex {
+                $0.isWhitespace || $0 == "/" || $0 == ">"
+            } ?? text.endIndex
+            guard nameStart < nameEnd,
+                  let tagEnd = try indexAfterTag(from: nameEnd) else {
+                return false
+            }
+
+            let qualifiedName = text[nameStart..<nameEnd]
+            let localName = qualifiedName.split(separator: ":").last?.lowercased()
+            if localName == "trainingcenterdatabase" || localName == "trackpoint" {
+                return true
+            }
+            searchStart = tagEnd
+        }
+        return false
+    }
+
+    private static func xmlProbeText(_ data: Data) -> String? {
+        let prefix = Data(data.prefix(4096))
+        let leadingBytes = Array(prefix.prefix(4))
+        let encoding: String.Encoding?
+
+        if leadingBytes.starts(with: [0x00, 0x00, 0xFE, 0xFF])
+            || leadingBytes.starts(with: [0x00, 0x00, 0x00, 0x3C]) {
+            encoding = .utf32BigEndian
+        } else if leadingBytes.starts(with: [0xFF, 0xFE, 0x00, 0x00])
+                    || leadingBytes.starts(with: [0x3C, 0x00, 0x00, 0x00]) {
+            encoding = .utf32LittleEndian
+        } else if leadingBytes.starts(with: [0xFE, 0xFF])
+                    || leadingBytes.starts(with: [0x00, 0x3C]) {
+            encoding = .utf16BigEndian
+        } else if leadingBytes.starts(with: [0xFF, 0xFE])
+                    || leadingBytes.starts(with: [0x3C, 0x00]) {
+            encoding = .utf16LittleEndian
+        } else {
+            encoding = nil
+        }
+
+        if let encoding {
+            return String(data: prefix, encoding: encoding)
+        }
+        return String(data: prefix, encoding: .utf8)
+            ?? String(data: prefix, encoding: .isoLatin1)
+    }
+
+    private static func containsDocumentTypeDeclaration(_ data: Data) throws -> Bool {
+        let declaration = Array("<!DOCTYPE".utf8)
+        var matchedBytes = 0
+
+        for (offset, byte) in data.enumerated() {
+            if offset.isMultiple(of: 4_096) {
+                try checkReplayImportCancellation()
+            }
+            guard byte != 0 else { continue }
+            let normalizedByte = byte >= 0x61 && byte <= 0x7A ? byte - 0x20 : byte
+            if normalizedByte == declaration[matchedBytes] {
+                matchedBytes += 1
+                if matchedBytes == declaration.count {
+                    return true
+                }
+            } else {
+                matchedBytes = normalizedByte == declaration[0] ? 1 : 0
+            }
+        }
+        return false
     }
 
     private static func parseTcx(_ data: Data) throws -> [RawRivalSample] {
-        // XMLParser can expand internal entities even when external resolution
-        // is disabled. TCX does not require a DTD, so reject declarations to
-        // keep parsing bounded by the selected file's actual contents.
-        guard data.range(of: Data("<!DOCTYPE".utf8)) == nil else {
+        try checkReplayImportCancellation()
+        // A bare DOCTYPE may not emit an XMLParser delegate callback. Reject it
+        // up front with a zero-stripped probe that also recognizes UTF-16/32;
+        // the delegate callbacks remain defense in depth for declarations.
+        guard try !containsDocumentTypeDeclaration(data) else {
             throw ReplayRivalFileParserError.malformed
         }
         let delegate = ReplayTcxParserDelegate(sampleLimit: maximumAcceptedSamples)
@@ -589,6 +844,10 @@ public enum ReplayRivalFileParser: Sendable {
         parser.shouldResolveExternalEntities = false
 
         let succeeded = parser.parse()
+        if delegate.wasCancelled {
+            throw CancellationError()
+        }
+        try checkReplayImportCancellation()
         if delegate.exceededSampleLimit {
             throw ReplayRivalFileParserError.tooManySamples
         }
@@ -626,10 +885,13 @@ public enum ReplayRivalFileParser: Sendable {
     private static func isFitSignature(_ data: Data) -> Bool {
         guard data.count >= 12 else { return false }
         // Bytes 8-11 are ".FIT"
-        return data[8] == 0x2E && data[9] == 0x46 && data[10] == 0x49 && data[11] == 0x54
+        let signatureStart = data.index(data.startIndex, offsetBy: 8)
+        let signatureEnd = data.index(signatureStart, offsetBy: 4)
+        return data[signatureStart..<signatureEnd].elementsEqual([0x2E, 0x46, 0x49, 0x54])
     }
 
     private static func parseFit(_ data: Data) throws -> [RawRivalSample] {
+        try checkReplayImportCancellation()
         guard data.count >= 14 else { throw ReplayRivalFileParserError.malformed }
         return try data.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> [RawRivalSample] in
             guard let base = rawBuffer.baseAddress else {
@@ -656,8 +918,13 @@ public enum ReplayRivalFileParser: Sendable {
             var records: [FitRecord] = []
             var lastTimestamp: UInt32?
             var pos = headerSize
+            var parsedMessageCount = 0
 
             while pos < end {
+                if parsedMessageCount.isMultiple(of: 256) {
+                    try checkReplayImportCancellation()
+                }
+                parsedMessageCount &+= 1
                 guard pos < end else { break }
                 let header = Int(readUInt8(base, offset: pos))
                 pos += 1
@@ -673,7 +940,7 @@ public enum ReplayRivalFileParser: Sendable {
                     // data header and field 253 in the record payload.
                     var rec = FitRecord()
                     var timestamp = (previousTimestamp & ~UInt32(0x1F)) | timeOffset
-                    if timestamp <= previousTimestamp {
+                    if timestamp < previousTimestamp {
                         timestamp &+= 0x20
                     }
                     rec.ts = timestamp
@@ -709,7 +976,11 @@ public enum ReplayRivalFileParser: Sendable {
                 if header & 0x40 != 0 {
                     // Definition message.
                     guard pos + 5 <= end else { throw ReplayRivalFileParserError.malformed }
-                    let littleEndian = readUInt8(base, offset: pos + 1) == 0
+                    let architecture = readUInt8(base, offset: pos + 1)
+                    guard architecture == 0 || architecture == 1 else {
+                        throw ReplayRivalFileParserError.malformed
+                    }
+                    let littleEndian = architecture == 0
                     let global = readUInt16(base, offset: pos + 2, littleEndian: littleEndian)
                     let numFields = Int(readUInt8(base, offset: pos + 4))
                     pos += 5
@@ -775,14 +1046,20 @@ public enum ReplayRivalFileParser: Sendable {
             guard !records.isEmpty else { return [] }
 
             var ts0 = UInt32.max
-            for r in records {
+            for (index, r) in records.enumerated() {
+                if index.isMultiple(of: 4_096) {
+                    try checkReplayImportCancellation()
+                }
                 if let ts = r.ts, ts < ts0 { ts0 = ts }
             }
             guard ts0 != UInt32.max else { return [] }
 
             var out: [RawRivalSample] = []
             out.reserveCapacity(records.count)
-            for r in records {
+            for (index, r) in records.enumerated() {
+                if index.isMultiple(of: 4_096) {
+                    try checkReplayImportCancellation()
+                }
                 guard let ts = r.ts else { continue }
                 let speedMps: Double? = r.speed.map { Double($0) / 1000.0 }
                 let pace: Double? = {

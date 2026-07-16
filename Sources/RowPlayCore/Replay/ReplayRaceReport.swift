@@ -6,6 +6,9 @@ import Foundation
 /// hardware identifiers, account identifiers, raw logs, and public URLs.
 public struct ReplayRaceReport: Codable, Equatable, Sendable {
     public static let currentSchema = "rowplay-race-report"
+    /// Rival performance metrics are additive optional fields in version 1.
+    /// Keeping the version stable lets current decoders read older version-1
+    /// reports that predate those fields, while older decoders can ignore them.
     public static let currentVersion = 1
 
     public var schema: String
@@ -82,6 +85,16 @@ public struct ReplayRaceReport: Codable, Equatable, Sendable {
         public var kind: ReplayRivalKind
         public var sessionDate: Date?
         public var targetPace: TimeInterval?
+        /// Rival distance represented by the completed result. For a
+        /// distance-axis DNF this is the distance reached at the player's
+        /// finish; otherwise it is the target/final distance.
+        public var distance: Double?
+        /// Rival elapsed time represented by the completed result. For a
+        /// distance-axis DNF this is the observation time at player finish.
+        public var time: TimeInterval?
+        /// Privacy-safe average pace derived from `distance` and `time`, or
+        /// the accepted pace-boat target when that is more precise.
+        public var pace: TimeInterval?
         /// Generic label for reports ("Past session", "Pace boat", "Imported rival").
         public var label: String
 
@@ -89,12 +102,28 @@ public struct ReplayRaceReport: Codable, Equatable, Sendable {
             kind: ReplayRivalKind,
             sessionDate: Date? = nil,
             targetPace: TimeInterval? = nil,
+            distance: Double? = nil,
+            time: TimeInterval? = nil,
+            pace: TimeInterval? = nil,
             label: String
         ) {
             self.kind = kind
             self.sessionDate = sessionDate
-            self.targetPace = targetPace
+            self.targetPace = Self.sanitizedPositive(targetPace)
+            self.distance = Self.sanitizedNonNegative(distance)
+            self.time = Self.sanitizedNonNegative(time)
+            self.pace = Self.sanitizedPositive(pace)
             self.label = label
+        }
+
+        private static func sanitizedNonNegative(_ value: Double?) -> Double? {
+            guard let value, value.isFinite, value >= 0 else { return nil }
+            return value
+        }
+
+        private static func sanitizedPositive(_ value: Double?) -> Double? {
+            guard let value, value.isFinite, value > 0 else { return nil }
+            return value
         }
     }
 }
@@ -117,24 +146,35 @@ public enum ReplayRaceReportBuilder: Sendable {
             target = .init(axis: .time, distance: nil, duration: player.time)
         }
 
+        let metrics = rivalMetrics(player: player, rival: rival, result: result)
+
         let rivalSummary: ReplayRaceReport.RivalSummary
         switch rival.kind {
         case .session:
             rivalSummary = .init(
                 kind: .session,
                 sessionDate: sessionDate,
+                distance: metrics.distance,
+                time: metrics.time,
+                pace: metrics.pace,
                 label: "Past session"
             )
         case .constantPace:
             rivalSummary = .init(
                 kind: .constantPace,
                 targetPace: rival.targetPace,
+                distance: metrics.distance,
+                time: metrics.time,
+                pace: metrics.pace,
                 label: "Pace boat"
             )
         case .importedFile:
             // Never include localFileName in the report.
             rivalSummary = .init(
                 kind: .importedFile,
+                distance: metrics.distance,
+                time: metrics.time,
+                pace: metrics.pace,
                 label: "Imported rival"
             )
         }
@@ -154,6 +194,59 @@ public enum ReplayRaceReportBuilder: Sendable {
             timeMargin: result.timeMargin,
             distanceMargin: result.distanceMargin,
             rivalDidNotFinish: result.rivalDidNotFinish
+        )
+    }
+
+    private struct RivalMetrics {
+        let distance: Double?
+        let time: TimeInterval?
+        let pace: TimeInterval?
+    }
+
+    /// Selects a coherent time/distance pair from the result. Completed
+    /// distance rivals use their target finish; a DNF uses the player's finish
+    /// as the observation point; time-axis races use the target duration.
+    private static func rivalMetrics(
+        player: Workout,
+        rival: ReplayRival,
+        result: ReplayRaceResult
+    ) -> RivalMetrics {
+        let distance: Double?
+        let time: TimeInterval?
+
+        switch result.axis {
+        case .distance:
+            if let rivalFinishTime = result.rivalFinishTime {
+                distance = player.distance
+                time = rivalFinishTime
+            } else if result.rivalDidNotFinish {
+                distance = result.rivalDistance
+                time = result.playerFinishTime
+            } else {
+                distance = nil
+                time = nil
+            }
+        case .time:
+            distance = result.rivalDistance
+            time = result.rivalFinishTime ?? result.playerFinishTime
+        }
+
+        let derivedPace: TimeInterval? = {
+            guard let distance, distance.isFinite, distance > 0,
+                  let time, time.isFinite, time > 0 else {
+                return nil
+            }
+            let value = time * 500 / distance
+            return value.isFinite && value > 0 ? value : nil
+        }()
+        let acceptedTargetPace = rival.targetPace.flatMap {
+            $0.isFinite && $0 > 0 ? $0 : nil
+        }
+
+        return RivalMetrics(
+            distance: distance,
+            time: time,
+            pace: acceptedTargetPace ?? derivedPace
         )
     }
 }

@@ -48,10 +48,13 @@ public enum PaceInput: Sendable {
     }
 
     /// Format positive seconds as canonical `M:SS` for display.
-    /// Returns empty string for non-positive or non-finite input.
+    /// Returns empty string for non-positive, non-finite, or unrepresentable input.
     public static func formatPaceInput(_ seconds: TimeInterval) -> String {
-        guard seconds.isFinite, seconds > 0 else { return "" }
-        let whole = Int(seconds.rounded())
+        guard seconds.isFinite,
+              seconds > 0,
+              let whole = Int(exactly: seconds.rounded()) else {
+            return ""
+        }
         let m = whole / 60
         let sec = whole % 60
         return "\(m):\(String(format: "%02d", sec))"

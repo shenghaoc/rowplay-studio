@@ -55,6 +55,66 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertTrue(path.isEmpty)
     }
 
+    func testGhostPathInterpolatesLongerRivalAtPlayerFinish() {
+        let ghostStrokes = [
+            Stroke(t: 20, d: 0, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 25, d: 60, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 35, d: 180, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        let samples = ReplayRivalPathBuilder.samples(
+            ghostStrokes: ghostStrokes,
+            playerDuration: 10,
+            maximumPointCount: 100
+        )
+
+        XCTAssertEqual(samples.last?.elapsed, 10)
+        XCTAssertEqual(samples.last?.distance ?? -1, 120, accuracy: 0.001)
+        XCTAssertTrue(samples.allSatisfy { $0.elapsed <= 10 })
+    }
+
+    func testGhostPathHoldsShorterRivalAtPlayerFinish() {
+        let ghostStrokes = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 5, d: 50, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        let samples = ReplayRivalPathBuilder.samples(
+            ghostStrokes: ghostStrokes,
+            playerDuration: 10,
+            maximumPointCount: 100
+        )
+
+        XCTAssertEqual(samples.map(\.elapsed), [0, 5, 10])
+        XCTAssertEqual(samples.last?.distance, 50)
+    }
+
+    func testGhostPathVisualSamplesAreBoundedAndKeepEndpoints() {
+        let ghostStrokes = (0...5_000).map { index in
+            Stroke(
+                t: Double(index),
+                d: Double(index) * 2,
+                pace: 120,
+                cadence: 28,
+                watts: 200
+            )
+        }
+
+        let samples = ReplayRivalPathBuilder.samples(
+            ghostStrokes: ghostStrokes,
+            playerDuration: 5_000,
+            maximumPointCount: 25
+        )
+
+        XCTAssertEqual(samples.count, 25)
+        XCTAssertEqual(samples.first, ReplayRivalPathBuilder.Sample(elapsed: 0, distance: 0))
+        XCTAssertEqual(samples.last, ReplayRivalPathBuilder.Sample(elapsed: 5_000, distance: 10_000))
+        XCTAssertEqual(
+            ReplayRivalPathBuilder.pointLimit(for: CGSize(width: 10_000, height: 100)),
+            2_048
+        )
+    }
+
     func testConstantPaceRivalCreatesTwoStrokeTrace() {
         guard let detail = DemoWorkoutLibrary.details.first else {
             return XCTFail("Demo data must include a replayable workout")
@@ -92,6 +152,56 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertEqual(rival.localFileName, url.lastPathComponent)
     }
 
+    func testSecurityScopedImportWrapperReadsAndParsesSelectedFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-rival-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("time,distance\n0,0\n10,50\n".utf8).write(to: url)
+
+        let rival = try ReplayRivalImportLoader.loadSecurityScopedRival(
+            from: url,
+            fileName: url.lastPathComponent
+        )
+
+        XCTAssertEqual(rival.kind, .importedFile)
+        XCTAssertEqual(rival.strokes.count, 2)
+    }
+
+    func testImportReadHonorsTaskCancellation() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-rival-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("time,distance\n0,0\n10,50\n".utf8).write(to: url)
+
+        let task = Task.detached { () throws -> Data in
+            withUnsafeCurrentTask { currentTask in
+                currentTask?.cancel()
+            }
+            return try ReplayRivalImportLoader.readData(from: url)
+        }
+
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled import must not continue")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    func testImportGenerationRejectsCompletionAfterNewerSelection() {
+        var generation = ReplayRivalImportGeneration()
+        let oldImport = generation.advance()
+
+        XCTAssertTrue(generation.accepts(oldImport))
+
+        let newerSelection = generation.advance()
+
+        XCTAssertFalse(generation.accepts(oldImport))
+        XCTAssertTrue(generation.accepts(newerSelection))
+    }
+
     func testImportLoaderRejectsOversizedFileWithoutReadingItAll() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("rowplay-rival-\(UUID().uuidString).bin")
@@ -110,6 +220,7 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         let unrelated = NSError(domain: "example", code: NSUserCancelledError)
 
         XCTAssertTrue(ReplayView.isUserCancellation(cancellation))
+        XCTAssertTrue(ReplayView.isUserCancellation(CancellationError()))
         XCTAssertFalse(ReplayView.isUserCancellation(unrelated))
         XCTAssertFalse(ReplayView.isUserCancellation(ReplayRivalFileParserError.malformed))
     }

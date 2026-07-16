@@ -9,7 +9,9 @@ public enum RowPlayFormatting: Sendable {
             return "--:--"
         }
 
-        let hours = Int(seconds / 3_600)
+        guard let hours = Int(exactly: (seconds / 3_600).rounded(.towardZero)) else {
+            return "--:--"
+        }
         let minutes = Int(seconds.truncatingRemainder(dividingBy: 3_600) / 60)
         let remaining = seconds.truncatingRemainder(dividingBy: 60)
 
