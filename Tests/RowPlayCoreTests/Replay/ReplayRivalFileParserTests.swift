@@ -339,6 +339,37 @@ final class ReplayRivalFileParserTests: XCTestCase {
         }
     }
 
+    func testTCXDocumentTypeIsRejectedAcrossUnicodeByteOrders() throws {
+        let encodings: [(name: String, declaration: String, encoding: String.Encoding, bom: [UInt8])] = [
+            ("utf16-be", "UTF-16", .utf16BigEndian, [0xFE, 0xFF]),
+            ("utf32-le", "UTF-32", .utf32LittleEndian, [0xFF, 0xFE, 0x00, 0x00]),
+            ("utf32-be", "UTF-32", .utf32BigEndian, [0x00, 0x00, 0xFE, 0xFF]),
+        ]
+
+        for candidate in encodings {
+            let tcx = """
+            <?xml version="1.0" encoding="\(candidate.declaration)"?>
+            <!DOCTYPE TrainingCenterDatabase>
+            <TrainingCenterDatabase>
+              <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+              <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+            </TrainingCenterDatabase>
+            """
+            var data = Data(candidate.bom)
+            data.append(try XCTUnwrap(tcx.data(using: candidate.encoding)))
+
+            XCTAssertThrowsError(
+                try ReplayRivalFileParser.parse(
+                    data: data,
+                    fileName: "bare-doctype-\(candidate.name).tcx"
+                ),
+                candidate.name
+            ) { error in
+                XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed, candidate.name)
+            }
+        }
+    }
+
     func testNormalizationParityCases() throws {
         let fixture = try Self.fixtureResult.get()
         for c in fixture.normalization {

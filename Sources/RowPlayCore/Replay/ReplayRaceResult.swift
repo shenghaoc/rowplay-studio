@@ -124,19 +124,53 @@ public enum ReplayRaceResultCalculator: Sendable {
             if curr.t < prev.t { continue }
 
             if prev.d < targetDistance && curr.d >= targetDistance {
-                let dd = curr.d - prev.d
-                if dd <= 0 {
-                    // Vertical jump: attribute to the current sample.
-                    return max(0, curr.t - originT)
+                guard let frac = unitInterpolationFraction(
+                    from: prev.d,
+                    to: curr.d,
+                    target: targetDistance
+                ) else {
+                    continue
                 }
-                let frac = (targetDistance - prev.d) / dd
                 let safeFrac = max(0, min(1, frac))
-                let absolute = prev.t + safeFrac * (curr.t - prev.t)
+                let deltaT = curr.t - prev.t
+                let absolute: TimeInterval
+                if deltaT.isFinite {
+                    absolute = prev.t + safeFrac * deltaT
+                } else {
+                    // A finite interval can overflow when its endpoints have
+                    // opposite signs. The weighted form keeps that midpoint
+                    // representable without forming the overflowing delta.
+                    absolute = prev.t * (1 - safeFrac) + curr.t * safeFrac
+                }
                 let relative = absolute - originT
                 return relative.isFinite && relative >= 0 ? relative : nil
             }
         }
         return nil
+    }
+
+    private static func unitInterpolationFraction(
+        from start: Double,
+        to end: Double,
+        target: Double
+    ) -> Double? {
+        let delta = end - start
+        if delta.isFinite, delta > 0 {
+            let fraction = (target - start) / delta
+            return fraction.isFinite ? fraction : nil
+        }
+
+        // Opposite-sign finite endpoints can produce an infinite subtraction.
+        // Scaling first preserves their relative positions in a bounded range.
+        let scale = max(abs(start), abs(end), abs(target))
+        guard scale.isFinite, scale > 0 else { return nil }
+        let scaledStart = start / scale
+        let scaledEnd = end / scale
+        let scaledTarget = target / scale
+        let scaledDelta = scaledEnd - scaledStart
+        guard scaledDelta.isFinite, scaledDelta > 0 else { return nil }
+        let fraction = (scaledTarget - scaledStart) / scaledDelta
+        return fraction.isFinite ? fraction : nil
     }
 
     private static func distanceAxisResult(

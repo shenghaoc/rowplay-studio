@@ -134,6 +134,36 @@ final class ReplayRaceResultTests: XCTestCase {
         XCTAssertEqual(crossing ?? -1, 240, accuracy: 0.001)
     }
 
+    func testTimeCrossingAvoidsOverflowForOppositeFiniteTimeExtremes() {
+        let limit = Double.greatestFiniteMagnitude
+        let strokes = [
+            Stroke(t: -limit, d: 0, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: limit, d: 100, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        let crossing = ReplayRaceResultCalculator.timeCrossingTarget(
+            strokes: strokes,
+            targetDistance: 50
+        )
+
+        XCTAssertEqual(crossing, limit)
+    }
+
+    func testTimeCrossingAvoidsOverflowForOppositeFiniteDistanceExtremes() {
+        let limit = Double.greatestFiniteMagnitude
+        let strokes = [
+            Stroke(t: 0, d: -limit, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 10, d: limit, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        let crossing = ReplayRaceResultCalculator.timeCrossingTarget(
+            strokes: strokes,
+            targetDistance: 0.5
+        )
+
+        XCTAssertEqual(crossing ?? -1, 5, accuracy: 0.001)
+    }
+
     private func toStroke(_ s: FixtureStroke) -> Stroke {
         Stroke(
             t: s.t,
