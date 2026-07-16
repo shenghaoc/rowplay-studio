@@ -12,9 +12,9 @@ struct DashboardView: View {
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
-    private static let measurementStyle = Measurement<UnitLength>.FormatStyle(width: .wide)
-    private static let durationStyle = Duration.UnitsFormatStyle(width: .wide, fractionalPart: .show(length: 1))
-    private static let pbDateFormatStyle = Date.FormatStyle().year().month(.abbreviated).day()
+    private static let measurementStyle = Measurement<UnitLength>.FormatStyle(width: .wide).locale(.autoupdatingCurrent)
+    private static let durationStyle = Duration.UnitsFormatStyle(allowedUnits: [.hours, .minutes, .seconds], width: .wide, fractionalPart: .show(length: 1)).locale(.autoupdatingCurrent)
+    private static let pbDateFormatStyle = Date.FormatStyle().year().month(.abbreviated).day().locale(.autoupdatingCurrent)
 
     var body: some View {
         ScrollView {
@@ -178,7 +178,7 @@ struct DashboardView: View {
                         .padding(AppDesign.Spacing.medium)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.small))
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(pbLabel(pb.distance) == "Half" ? "Half Marathon" : (pbLabel(pb.distance) == "Marathon" ? "Marathon" : Measurement(value: pb.distance, unit: UnitLength.meters).formatted(Self.measurementStyle))) \(pb.sport.displayName) Personal Best")
+                        .accessibilityLabel(pbAccessibilityLabel(pb))
                         .accessibilityValue("\(Duration.seconds(pb.time).formatted(Self.durationStyle)), \(Duration.seconds(pb.pace).formatted(Self.durationStyle)) per 500 meters, \(pb.date.formatted(Self.pbDateFormatStyle))")
                     }
                 }
@@ -197,5 +197,19 @@ struct DashboardView: View {
             return "\(Int(distance / 1_000))k"
         }
         return "\(Int(distance))m"
+    }
+
+    private func pbAccessibilityLabel(_ pb: DashboardPersonalBest) -> String {
+        let label = pbLabel(pb.distance)
+        let distanceText: String
+        if label == "Half" {
+            distanceText = "Half Marathon"
+        } else if label == "Marathon" {
+            distanceText = "Marathon"
+        } else {
+            distanceText = Measurement(value: pb.distance, unit: UnitLength.meters)
+                .formatted(Self.measurementStyle)
+        }
+        return "\(distanceText) \(pb.sport.displayName) Personal Best"
     }
 }
