@@ -342,8 +342,12 @@ final class ReplayRivalFileParserTests: XCTestCase {
     func testTCXDocumentTypeIsRejectedAcrossUnicodeByteOrders() throws {
         let encodings: [(name: String, declaration: String, encoding: String.Encoding, bom: [UInt8])] = [
             ("utf16-be", "UTF-16", .utf16BigEndian, [0xFE, 0xFF]),
+            ("utf16-le-bomless", "UTF-16", .utf16LittleEndian, []),
+            ("utf16-be-bomless", "UTF-16", .utf16BigEndian, []),
             ("utf32-le", "UTF-32", .utf32LittleEndian, [0xFF, 0xFE, 0x00, 0x00]),
             ("utf32-be", "UTF-32", .utf32BigEndian, [0x00, 0x00, 0xFE, 0xFF]),
+            ("utf32-le-bomless", "UTF-32", .utf32LittleEndian, []),
+            ("utf32-be-bomless", "UTF-32", .utf32BigEndian, []),
         ]
 
         for candidate in encodings {
@@ -427,11 +431,22 @@ final class ReplayRivalFileParserTests: XCTestCase {
 
     func testLastPathComponentOnlyInResult() throws {
         let csv = "time,distance\n0,0\n10,50\n20,100\n"
-        let parsed = try ReplayRivalFileParser.parse(
-            data: Data(csv.utf8),
-            fileName: "/private/var/folders/xx/secret/rival.csv"
-        )
-        XCTAssertEqual(parsed.fileName, "rival.csv")
+        let cases = [
+            "/private/var/folders/xx/secret/rival.csv",
+            #"C:\Users\secret\rival.csv"#,
+            #"C:\Users\secret/exports\rival.csv"#,
+            #"/Users/secret\exports/rival.csv"#,
+            "/private/var/folders/xx/secret/rival.csv/",
+            #"C:\Users\secret\rival.csv\"#,
+        ]
+
+        for fileName in cases {
+            let parsed = try ReplayRivalFileParser.parse(
+                data: Data(csv.utf8),
+                fileName: fileName
+            )
+            XCTAssertEqual(parsed.fileName, "rival.csv", fileName)
+        }
     }
 
     func testDerivedWattsFromPace() throws {

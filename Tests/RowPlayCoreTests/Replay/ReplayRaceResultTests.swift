@@ -164,6 +164,25 @@ final class ReplayRaceResultTests: XCTestCase {
         XCTAssertEqual(crossing ?? -1, 5, accuracy: 0.001)
     }
 
+    func testTimeCrossingHandlesSameSignLargeFiniteTimes() {
+        // Large but still precisely representable same-sign endpoints. This
+        // guards the common path of interpolateScalar; opposite-sign extremes
+        // are covered separately where intermediate overflow is real.
+        let start = 1_000_000_000_000.0
+        let end = start + 10
+        let strokes = [
+            Stroke(t: start, d: 0, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: end, d: 100, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        let crossing = ReplayRaceResultCalculator.timeCrossingTarget(
+            strokes: strokes,
+            targetDistance: 50
+        )
+
+        XCTAssertEqual(crossing ?? -1, 5, accuracy: 0.001)
+    }
+
     private func toStroke(_ s: FixtureStroke) -> Stroke {
         Stroke(
             t: s.t,

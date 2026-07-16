@@ -120,7 +120,7 @@ public enum ReplayRivalFactory: Sendable {
         fileName: String?
     ) -> ReplayRival? {
         guard strokes.count >= 2 else { return nil }
-        let lastComponent = fileName.map(Self.lastPathComponent).flatMap { $0.isEmpty ? nil : $0 }
+        let lastComponent = fileName.map(ReplayPathUtilities.lastPathComponent).flatMap { $0.isEmpty ? nil : $0 }
         let label = lastComponent ?? "Imported rival"
         let sourceKey = lastComponent.map(Self.stableStringKey) ?? "anonymous"
         // Include the normalized trace so replacing a same-named file refreshes
@@ -177,17 +177,6 @@ public enum ReplayRivalFactory: Sendable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
         return formatter.string(from: date)
-    }
-
-    private static func lastPathComponent(_ path: String) -> String {
-        // Accept both POSIX and display-style paths without Foundation URL parsing.
-        if let slash = path.lastIndex(of: "/") {
-            return String(path[path.index(after: slash)...])
-        }
-        if let slash = path.lastIndex(of: "\\") {
-            return String(path[path.index(after: slash)...])
-        }
-        return path
     }
 
     private static func stableDoubleKey(_ value: Double) -> String {

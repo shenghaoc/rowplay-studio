@@ -132,21 +132,52 @@ public enum ReplayRaceResultCalculator: Sendable {
                     continue
                 }
                 let safeFrac = max(0, min(1, frac))
-                let deltaT = curr.t - prev.t
-                let absolute: TimeInterval
-                if deltaT.isFinite {
-                    absolute = prev.t + safeFrac * deltaT
-                } else {
-                    // A finite interval can overflow when its endpoints have
-                    // opposite signs. The weighted form keeps that midpoint
-                    // representable without forming the overflowing delta.
-                    absolute = prev.t * (1 - safeFrac) + curr.t * safeFrac
+                guard let absolute = interpolateScalar(
+                    from: prev.t,
+                    to: curr.t,
+                    fraction: safeFrac
+                ) else {
+                    continue
                 }
                 let relative = absolute - originT
                 return relative.isFinite && relative >= 0 ? relative : nil
             }
         }
         return nil
+    }
+
+    /// Linear interpolation that degrades safely when intermediate subtraction
+    /// or multiplication overflows near the finite extremes.
+    private static func interpolateScalar(
+        from start: Double,
+        to end: Double,
+        fraction: Double
+    ) -> Double? {
+        guard start.isFinite, end.isFinite, fraction.isFinite else { return nil }
+        let safeFrac = max(0, min(1, fraction))
+
+        let delta = end - start
+        if delta.isFinite {
+            let simple = start + safeFrac * delta
+            if simple.isFinite {
+                return simple
+            }
+        }
+
+        // Weighted form avoids forming an overflowing delta when endpoints have
+        // opposite signs near the greatest finite magnitude.
+        let weighted = start * (1 - safeFrac) + end * safeFrac
+        if weighted.isFinite {
+            return weighted
+        }
+
+        // Scale into a bounded range, interpolate, then rescale.
+        let scale = max(abs(start), abs(end))
+        guard scale.isFinite, scale > 0 else { return nil }
+        let scaled = (start / scale) * (1 - safeFrac) + (end / scale) * safeFrac
+        guard scaled.isFinite else { return nil }
+        let value = scaled * scale
+        return value.isFinite ? value : nil
     }
 
     private static func unitInterpolationFraction(

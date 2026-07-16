@@ -290,6 +290,31 @@ final class ReplayRivalFactoryTests: XCTestCase {
         XCTAssertFalse(rival?.id.contains("secret") ?? true)
     }
 
+    func testImportedRivalResolvesMixedPathSeparators() {
+        let strokes = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),
+            Stroke(t: 100, d: 400, pace: 125, cadence: 0, watts: 190),
+        ]
+        let cases: [(String, String)] = [
+            (#"C:\Users\secret/exports\my-session.csv"#, "my-session.csv"),
+            (#"C:\Users\secret\my-session.csv"#, "my-session.csv"),
+            (#"/Users/secret\exports/my-session.csv"#, "my-session.csv"),
+            (#"/Users/secret/my-session.csv/"#, "my-session.csv"),
+            (#"C:\Users\secret\my-session.csv\"#, "my-session.csv"),
+        ]
+
+        for (fileName, expected) in cases {
+            let rival = ReplayRivalFactory.makeImportedRival(
+                strokes: strokes,
+                fileName: fileName
+            )
+            XCTAssertEqual(rival?.localFileName, expected, fileName)
+            XCTAssertEqual(rival?.displayLabel, expected, fileName)
+            XCTAssertFalse(rival?.id.contains("Users") ?? true, fileName)
+            XCTAssertFalse(rival?.id.contains("secret") ?? true, fileName)
+        }
+    }
+
     func testImportedRivalIdentityIncludesTraceContent() throws {
         let firstTrace = [
             Stroke(t: 0, d: 0, pace: 120, cadence: 0, watts: 200),

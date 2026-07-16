@@ -338,7 +338,7 @@ public enum ReplayRivalFileParser: Sendable {
             throw ReplayRivalFileParserError.fileTooLarge
         }
 
-        let lastComponent = lastPathComponent(fileName)
+        let lastComponent = ReplayPathUtilities.lastPathComponent(fileName)
         let ext = (lastComponent as NSString).pathExtension.lowercased()
 
         let raw: [RawRivalSample]
@@ -806,24 +806,108 @@ public enum ReplayRivalFileParser: Sendable {
             ?? String(data: prefix, encoding: .isoLatin1)
     }
 
+    /// Reject DOCTYPE / DTD payloads before XMLParser runs.
+    ///
+    /// Scans the raw bytes for `<!DOCTYPE` in UTF-8 and the common multi-byte
+    /// XML encodings (UTF-16/32, both endiannesses) rather than relying only on
+    /// a zero-byte strip, which is harder to reason about under review and can
+    /// false-match unrelated binary with interleaved zeros.
     private static func containsDocumentTypeDeclaration(_ data: Data) throws -> Bool {
-        let declaration = Array("<!DOCTYPE".utf8)
-        var matchedBytes = 0
+        // Early probe covers the usual declaration-at-start case across encodings.
+        if let probe = xmlProbeText(data),
+           probe.range(of: "<!DOCTYPE", options: [.caseInsensitive, .literal]) != nil {
+            return true
+        }
 
-        for (offset, byte) in data.enumerated() {
+        // Full-file UTF-8 / ASCII-compatible scan catches late declarations.
+        if try containsASCIISequence(
+            data,
+            ascii: "<!DOCTYPE",
+            unitWidth: 1,
+            littleEndian: true
+        ) {
+            return true
+        }
+
+        // Wide encodings pad ASCII with zero bytes. Skip the multi-byte scans
+        // when no zeros are present (pure UTF-8/Latin-1 payloads).
+        guard data.contains(0) else { return false }
+
+        let wideLayouts: [(unitWidth: Int, littleEndian: Bool)] = [
+            (2, true),   // UTF-16 LE
+            (2, false),  // UTF-16 BE
+            (4, true),   // UTF-32 LE
+            (4, false),  // UTF-32 BE
+        ]
+        for layout in wideLayouts {
+            if try containsASCIISequence(
+                data,
+                ascii: "<!DOCTYPE",
+                unitWidth: layout.unitWidth,
+                littleEndian: layout.littleEndian
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Case-insensitive search for an ASCII needle encoded with fixed-width units.
+    private static func containsASCIISequence(
+        _ data: Data,
+        ascii: String,
+        unitWidth: Int,
+        littleEndian: Bool
+    ) throws -> Bool {
+        let needle = Array(ascii.utf8)
+        guard !needle.isEmpty, unitWidth == 1 || unitWidth == 2 || unitWidth == 4 else {
+            return false
+        }
+
+        var matched = 0
+        var offset = 0
+        while offset + unitWidth <= data.count {
             if offset.isMultiple(of: 4_096) {
                 try checkReplayImportCancellation()
             }
-            guard byte != 0 else { continue }
-            let normalizedByte = byte >= 0x61 && byte <= 0x7A ? byte - 0x20 : byte
-            if normalizedByte == declaration[matchedBytes] {
-                matchedBytes += 1
-                if matchedBytes == declaration.count {
-                    return true
+
+            let codeUnit: UInt32
+            switch unitWidth {
+            case 1:
+                codeUnit = UInt32(data[offset])
+            case 2:
+                let b0 = UInt32(data[offset])
+                let b1 = UInt32(data[offset + 1])
+                codeUnit = littleEndian ? (b0 | (b1 &<< 8)) : ((b0 &<< 8) | b1)
+            default:
+                let b0 = UInt32(data[offset])
+                let b1 = UInt32(data[offset + 1])
+                let b2 = UInt32(data[offset + 2])
+                let b3 = UInt32(data[offset + 3])
+                codeUnit = littleEndian
+                    ? (b0 | (b1 &<< 8) | (b2 &<< 16) | (b3 &<< 24))
+                    : ((b0 &<< 24) | (b1 &<< 16) | (b2 &<< 8) | b3)
+            }
+
+            // Only pure ASCII code units participate; multi-byte content resets.
+            if codeUnit <= 0x7F {
+                var normalized = UInt8(codeUnit)
+                if normalized >= 0x61 && normalized <= 0x7A {
+                    normalized -= 0x20
+                }
+                if normalized == needle[matched] {
+                    matched += 1
+                    if matched == needle.count {
+                        return true
+                    }
+                } else {
+                    matched = normalized == needle[0] ? 1 : 0
                 }
             } else {
-                matchedBytes = normalizedByte == declaration[0] ? 1 : 0
+                matched = 0
             }
+
+            offset += unitWidth
         }
         return false
     }
@@ -1192,15 +1276,4 @@ public enum ReplayRivalFileParser: Sendable {
         return littleEndian ? (lo | (hi &<< 32)) : (hi | (lo &<< 32))
     }
 
-    // MARK: - Path helpers
-
-    private static func lastPathComponent(_ path: String) -> String {
-        if let slash = path.lastIndex(of: "/") {
-            return String(path[path.index(after: slash)...])
-        }
-        if let slash = path.lastIndex(of: "\\") {
-            return String(path[path.index(after: slash)...])
-        }
-        return path
-    }
 }
