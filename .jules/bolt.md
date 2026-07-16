@@ -13,3 +13,6 @@
 ## 2024-11-21 - FormatStyle Allocations in Hot Loops
 **Learning:** Using `Date.ISO8601FormatStyle` with `.formatted()` inside hot loops (like generating thousands of TCX trackpoints) implicitly instantiates a new formatter object under the hood for each call. This results in significant memory allocation overhead.
 **Action:** For hot loops that do not require localized auto-updating behavior (e.g. strict ISO8601 data serialization), prefer a statically cached `ISO8601DateFormatter`. Ensure it is wrapped in a `Mutex` to prevent concurrent modification issues since formatters are mutable and not Sendable.
+## 2024-11-23 - Inline FormatStyles in SwiftUI ForEach
+**Learning:** Using inline `.formatted()` calls or `Text(date, format: .dateTime...)` inside SwiftUI views (especially `ForEach` loops) implicitly instantiates a new style format on every evaluation. This causes unnecessary overhead during view rendering.
+**Action:** Always extract `Date.FormatStyle`, `Duration.UnitsFormatStyle`, or `Measurement.FormatStyle` to `static let` properties when used inside SwiftUI views.
