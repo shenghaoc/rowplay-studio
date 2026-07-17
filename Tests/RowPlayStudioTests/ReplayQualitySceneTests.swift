@@ -391,10 +391,13 @@ final class ReplayQualitySceneTests: XCTestCase {
         let performanceController = ReplayPerformanceController(selectedQuality: .ultra)
         let outerIdentityBefore = Replay3DSceneIdentity(
             workoutID: 1,
-            ghostWorkoutID: 2,
+            rivalID: "session-2",
             sportRawValue: Sport.rower.rawValue
         )
-        let graphIdentityBefore = Replay3DQualityGraphIdentity(effectiveQuality: .ultra)
+        let graphIdentityBefore = Replay3DQualityGraphIdentity(
+            effectiveQuality: .ultra,
+            sceneIdentity: outerIdentityBefore
+        )
 
         let originalContainer = Replay3DSceneBuilder.buildScene(
             sport: .rower,
@@ -420,11 +423,12 @@ final class ReplayQualitySceneTests: XCTestCase {
         performanceController.selectQuality(.low)
         let outerIdentityAfter = Replay3DSceneIdentity(
             workoutID: 1,
-            ghostWorkoutID: 2,
+            rivalID: "session-2",
             sportRawValue: Sport.rower.rawValue
         )
         let graphIdentityAfter = Replay3DQualityGraphIdentity(
-            effectiveQuality: performanceController.effectiveQuality
+            effectiveQuality: performanceController.effectiveQuality,
+            sceneIdentity: outerIdentityAfter
         )
         let rebuiltContainer = Replay3DSceneBuilder.buildScene(
             sport: .rower,
@@ -446,6 +450,65 @@ final class ReplayQualitySceneTests: XCTestCase {
         XCTAssertEqual(rebuiltContainer.effectRenderer.liveWakeCount, 0)
         XCTAssertEqual(rebuiltContainer.effectRenderer.ghostWakeCount, 0)
         XCTAssertEqual(rebuiltContainer.effectRenderer.sprayCount, 0)
+    }
+
+    func testRivalTransitionRebuildsOnlyInnerGraphState() {
+        let cameraController = ReplayCameraController()
+        cameraController.updateOrbitDrag(translationX: 36, translationY: -8)
+        cameraController.endOrbitDrag()
+        let orbitBefore = cameraController.orbit
+        let performanceController = ReplayPerformanceController(selectedQuality: .high)
+        let effectiveQualityBefore = performanceController.effectiveQuality
+
+        let firstScene = Replay3DSceneIdentity(
+            workoutID: 1,
+            rivalID: "session-2",
+            sportRawValue: Sport.rower.rawValue
+        )
+        let secondScene = Replay3DSceneIdentity(
+            workoutID: 1,
+            rivalID: "file-content-fingerprint",
+            sportRawValue: Sport.rower.rawValue
+        )
+        let firstGraph = Replay3DQualityGraphIdentity(
+            effectiveQuality: effectiveQualityBefore,
+            sceneIdentity: firstScene
+        )
+        let secondGraph = Replay3DQualityGraphIdentity(
+            effectiveQuality: effectiveQualityBefore,
+            sceneIdentity: secondScene
+        )
+        let stableOwnerBefore = Replay3DViewIdentity(
+            workoutID: firstScene.workoutID,
+            sportRawValue: firstScene.sportRawValue
+        )
+        let stableOwnerAfter = Replay3DViewIdentity(
+            workoutID: secondScene.workoutID,
+            sportRawValue: secondScene.sportRawValue
+        )
+
+        XCTAssertNotEqual(firstGraph, secondGraph)
+        XCTAssertEqual(stableOwnerBefore, stableOwnerAfter)
+        XCTAssertEqual(cameraController.orbit, orbitBefore)
+        XCTAssertEqual(performanceController.effectiveQuality, effectiveQualityBefore)
+    }
+
+    func testWorkoutTransitionReplacesOuterSceneStateOwner() {
+        let firstWorkout = Replay3DViewIdentity(
+            workoutID: 1,
+            sportRawValue: Sport.rower.rawValue
+        )
+        let secondWorkout = Replay3DViewIdentity(
+            workoutID: 2,
+            sportRawValue: Sport.rower.rawValue
+        )
+        let changedSport = Replay3DViewIdentity(
+            workoutID: 1,
+            sportRawValue: Sport.skierg.rawValue
+        )
+
+        XCTAssertNotEqual(firstWorkout, secondWorkout)
+        XCTAssertNotEqual(firstWorkout, changedSport)
     }
 
     func testQualityControlAccessibilityVisibilityLabelsAndHelpAreStable() {
@@ -594,6 +657,11 @@ private final class ReplayQualityBoundaryHarnessModel {
     let replayState: ReplayState
     let cameraController = ReplayCameraController()
     let cameraPreset = ReplayCameraPreset.orbit
+    let sceneIdentity = Replay3DSceneIdentity(
+        workoutID: 1,
+        rivalID: "session-2",
+        sportRawValue: Sport.rower.rawValue
+    )
     var effectiveQuality = ReplayRenderQuality.ultra
     var graphAppearances: [UUID] = []
 
@@ -612,7 +680,10 @@ private struct ReplayQualityBoundaryHarness: View {
     let model: ReplayQualityBoundaryHarnessModel
 
     var body: some View {
-        Replay3DQualityRebuildBoundary(effectiveQuality: model.effectiveQuality) {
+        Replay3DQualityRebuildBoundary(
+            effectiveQuality: model.effectiveQuality,
+            sceneIdentity: model.sceneIdentity
+        ) {
             ReplayQualityGraphProbe(model: model)
         }
     }

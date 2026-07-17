@@ -14,7 +14,8 @@ struct RealityReplaySceneView: View {
     let detail: WorkoutDetail
     @Binding var state: ReplayState
     let reduceMotion: Bool
-    let ghostDetail: WorkoutDetail?
+    /// Generic rival (past session, constant pace, or imported). Nil = no rival.
+    let rival: ReplayRival?
     let selectedQuality: ReplayRenderQuality
     @Binding var effectiveQuality: ReplayRenderQuality
     let cameraPreset: ReplayCameraPreset
@@ -33,7 +34,7 @@ struct RealityReplaySceneView: View {
         detail: WorkoutDetail,
         state: Binding<ReplayState>,
         reduceMotion: Bool,
-        ghostDetail: WorkoutDetail?,
+        rival: ReplayRival?,
         selectedQuality: ReplayRenderQuality,
         effectiveQuality: Binding<ReplayRenderQuality>,
         cameraPreset: ReplayCameraPreset,
@@ -43,7 +44,7 @@ struct RealityReplaySceneView: View {
         self.detail = detail
         _state = state
         self.reduceMotion = reduceMotion
-        self.ghostDetail = ghostDetail
+        self.rival = rival
         self.selectedQuality = selectedQuality
         _effectiveQuality = effectiveQuality
         self.cameraPreset = cameraPreset
@@ -59,7 +60,12 @@ struct RealityReplaySceneView: View {
         let interval = 1.0 / Double(configuration.targetFrameRate)
         TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
             Replay3DQualityRebuildBoundary(
-                effectiveQuality: performanceController.effectiveQuality
+                effectiveQuality: performanceController.effectiveQuality,
+                sceneIdentity: Replay3DSceneIdentity(
+                    workoutID: detail.id,
+                    rivalID: rival?.id,
+                    sportRawValue: sport.rawValue
+                )
             ) {
                 realityContent(timeline: timeline, configuration: configuration)
             }
@@ -84,14 +90,8 @@ struct RealityReplaySceneView: View {
             effectiveQuality = quality
             resetPerformanceTiming()
         }
-        .onChange(of: ghostDetail?.id) { _, _ in
-            if let ghost = ghostDetail {
-                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
-            } else {
-                sceneState.ghostPoseContext = nil
-                sceneState.ghostMedianHR = 0
-            }
+        .onChange(of: rival?.id) { _, _ in
+            refreshGhostPoseAggregates()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
@@ -113,15 +113,13 @@ struct RealityReplaySceneView: View {
         configuration: ReplayRenderConfiguration
     ) -> some View {
         RealityView { make in
-            // Precompute immutable aggregates once.
+            // Precompute immutable aggregates once per live workout, and per
+            // rival identity so session A → session B cannot reuse A's pose/HR.
             if sceneState.livePoseContext == nil {
                 sceneState.livePoseContext = computePoseContext(strokes: detail.strokes)
                 sceneState.liveMedianHR = computeMedianHR(strokes: detail.strokes)
             }
-            if let ghost = ghostDetail, sceneState.ghostPoseContext == nil {
-                sceneState.ghostPoseContext = computePoseContext(strokes: ghost.strokes)
-                sceneState.ghostMedianHR = computeMedianHR(strokes: ghost.strokes)
-            }
+            refreshGhostPoseAggregates()
 
             let container = Replay3DSceneBuilder.buildScene(
                 sport: sport,
@@ -149,7 +147,7 @@ struct RealityReplaySceneView: View {
                 sport: sport,
                 ghostPose: ghostSample.pose,
                 ghostDistance: ghostSample.distance,
-                ghostVisible: ghostDetail != nil,
+                ghostVisible: rival != nil,
                 reduceMotion: reduceMotion,
                 deltaTime: sceneState.lastFrameDelta,
                 playbackTickGeneration: sceneState.playbackTickGeneration,
@@ -256,11 +254,24 @@ struct RealityReplaySceneView: View {
     }
 
     private func currentGhostSample() -> (pose: ReplayStrokePose?, distance: Double) {
-        guard let ghost = ghostDetail, !ghost.strokes.isEmpty else { return (nil, 0) }
-        guard let context = sceneState.ghostPoseContext else { return (nil, 0) }
-        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: ghost.strokes)
-        let ghostFrame = ReplaySample.sampleAt(strokes: ghost.strokes, t: ghostTime)
-        let strokeIndex = ReplaySample.sampleIndexAt(strokes: ghost.strokes, t: ghostTime)
+        guard let rival, !rival.strokes.isEmpty else { return (nil, 0) }
+        let ghostTime = ghostTimeAtCurrentElapsedTime(strokes: rival.strokes)
+        let ghostFrame = ReplaySample.sampleAt(strokes: rival.strokes, t: ghostTime)
+
+        // Constant-pace and imported rivals: deterministic fallback articulation.
+        guard case let .genuine(context) = Replay3DGhostArticulation.select(
+            rival: rival,
+            poseContext: sceneState.ghostPoseContext
+        ) else {
+            let fallback = ReplayStrokePose.fallback(
+                sport: sport,
+                phase: stableFallbackPhase(distance: ghostFrame.d),
+                rate: ghostFrame.cadence > 0 ? ghostFrame.cadence : defaultFallbackRate
+            )
+            return (reduceMotion ? .reducedMotion(fallback) : fallback, ghostFrame.d)
+        }
+
+        let strokeIndex = ReplaySample.sampleIndexAt(strokes: rival.strokes, t: ghostTime)
         guard strokeIndex >= 0 else {
             let fallback = ReplayStrokePose.fallback(
                 sport: sport,
@@ -270,11 +281,13 @@ struct RealityReplaySceneView: View {
             return (reduceMotion ? .reducedMotion(fallback) : fallback, ghostFrame.d)
         }
 
-        let strokes = ghost.strokes
+        let strokes = rival.strokes
         let startD = strokes[strokeIndex].d
         let endD = strokeIndex + 1 < strokes.count ? strokes[strokeIndex + 1].d : startD
         let startT = strokes[strokeIndex].t
         let endT = strokeIndex + 1 < strokes.count ? strokes[strokeIndex + 1].t : startT
+        let originT = strokes.first?.t ?? 0
+        let relativeDuration = max(0, (strokes.last?.t ?? originT) - originT)
 
         let pose = ReplayStrokePose.computeAtTime(
             frame: ghostFrame,
@@ -285,9 +298,17 @@ struct RealityReplaySceneView: View {
             strokeIndex: strokeIndex,
             context: context,
             medianHR: sceneState.ghostMedianHR,
-            duration: ghost.strokes.last?.t ?? 1
+            duration: relativeDuration > 0 ? relativeDuration : 1
         )
         return (reduceMotion ? .reducedMotion(pose) : pose, ghostFrame.d)
+    }
+
+    private var defaultFallbackRate: Double {
+        switch sport {
+        case .rower: return 28
+        case .skierg: return 30
+        case .bike: return 80
+        }
     }
 
     private func ghostTimeAtCurrentElapsedTime(strokes: [Stroke]) -> TimeInterval {
@@ -302,13 +323,29 @@ struct RealityReplaySceneView: View {
 
     // MARK: - Context Builders (called once)
 
+    /// Rebuild ghost pose/HR aggregates whenever the active rival identity
+    /// changes. `sceneState` outlives the RealityView remake boundary, so a
+    /// nil-check alone would leave session A's context articulating session B.
+    private func refreshGhostPoseAggregates() {
+        guard let rival, rival.hasGenuineStrokeData else {
+            sceneState.clearGhostPoseAggregates()
+            return
+        }
+        sceneState.updateGhostPoseAggregates(for: rival.id) {
+            (
+                context: computePoseContext(strokes: rival.strokes),
+                medianHR: computeMedianHR(strokes: rival.strokes)
+            )
+        }
+    }
+
     /// Proper median matching the web `median()` helper: averages the two
     /// middle values for even-length arrays.
     private func computePoseContext(strokes: [Stroke]) -> ReplayStrokePoseContext {
         let watts = strokes.map(\.watts)
         let peakWatts = watts.max() ?? 0
         let wattsAsDoubles = watts.map { Double($0) }
-        let medianWatts = Int(properMedian(wattsAsDoubles, fallback: 0))
+        let medianWatts = Int(exactly: properMedian(wattsAsDoubles, fallback: 0).rounded()) ?? 0
         let dps = strokes.enumerated().compactMap { i, s -> Double? in
             guard i > 0 else { return nil }
             let delta = s.d - strokes[i - 1].d
@@ -332,7 +369,7 @@ struct RealityReplaySceneView: View {
 
     private func computeMedianHR(strokes: [Stroke]) -> Int {
         let hrs = strokes.compactMap(\.heartRate).map { Double($0) }
-        return Int(properMedian(hrs, fallback: 0))
+        return Int(exactly: properMedian(hrs, fallback: 0).rounded()) ?? 0
     }
 
     /// Proper median: averages two middle values for even-length arrays,
@@ -385,38 +422,49 @@ struct RealityReplaySceneView: View {
 
     private var accessibilityDescription: String {
         let sportName = sport.displayName
-        let progress = Int(state.currentFrame.progress * 100)
+        let progress = ReplayTelemetryFormatting.roundedInteger(
+            state.currentFrame.progress * 100,
+            fallback: "0"
+        )
         let pace = RowPlayFormatting.pace(state.currentFrame.pace)
-        let cadence = state.currentFrame.cadence.isFinite ? String(Int(state.currentFrame.cadence.rounded())) : "-"
+        let cadence = ReplayTelemetryFormatting.roundedInteger(state.currentFrame.cadence)
         let unit = sport.cadenceUnit
-        let ghost = ghostDetail != nil ? "ghost present" : "no ghost"
+        let ghost = rival != nil ? "ghost present" : "no ghost"
         return "\(sportName), \(cameraPreset.displayName) camera, \(progress)%, \(pace), \(cadence) \(unit), \(ghost)"
     }
 
 }
 
-/// Identity for the quality-sized RealityKit graph only. Replay, camera, and
-/// orbit owners intentionally live outside the view keyed by this value.
+/// Identity for the RealityKit graph only. Replay, camera, orbit, and adaptive
+/// performance owners intentionally live outside the view keyed by this value.
 struct Replay3DQualityGraphIdentity: Hashable {
     let effectiveQuality: ReplayRenderQuality
+    let sceneIdentity: Replay3DSceneIdentity
 }
 
-/// Production identity boundary that limits a quality change to its content.
-/// The caller retains replay, camera, orbit, and performance state outside it.
+/// Production identity boundary that limits quality and rival changes to the
+/// RealityKit graph. The caller retains replay, camera, orbit, and adaptive
+/// performance state outside it.
 struct Replay3DQualityRebuildBoundary<Content: View>: View {
     let effectiveQuality: ReplayRenderQuality
+    let sceneIdentity: Replay3DSceneIdentity
     private let content: Content
 
     init(
         effectiveQuality: ReplayRenderQuality,
+        sceneIdentity: Replay3DSceneIdentity,
         @ViewBuilder content: () -> Content
     ) {
         self.effectiveQuality = effectiveQuality
+        self.sceneIdentity = sceneIdentity
         self.content = content()
     }
 
     var body: some View {
-        content.id(Replay3DQualityGraphIdentity(effectiveQuality: effectiveQuality))
+        content.id(Replay3DQualityGraphIdentity(
+            effectiveQuality: effectiveQuality,
+            sceneIdentity: sceneIdentity
+        ))
     }
 }
 
@@ -441,4 +489,58 @@ final class Replay3DSceneState {
     var ghostPoseContext: ReplayStrokePoseContext?
     /// Precomputed ghost median HR (immutable during replay).
     var ghostMedianHR: Int = 0
+    /// Rival identity that produced `ghostPoseContext` / `ghostMedianHR`.
+    /// Prevents session A aggregates from articulating session B after a rebuild.
+    var ghostPoseRivalID: String?
+
+    /// Installs aggregates for a new genuine rival. The closure is deliberately
+    /// lazy because computing medians is O(N log N), and the same rival can
+    /// revisit the RealityView make path after a quality-only rebuild.
+    @discardableResult
+    func updateGhostPoseAggregates(
+        for rivalID: String,
+        makeAggregates: () -> (context: ReplayStrokePoseContext, medianHR: Int)
+    ) -> Replay3DGhostAggregateUpdate {
+        guard ghostPoseRivalID != rivalID else { return .unchanged }
+        let aggregates = makeAggregates()
+        ghostPoseContext = aggregates.context
+        ghostMedianHR = aggregates.medianHR
+        ghostPoseRivalID = rivalID
+        return .recomputed
+    }
+
+    /// Clears genuine-stroke aggregates when the rival is removed or switches
+    /// to constant-pace/imported fallback articulation.
+    @discardableResult
+    func clearGhostPoseAggregates() -> Replay3DGhostAggregateUpdate {
+        guard ghostPoseRivalID != nil || ghostPoseContext != nil || ghostMedianHR != 0 else {
+            return .unchanged
+        }
+        ghostPoseContext = nil
+        ghostMedianHR = 0
+        ghostPoseRivalID = nil
+        return .cleared
+    }
+}
+
+/// Selects the production 3D articulation path for a rival. Session rivals
+/// with precomputed genuine-stroke context use data-driven poses; synthetic or
+/// imported traces deliberately use the deterministic fallback animation.
+enum Replay3DGhostArticulation: Equatable {
+    case genuine(ReplayStrokePoseContext)
+    case fallback
+
+    static func select(
+        rival: ReplayRival,
+        poseContext: ReplayStrokePoseContext?
+    ) -> Replay3DGhostArticulation {
+        guard rival.hasGenuineStrokeData, let poseContext else { return .fallback }
+        return .genuine(poseContext)
+    }
+}
+
+enum Replay3DGhostAggregateUpdate: Equatable {
+    case unchanged
+    case recomputed
+    case cleared
 }

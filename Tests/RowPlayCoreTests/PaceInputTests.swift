@@ -70,6 +70,10 @@ final class PaceInputTests: XCTestCase {
         XCTAssertEqual(PaceInput.formatPaceInput(.nan), "")
     }
 
+    func testFormatReturnsEmptyForUnrepresentableFiniteValue() {
+        XCTAssertEqual(PaceInput.formatPaceInput(.greatestFiniteMagnitude), "")
+    }
+
     // MARK: - Round-trip
 
     func testRoundTrip() {

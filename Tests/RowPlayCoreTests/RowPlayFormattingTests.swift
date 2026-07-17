@@ -41,6 +41,10 @@ final class RowPlayFormattingTests: XCTestCase {
         XCTAssertEqual(RowPlayFormatting.time(.nan), "--:--")
     }
 
+    func testTimeUnrepresentableFiniteValueReturnsPlaceholder() {
+        XCTAssertEqual(RowPlayFormatting.time(.greatestFiniteMagnitude), "--:--")
+    }
+
     // MARK: - pace()
 
     func testPaceNormal() {
@@ -142,6 +146,14 @@ final class RowPlayFormattingTests: XCTestCase {
 
     func testDistanceDefaultIsMetric() {
         XCTAssertEqual(RowPlayFormatting.distance(5_000), RowPlayFormatting.distance(5_000, unit: .metric))
+    }
+
+    func testDistanceMarginPreservesPositiveSubMetreValue() {
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.3), "0.3 m")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.01), "0.1 m")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.1, unit: .imperial), "0.3 ft")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(0.001, unit: .imperial), "0.1 ft")
+        XCTAssertEqual(RowPlayFormatting.distanceMargin(12), "12 m")
     }
 
     // MARK: - DistanceUnit
