@@ -117,6 +117,23 @@ final class WorkoutLibraryGhostCandidateTests: XCTestCase {
         XCTAssertNotEqual(library.replayContentIdentity(for: 1), original)
     }
 
+    func testReplayContentIdentityIsComputedLazilyAndMemoized() throws {
+        let details = [
+            makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),
+            makeDetail(id: 2, distance: 2_000, time: 480, pace: 130),
+        ]
+        let library = WorkoutLibrary(details: details)
+
+        XCTAssertEqual(library.replayContentIdentityCacheCount, 0)
+        let first = try XCTUnwrap(library.replayContentIdentity(for: 1))
+        XCTAssertEqual(library.replayContentIdentityCacheCount, 1)
+        XCTAssertEqual(library.replayContentIdentity(for: 1), first)
+        XCTAssertEqual(library.replayContentIdentityCacheCount, 1)
+
+        library.updateDetail(details[1])
+        XCTAssertEqual(library.replayContentIdentityCacheCount, 0)
+    }
+
     func testGhostCandidatesUseFullLibraryDespiteActiveFilters() {
         let details = [
             makeDetail(id: 1, distance: 2_000, time: 480, pace: 120),

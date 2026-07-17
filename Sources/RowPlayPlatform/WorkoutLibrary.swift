@@ -108,7 +108,17 @@ public final class WorkoutLibrary: ObservableObject {
     }
 
     public func replayContentIdentity(for workoutID: Int) -> ReplayPrimaryContentIdentity? {
-        replayContentIdentityByWorkoutID[workoutID]
+        if let cachedIdentity = replayContentIdentityByWorkoutID[workoutID] {
+            return cachedIdentity
+        }
+        guard let detail = detailByID[workoutID] else { return nil }
+        let identity = ReplayPrimaryContentIdentity(detail: detail)
+        replayContentIdentityByWorkoutID[workoutID] = identity
+        return identity
+    }
+
+    var replayContentIdentityCacheCount: Int {
+        replayContentIdentityByWorkoutID.count
     }
 
     public func strokeSummary(for workoutID: Int) -> StrokeSummary {
@@ -389,10 +399,7 @@ public final class WorkoutLibrary: ObservableObject {
 
     private func updateAllDerivedData() {
         detailByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        replayContentIdentityByWorkoutID = Dictionary(
-            details.map { ($0.id, ReplayPrimaryContentIdentity(detail: $0)) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        replayContentIdentityByWorkoutID.removeAll(keepingCapacity: true)
         strokeSummaryByWorkoutID = Dictionary(
             details.map { ($0.id, WorkoutAnalytics.strokeSummary(for: $0.strokes)) },
             uniquingKeysWith: { first, _ in first }

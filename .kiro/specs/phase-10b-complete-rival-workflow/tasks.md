@@ -35,7 +35,7 @@
 - [x] Cached race result; finish verdict banner
 - [x] No-op session-rival reconciliation avoids redundant result/share-card work
 - [x] O(1) past-session label/verdict lookup in SwiftUI render paths
-- [x] Cached primary trace/axis identity with O(1) replay-subtree keying
+- [x] Lazily memoized primary trace/axis identity with O(1) repeated replay-subtree keying
 - [x] Exclude unusable one-stroke sessions from cached rival candidates
 - [x] Save report / save card / share card
 - [x] Single-action native share-sheet preparation at finish
