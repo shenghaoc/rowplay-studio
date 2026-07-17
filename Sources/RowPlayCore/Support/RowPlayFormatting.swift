@@ -65,11 +65,11 @@ public enum RowPlayFormatting: Sendable {
         guard metres.isFinite, metres >= 0 else { return "--" }
         switch unit {
         case .metric where metres > 0 && metres < 1:
-            return "\(String(format: "%.1f", metres)) m"
+            return "\(String(format: "%.1f", max(0.1, metres))) m"
         case .imperial:
             let feet = metres * 3.28084
-            if feet > 0, feet < 1 {
-                return "\(String(format: "%.1f", feet)) ft"
+            if metres > 0, feet < 1 {
+                return "\(String(format: "%.1f", max(0.1, feet))) ft"
             }
             return distance(metres, unit: unit)
         case .metric:

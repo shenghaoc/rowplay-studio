@@ -15,7 +15,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 - Imported: from normalized strokes; non-genuine; deterministic identity fingerprints both last-path-component and normalized trace so same-named replacement files invalidate cached UI/3D state.
 
 ### ReplayRivalFileParser
-`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming Unicode-scalar, quote-aware state machine with quoted-newline support, direct CR/LF/CRLF delimiter handling, and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
+`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming Unicode-scalar, quote-aware state machine with quoted-newline support, direct CR/LF/CRLF delimiter handling, and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings with one full-file code-unit scan, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
@@ -65,6 +65,7 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, internal 
 
 - File read and parse off main actor; read stops at 25 MiB + 1 byte and parsing enforces the 25 MiB / 200k sample caps.
 - CSV scanning advances by Unicode scalar rather than extended grapheme cluster, coalesces CRLF as one delimiter, and preserves quoted Unicode and newline fields.
+- TCX selects its XML code-unit layout once and scans the complete bounded input once for DOCTYPE; it does not truncate the security-sensitive prolog.
 - Race-report JSON encoding and decoding reuse separate `Mutex`-protected coders.
 - Race calculation O(N) once per rival selection.
 - Past-session display/accessibility lookups use an initializer-built ID map rather than render-time array scans.

@@ -377,6 +377,23 @@ final class ReplayRivalFileParserTests: XCTestCase {
         }
     }
 
+    func testTCXDocumentTypeAfterLargePrologIsStillRejected() {
+        let tcx = """
+        \(String(repeating: " ", count: 70_000))
+        <!DOCTYPE TrainingCenterDatabase>
+        <TrainingCenterDatabase>
+          <Trackpoint><Time>2026-07-15T10:00:00Z</Time><DistanceMeters>0</DistanceMeters></Trackpoint>
+          <Trackpoint><Time>2026-07-15T10:00:10Z</Time><DistanceMeters>50</DistanceMeters></Trackpoint>
+        </TrainingCenterDatabase>
+        """
+
+        XCTAssertThrowsError(
+            try ReplayRivalFileParser.parse(data: Data(tcx.utf8), fileName: "late-doctype.tcx")
+        ) { error in
+            XCTAssertEqual(error as? ReplayRivalFileParserError, .malformed)
+        }
+    }
+
     func testUTF16TCXDocumentTypeIsRejectedToPreventEntityExpansion() throws {
         let tcx = """
         <?xml version="1.0" encoding="UTF-16"?>

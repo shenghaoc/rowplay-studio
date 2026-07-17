@@ -386,26 +386,9 @@ enum ReplayRivalTCXParser {
 
     private static func xmlProbeText(_ data: Data) -> String? {
         let prefix = Data(data.prefix(4096))
-        let leadingBytes = Array(prefix.prefix(4))
-        let encoding: String.Encoding?
+        let layout = xmlCodeUnitLayout(prefix)
 
-        if leadingBytes.starts(with: [0x00, 0x00, 0xFE, 0xFF])
-            || leadingBytes.starts(with: [0x00, 0x00, 0x00, 0x3C]) {
-            encoding = .utf32BigEndian
-        } else if leadingBytes.starts(with: [0xFF, 0xFE, 0x00, 0x00])
-                    || leadingBytes.starts(with: [0x3C, 0x00, 0x00, 0x00]) {
-            encoding = .utf32LittleEndian
-        } else if leadingBytes.starts(with: [0xFE, 0xFF])
-                    || leadingBytes.starts(with: [0x00, 0x3C]) {
-            encoding = .utf16BigEndian
-        } else if leadingBytes.starts(with: [0xFF, 0xFE])
-                    || leadingBytes.starts(with: [0x3C, 0x00]) {
-            encoding = .utf16LittleEndian
-        } else {
-            encoding = nil
-        }
-
-        if let encoding {
+        if let encoding = layout.encoding {
             return String(data: prefix, encoding: encoding)
         }
         return String(data: prefix, encoding: .utf8)
@@ -413,30 +396,40 @@ enum ReplayRivalTCXParser {
     }
 
     private static func containsDocumentTypeDeclaration(_ data: Data) throws -> Bool {
-        if let probe = xmlProbeText(data),
-           probe.range(of: "<!DOCTYPE", options: [.caseInsensitive, .literal]) != nil {
-            return true
-        }
+        let layout = xmlCodeUnitLayout(data)
+        return try containsASCIISequence(
+            data,
+            ascii: "<!DOCTYPE",
+            unitWidth: layout.unitWidth,
+            littleEndian: layout.littleEndian
+        )
+    }
 
-        if try containsASCIISequence(data, ascii: "<!DOCTYPE", unitWidth: 1, littleEndian: true) {
-            return true
+    /// XML's BOM or required opening markup identifies the code-unit layout.
+    /// Selecting it once keeps the security scan to one full-file pass without
+    /// truncating the prolog, where a document type declaration may legally
+    /// appear before the root element.
+    private static func xmlCodeUnitLayout(
+        _ data: Data
+    ) -> (unitWidth: Int, littleEndian: Bool, encoding: String.Encoding?) {
+        let leadingBytes = Array(data.prefix(4))
+        if leadingBytes.starts(with: [0x00, 0x00, 0xFE, 0xFF])
+            || leadingBytes.starts(with: [0x00, 0x00, 0x00, 0x3C]) {
+            return (4, false, .utf32BigEndian)
         }
-        guard data.contains(0) else { return false }
-
-        let wideLayouts: [(unitWidth: Int, littleEndian: Bool)] = [
-            (2, true), (2, false), (4, true), (4, false),
-        ]
-        for layout in wideLayouts {
-            if try containsASCIISequence(
-                data,
-                ascii: "<!DOCTYPE",
-                unitWidth: layout.unitWidth,
-                littleEndian: layout.littleEndian
-            ) {
-                return true
-            }
+        if leadingBytes.starts(with: [0xFF, 0xFE, 0x00, 0x00])
+            || leadingBytes.starts(with: [0x3C, 0x00, 0x00, 0x00]) {
+            return (4, true, .utf32LittleEndian)
         }
-        return false
+        if leadingBytes.starts(with: [0xFE, 0xFF])
+            || leadingBytes.starts(with: [0x00, 0x3C]) {
+            return (2, false, .utf16BigEndian)
+        }
+        if leadingBytes.starts(with: [0xFF, 0xFE])
+            || leadingBytes.starts(with: [0x3C, 0x00]) {
+            return (2, true, .utf16LittleEndian)
+        }
+        return (1, true, nil)
     }
 
     private static func containsASCIISequence(
