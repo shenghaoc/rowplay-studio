@@ -256,12 +256,7 @@ struct ReplayView: View {
             activeRival: activeRival,
             candidates: ghostCandidates
         )
-        guard reconciled != activeRival else {
-            shareCardItem = nil
-            refreshCachedRaceResult()
-            prepareShareCardIfFinished()
-            return
-        }
+        guard reconciled != activeRival else { return }
         // This is a library-driven refresh, not a direct selection. Do not call
         // selectRival(_:): an in-flight user import must remain authoritative
         // when it completes.

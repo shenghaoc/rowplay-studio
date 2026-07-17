@@ -139,10 +139,17 @@ enum ReplayRivalCSVParser {
                 isQuoted = true
             } else if scalar == "," {
                 finishField()
-            } else if Character(scalar).isNewline {
+            } else if scalar == "\r" {
+                let next = scalars.index(after: index)
+                if next < scalars.endIndex, scalars[next] == "\n" {
+                    index = next
+                    scannedScalars &+= 1
+                }
+                try finishRow()
+            } else if Self.isNewline(scalar) {
                 try finishRow()
             } else if didCloseQuote {
-                guard Character(scalar).isWhitespace else {
+                guard CharacterSet.whitespaces.contains(scalar) else {
                     throw ReplayRivalFileParserError.malformed
                 }
             } else {
@@ -156,6 +163,17 @@ enum ReplayRivalCSVParser {
         }
         if !row.isEmpty || !field.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || didCloseQuote {
             try finishRow()
+        }
+    }
+
+    /// Matches `Character.isNewline` without constructing a grapheme cluster.
+    /// Carriage return is handled separately so CRLF advances as one delimiter.
+    private static func isNewline(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x0A, 0x0B, 0x0C, 0x85, 0x2028, 0x2029:
+            return true
+        default:
+            return false
         }
     }
 

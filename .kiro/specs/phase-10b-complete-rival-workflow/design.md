@@ -15,7 +15,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 - Imported: from normalized strokes; non-genuine; deterministic identity fingerprints both last-path-component and normalized trace so same-named replacement files invalidate cached UI/3D state.
 
 ### ReplayRivalFileParser
-`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming Unicode-scalar, quote-aware state machine with quoted-newline support and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
+`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming Unicode-scalar, quote-aware state machine with quoted-newline support, direct CR/LF/CRLF delimiter handling, and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
@@ -34,6 +34,7 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, internal 
 - `ReplayRivalControlView` owns selection/gap presentation and `Replay2DSceneView` owns Canvas/timeline state; the root retains import, race-result, renderer, playback, and export orchestration.
 - Menu adds constant-pace and import actions; pace popover; balanced security-scope acquisition and release contained with bounded file reading and parsing in one detached import operation.
 - A monotonic import generation token discards stale detached completions after a newer rival selection; task cancellation is propagated to the detached worker and checked during bounded reads plus the CSV, TCX, FIT, and normalization loops.
+- Session-rival reconciliation returns immediately when the refreshed value is unchanged; changed trace or display metadata still invalidates the appropriate derived artifacts.
 - `cachedRaceResult` recomputed only on rival (or detail) change; a library revision reconciles a selected session rival by session workout ID and trace fingerprint.
 - A primary workout trace/axis identity owns the whole replay subtree, so a same-ID source refresh restarts playback, 2D, 3D, result, and report state together while unrelated library revisions do not interrupt replay. `WorkoutLibrary` computes and caches this O(N) identity when details change; SwiftUI only performs an O(1) lookup.
 - Finish banner appears only at or after the player's interpolated distance-target crossing or the time-axis target duration; when a recorded trace ends fractionally before its summary duration, its reachable replay end is the finish gate. The separate 0.05-second epsilon applies only to tie classification and margin presentation.
@@ -63,7 +64,7 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, internal 
 ## Performance
 
 - File read and parse off main actor; read stops at 25 MiB + 1 byte and parsing enforces the 25 MiB / 200k sample caps.
-- CSV scanning advances by Unicode scalar rather than extended grapheme cluster while preserving quoted Unicode and CRLF fields.
+- CSV scanning advances by Unicode scalar rather than extended grapheme cluster, coalesces CRLF as one delimiter, and preserves quoted Unicode and newline fields.
 - Race-report JSON encoding and decoding reuse separate `Mutex`-protected coders.
 - Race calculation O(N) once per rival selection.
 - Past-session display/accessibility lookups use an initializer-built ID map rather than render-time array scans.

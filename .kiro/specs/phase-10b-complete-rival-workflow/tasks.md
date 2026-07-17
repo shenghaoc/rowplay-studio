@@ -8,6 +8,7 @@
 - [x] Split parser facade, CSV, TCX, FIT, and shared support into focused files
 - [x] Streaming quote-aware CSV fields/newlines, strict XML TCX parsing, and compressed-timestamp FIT records
 - [x] Unicode-scalar CSV scanning with quoted Unicode and CRLF regression coverage
+- [x] Direct CR/LF/CRLF delimiter handling without grapheme construction
 - [x] Reject malformed TCX/CSV and declared-payload FIT truncation
 - [x] Reject encoding-independent TCX DTD/entity declarations and invalid FIT definition architectures
 - [x] Deterministically collapse duplicate timestamps and preserve exact constant-pace identities
@@ -30,6 +31,7 @@
 - [x] Cancellable stale-import guard and colocated security-scope lifetime
 - [x] Cooperative cancellation through CSV, TCX, FIT, and normalization work
 - [x] Cached race result; finish verdict banner
+- [x] No-op session-rival reconciliation avoids redundant result/share-card work
 - [x] O(1) past-session label/verdict lookup in SwiftUI render paths
 - [x] Cached primary trace/axis identity with O(1) replay-subtree keying
 - [x] Exclude unusable one-stroke sessions from cached rival candidates

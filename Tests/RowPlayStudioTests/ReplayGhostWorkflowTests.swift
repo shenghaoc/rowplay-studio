@@ -57,6 +57,20 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         XCTAssertNotEqual(reconciled.id, originalRival.id)
     }
 
+    func testSessionRivalReconciliationReturnsEqualValueForUnchangedCandidate() throws {
+        guard let detail = DemoWorkoutLibrary.details.first else {
+            return XCTFail("Demo data must include a replayable workout")
+        }
+        let originalRival = try XCTUnwrap(ReplayRivalFactory.makeSessionRival(from: detail))
+
+        let reconciled = ReplaySessionRivalReconciler.reconcile(
+            activeRival: originalRival,
+            candidates: [detail]
+        )
+
+        XCTAssertEqual(reconciled, originalRival)
+    }
+
     func testSessionRivalReconciliationRemovesMissingWorkout() throws {
         guard let detail = DemoWorkoutLibrary.details.first else {
             return XCTFail("Demo data must include a replayable workout")

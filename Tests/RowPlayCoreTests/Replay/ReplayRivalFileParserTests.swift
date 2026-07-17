@@ -729,6 +729,16 @@ final class ReplayRivalFileParserTests: XCTestCase {
         XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
     }
 
+    func testCSVUnicodeScalarScannerHandlesCarriageReturnLineEndings() throws {
+        let csv = "time,distance\r0,0\r10,50\r"
+
+        let parsed = try ReplayRivalFileParser.parse(data: Data(csv.utf8), fileName: "cr.csv")
+
+        XCTAssertEqual(parsed.strokes.count, 2)
+        XCTAssertEqual(parsed.strokes[1].t, 10, accuracy: 0.001)
+        XCTAssertEqual(parsed.strokes[1].d, 50, accuracy: 0.001)
+    }
+
     func testCSVUnbalancedQuoteIsRejected() {
         let csv = "time,distance,note\n0,0,\"unterminated\n10,50,still quoted\n"
 
