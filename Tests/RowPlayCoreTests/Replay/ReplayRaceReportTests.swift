@@ -1,3 +1,5 @@
+import Dispatch
+import Synchronization
 import XCTest
 @testable import RowPlayCore
 
@@ -57,6 +59,46 @@ final class ReplayRaceReportTests: XCTestCase {
         XCTAssertEqual(decoded.rival.pace ?? -1, 120, accuracy: 0.001)
         XCTAssertEqual(decoded.rival.label, "Pace boat")
         XCTAssertEqual(decoded.sport, .rower)
+    }
+
+    func testReportCodecSupportsConcurrentReuse() {
+        let report = ReplayRaceReport(
+            exportedAt: Date(timeIntervalSince1970: 1_700_000_100),
+            sport: .rower,
+            target: .init(axis: .distance, distance: 2_000),
+            primary: .init(
+                date: Date(timeIntervalSince1970: 1_700_000_000),
+                distance: 2_000,
+                time: 480,
+                pace: 120
+            ),
+            rival: .init(
+                kind: .constantPace,
+                targetPace: 120,
+                distance: 2_000,
+                time: 500,
+                pace: 125,
+                label: "Pace boat"
+            ),
+            outcome: .playerWon,
+            timeMargin: 20,
+            distanceMargin: 80
+        )
+        let failures = Mutex([String]())
+
+        DispatchQueue.concurrentPerform(iterations: 64) { _ in
+            do {
+                let data = try ReplayRaceReportCodec.encode(report)
+                let decoded = try ReplayRaceReportCodec.decode(data)
+                if decoded != report {
+                    failures.withLock { $0.append("Round trip mismatch") }
+                }
+            } catch {
+                failures.withLock { $0.append(String(describing: error)) }
+            }
+        }
+
+        XCTAssertEqual(failures.withLock { $0 }, [])
     }
 
     func testImportedFilenameAbsentFromReportAndJSON() throws {

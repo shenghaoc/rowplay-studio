@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Versioned, privacy-safe local race report for offline export/share.
 ///
@@ -285,6 +286,12 @@ public enum ReplayRaceReportBuilder: Sendable {
 }
 
 public enum ReplayRaceReportCodec: Sendable {
+    // JSONEncoder and JSONDecoder are mutable, non-Sendable reference types.
+    // Reuse them behind separate locks to avoid repeated setup without
+    // introducing unsafe shared access or serializing encode against decode.
+    private static let encoder = Mutex(makeEncoder())
+    private static let decoder = Mutex(makeDecoder())
+
     private static func makeEncoder() -> JSONEncoder {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
@@ -299,10 +306,14 @@ public enum ReplayRaceReportCodec: Sendable {
     }
 
     public static func encode(_ report: ReplayRaceReport) throws -> Data {
-        try makeEncoder().encode(report)
+        try encoder.withLock { encoder in
+            try encoder.encode(report)
+        }
     }
 
     public static func decode(_ data: Data) throws -> ReplayRaceReport {
-        try makeDecoder().decode(ReplayRaceReport.self, from: data)
+        try decoder.withLock { decoder in
+            try decoder.decode(ReplayRaceReport.self, from: data)
+        }
     }
 }

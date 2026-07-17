@@ -15,7 +15,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 - Imported: from normalized strokes; non-genuine; deterministic identity fingerprints both last-path-component and normalized trace so same-named replacement files invalidate cached UI/3D state.
 
 ### ReplayRivalFileParser
-`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming quote-aware state machine with quoted-newline support and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
+`ReplayRivalFileParser` is a small public dispatch/normalization facade over focused CSV, TCX, FIT, and shared-support files. The dependency-free parser enforces size and sample caps. CSV uses a streaming Unicode-scalar, quote-aware state machine with quoted-newline support and malformed-quote rejection. TCX uses Foundation XMLParser for namespace-insensitive extraction, rejects DTD/entity declarations across supported XML encodings, and strictly rejects malformed documents. FIT is a bounded record-message decoder, including compressed timestamps, with declared-payload, definition-architecture, field, and buffer bounds checks. Structurally recognized FIT/TCX content outranks a misleading filename hint. Normalization keeps the farthest sample at an equal timestamp so emitted time is strictly increasing. Returns strokes + last path component or typed error.
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
@@ -24,7 +24,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 - Outcomes playerWon / rivalWon / tie with finite non-negative margins.
 
 ### ReplayRaceReport
-Versioned Codable schema excluding tokens, comments, paths, filenames, internal workout/session IDs, hardware IDs, account IDs, logs, and public URLs. Builder maps imported rivals to the generic label “Imported rival”; session cards use a date rather than an identifier. Primary metrics describe completion: distance races pair the target distance with the player's interpolated crossing time, while time races pair the distance sampled at the target duration with that duration. Winner-decision shortfall snapshots remain in result margins. `RivalSummary` includes sanitized result distance, elapsed time, and average pace. These metrics are additive optional version-1 fields: legacy version-1 reports decode them as `nil`, so the schema version remains 1 rather than introducing a needless breaking version.
+Versioned Codable schema excluding tokens, comments, paths, filenames, internal workout/session IDs, hardware IDs, account IDs, logs, and public URLs. Builder maps imported rivals to the generic label “Imported rival”; session cards use a date rather than an identifier. Primary metrics describe completion: distance races pair the target distance with the player's interpolated crossing time, while time races pair the distance sampled at the target duration with that duration. Winner-decision shortfall snapshots remain in result margins. `RivalSummary` includes sanitized result distance, elapsed time, and average pace. These metrics are additive optional version-1 fields: legacy version-1 reports decode them as `nil`, so the schema version remains 1 rather than introducing a needless breaking version. Encoding and decoding reuse separately synchronized JSON coders so concurrent callers remain Swift 6-safe without repeated coder setup.
 
 ## UI Design
 
@@ -62,6 +62,8 @@ Versioned Codable schema excluding tokens, comments, paths, filenames, internal 
 ## Performance
 
 - File read and parse off main actor; read stops at 25 MiB + 1 byte and parsing enforces the 25 MiB / 200k sample caps.
+- CSV scanning advances by Unicode scalar rather than extended grapheme cluster while preserving quoted Unicode and CRLF fields.
+- Race-report JSON encoding and decoding reuse separate `Mutex`-protected coders.
 - Race calculation O(N) once per rival selection.
 - Past-session display/accessibility lookups use an initializer-built ID map rather than render-time array scans.
 - 2D paths are precomputed by `ReplayRivalPathBuilder`; shorter rivals hold at the player finish, longer rivals interpolate at that cutoff, and dense visual traces are capped at 2,048 points while full traces remain available to race math.

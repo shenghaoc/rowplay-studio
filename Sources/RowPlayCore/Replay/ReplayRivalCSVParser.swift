@@ -93,8 +93,9 @@ enum ReplayRivalCSVParser {
         var field = ""
         var isQuoted = false
         var didCloseQuote = false
-        var index = text.startIndex
-        var scannedCharacters = 0
+        let scalars = text.unicodeScalars
+        var index = scalars.startIndex
+        var scannedScalars = 0
 
         func finishField() {
             row.append(field.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -110,44 +111,44 @@ enum ReplayRivalCSVParser {
             row.removeAll(keepingCapacity: true)
         }
 
-        while index < text.endIndex {
-            if scannedCharacters.isMultiple(of: 4_096) {
+        while index < scalars.endIndex {
+            if scannedScalars.isMultiple(of: 4_096) {
                 try checkReplayImportCancellation()
             }
-            scannedCharacters &+= 1
-            let character = text[index]
+            scannedScalars &+= 1
+            let scalar = scalars[index]
             if isQuoted {
-                if character == "\"" {
-                    let next = text.index(after: index)
-                    if next < text.endIndex, text[next] == "\"" {
+                if scalar == "\"" {
+                    let next = scalars.index(after: index)
+                    if next < scalars.endIndex, scalars[next] == "\"" {
                         field.append("\"")
-                        index = text.index(after: next)
+                        index = scalars.index(after: next)
                         continue
                     }
                     isQuoted = false
                     didCloseQuote = true
                 } else {
-                    field.append(character)
+                    field.unicodeScalars.append(scalar)
                 }
-            } else if character == "\"" {
+            } else if scalar == "\"" {
                 guard !didCloseQuote,
                       field.trimmingCharacters(in: .whitespaces).isEmpty else {
                     throw ReplayRivalFileParserError.malformed
                 }
                 field.removeAll(keepingCapacity: true)
                 isQuoted = true
-            } else if character == "," {
+            } else if scalar == "," {
                 finishField()
-            } else if character.isNewline {
+            } else if Character(scalar).isNewline {
                 try finishRow()
             } else if didCloseQuote {
-                guard character.isWhitespace else {
+                guard Character(scalar).isWhitespace else {
                     throw ReplayRivalFileParserError.malformed
                 }
             } else {
-                field.append(character)
+                field.unicodeScalars.append(scalar)
             }
-            index = text.index(after: index)
+            index = scalars.index(after: index)
         }
 
         guard !isQuoted else {

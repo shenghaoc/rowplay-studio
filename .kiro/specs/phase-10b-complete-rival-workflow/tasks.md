@@ -7,6 +7,7 @@
 - [x] `ReplayRivalFileParser` (CSV, TCX, FIT; limits; normalization)
 - [x] Split parser facade, CSV, TCX, FIT, and shared support into focused files
 - [x] Streaming quote-aware CSV fields/newlines, strict XML TCX parsing, and compressed-timestamp FIT records
+- [x] Unicode-scalar CSV scanning with quoted Unicode and CRLF regression coverage
 - [x] Reject malformed TCX/CSV and declared-payload FIT truncation
 - [x] Reject encoding-independent TCX DTD/entity declarations and invalid FIT definition architectures
 - [x] Deterministically collapse duplicate timestamps and preserve exact constant-pace identities
@@ -15,6 +16,7 @@
 - [x] `ReplayRaceResult` + calculator (distance crossing, time axis, DNF, ties)
 - [x] Strict finish gate with reachable time-axis end and tie epsilon limited to classification/margins
 - [x] `ReplayRaceReport` + builder + codec
+- [x] Swift 6-safe synchronized reuse of race-report JSON coders
 - [x] Additive version-1 rival distance/time/pace metrics with legacy decode coverage
 - [x] Register parity fixtures in `Package.swift`
 
