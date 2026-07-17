@@ -183,6 +183,45 @@ final class ReplayRaceResultTests: XCTestCase {
         XCTAssertEqual(crossing ?? -1, 5, accuracy: 0.001)
     }
 
+    func testResultRejectsTracesWithFewerThanTwoStrokes() {
+        let workout = Workout(
+            id: 1,
+            date: Date(timeIntervalSince1970: 0),
+            sport: .rower,
+            distance: 2_000,
+            time: 480,
+            pace: 120,
+            workoutType: "FixedDistanceIntervals",
+            hasStrokeData: true
+        )
+        let stroke = Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 200)
+        let validStrokes = [
+            stroke,
+            Stroke(t: 480, d: 2_000, pace: 120, cadence: 28, watts: 200),
+        ]
+
+        XCTAssertNil(ReplayRaceResultCalculator.result(
+            playerStrokes: [],
+            rivalStrokes: validStrokes,
+            workout: workout
+        ))
+        XCTAssertNil(ReplayRaceResultCalculator.result(
+            playerStrokes: [stroke],
+            rivalStrokes: validStrokes,
+            workout: workout
+        ))
+        XCTAssertNil(ReplayRaceResultCalculator.result(
+            playerStrokes: validStrokes,
+            rivalStrokes: [],
+            workout: workout
+        ))
+        XCTAssertNil(ReplayRaceResultCalculator.result(
+            playerStrokes: validStrokes,
+            rivalStrokes: [stroke],
+            workout: workout
+        ))
+    }
+
     private func toStroke(_ s: FixtureStroke) -> Stroke {
         Stroke(
             t: s.t,

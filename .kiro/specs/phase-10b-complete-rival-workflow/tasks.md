@@ -14,6 +14,7 @@
 - [x] Trace-content identity for same-named imported-file replacement
 - [x] Checked formatting for extreme finite telemetry and positive sub-metre race margins
 - [x] `ReplayRaceResult` + calculator (distance crossing, time axis, DNF, ties)
+- [x] Reject empty and single-stroke race-result inputs at the public boundary
 - [x] Strict finish gate with reachable time-axis end and tie epsilon limited to classification/margins
 - [x] `ReplayRaceReport` + builder + codec
 - [x] Swift 6-safe synchronized reuse of race-report JSON coders

@@ -19,6 +19,7 @@ Portable value type with stable `id`, `kind` (session / constantPace / importedF
 
 ### ReplayRaceResult
 `ReplayRaceResultCalculator` produces optional completed results:
+- Both player and rival traces require at least two strokes before axis-specific math begins.
 - Distance: first interpolated time each trace crosses target distance.
 - Time: distance at target duration.
 - Outcomes playerWon / rivalWon / tie with finite non-negative margins.

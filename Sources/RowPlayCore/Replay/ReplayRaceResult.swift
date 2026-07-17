@@ -65,7 +65,8 @@ public enum ReplayRaceResultCalculator: Sendable {
     /// Time-axis distance tie tolerance (metres).
     public static let timeDistanceTieTolerance: Double = 0.5
 
-    /// Compute a completed race result, or `nil` when the player never finishes.
+    /// Compute a completed race result, or `nil` when either trace has fewer
+    /// than two strokes or the player never finishes.
     ///
     /// - Parameters:
     ///   - playerStrokes: Primary workout strokes.
@@ -76,6 +77,8 @@ public enum ReplayRaceResultCalculator: Sendable {
         rivalStrokes: [Stroke],
         workout: Workout
     ) -> ReplayRaceResult? {
+        guard playerStrokes.count >= 2, rivalStrokes.count >= 2 else { return nil }
+
         let axis = ComparabilityGuard.classifyAxis(workoutType: workout.workoutType)
         switch axis {
         case .distance:
