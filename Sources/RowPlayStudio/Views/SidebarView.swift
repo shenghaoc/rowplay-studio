@@ -92,11 +92,9 @@ private struct WorkoutSidebarRow: View {
     var isPB: Bool
     var distanceUnit: DistanceUnit
 
-    // Cache Date.FormatStyle to avoid expensive recreation in ForEach during rendering cycles
-    private static let dateFormatStyle = Date.FormatStyle.dateTime.year(.twoDigits).month(.abbreviated).day()
-
     var body: some View {
-        Label {
+        let dateFormat = Date.FormatStyle.dateTime.year(.twoDigits).month(.abbreviated).day()
+        return Label {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xxSmall) {
                 HStack(spacing: AppDesign.Spacing.small) {
                     Text(workout.workoutType)
@@ -113,7 +111,7 @@ private struct WorkoutSidebarRow: View {
                 }
                 HStack(spacing: AppDesign.Spacing.small) {
                     HStack(spacing: AppDesign.Spacing.xSmall) {
-                        Text(workout.date, format: Self.dateFormatStyle)
+                        Text(workout.date, format: dateFormat)
                         Text(RowPlayFormatting.distance(workout.distance, unit: distanceUnit))
                     }
                     .foregroundStyle(.secondary)
@@ -136,6 +134,6 @@ private struct WorkoutSidebarRow: View {
         .padding(.vertical, AppDesign.Spacing.xxSmall)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(workout.sport.displayName) \(workout.workoutType)\(isPB ? ", Personal Best" : "")"))
-        .accessibilityValue(Text("\(workout.date, format: Self.dateFormatStyle); \(RowPlayFormatting.distance(workout.distance, unit: distanceUnit)); \(RowPlayFormatting.time(workout.time)); \(RowPlayFormatting.pace(workout.pace))"))
+        .accessibilityValue(Text("\(workout.date, format: dateFormat); \(RowPlayFormatting.distance(workout.distance, unit: distanceUnit)); \(RowPlayFormatting.time(workout.time)); \(RowPlayFormatting.pace(workout.pace))"))
     }
 }
