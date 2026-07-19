@@ -107,6 +107,8 @@ struct ReplayRaceCardView: View {
         Self.rivalLines(for: report)
     }
 
+    private static let rivalDateFormatStyle = Date.FormatStyle.dateTime.year().month(.abbreviated).day()
+
     /// Privacy-safe card copy derived only from the exported report. Keeping
     /// this formatter testable prevents a filename or internal identifier from
     /// accidentally replacing the generic imported-rival metrics.
@@ -115,7 +117,7 @@ struct ReplayRaceCardView: View {
         switch report.rival.kind {
         case .session:
             if let date = report.rival.sessionDate {
-                lines.append(date.formatted(.dateTime.year().month(.abbreviated).day()))
+                lines.append(date.formatted(Self.rivalDateFormatStyle))
             }
         case .constantPace:
             if let pace = report.rival.targetPace {
