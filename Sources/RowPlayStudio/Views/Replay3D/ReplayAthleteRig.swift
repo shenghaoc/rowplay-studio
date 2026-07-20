@@ -81,10 +81,8 @@ final class ReplayAthleteRig {
         // Pelvis
         parent.addChild(pelvis)
 
-        // Torso
+        // Torso — proximal pivot at pelvis (HIP_Y in Blender, now at origin)
         if let torsoMesh = meshes?["athlete-torso"] {
-            // Use the authored character mesh, scaled to match rig pivot spacing
-            torsoMesh.position = SIMD3(0, 0, 0)
             torso.addChild(torsoMesh)
         } else {
             let torsoModel = ModelEntity(
@@ -101,7 +99,7 @@ final class ReplayAthleteRig {
         shoulders.position = SIMD3(0, torsoHeight, 0)
         torso.addChild(shoulders)
 
-        // Head
+        // Head — proximal pivot at head center, offset by neck length from shoulders
         if let headMesh = meshes?["athlete-head"] {
             headMesh.position = SIMD3(0, 0.12, 0)
             head.addChild(headMesh)
@@ -114,9 +112,8 @@ final class ReplayAthleteRig {
         }
         shoulders.addChild(head)
 
-        // Neck (authored mesh only — no procedural equivalent needed)
+        // Neck — proximal at neck top, extends down into torso
         if let neckMesh = meshes?["athlete-neck"] {
-            neckMesh.position = SIMD3(0, 0, 0)
             head.addChild(neckMesh)
         }
 
@@ -134,18 +131,15 @@ final class ReplayAthleteRig {
 
         // Clothing (authored mesh only — bridges joint transitions)
         if let shirt = meshes?["athlete-shirt"] {
-            shirt.position = SIMD3(0, 0, 0)
             torso.addChild(shirt)
         }
         if let shorts = meshes?["athlete-shorts"] {
-            shorts.position = SIMD3(0, 0, 0)
             pelvis.addChild(shorts)
         }
         for side: Float in [-1, 1] {
             let sfx = side > 0 ? "R" : "L"
             if let shoe = meshes?["athlete-shoe-\(sfx)"] {
                 let footPivot = side > 0 ? footR : footL
-                shoe.position = .zero
                 footPivot.addChild(shoe)
             }
         }
@@ -169,7 +163,6 @@ final class ReplayAthleteRig {
         // Upper arm pivot at shoulder
         upperArm.position = SIMD3(side * 0.18, 0, 0)
         if let uaMesh = meshes?["athlete-upperArm-\(sfx)"] {
-            uaMesh.position = SIMD3(0, -upperArmLength / 2, 0)
             upperArm.addChild(uaMesh)
         } else {
             let upperModel = ModelEntity(
@@ -185,7 +178,6 @@ final class ReplayAthleteRig {
         // Forearm pivot at elbow
         forearm.position = SIMD3(0, -upperArmLength, 0)
         if let faMesh = meshes?["athlete-forearm-\(sfx)"] {
-            faMesh.position = SIMD3(0, -forearmLength / 2, 0)
             forearm.addChild(faMesh)
         } else {
             let forearmModel = ModelEntity(
@@ -198,9 +190,8 @@ final class ReplayAthleteRig {
         }
         upperArm.addChild(forearm)
 
-        // Hand at wrist
+        // Hand at wrist — proximal pivot at wrist
         if let handMesh = meshes?["athlete-hand-\(sfx)"] {
-            handMesh.position = SIMD3(0, 0, 0)
             hand.addChild(handMesh)
         } else {
             let handEntity = ReplayMeshFactory.handEntity(material: skinMat)
@@ -229,7 +220,6 @@ final class ReplayAthleteRig {
         // Thigh pivot at hip
         thigh.position = SIMD3(side * 0.10, 0, 0)
         if let thMesh = meshes?["athlete-thigh-\(sfx)"] {
-            thMesh.position = SIMD3(0, -thighLength / 2, 0)
             thigh.addChild(thMesh)
         } else {
             let thighModel = ModelEntity(
@@ -245,7 +235,6 @@ final class ReplayAthleteRig {
         // Shin pivot at knee
         shin.position = SIMD3(0, -thighLength, 0)
         if let shMesh = meshes?["athlete-shin-\(sfx)"] {
-            shMesh.position = SIMD3(0, -shinLength / 2, 0)
             shin.addChild(shMesh)
         } else {
             let shinModel = ModelEntity(
@@ -258,9 +247,8 @@ final class ReplayAthleteRig {
         }
         thigh.addChild(shin)
 
-        // Foot at ankle
+        // Foot at ankle — proximal pivot at ankle
         if let ftMesh = meshes?["athlete-foot-\(sfx)"] {
-            ftMesh.position = SIMD3(0, 0, 0)
             foot.addChild(ftMesh)
         } else {
             let footEntity = ReplayMeshFactory.footEntity(material: shoeMat)
