@@ -14,7 +14,7 @@ struct DashboardView: View {
 
     private static let measurementStyle = Measurement<UnitLength>.FormatStyle(width: .wide).locale(.autoupdatingCurrent)
     private static let durationStyle = Duration.UnitsFormatStyle(allowedUnits: [.hours, .minutes, .seconds], width: .wide, fractionalPart: .show(length: 1)).locale(.autoupdatingCurrent)
-    private static let pbDateFormatStyle = Date.FormatStyle().year().month(.abbreviated).day().locale(.autoupdatingCurrent)
+    private static let pbDateFormatStyle = Date.FormatStyle().year().month(.abbreviated).day()
 
     var body: some View {
         ScrollView {
