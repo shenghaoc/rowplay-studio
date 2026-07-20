@@ -76,6 +76,12 @@ struct RealityReplaySceneView: View {
             effectiveQuality = performanceController.effectiveQuality
             resetPerformanceTiming()
         }
+        .task {
+            // Pre-load the bundled athlete character mesh once.
+            if Replay3DSceneBuilder.athleteCatalog == nil {
+                Replay3DSceneBuilder.athleteCatalog = await ReplayAthleteMeshCatalog()
+            }
+        }
         .onChange(of: state.playing) { _, playing in
             if playing {
                 lastTickDate = nil

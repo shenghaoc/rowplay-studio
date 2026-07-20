@@ -59,6 +59,10 @@ final class Replay3DSceneContainer {
 enum Replay3DSceneBuilder {
     static let loopMeters = ReplayCourseLayout.loopMeters
 
+    /// Shared athlete mesh catalog, loaded once from the bundled USDZ.
+    /// nil when the asset is missing — callers fall back to procedural primitives.
+    static var athleteCatalog: ReplayAthleteMeshCatalog?
+
     // MARK: - Build
 
     static func buildScene(
@@ -66,6 +70,10 @@ enum Replay3DSceneBuilder {
         colorScheme: ColorScheme,
         configuration: ReplayRenderConfiguration
     ) -> Replay3DSceneContainer {
+        // Clone independent mesh sets for live and ghost from the shared catalog.
+        let liveMeshes = athleteCatalog?.cloneAll()
+        let ghostMeshes = athleteCatalog?.cloneAll()
+
         let root = Entity()
         root.name = "scene-root"
 
@@ -122,7 +130,8 @@ enum Replay3DSceneBuilder {
         liveGroup.name = "live-athlete"
         root.addChild(liveGroup)
         let liveRig = ReplaySportRigFactory.build(
-            sport: sport, into: liveGroup, accent: .green, opacity: 1.0
+            sport: sport, into: liveGroup, accent: .green, opacity: 1.0,
+            meshes: liveMeshes
         )
 
         // Ghost avatar
@@ -131,7 +140,8 @@ enum Replay3DSceneBuilder {
         ghostGroup.isEnabled = false
         root.addChild(ghostGroup)
         let ghostRig = ReplaySportRigFactory.build(
-            sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45
+            sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45,
+            meshes: ghostMeshes
         )
         ghostRig.applyGhostTranslucency()
 

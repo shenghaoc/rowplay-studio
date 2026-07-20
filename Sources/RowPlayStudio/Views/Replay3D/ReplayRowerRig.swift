@@ -32,7 +32,7 @@ final class ReplayRowerRig: ReplaySportRig {
 
     // MARK: - Build
 
-    func build(into parent: ModelEntity, accent: Color, opacity: Float) {
+    func build(into parent: ModelEntity, accent: Color, opacity: Float, meshes: [String: Entity]? = nil) {
         root.name = "rower-rig"
         parent.addChild(root)
 
@@ -149,7 +149,7 @@ final class ReplayRowerRig: ReplaySportRig {
         }
 
         // Athlete body (seated)
-        athlete.build(into: root, seated: true, accent: accent, opacity: opacity)
+        athlete.build(into: root, seated: true, accent: accent, opacity: opacity, meshes: meshes)
         // Position the pelvis on the seat
         athlete.pelvis.position = SIMD3(0, 0.30, -0.1)
     }
