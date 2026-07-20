@@ -92,7 +92,7 @@ private struct WorkoutSidebarRow: View {
     var isPB: Bool
     var distanceUnit: DistanceUnit
 
-    private static let dateFormat = Date.FormatStyle.dateTime.year(.twoDigits).month(.abbreviated).day().locale(.autoupdatingCurrent)
+    private static let dateFormat = Date.FormatStyle.dateTime.year(.twoDigits).month(.abbreviated).day()
 
     var body: some View {
         return Label {
