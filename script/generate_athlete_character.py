@@ -265,6 +265,48 @@ def make_shoe_mesh(side):
     ], bevel_r=0.01)
 
 
+# ── Pivot alignment offsets ──────────────────────────────────────────────────
+# Each segment mesh is built at its world-space position, then translated so
+# its proximal joint sits at the object origin. RealityKit attaches each mesh
+# at (0,0,0) relative to its pivot entity.
+
+def proximal_offset(name):
+    """Return (x, y, z) translation that moves the proximal joint to origin."""
+    # Arms: lateral offset at shoulder
+    if "upperArm-L" in name: return (-SHOULDER_W, SHOULDER_Y, 0)
+    if "upperArm-R" in name: return ( SHOULDER_W, SHOULDER_Y, 0)
+    if "forearm-L" in name:  return (-SHOULDER_W, ELBOW_Y, 0)
+    if "forearm-R" in name:  return ( SHOULDER_W, ELBOW_Y, 0)
+    if "hand-L" in name:     return (-SHOULDER_W, WRIST_Y, 0)
+    if "hand-R" in name:     return ( SHOULDER_W, WRIST_Y, 0)
+    # Legs: lateral offset at hip
+    if "thigh-L" in name:    return (-HIP_W, HIP_Y, 0)
+    if "thigh-R" in name:    return ( HIP_W, HIP_Y, 0)
+    if "shin-L" in name:     return (-HIP_W, KNEE_Y, 0)
+    if "shin-R" in name:     return ( HIP_W, KNEE_Y, 0)
+    if "foot-L" in name:     return (-HIP_W, ANKLE_Y, 0)
+    if "foot-R" in name:     return ( HIP_W, ANKLE_Y, 0)
+    if "shoe-L" in name:     return (-HIP_W, ANKLE_Y, 0)
+    if "shoe-R" in name:     return ( HIP_W, ANKLE_Y, 0)
+    # Central body
+    if "head" in name:       return (0, HEAD_CENTER.y, 0)
+    if "neck" in name:       return (0, NECK_TOP, 0)
+    if "torso" in name:      return (0, HIP_Y, 0)
+    if "shirt" in name:      return (0, HIP_Y + 0.12, 0)
+    if "shorts" in name:     return (0, HIP_Y, 0)
+    return (0, 0, 0)
+
+def translate_to_origin(obj):
+    """Shift vertex positions so proximal joint is at origin."""
+    ox, oy, oz = proximal_offset(obj.name)
+    if ox == 0 and oy == 0 and oz == 0:
+        return
+    # Move vertices in mesh data
+    for v in obj.data.vertices:
+        v.co.x -= ox
+        v.co.y -= oy
+        v.co.z -= oz
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -302,6 +344,13 @@ def main():
         s = make_shoe_mesh(side); s.data.materials.append(shoe_mat)
         clothing.append(s)
 
+    # Center each mesh at its proximal pivot
+    print("Aligning pivots...")
+    all_objs = segments + clothing
+    for obj in all_objs:
+        translate_to_origin(obj)
+        apply_transform(obj)
+
     # Material assignment
     mat_map = {"head": hair_mat, "neck": skin_mat, "torso": kit_mat,
                "upperArm": skin_mat, "forearm": skin_mat, "hand": skin_mat,
@@ -312,10 +361,6 @@ def main():
                 if obj.data.materials: obj.data.materials[0] = mat
                 else: obj.data.materials.append(mat)
                 break
-
-    all_objs = segments + clothing
-    for obj in all_objs:
-        apply_transform(obj)
 
     empty = [o for o in all_objs if not o.data or len(o.data.vertices) == 0]
     if empty:
@@ -338,7 +383,14 @@ def main():
     print(f"\nOK: {len(valid)} objects → {OUTPUT_PATH}")
     print(f"Total: {tv}v / {tf}f")
     for o in valid:
-        print(f"  {o.name}: {len(o.data.vertices)}v / {len(o.data.polygons)}f")
+        # Show bounds to verify pivot alignment
+        xs = [v.co.x for v in o.data.vertices]
+        ys = [v.co.y for v in o.data.vertices]
+        zs = [v.co.z for v in o.data.vertices]
+        print(f"  {o.name}: {len(o.data.vertices)}v, "
+              f"X[{min(xs):.3f}:{max(xs):.3f}] "
+              f"Y[{min(ys):.3f}:{max(ys):.3f}] "
+              f"Z[{min(zs):.3f}:{max(zs):.3f}]")
 
 if __name__ == "__main__":
     main()
