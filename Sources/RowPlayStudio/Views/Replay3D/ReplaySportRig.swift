@@ -35,25 +35,28 @@ enum ReplaySportRigFactory {
     ///   - parent: The entity to attach the rig to.
     ///   - accent: Accent color for sport-specific elements.
     ///   - opacity: Material opacity (1.0 for live, <1 for ghost).
+    ///   - meshes: Optional pre-loaded character meshes for the authored athlete.
+    ///     When nil, falls back to procedural primitives.
     /// - Returns: A `ReplaySportRig` that can apply poses.
     static func build(
         sport: Sport,
         into parent: ModelEntity,
         accent: Color,
-        opacity: Float = 1.0
+        opacity: Float = 1.0,
+        meshes: [String: Entity]? = nil
     ) -> ReplaySportRig {
         switch sport {
         case .rower:
             let rig = ReplayRowerRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(into: parent, accent: accent, opacity: opacity, meshes: meshes)
             return rig
         case .skierg:
             let rig = ReplaySkiErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(into: parent, accent: accent, opacity: opacity, meshes: meshes)
             return rig
         case .bike:
             let rig = ReplayBikeErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(into: parent, accent: accent, opacity: opacity, meshes: meshes)
             return rig
         }
     }

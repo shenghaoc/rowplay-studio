@@ -26,7 +26,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
 
     // MARK: - Build
 
-    func build(into parent: ModelEntity, accent: Color, opacity: Float) {
+    func build(into parent: ModelEntity, accent: Color, opacity: Float, meshes: [String: Entity]? = nil) {
         root.name = "skierg-rig"
         parent.addChild(root)
 
@@ -138,7 +138,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
         }
 
         // Athlete body (standing)
-        athlete.build(into: root, seated: false, accent: accent, opacity: opacity)
+        athlete.build(into: root, seated: false, accent: accent, opacity: opacity, meshes: meshes)
         // Position pelvis at hip height
         athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
     }
