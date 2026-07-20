@@ -36,8 +36,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Erg connection")
-                .accessibilityValue("Simulated")
+                .accessibilityLabel(LocalizedStringKey("Erg connection"))
+                .accessibilityValue(LocalizedStringKey("Simulated"))
 
                 Text("Direct Bluetooth connection to Concept2 ergs is coming soon.")
                     .font(.caption)
@@ -52,8 +52,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Logbook")
-                .accessibilityValue(syncController.isConnected ? "Connected" : "Not connected")
+                .accessibilityLabel(LocalizedStringKey("Logbook"))
+                .accessibilityValue(syncController.isConnected ? LocalizedStringKey("Connected") : LocalizedStringKey("Not connected"))
 
                 SecureField("Access token", text: $concept2Token)
                     .textFieldStyle(.roundedBorder)
