@@ -30,15 +30,18 @@ struct WorkoutDetailView: View {
         }
         .navigationTitle(detail.workout.workoutType)
         .toolbar {
-            if detail.workout.hasStrokeData {
-                ToolbarItem {
-                    Button(action: onReplay) {
-                        Label("Replay Workout", systemImage: "play.rectangle.fill")
-                    }
-                    .help("Replay workout with stroke data")
-                    .accessibilityHint("Opens the workout replay viewer")
-                    .keyboardShortcut("p", modifiers: [.command, .shift])
+            ToolbarItem {
+                Button(action: onReplay) {
+                    Label("Replay Workout", systemImage: "play.rectangle.fill")
                 }
+                .disabled(!detail.workout.hasStrokeData)
+                .help(detail.workout.hasStrokeData
+                      ? LocalizedStringKey("Replay workout with stroke data")
+                      : LocalizedStringKey("Replay requires stroke data"))
+                .accessibilityHint(detail.workout.hasStrokeData
+                                   ? LocalizedStringKey("Opens the workout replay viewer")
+                                   : LocalizedStringKey("Replay requires stroke data"))
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             }
         }
         .onAppear {
