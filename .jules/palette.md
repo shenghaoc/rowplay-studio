@@ -9,3 +9,7 @@
 ## 2026-07-15 - Hide decorative text separators from VoiceOver
 **Learning:** Screen readers will read out decorative text characters (like bullet points or "·" separators), creating a noisy and poor auditory experience for visually impaired users.
 **Action:** When using decorative characters to separate elements visually in a `Text` view, apply a custom `.accessibilityLabel` that uses commas for natural VoiceOver pauses instead of wrapping separators in individual `Text("·").accessibilityHidden(true)` views. The single-`Text` approach keeps the view hierarchy flat and performant while achieving the same visual and auditory result.
+
+## 2026-07-20 - [UX: Disabled Button Explanations]
+**Learning:** Hiding UI elements completely when their prerequisites aren't met (e.g. hiding "Replay Workout" when there's no stroke data) causes confusion. Users may think the feature was removed or wonder where it is. Showing the button but disabling it and adding a tooltip/hint explaining *why* it's disabled is far better UX.
+**Action:** When a button's required data or state is unavailable, prefer `.disabled(true)` paired with a dynamic `.help()` and `.accessibilityHint()` explaining the reason over conditionally rendering (hiding) the button.

@@ -36,11 +36,11 @@ struct WorkoutDetailView: View {
                 }
                 .disabled(!detail.workout.hasStrokeData)
                 .help(detail.workout.hasStrokeData
-                      ? "Replay workout with stroke data"
-                      : "Replay requires stroke data")
+                      ? LocalizedStringKey("Replay workout with stroke data")
+                      : LocalizedStringKey("Replay requires stroke data"))
                 .accessibilityHint(detail.workout.hasStrokeData
-                                   ? "Opens the workout replay viewer"
-                                   : "Replay requires stroke data")
+                                   ? LocalizedStringKey("Opens the workout replay viewer")
+                                   : LocalizedStringKey("Replay requires stroke data"))
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             }
         }
