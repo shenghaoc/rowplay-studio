@@ -1,0 +1,391 @@
+{
+  "budgets": {
+    "combinedByteLimitExclusive": 15728640,
+    "environmentTriangleCeiling": 30000,
+    "rigTriangleCeiling": 18000
+  },
+  "environmentContract": {
+    "directions": {
+      "bike": [
+        "paved velodrome-style course",
+        "barriers",
+        "banners",
+        "trackside depth"
+      ],
+      "rower": [
+        "water course",
+        "shoreline depth",
+        "buoys",
+        "dock",
+        "restrained vegetation"
+      ],
+      "skierg": [
+        "snow course",
+        "conifers",
+        "gates",
+        "snowbank depth"
+      ]
+    },
+    "noEmbeddedCamerasOrLights": true,
+    "requiredNodes": [
+      "environment-root",
+      "environment-ground",
+      "environment-props"
+    ]
+  },
+  "generator": {
+    "checkCommand": "python3 script/generate_replay_assets.py --check",
+    "command": "python3 script/generate_replay_assets.py",
+    "fixedSeed": 20260721,
+    "networkAccess": "none",
+    "path": "script/generate_replay_assets.py",
+    "standardLibraryOnly": true
+  },
+  "resources": [
+    {
+      "expectedBounds": {
+        "max": [
+          2.67,
+          0.42,
+          1.55
+        ],
+        "min": [
+          -2.67,
+          -0.4175,
+          -1.55
+        ]
+      },
+      "kind": "rig",
+      "name": "rower-rig.usda",
+      "requiredMaterialCategories": [
+        "skin",
+        "hair",
+        "kit",
+        "shoe",
+        "accent",
+        "metal",
+        "rubber"
+      ],
+      "requiredNodes": [
+        "visual-pelvis",
+        "visual-torso",
+        "visual-head",
+        "visual-upperArm-L",
+        "visual-forearm-L",
+        "visual-hand-L",
+        "visual-upperArm-R",
+        "visual-forearm-R",
+        "visual-hand-R",
+        "visual-thigh-L",
+        "visual-shin-L",
+        "visual-foot-L",
+        "visual-thigh-R",
+        "visual-shin-R",
+        "visual-foot-R",
+        "visual-hull",
+        "visual-deck-stripe",
+        "visual-footplate",
+        "visual-rail",
+        "visual-seat",
+        "visual-handle",
+        "visual-oar-port",
+        "visual-oar-starboard"
+      ],
+      "sport": "rower",
+      "triangleCeiling": 18000,
+      "usdPrimNames": {
+        "visual-deck-stripe": "visual_deck_stripe",
+        "visual-foot-L": "visual_foot_L",
+        "visual-foot-R": "visual_foot_R",
+        "visual-footplate": "visual_footplate",
+        "visual-forearm-L": "visual_forearm_L",
+        "visual-forearm-R": "visual_forearm_R",
+        "visual-hand-L": "visual_hand_L",
+        "visual-hand-R": "visual_hand_R",
+        "visual-handle": "visual_handle",
+        "visual-head": "visual_head",
+        "visual-hull": "visual_hull",
+        "visual-oar-port": "visual_oar_port",
+        "visual-oar-starboard": "visual_oar_starboard",
+        "visual-pelvis": "visual_pelvis",
+        "visual-rail": "visual_rail",
+        "visual-seat": "visual_seat",
+        "visual-shin-L": "visual_shin_L",
+        "visual-shin-R": "visual_shin_R",
+        "visual-thigh-L": "visual_thigh_L",
+        "visual-thigh-R": "visual_thigh_R",
+        "visual-torso": "visual_torso",
+        "visual-upperArm-L": "visual_upperArm_L",
+        "visual-upperArm-R": "visual_upperArm_R"
+      }
+    },
+    {
+      "expectedBounds": {
+        "max": [
+          67.0,
+          6.08,
+          60.0
+        ],
+        "min": [
+          -67.0,
+          -0.105,
+          -60.0
+        ]
+      },
+      "kind": "environment",
+      "name": "rower-environment.usda",
+      "requiredMaterialCategories": [
+        "water",
+        "shore",
+        "foliage",
+        "accent",
+        "metal"
+      ],
+      "requiredNodes": [
+        "environment-root",
+        "environment-ground",
+        "environment-props"
+      ],
+      "sport": "rower",
+      "triangleCeiling": 30000,
+      "usdPrimNames": {
+        "environment-ground": "environment_ground",
+        "environment-props": "environment_props",
+        "environment-root": "environment_root"
+      }
+    },
+    {
+      "expectedBounds": {
+        "max": [
+          0.41,
+          0.9,
+          0.31
+        ],
+        "min": [
+          -0.41,
+          -1.2,
+          -0.31
+        ]
+      },
+      "kind": "rig",
+      "name": "skierg-rig.usda",
+      "requiredMaterialCategories": [
+        "skin",
+        "hair",
+        "kit",
+        "shoe",
+        "accent",
+        "metal",
+        "rubber"
+      ],
+      "requiredNodes": [
+        "visual-pelvis",
+        "visual-torso",
+        "visual-head",
+        "visual-upperArm-L",
+        "visual-forearm-L",
+        "visual-hand-L",
+        "visual-upperArm-R",
+        "visual-forearm-R",
+        "visual-hand-R",
+        "visual-thigh-L",
+        "visual-shin-L",
+        "visual-foot-L",
+        "visual-thigh-R",
+        "visual-shin-R",
+        "visual-foot-R",
+        "visual-post-L",
+        "visual-post-R",
+        "visual-topBar",
+        "visual-platform",
+        "visual-handle-L",
+        "visual-handle-R",
+        "visual-pole-L",
+        "visual-pole-R",
+        "visual-cable"
+      ],
+      "sport": "skierg",
+      "triangleCeiling": 18000,
+      "usdPrimNames": {
+        "visual-cable": "visual_cable",
+        "visual-foot-L": "visual_foot_L",
+        "visual-foot-R": "visual_foot_R",
+        "visual-forearm-L": "visual_forearm_L",
+        "visual-forearm-R": "visual_forearm_R",
+        "visual-hand-L": "visual_hand_L",
+        "visual-hand-R": "visual_hand_R",
+        "visual-handle-L": "visual_handle_L",
+        "visual-handle-R": "visual_handle_R",
+        "visual-head": "visual_head",
+        "visual-pelvis": "visual_pelvis",
+        "visual-platform": "visual_platform",
+        "visual-pole-L": "visual_pole_L",
+        "visual-pole-R": "visual_pole_R",
+        "visual-post-L": "visual_post_L",
+        "visual-post-R": "visual_post_R",
+        "visual-shin-L": "visual_shin_L",
+        "visual-shin-R": "visual_shin_R",
+        "visual-thigh-L": "visual_thigh_L",
+        "visual-thigh-R": "visual_thigh_R",
+        "visual-topBar": "visual_topBar",
+        "visual-torso": "visual_torso",
+        "visual-upperArm-L": "visual_upperArm_L",
+        "visual-upperArm-R": "visual_upperArm_R"
+      }
+    },
+    {
+      "expectedBounds": {
+        "max": [
+          60.0,
+          6.65,
+          60.0
+        ],
+        "min": [
+          -60.0,
+          -0.12,
+          -60.0
+        ]
+      },
+      "kind": "environment",
+      "name": "skierg-environment.usda",
+      "requiredMaterialCategories": [
+        "snow",
+        "ice",
+        "foliage",
+        "accent",
+        "metal"
+      ],
+      "requiredNodes": [
+        "environment-root",
+        "environment-ground",
+        "environment-props"
+      ],
+      "sport": "skierg",
+      "triangleCeiling": 30000,
+      "usdPrimNames": {
+        "environment-ground": "environment_ground",
+        "environment-props": "environment_props",
+        "environment-root": "environment_root"
+      }
+    },
+    {
+      "expectedBounds": {
+        "max": [
+          0.39,
+          0.475,
+          0.8
+        ],
+        "min": [
+          -0.39,
+          -0.475,
+          -0.8
+        ]
+      },
+      "kind": "rig",
+      "name": "bike-rig.usda",
+      "requiredMaterialCategories": [
+        "skin",
+        "hair",
+        "kit",
+        "shoe",
+        "accent",
+        "metal",
+        "rubber"
+      ],
+      "requiredNodes": [
+        "visual-pelvis",
+        "visual-torso",
+        "visual-head",
+        "visual-upperArm-L",
+        "visual-forearm-L",
+        "visual-hand-L",
+        "visual-upperArm-R",
+        "visual-forearm-R",
+        "visual-hand-R",
+        "visual-thigh-L",
+        "visual-shin-L",
+        "visual-foot-L",
+        "visual-thigh-R",
+        "visual-shin-R",
+        "visual-foot-R",
+        "visual-wheel-front",
+        "visual-wheel-rear",
+        "visual-downTube",
+        "visual-seatTube",
+        "visual-topTube",
+        "visual-cranks",
+        "visual-chainRing",
+        "visual-pedal-L",
+        "visual-pedal-R",
+        "visual-handlebar",
+        "visual-saddle"
+      ],
+      "sport": "bike",
+      "triangleCeiling": 18000,
+      "usdPrimNames": {
+        "visual-chainRing": "visual_chainRing",
+        "visual-cranks": "visual_cranks",
+        "visual-downTube": "visual_downTube",
+        "visual-foot-L": "visual_foot_L",
+        "visual-foot-R": "visual_foot_R",
+        "visual-forearm-L": "visual_forearm_L",
+        "visual-forearm-R": "visual_forearm_R",
+        "visual-hand-L": "visual_hand_L",
+        "visual-hand-R": "visual_hand_R",
+        "visual-handlebar": "visual_handlebar",
+        "visual-head": "visual_head",
+        "visual-pedal-L": "visual_pedal_L",
+        "visual-pedal-R": "visual_pedal_R",
+        "visual-pelvis": "visual_pelvis",
+        "visual-saddle": "visual_saddle",
+        "visual-seatTube": "visual_seatTube",
+        "visual-shin-L": "visual_shin_L",
+        "visual-shin-R": "visual_shin_R",
+        "visual-thigh-L": "visual_thigh_L",
+        "visual-thigh-R": "visual_thigh_R",
+        "visual-topTube": "visual_topTube",
+        "visual-torso": "visual_torso",
+        "visual-upperArm-L": "visual_upperArm_L",
+        "visual-upperArm-R": "visual_upperArm_R",
+        "visual-wheel-front": "visual_wheel_front",
+        "visual-wheel-rear": "visual_wheel_rear"
+      }
+    },
+    {
+      "expectedBounds": {
+        "max": [
+          60.0,
+          5.13,
+          60.0
+        ],
+        "min": [
+          -60.0,
+          -0.13,
+          -60.0
+        ]
+      },
+      "kind": "environment",
+      "name": "bike-environment.usda",
+      "requiredMaterialCategories": [
+        "asphalt",
+        "concrete",
+        "accent",
+        "metal",
+        "foliage"
+      ],
+      "requiredNodes": [
+        "environment-root",
+        "environment-ground",
+        "environment-props"
+      ],
+      "sport": "bike",
+      "triangleCeiling": 30000,
+      "usdPrimNames": {
+        "environment-ground": "environment_ground",
+        "environment-props": "environment_props",
+        "environment-root": "environment_root"
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

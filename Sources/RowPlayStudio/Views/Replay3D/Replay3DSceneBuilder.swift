@@ -20,6 +20,8 @@ final class Replay3DSceneContainer {
     let sport: Sport
     let layout: ReplayCourseLayout
     let configuration: ReplayRenderConfiguration
+    let visualSource: ReplayAssetVisualSource
+    let bundledEnvironment: Entity?
 
     init(
         root: Entity,
@@ -35,7 +37,9 @@ final class Replay3DSceneContainer {
         effectRenderer: ReplayEffectRenderer,
         sport: Sport,
         layout: ReplayCourseLayout,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        visualSource: ReplayAssetVisualSource,
+        bundledEnvironment: Entity?
     ) {
         self.root = root
         self.camera = camera
@@ -51,6 +55,8 @@ final class Replay3DSceneContainer {
         self.sport = sport
         self.layout = layout
         self.configuration = configuration
+        self.visualSource = visualSource
+        self.bundledEnvironment = bundledEnvironment
     }
 }
 
@@ -59,20 +65,30 @@ final class Replay3DSceneContainer {
 enum Replay3DSceneBuilder {
     static let loopMeters = ReplayCourseLayout.loopMeters
 
-    /// Shared athlete mesh catalog, loaded once from the bundled USDZ.
-    /// nil when the asset is missing — callers fall back to procedural primitives.
-    static var athleteCatalog: ReplayAthleteMeshCatalog?
-
     // MARK: - Build
 
     static func buildScene(
         sport: Sport,
         colorScheme: ColorScheme,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        effectiveQuality: ReplayRenderQuality = .high,
+        bundledAssetSet: ReplayBundledAssetSet? = nil
     ) -> Replay3DSceneContainer {
-        // Clone independent mesh sets for live and ghost from the shared catalog.
-        let liveMeshes = athleteCatalog?.cloneAll()
-        let ghostMeshes = athleteCatalog?.cloneAll()
+        // A just-finished async load for a previous sport must never lend its
+        // common visual nodes to the next sport. Treat a mismatched set exactly
+        // like a failed load so rig and environment selection stay atomic.
+        let matchingAssetSet = bundledAssetSet?.sport == sport ? bundledAssetSet : nil
+        let visualSource = ReplayAssetCatalog.visualSource(
+            for: effectiveQuality,
+            assetSetIsValid: matchingAssetSet != nil
+        )
+        let visualProvider: (any ReplayRigVisualProvider) = switch visualSource {
+        case .procedural:
+            ReplayProceduralRigVisualProvider.shared
+        case .bundled:
+            // `visualSource` can only be `.bundled` when the optional set is non-nil.
+            matchingAssetSet!.rigVisualProvider
+        }
 
         let root = Entity()
         root.name = "scene-root"
@@ -110,6 +126,20 @@ enum Replay3DSceneBuilder {
         ground.position = SIMD3(0, -0.05, 0)
         root.addChild(ground)
 
+        // The bundle supplies the complete environment only when its matching
+        // rig also validated. The procedural ground is otherwise retained as a
+        // coherent fallback rather than mixing the two visual sources.
+        let bundledEnvironment: Entity?
+        if visualSource == .bundled, let matchingAssetSet {
+            ground.isEnabled = false
+            bundledEnvironment = ReplayEnvironmentAssetInstaller.install(
+                assetSet: matchingAssetSet,
+                into: root
+            )
+        } else {
+            bundledEnvironment = nil
+        }
+
         // Course ring
         let courseEntity = Entity()
         courseEntity.name = "course"
@@ -131,7 +161,7 @@ enum Replay3DSceneBuilder {
         root.addChild(liveGroup)
         let liveRig = ReplaySportRigFactory.build(
             sport: sport, into: liveGroup, accent: .green, opacity: 1.0,
-            meshes: liveMeshes
+            visualProvider: visualProvider
         )
 
         // Ghost avatar
@@ -141,7 +171,7 @@ enum Replay3DSceneBuilder {
         root.addChild(ghostGroup)
         let ghostRig = ReplaySportRigFactory.build(
             sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45,
-            meshes: ghostMeshes
+            visualProvider: visualProvider
         )
         ghostRig.applyGhostTranslucency()
 
@@ -166,7 +196,9 @@ enum Replay3DSceneBuilder {
             effectRenderer: effectRenderer,
             sport: sport,
             layout: layout,
-            configuration: configuration
+            configuration: configuration,
+            visualSource: visualSource,
+            bundledEnvironment: bundledEnvironment
         )
     }
 

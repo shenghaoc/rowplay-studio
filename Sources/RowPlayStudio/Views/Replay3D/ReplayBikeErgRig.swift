@@ -32,7 +32,12 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
     // MARK: - Build
 
-    func build(into parent: ModelEntity, accent: Color, opacity: Float, meshes: [String: Entity]? = nil) {
+    func build(
+        into parent: ModelEntity,
+        accent: Color,
+        opacity: Float,
+        visualProvider: (any ReplayRigVisualProvider)? = nil
+    ) {
         root.name = "bikeerg-rig"
         parent.addChild(root)
 
@@ -56,33 +61,52 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
         // Wheels
         for z: Float in [0.85, -0.85] {
-            let wheel = ReplayMeshFactory.wheelEntity(
-                radius: wheelR,
-                tyreMaterial: tyreMat,
-                spokeMaterial: spokeMat
-            )
+            let wheel = Entity()
             wheel.name = "wheel-\(z > 0 ? "front" : "rear")"
+            let visualName = z > 0 ? "visual-wheel-front" : "visual-wheel-rear"
+            if visualProvider?.attachVisual(named: visualName, to: wheel) != true {
+                wheel.addChild(ReplayMeshFactory.wheelEntity(
+                    radius: wheelR,
+                    tyreMaterial: tyreMat,
+                    spokeMaterial: spokeMat
+                ))
+            }
             wheel.position = SIMD3(0, wheelR, z)
             root.addChild(wheel)
             wheels.append(wheel)
         }
 
         // Frame: down tube, seat tube, top tube, chain stays
-        let downTubeMesh = MeshResource.generateBox(size: SIMD3(0.08, 0.08, 1.6))
-        let downTube = ModelEntity(mesh: downTubeMesh, materials: [frameMat])
+        let downTube = Entity()
         downTube.name = "downTube"
+        if visualProvider?.attachVisual(named: "visual-downTube", to: downTube) != true {
+            let downTubeMesh = MeshResource.generateBox(size: SIMD3(0.08, 0.08, 1.6))
+            let downTubeModel = ModelEntity(mesh: downTubeMesh, materials: [frameMat])
+            downTubeModel.name = "downTube-model"
+            downTube.addChild(downTubeModel)
+        }
         downTube.position = SIMD3(0, wheelR + 0.15, 0)
         root.addChild(downTube)
 
-        let seatTubeMesh = MeshResource.generateBox(size: SIMD3(0.08, 0.7, 0.08))
-        let seatTube = ModelEntity(mesh: seatTubeMesh, materials: [frameMat])
+        let seatTube = Entity()
         seatTube.name = "seatTube"
+        if visualProvider?.attachVisual(named: "visual-seatTube", to: seatTube) != true {
+            let seatTubeMesh = MeshResource.generateBox(size: SIMD3(0.08, 0.7, 0.08))
+            let seatTubeModel = ModelEntity(mesh: seatTubeMesh, materials: [frameMat])
+            seatTubeModel.name = "seatTube-model"
+            seatTube.addChild(seatTubeModel)
+        }
         seatTube.position = SIMD3(0, wheelR + 0.45, -0.4)
         root.addChild(seatTube)
 
-        let topTubeMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 1.1))
-        let topTube = ModelEntity(mesh: topTubeMesh, materials: [frameMat])
+        let topTube = Entity()
         topTube.name = "topTube"
+        if visualProvider?.attachVisual(named: "visual-topTube", to: topTube) != true {
+            let topTubeMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 1.1))
+            let topTubeModel = ModelEntity(mesh: topTubeMesh, materials: [frameMat])
+            topTubeModel.name = "topTube-model"
+            topTube.addChild(topTubeModel)
+        }
         topTube.position = SIMD3(0, wheelR + 0.75, -0.15)
         root.addChild(topTube)
 
@@ -97,23 +121,33 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
         // Saddle
         saddle.name = "saddle"
-        let saddleMesh = MeshResource.generateBox(size: SIMD3(0.18, 0.05, 0.30))
-        let saddleMat = ReplayMeshFactory.kitDarkMaterial(opacity: opacity)
-        let saddleModel = ModelEntity(mesh: saddleMesh, materials: [saddleMat])
-        saddleModel.name = "saddle-model"
-        saddle.addChild(saddleModel)
+        if visualProvider?.attachVisual(named: "visual-saddle", to: saddle) != true {
+            let saddleMesh = MeshResource.generateBox(size: SIMD3(0.18, 0.05, 0.30))
+            let saddleMat = ReplayMeshFactory.kitDarkMaterial(opacity: opacity)
+            let saddleModel = ModelEntity(mesh: saddleMesh, materials: [saddleMat])
+            saddleModel.name = "saddle-model"
+            saddle.addChild(saddleModel)
+        }
         saddle.position = SIMD3(0, wheelR + 0.8, -0.4)
         root.addChild(saddle)
 
         // Cranks with chain ring and pedals
         cranks.name = "cranks"
         cranks.position = SIMD3(0, wheelR, -0.05)
+        // The bundled crank arms sit on the same rotating parent as the
+        // existing chain ring and pedals; `applyPose` remains unchanged.
+        _ = visualProvider?.attachVisual(named: "visual-cranks", to: cranks)
 
         // Chain ring
-        let chainRingMesh = MeshResource.generateSphere(radius: 0.16)
-        let chainRing = ModelEntity(mesh: chainRingMesh, materials: [metalMat])
+        let chainRing = Entity()
         chainRing.name = "chainRing"
-        chainRing.scale = SIMD3(1, 0.12, 1)
+        if visualProvider?.attachVisual(named: "visual-chainRing", to: chainRing) != true {
+            let chainRingMesh = MeshResource.generateSphere(radius: 0.16)
+            let chainRingModel = ModelEntity(mesh: chainRingMesh, materials: [metalMat])
+            chainRingModel.name = "chainRing-model"
+            chainRingModel.scale = SIMD3(1, 0.12, 1)
+            chainRing.addChild(chainRingModel)
+        }
         cranks.addChild(chainRing)
 
         // Pedals
@@ -121,16 +155,20 @@ final class ReplayBikeErgRig: ReplaySportRig {
         let pedalMat = ReplayMeshFactory.kitDarkMaterial(opacity: opacity)
 
         pedalL.name = "pedal-L"
-        let pedalLModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
-        pedalLModel.name = "pedal-model-L"
-        pedalL.addChild(pedalLModel)
+        if visualProvider?.attachVisual(named: "visual-pedal-L", to: pedalL) != true {
+            let pedalLModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
+            pedalLModel.name = "pedal-model-L"
+            pedalL.addChild(pedalLModel)
+        }
         pedalL.position = SIMD3(-0.1, 0.18, 0)
         cranks.addChild(pedalL)
 
         pedalR.name = "pedal-R"
-        let pedalRModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
-        pedalRModel.name = "pedal-model-R"
-        pedalR.addChild(pedalRModel)
+        if visualProvider?.attachVisual(named: "visual-pedal-R", to: pedalR) != true {
+            let pedalRModel = ModelEntity(mesh: pedalMesh, materials: [pedalMat])
+            pedalRModel.name = "pedal-model-R"
+            pedalR.addChild(pedalRModel)
+        }
         pedalR.position = SIMD3(0.1, -0.18, 0)
         cranks.addChild(pedalR)
 
@@ -139,18 +177,20 @@ final class ReplayBikeErgRig: ReplaySportRig {
         // Handlebar
         let handlebar = Entity()
         handlebar.name = "handlebar"
-        let barMesh = MeshResource.generateCylinder(height: 0.64, radius: 0.026)
-        let bar = ModelEntity(mesh: barMesh, materials: [darkMat])
-        bar.name = "crossbar"
-        bar.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
-        handlebar.addChild(bar)
-        for side: Float in [-1, 1] {
-            let gripMesh = MeshResource.generateCylinder(height: 0.22, radius: 0.024)
-            let grip = ModelEntity(mesh: gripMesh, materials: [darkMat])
-            grip.position = SIMD3(side * 0.28, -0.02, 0.04)
-            grip.orientation = simd_quatf(angle: -0.3, axis: SIMD3(1, 0, 0))
-            grip.name = "grip-\(side > 0 ? "R" : "L")"
-            handlebar.addChild(grip)
+        if visualProvider?.attachVisual(named: "visual-handlebar", to: handlebar) != true {
+            let barMesh = MeshResource.generateCylinder(height: 0.64, radius: 0.026)
+            let bar = ModelEntity(mesh: barMesh, materials: [darkMat])
+            bar.name = "crossbar"
+            bar.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+            handlebar.addChild(bar)
+            for side: Float in [-1, 1] {
+                let gripMesh = MeshResource.generateCylinder(height: 0.22, radius: 0.024)
+                let grip = ModelEntity(mesh: gripMesh, materials: [darkMat])
+                grip.position = SIMD3(side * 0.28, -0.02, 0.04)
+                grip.orientation = simd_quatf(angle: -0.3, axis: SIMD3(1, 0, 0))
+                grip.name = "grip-\(side > 0 ? "R" : "L")"
+                handlebar.addChild(grip)
+            }
         }
         handlebar.position = SIMD3(0, wheelR + 0.8, 0.35)
         handleGripL.name = "handle-grip-anchor-L"
@@ -169,7 +209,13 @@ final class ReplayBikeErgRig: ReplaySportRig {
         root.addChild(rider)
 
         // Athlete body (seated, aero tuck)
-        athlete.build(into: rider, seated: true, accent: accent, opacity: opacity, meshes: meshes)
+        athlete.build(
+            into: rider,
+            seated: true,
+            accent: accent,
+            opacity: opacity,
+            visualProvider: visualProvider
+        )
         // Position pelvis on saddle relative to rider group
         athlete.pelvis.position = .zero
     }

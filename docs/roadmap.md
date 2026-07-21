@@ -363,7 +363,7 @@ Scope:
 
 ### Phase 10B - Complete Rival Workflow
 
-Status: complete on branch `codex/phase-10b-complete-rival-workflow` (this PR).
+Status: merged to `main` (PR #64).
 
 Scope:
 
@@ -382,12 +382,66 @@ Non-goals:
 
 ### Phase 11 - Production-Quality Bundled 3D Assets
 
-Status: planned follow-up.
+Status: implementation and local validation complete on
+`codex/phase-11-production-3d-assets` (PR #72); the draft PR awaits fresh
+GitHub CI on its pushed head.
 
 Scope:
 
-- Bundle production-quality 3D athlete/equipment assets while retaining the procedural renderer as fallback.
+- Add a deterministic, project-authored USDA asset pipeline for RowErg,
+  SkiErg, and BikeErg rigs plus sport-specific environments. Resources remain
+  bundled with the native app and have no network or third-party model
+  dependency.
+- Keep `ReplayRigPoseSolver`, existing pivot/contact ownership, 2D replay,
+  cameras, effects, quality policy, rivals, deterministic demo mode, and
+  automation mode intact. Phase 11 selects visual geometry; it does not add a
+  second renderer or animation system.
+- Put generated resources behind an asset catalog/library and visual-provider
+  boundary. Low quality remains complete procedural visuals. Medium, high, and
+  ultra use a complete validated bundled sport set; any load or contract failure
+  uses the complete procedural fallback rather than mixing visual sources.
+- Install bundled scenery only as a native background enhancement. The 400 m
+  course, lanes, start/finish and distance markers, cameras, lights, wakes,
+  catch effects, and contact targets remain native-owned.
+- Require deterministic generation/provenance, bounded asset budgets, resource
+  and clone-isolation tests, staged-bundle resource verification, and staged-app
+  visual QA before marking the phase complete.
 - Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
+
+Exit criteria:
+
+- Generated assets pass the deterministic contract, resource budgets, and
+  provenance check.
+- Existing rig/contact/effect/camera/rival behavior passes under both
+  procedural low and bundled higher-quality paths.
+- Full local SwiftPM, architecture, staged-bundle, and bounded staged-app
+  visual QA validation passes; PR #72 still requires fresh exact-head GitHub
+  CI before merge. The local evidence does not claim universal visual or GPU
+  performance.
+
+Local validation record:
+
+- `python3 script/generate_replay_assets.py --check`, the focused asset, rig,
+  scene, quality, effect, and ghost suites, `swift test` (978 tests, two
+  expected skips), `swift build`, architecture scans, and `git diff --check`
+  pass.
+- The staged `.app` passes `--verify`, `--automation`, and `--sign-verify`,
+  and its resource bundle contains all six generated USDA files.
+- RowErg, SkiErg, and BikeErg were checked at every quality choice. Low showed
+  the complete procedural source, while medium/high/ultra selected the
+  bundled source. BikeErg Low-to-Medium retained the seek position; playback
+  pause/resume worked.
+- The Phase 11 visual pass did not include a spoken VoiceOver pass, gestures,
+  all rival/live routes, every camera or appearance mode, window-size matrix,
+  Instruments, or GPU profiling; those are not claimed as complete.
+
+Non-goals:
+
+- Skeletal/IK animation, a second renderer, Metal, SceneKit, custom shaders,
+  runtime asset downloads, third-party model libraries, or asset themes.
+- New replay controls or a 2D redesign.
+- Bluetooth/FTMS/Concept2 PM transport, OAuth, public sharing, new networking,
+  or toolchain/deployment-target/CI changes.
 
 ## Review Strategy
 
