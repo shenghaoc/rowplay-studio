@@ -8,7 +8,6 @@ struct ReplayView: View {
     static let qualityAccessibilityLabel = "3D replay quality"
     static let qualityPickerHelp = "Choose the maximum 3D replay quality"
     static let adaptiveQualityHelp = "Quality was reduced to maintain replay performance"
-    private static let candidateDateStyle = Date.FormatStyle(date: .abbreviated, time: .omitted)
     private static let tieEpsilon: TimeInterval = 0.05
 
     let detail: WorkoutDetail
@@ -425,7 +424,7 @@ struct ReplayView: View {
         case .session:
             if let id = rival.sessionWorkoutID,
                let candidate = ghostCandidateByID[id] {
-                let date = candidate.workout.date.formatted(Self.candidateDateStyle.locale(currentLocale))
+                let date = candidate.workout.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(currentLocale))
                 return "your \(date) session"
             }
             return "your past session"

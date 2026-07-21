@@ -12,10 +12,6 @@ struct DashboardView: View {
 
     private var unit: DistanceUnit { preferences.distanceUnit }
 
-    private static let measurementStyle = Measurement<UnitLength>.FormatStyle(width: .wide).locale(.autoupdatingCurrent)
-    private static let durationStyle = Duration.UnitsFormatStyle(allowedUnits: [.hours, .minutes, .seconds], width: .wide, fractionalPart: .show(length: 1)).locale(.autoupdatingCurrent)
-    private static let pbDateFormatStyle = Date.FormatStyle().year().month(.abbreviated).day()
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xxxLarge) {
@@ -170,7 +166,7 @@ struct DashboardView: View {
                             Text(RowPlayFormatting.pace(pb.pace))
                                 .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(AppDesign.MetricColor.pace)
-                            Text(pb.date, format: Self.pbDateFormatStyle)
+                            Text(pb.date, format: .dateTime.year().month(.abbreviated).day())
                                 .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(.tertiary)
                         }
@@ -179,7 +175,7 @@ struct DashboardView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDesign.Radius.small))
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(pbAccessibilityLabel(pb))
-                        .accessibilityValue("\(Duration.seconds(pb.time).formatted(Self.durationStyle)), \(Duration.seconds(pb.pace).formatted(Self.durationStyle)) per 500 meters, \(pb.date.formatted(Self.pbDateFormatStyle))")
+                        .accessibilityValue(pbAccessibilityValue(pb))
                     }
                 }
             }
@@ -208,8 +204,20 @@ struct DashboardView: View {
             distanceText = "Marathon"
         } else {
             distanceText = Measurement(value: pb.distance, unit: UnitLength.meters)
-                .formatted(Self.measurementStyle)
+                .formatted(.measurement(width: .wide))
         }
         return "\(distanceText) \(pb.sport.displayName) Personal Best"
+    }
+
+    private func pbAccessibilityValue(_ pb: DashboardPersonalBest) -> String {
+        let durationStyle = Duration.UnitsFormatStyle(
+            allowedUnits: [.hours, .minutes, .seconds],
+            width: .wide,
+            fractionalPart: .show(length: 1)
+        )
+        let timeFormatted = Duration.seconds(pb.time).formatted(durationStyle)
+        let paceFormatted = Duration.seconds(pb.pace).formatted(durationStyle)
+        let dateFormatted = pb.date.formatted(.dateTime.year().month(.abbreviated).day())
+        return "\(timeFormatted), \(paceFormatted) per 500 meters, \(dateFormatted)"
     }
 }

@@ -8,11 +8,6 @@ import SwiftUI
 /// this view only presents that state and routes user intent through bindings
 /// and actions.
 struct ReplayRivalControlView: View {
-    private static let candidateDateStyle = Date.FormatStyle(
-        date: .abbreviated,
-        time: .omitted
-    ).locale(.autoupdatingCurrent)
-
     let detail: WorkoutDetail
     let ghostCandidates: [WorkoutDetail]
     let ghostCandidateByID: [Int: WorkoutDetail]
@@ -193,7 +188,7 @@ struct ReplayRivalControlView: View {
 
     private func candidateLabel(for candidate: WorkoutDetail) -> some View {
         let workout = candidate.workout
-        let date = workout.date.formatted(Self.candidateDateStyle.locale(locale))
+        let date = workout.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
         let distance = RowPlayFormatting.distance(workout.distance, unit: distanceUnit)
         let pace = RowPlayFormatting.pace(workout.pace)
         return Text("\(date) · \(distance) · \(pace)")
@@ -211,7 +206,7 @@ struct ReplayRivalControlView: View {
                 let workout = candidate.workout
                 let distance = RowPlayFormatting.distance(workout.distance, unit: distanceUnit)
                 let pace = RowPlayFormatting.pace(workout.pace)
-                let date = workout.date.formatted(Self.candidateDateStyle.locale(locale))
+                let date = workout.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
                 return "Rival: \(distance) at \(pace) from \(date)"
             }
             return "Past session rival"
@@ -273,7 +268,7 @@ struct ReplayRivalControlView: View {
         case .session:
             if let id = rival.sessionWorkoutID,
                let candidate = ghostCandidateByID[id] {
-                return candidate.workout.date.formatted(Self.candidateDateStyle.locale(locale))
+                return candidate.workout.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
             }
             return "Session"
         case .constantPace:
