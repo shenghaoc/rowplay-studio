@@ -43,14 +43,14 @@ final class ReplayAthleteRig {
     ///   - seated: Whether the athlete is seated (affects proportions).
     ///   - accent: Accent color for sport-specific elements.
     ///   - opacity: Material opacity (1.0 for live, <1 for ghost).
-    ///   - meshes: Optional pre-loaded character meshes. When nil, falls back
-    ///     to procedural primitives via ReplayMeshFactory.
+    ///   - visualProvider: Optional complete bundled visuals. When absent, the
+    ///     existing procedural primitives remain the entire visual path.
     func build(
         into parent: Entity,
         seated: Bool,
         accent: Color,
         opacity: Float,
-        meshes: [String: Entity]? = nil
+        visualProvider: (any ReplayRigVisualProvider)? = nil
     ) {
         let skinMat = ReplayMeshFactory.skinMaterial(opacity: opacity)
         let kitMat = ReplayMeshFactory.kitMaterial(opacity: opacity)
@@ -80,11 +80,10 @@ final class ReplayAthleteRig {
 
         // Pelvis
         parent.addChild(pelvis)
+        _ = visualProvider?.attachVisual(named: "visual-pelvis", to: pelvis)
 
-        // Torso — proximal pivot at pelvis (HIP_Y in Blender, now at origin)
-        if let torsoMesh = meshes?["athlete-torso"] {
-            torso.addChild(torsoMesh)
-        } else {
+        // Torso — proximal pivot at pelvis.
+        if visualProvider?.attachVisual(named: "visual-torso", to: torso) != true {
             let torsoModel = ModelEntity(
                 mesh: MeshResource.generateBox(size: SIMD3(0.30, torsoHeight, 0.18)),
                 materials: [kitMat]
@@ -99,11 +98,8 @@ final class ReplayAthleteRig {
         shoulders.position = SIMD3(0, torsoHeight, 0)
         torso.addChild(shoulders)
 
-        // Head — proximal pivot at head center, offset by neck length from shoulders
-        if let headMesh = meshes?["athlete-head"] {
-            headMesh.position = SIMD3(0, 0.12, 0)
-            head.addChild(headMesh)
-        } else {
+        // Head — bundled assets encode their own local neck offset.
+        if visualProvider?.attachVisual(named: "visual-head", to: head) != true {
             let headEntity = ReplayMeshFactory.headEntity(
                 skinMaterial: skinMat, hairMaterial: hairMat
             )
@@ -112,37 +108,17 @@ final class ReplayAthleteRig {
         }
         shoulders.addChild(head)
 
-        // Neck — proximal at neck top, extends down into torso
-        if let neckMesh = meshes?["athlete-neck"] {
-            head.addChild(neckMesh)
-        }
-
         // Arms
         buildArm(side: -1, upperArm: upperArmL, forearm: forearmL, hand: handL,
-                 skinMat: skinMat, into: shoulders, meshes: meshes)
+                 skinMat: skinMat, into: shoulders, visualProvider: visualProvider)
         buildArm(side: 1, upperArm: upperArmR, forearm: forearmR, hand: handR,
-                 skinMat: skinMat, into: shoulders, meshes: meshes)
+                 skinMat: skinMat, into: shoulders, visualProvider: visualProvider)
 
         // Legs
         buildLeg(side: -1, thigh: thighL, shin: shinL, foot: footL,
-                 kitDarkMat: kitDarkMat, shoeMat: shoeMat, into: pelvis, meshes: meshes)
+                 kitDarkMat: kitDarkMat, shoeMat: shoeMat, into: pelvis, visualProvider: visualProvider)
         buildLeg(side: 1, thigh: thighR, shin: shinR, foot: footR,
-                 kitDarkMat: kitDarkMat, shoeMat: shoeMat, into: pelvis, meshes: meshes)
-
-        // Clothing (authored mesh only — bridges joint transitions)
-        if let shirt = meshes?["athlete-shirt"] {
-            torso.addChild(shirt)
-        }
-        if let shorts = meshes?["athlete-shorts"] {
-            pelvis.addChild(shorts)
-        }
-        for side: Float in [-1, 1] {
-            let sfx = side > 0 ? "R" : "L"
-            if let shoe = meshes?["athlete-shoe-\(sfx)"] {
-                let footPivot = side > 0 ? footR : footL
-                footPivot.addChild(shoe)
-            }
-        }
+                 kitDarkMat: kitDarkMat, shoeMat: shoeMat, into: pelvis, visualProvider: visualProvider)
     }
 
     // MARK: - Arm Construction
@@ -154,7 +130,7 @@ final class ReplayAthleteRig {
         hand: Entity,
         skinMat: SimpleMaterial,
         into parent: Entity,
-        meshes: [String: Entity]?
+        visualProvider: (any ReplayRigVisualProvider)?
     ) {
         let sfx = side > 0 ? "R" : "L"
         let upperArmLength: Float = 0.30
@@ -162,9 +138,7 @@ final class ReplayAthleteRig {
 
         // Upper arm pivot at shoulder
         upperArm.position = SIMD3(side * 0.18, 0, 0)
-        if let uaMesh = meshes?["athlete-upperArm-\(sfx)"] {
-            upperArm.addChild(uaMesh)
-        } else {
+        if visualProvider?.attachVisual(named: "visual-upperArm-\(sfx)", to: upperArm) != true {
             let upperModel = ModelEntity(
                 mesh: MeshResource.generateCylinder(height: upperArmLength, radius: 0.025),
                 materials: [skinMat]
@@ -177,9 +151,7 @@ final class ReplayAthleteRig {
 
         // Forearm pivot at elbow
         forearm.position = SIMD3(0, -upperArmLength, 0)
-        if let faMesh = meshes?["athlete-forearm-\(sfx)"] {
-            forearm.addChild(faMesh)
-        } else {
+        if visualProvider?.attachVisual(named: "visual-forearm-\(sfx)", to: forearm) != true {
             let forearmModel = ModelEntity(
                 mesh: MeshResource.generateCylinder(height: forearmLength, radius: 0.022),
                 materials: [skinMat]
@@ -190,12 +162,10 @@ final class ReplayAthleteRig {
         }
         upperArm.addChild(forearm)
 
-        // Hand at wrist — proximal pivot at wrist
-        if let handMesh = meshes?["athlete-hand-\(sfx)"] {
-            hand.addChild(handMesh)
-        } else {
+        // Hand pivot at wrist.
+        hand.position = SIMD3(0, -forearmLength, 0)
+        if visualProvider?.attachVisual(named: "visual-hand-\(sfx)", to: hand) != true {
             let handEntity = ReplayMeshFactory.handEntity(material: skinMat)
-            handEntity.position = SIMD3(0, -forearmLength, 0)
             hand.addChild(handEntity)
         }
         forearm.addChild(hand)
@@ -211,7 +181,7 @@ final class ReplayAthleteRig {
         kitDarkMat: SimpleMaterial,
         shoeMat: SimpleMaterial,
         into parent: Entity,
-        meshes: [String: Entity]?
+        visualProvider: (any ReplayRigVisualProvider)?
     ) {
         let sfx = side > 0 ? "R" : "L"
         let thighLength: Float = 0.42
@@ -219,9 +189,7 @@ final class ReplayAthleteRig {
 
         // Thigh pivot at hip
         thigh.position = SIMD3(side * 0.10, 0, 0)
-        if let thMesh = meshes?["athlete-thigh-\(sfx)"] {
-            thigh.addChild(thMesh)
-        } else {
+        if visualProvider?.attachVisual(named: "visual-thigh-\(sfx)", to: thigh) != true {
             let thighModel = ModelEntity(
                 mesh: MeshResource.generateCylinder(height: thighLength, radius: 0.04),
                 materials: [kitDarkMat]
@@ -234,9 +202,7 @@ final class ReplayAthleteRig {
 
         // Shin pivot at knee
         shin.position = SIMD3(0, -thighLength, 0)
-        if let shMesh = meshes?["athlete-shin-\(sfx)"] {
-            shin.addChild(shMesh)
-        } else {
+        if visualProvider?.attachVisual(named: "visual-shin-\(sfx)", to: shin) != true {
             let shinModel = ModelEntity(
                 mesh: MeshResource.generateCylinder(height: shinLength, radius: 0.032),
                 materials: [kitDarkMat]
@@ -247,13 +213,10 @@ final class ReplayAthleteRig {
         }
         thigh.addChild(shin)
 
-        // Foot at ankle — proximal pivot at ankle
-        if let ftMesh = meshes?["athlete-foot-\(sfx)"] {
-            foot.addChild(ftMesh)
-        } else {
+        // Foot at ankle — preserve this pivot for both bundled and procedural paths.
+        foot.position = SIMD3(0, -shinLength, 0)
+        if visualProvider?.attachVisual(named: "visual-foot-\(sfx)", to: foot) != true {
             let footEntity = ReplayMeshFactory.footEntity(material: shoeMat)
-            // footEntity local position is (0,0,0) — the foot pivot is already
-            // positioned at `foot.position = (0, -shinLength, 0)` above.
             foot.addChild(footEntity)
         }
         shin.addChild(foot)

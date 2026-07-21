@@ -27,6 +27,8 @@ struct RealityReplaySceneView: View {
     @State private var cameraController = ReplayCameraController()
     @State private var performanceController: ReplayPerformanceController
     @State private var lastTickDate: Date?
+    @State private var bundledAssetSet: ReplayBundledAssetSet?
+    @State private var assetLoadGeneration = 0
 
     private var sport: Sport { detail.workout.sport }
 
@@ -65,7 +67,8 @@ struct RealityReplaySceneView: View {
                     workoutID: detail.id,
                     rivalID: rival?.id,
                     sportRawValue: sport.rawValue
-                )
+                ),
+                assetGeneration: assetLoadGeneration
             ) {
                 realityContent(timeline: timeline, configuration: configuration)
             }
@@ -76,11 +79,21 @@ struct RealityReplaySceneView: View {
             effectiveQuality = performanceController.effectiveQuality
             resetPerformanceTiming()
         }
-        .task {
-            // Pre-load the bundled athlete character mesh once.
-            if Replay3DSceneBuilder.athleteCatalog == nil {
-                Replay3DSceneBuilder.athleteCatalog = await ReplayAthleteMeshCatalog()
+        .task(id: sport) {
+            // Clear the previous sport before awaiting. A missing/invalid pair
+            // intentionally remains nil so the builder selects the complete
+            // procedural scene; generation guards reject a late prior result.
+            assetLoadGeneration &+= 1
+            let requestGeneration = assetLoadGeneration
+            bundledAssetSet = nil
+            let loadedSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            guard !Task.isCancelled,
+                  requestGeneration == assetLoadGeneration,
+                  loadedSet?.sport == sport else {
+                return
             }
+            bundledAssetSet = loadedSet
+            assetLoadGeneration &+= 1
         }
         .onChange(of: state.playing) { _, playing in
             if playing {
@@ -130,7 +143,9 @@ struct RealityReplaySceneView: View {
             let container = Replay3DSceneBuilder.buildScene(
                 sport: sport,
                 colorScheme: colorScheme,
-                configuration: configuration
+                configuration: configuration,
+                effectiveQuality: performanceController.effectiveQuality,
+                bundledAssetSet: bundledAssetSet
             )
             make.add(container.root)
             sceneState.container = container
@@ -446,6 +461,17 @@ struct RealityReplaySceneView: View {
 struct Replay3DQualityGraphIdentity: Hashable {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let assetGeneration: Int
+
+    init(
+        effectiveQuality: ReplayRenderQuality,
+        sceneIdentity: Replay3DSceneIdentity,
+        assetGeneration: Int = 0
+    ) {
+        self.effectiveQuality = effectiveQuality
+        self.sceneIdentity = sceneIdentity
+        self.assetGeneration = assetGeneration
+    }
 }
 
 /// Production identity boundary that limits quality and rival changes to the
@@ -454,22 +480,26 @@ struct Replay3DQualityGraphIdentity: Hashable {
 struct Replay3DQualityRebuildBoundary<Content: View>: View {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let assetGeneration: Int
     private let content: Content
 
     init(
         effectiveQuality: ReplayRenderQuality,
         sceneIdentity: Replay3DSceneIdentity,
+        assetGeneration: Int = 0,
         @ViewBuilder content: () -> Content
     ) {
         self.effectiveQuality = effectiveQuality
         self.sceneIdentity = sceneIdentity
+        self.assetGeneration = assetGeneration
         self.content = content()
     }
 
     var body: some View {
         content.id(Replay3DQualityGraphIdentity(
             effectiveQuality: effectiveQuality,
-            sceneIdentity: sceneIdentity
+            sceneIdentity: sceneIdentity,
+            assetGeneration: assetGeneration
         ))
     }
 }

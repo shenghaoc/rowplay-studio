@@ -32,7 +32,12 @@ final class ReplayRowerRig: ReplaySportRig {
 
     // MARK: - Build
 
-    func build(into parent: ModelEntity, accent: Color, opacity: Float, meshes: [String: Entity]? = nil) {
+    func build(
+        into parent: ModelEntity,
+        accent: Color,
+        opacity: Float,
+        visualProvider: (any ReplayRigVisualProvider)? = nil
+    ) {
         root.name = "rower-rig"
         parent.addChild(root)
 
@@ -48,28 +53,40 @@ final class ReplayRowerRig: ReplaySportRig {
 
         // Hull — narrow shell
         hull.name = "hull"
-        let hullMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.2, 3.0))
-        let hullModel = ModelEntity(mesh: hullMesh, materials: [accentMat])
-        hullModel.name = "hull-model"
-        hull.addChild(hullModel)
+        if visualProvider?.attachVisual(named: "visual-hull", to: hull) != true {
+            let hullMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.2, 3.0))
+            let hullModel = ModelEntity(mesh: hullMesh, materials: [accentMat])
+            hullModel.name = "hull-model"
+            hull.addChild(hullModel)
+        }
         hull.position = SIMD3(0, 0.15, 0)
         root.addChild(hull)
 
         // Deck stripe
-        let stripeMesh = MeshResource.generateBox(size: SIMD3(0.14, 0.015, 2.2))
-        let stripeMat = SimpleMaterial(
-            color: NSColor.white.withAlphaComponent(CGFloat(opacity)),
-            isMetallic: false
-        )
-        let stripe = ModelEntity(mesh: stripeMesh, materials: [stripeMat])
+        let stripe = Entity()
         stripe.name = "deck-stripe"
+        if visualProvider?.attachVisual(named: "visual-deck-stripe", to: stripe) != true {
+            let stripeMesh = MeshResource.generateBox(size: SIMD3(0.14, 0.015, 2.2))
+            let stripeMat = SimpleMaterial(
+                color: NSColor.white.withAlphaComponent(CGFloat(opacity)),
+                isMetallic: false
+            )
+            let stripeModel = ModelEntity(mesh: stripeMesh, materials: [stripeMat])
+            stripeModel.name = "deck-stripe-model"
+            stripe.addChild(stripeModel)
+        }
         stripe.position = SIMD3(0, 0.335, 0)
         root.addChild(stripe)
 
         // Footplate
-        let footplateMesh = MeshResource.generateBox(size: SIMD3(0.48, 0.05, 0.12))
-        let footplate = ModelEntity(mesh: footplateMesh, materials: [metalMat])
+        let footplate = Entity()
         footplate.name = "footplate"
+        if visualProvider?.attachVisual(named: "visual-footplate", to: footplate) != true {
+            let footplateMesh = MeshResource.generateBox(size: SIMD3(0.48, 0.05, 0.12))
+            let footplateModel = ModelEntity(mesh: footplateMesh, materials: [metalMat])
+            footplateModel.name = "footplate-model"
+            footplate.addChild(footplateModel)
+        }
         footplate.position = SIMD3(0, 0.34, 0.72)
         footAnchorL.name = "foot-anchor-L"
         footAnchorL.position = SIMD3(-0.1, 0.03, 0)
@@ -80,31 +97,40 @@ final class ReplayRowerRig: ReplaySportRig {
         root.addChild(footplate)
 
         // Rail
-        let railMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.04, 2.8))
-        let rail = ModelEntity(mesh: railMesh, materials: [metalMat])
+        let rail = Entity()
         rail.name = "rail"
+        if visualProvider?.attachVisual(named: "visual-rail", to: rail) != true {
+            let railMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.04, 2.8))
+            let railModel = ModelEntity(mesh: railMesh, materials: [metalMat])
+            railModel.name = "rail-model"
+            rail.addChild(railModel)
+        }
         rail.position = SIMD3(0, 0.26, 0)
         root.addChild(rail)
 
         // Seat
         seat.name = "seat"
-        let seatMesh = MeshResource.generateBox(size: SIMD3(0.25, 0.06, 0.20))
-        let seatMat = SimpleMaterial(
-            color: NSColor.gray.withAlphaComponent(CGFloat(opacity)),
-            isMetallic: false
-        )
-        let seatModel = ModelEntity(mesh: seatMesh, materials: [seatMat])
-        seatModel.name = "seat-model"
-        seat.addChild(seatModel)
+        if visualProvider?.attachVisual(named: "visual-seat", to: seat) != true {
+            let seatMesh = MeshResource.generateBox(size: SIMD3(0.25, 0.06, 0.20))
+            let seatMat = SimpleMaterial(
+                color: NSColor.gray.withAlphaComponent(CGFloat(opacity)),
+                isMetallic: false
+            )
+            let seatModel = ModelEntity(mesh: seatMesh, materials: [seatMat])
+            seatModel.name = "seat-model"
+            seat.addChild(seatModel)
+        }
         seat.position = SIMD3(0, 0.30, -0.2)
         root.addChild(seat)
 
         // Handle — cylinder laid horizontal via base orientation
         handle.name = "handle"
-        let handleMesh = MeshResource.generateCylinder(height: 0.5, radius: 0.015)
-        let handleModel = ModelEntity(mesh: handleMesh, materials: [metalMat])
-        handleModel.name = "handle-model"
-        handle.addChild(handleModel)
+        if visualProvider?.attachVisual(named: "visual-handle", to: handle) != true {
+            let handleMesh = MeshResource.generateCylinder(height: 0.5, radius: 0.015)
+            let handleModel = ModelEntity(mesh: handleMesh, materials: [metalMat])
+            handleModel.name = "handle-model"
+            handle.addChild(handleModel)
+        }
         handleGripL.name = "handle-grip-anchor-L"
         handleGripL.position = SIMD3(0, 0.18, 0)
         handle.addChild(handleGripL)
@@ -119,27 +145,29 @@ final class ReplayRowerRig: ReplaySportRig {
         for side: Float in [-1, 1] {
             let oar = Entity()
             oar.name = "oar-\(side > 0 ? "starboard" : "port")"
+            let visualName = side > 0 ? "visual-oar-starboard" : "visual-oar-port"
+            if visualProvider?.attachVisual(named: visualName, to: oar) != true {
+                // Shaft
+                let shaftMesh = MeshResource.generateCylinder(height: 2.4, radius: 0.02)
+                let shaft = ModelEntity(mesh: shaftMesh, materials: [oarMat])
+                shaft.position = SIMD3(side * 1.2, 0, 0)
+                shaft.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+                shaft.name = "shaft"
+                oar.addChild(shaft)
 
-            // Shaft
-            let shaftMesh = MeshResource.generateCylinder(height: 2.4, radius: 0.02)
-            let shaft = ModelEntity(mesh: shaftMesh, materials: [oarMat])
-            shaft.position = SIMD3(side * 1.2, 0, 0)
-            shaft.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
-            shaft.name = "shaft"
-            oar.addChild(shaft)
+                // Collar
+                let collarMesh = MeshResource.generateSphere(radius: 0.05)
+                let collar = ModelEntity(mesh: collarMesh, materials: [metalMat])
+                collar.name = "collar"
+                oar.addChild(collar)
 
-            // Collar
-            let collarMesh = MeshResource.generateSphere(radius: 0.05)
-            let collar = ModelEntity(mesh: collarMesh, materials: [metalMat])
-            collar.name = "collar"
-            oar.addChild(collar)
-
-            // Blade
-            let bladeMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.02, 0.26))
-            let blade = ModelEntity(mesh: bladeMesh, materials: [accentMat])
-            blade.position = SIMD3(side * 2.4, -0.05, 0)
-            blade.name = "blade"
-            oar.addChild(blade)
+                // Blade
+                let bladeMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.02, 0.26))
+                let blade = ModelEntity(mesh: bladeMesh, materials: [accentMat])
+                blade.position = SIMD3(side * 2.4, -0.05, 0)
+                blade.name = "blade"
+                oar.addChild(blade)
+            }
 
             // The oar entity origin is the gate, so sweep/feather rotations
             // cannot translate the collar away from its fixed hull contact.
@@ -149,7 +177,13 @@ final class ReplayRowerRig: ReplaySportRig {
         }
 
         // Athlete body (seated)
-        athlete.build(into: root, seated: true, accent: accent, opacity: opacity, meshes: meshes)
+        athlete.build(
+            into: root,
+            seated: true,
+            accent: accent,
+            opacity: opacity,
+            visualProvider: visualProvider
+        )
         // Position the pelvis on the seat
         athlete.pelvis.position = SIMD3(0, 0.30, -0.1)
     }

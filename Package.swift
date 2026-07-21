@@ -66,7 +66,7 @@ let targets: [Target] = [
         name: "RowPlayStudio",
         dependencies: ["RowPlayPlatform", "RowPlayCore"],
         resources: [
-            .process("Assets")
+            .process("Resources")
         ]
     ),
     makeCoreTestTarget(),
@@ -76,7 +76,10 @@ let targets: [Target] = [
     ),
     .testTarget(
         name: "RowPlayStudioTests",
-        dependencies: ["RowPlayStudio", "RowPlayCore"]
+        dependencies: ["RowPlayStudio", "RowPlayCore"],
+        resources: [
+            .copy("Fixtures/replay-asset-contract.json")
+        ]
     ),
 ]
 #endif
