@@ -119,17 +119,8 @@ struct WorkoutComparisonPanel: View {
         return -(slowest + padding) ... -(fastest - padding)
     }
 
-    // Keep the original FormatStyle behavior while reusing its value-type configuration.
-    // FormatStyle resolves localized component ordering when it formats each date, so a
-    // system locale change updates both the names and order of the date components.
-    private static let candidateDateFormatStyle = Date.FormatStyle.dateTime
-        .year()
-        .month(.abbreviated)
-        .day()
-        .locale(.autoupdatingCurrent)
-
     private func candidateLabel(_ candidate: WorkoutDetail) -> some View {
-        let date = candidate.workout.date.formatted(Self.candidateDateFormatStyle)
+        let date = candidate.workout.date.formatted(.dateTime.year().month(.abbreviated).day())
         let pace = RowPlayFormatting.pace(candidate.workout.pace)
         let type = candidate.workout.workoutType
         return Text("\(date) · \(type) · \(pace)")
