@@ -23,8 +23,10 @@ final class ReplayBikeErgRig: ReplaySportRig {
     // Rider group (contains athlete body)
     private let rider = Entity()
 
-    // Athlete
+    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
     private let athlete = ReplayAthleteRig()
+    private var canonicalAthlete: ReplayAthleteInstance?
+    private var poseAdapter: ReplayAthletePoseAdapter?
 
     // Pedal references for foot attachment
     private let pedalL = Entity()
@@ -36,7 +38,8 @@ final class ReplayBikeErgRig: ReplaySportRig {
         into parent: ModelEntity,
         accent: Color,
         opacity: Float,
-        visualProvider: (any ReplayRigVisualProvider)? = nil
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
     ) {
         root.name = "bikeerg-rig"
         parent.addChild(root)
@@ -208,21 +211,28 @@ final class ReplayBikeErgRig: ReplaySportRig {
         rider.position = saddle.position
         root.addChild(rider)
 
-        // Athlete body (seated, aero tuck)
-        athlete.build(
-            into: rider,
-            seated: true,
-            accent: accent,
-            opacity: opacity,
-            visualProvider: visualProvider
-        )
-        // Position pelvis on saddle relative to rider group
-        athlete.pelvis.position = .zero
+        // Athlete body (seated, aero tuck). Canonical V4 and procedural are exclusive.
+        if let canonicalAthlete {
+            self.canonicalAthlete = canonicalAthlete
+            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
+            canonicalAthlete.attach(to: rider)
+            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
+            canonicalAthlete.root.position = .zero
+        } else {
+            athlete.build(
+                into: rider,
+                seated: true,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: nil
+            )
+            athlete.pelvis.position = .zero
+        }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose) {
+    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
         guard case .bike(let bikePose) = pose else {
             assertionFailure("ReplayBikeErgRig.applyPose received non-bike pose")
             return
@@ -244,15 +254,34 @@ final class ReplayBikeErgRig: ReplaySportRig {
         // Rider sway
         rider.orientation = simd_quatf(angle: riderSway, axis: SIMD3(0, 0, 1))
 
-        // Apply athlete joint pose (includes aero tuck and leg pedaling)
-        athlete.applyPose(bikePose.joints)
+        let pelvisTarget = SIMD3<Float>.zero
+        let handL = handleGripL.position(relativeTo: root)
+        let handR = handleGripR.position(relativeTo: root)
+        let footL = pedalL.position(relativeTo: root)
+        let footR = pedalR.position(relativeTo: root)
 
-        athlete.handL.setPosition(handleGripL.position(relativeTo: root), relativeTo: root)
-        athlete.handR.setPosition(handleGripR.position(relativeTo: root), relativeTo: root)
-
-        // Keep the ankle pivots on the moving pedals. Positioning relative to
-        // the rig root preserves contact even though feet remain in the leg hierarchy.
-        athlete.footL.setPosition(pedalL.position(relativeTo: root), relativeTo: root)
-        athlete.footR.setPosition(pedalR.position(relativeTo: root), relativeTo: root)
+        if let canonicalAthlete, let poseAdapter, let motion {
+            poseAdapter.apply(sample: motion, sport: .bike, to: canonicalAthlete)
+            // Contact space is the rig root so pedals and grips stay authoritative.
+            _ = ReplayAthleteContactSolver.constrain(
+                instance: canonicalAthlete,
+                targets: ReplayAthleteContactTargets(
+                    pelvis: rider.position(relativeTo: root),
+                    leftHand: handL,
+                    rightHand: handR,
+                    leftFoot: footL,
+                    rightFoot: footR
+                ),
+                relativeTo: root
+            )
+            // Keep a local zero under the swaying rider group after world placement.
+            _ = pelvisTarget
+        } else {
+            athlete.applyPose(bikePose.joints)
+            athlete.handL.setPosition(handL, relativeTo: root)
+            athlete.handR.setPosition(handR, relativeTo: root)
+            athlete.footL.setPosition(footL, relativeTo: root)
+            athlete.footR.setPosition(footR, relativeTo: root)
+        }
     }
 }

@@ -380,75 +380,86 @@ Non-goals:
 
 - Public share URLs, network rivals, persisted rival selection, deep links, leaderboards, OAuth, Bluetooth, external dependencies, full FIT SDK, GPX, new 3D assets.
 
-### Phase 11 - Production-Quality Bundled 3D Assets
+### Phase 11 - Align Native Replay with the Canonical RowPlay Athlete
 
-Status: implementation and local validation complete on
-`codex/phase-11-production-3d-assets` (PR #72); exact-head GitHub CI remains a
-separate PR merge gate whose current state is recorded on GitHub.
+Status: in progress on `codex/phase-11-production-3d-assets` (PR #72, **draft**).
+Upstream athlete ownership is provisional PR #171
+(`dba7211bfa94d3f86e60b75921bd5853ec736f55`). PR #72 must not merge before
+PR #171; the pinned snapshot is refreshed mechanically before either final merge.
 
 Scope:
 
-- Add a deterministic, project-authored USDA asset pipeline for RowErg,
-  SkiErg, and BikeErg rigs plus sport-specific environments. Resources remain
-  bundled with the native app and have no network or third-party model
-  dependency.
-- Keep `ReplayRigPoseSolver`, existing pivot/contact ownership, 2D replay,
-  cameras, effects, quality policy, rivals, deterministic demo mode, and
-  automation mode intact. Phase 11 selects visual geometry; it does not add a
-  second renderer or animation system.
-- Put generated resources behind an asset catalog/library and visual-provider
-  boundary. Low quality remains complete procedural visuals. Medium, high, and
-  ultra use a complete validated bundled sport set; any load or contract failure
-  uses the complete procedural fallback rather than mixing visual sources.
-- Install bundled scenery only as a native background enhancement. The 400 m
-  course, lanes, start/finish and distance markers, cameras, lights, wakes,
-  catch effects, and contact targets remain native-owned.
-- Require deterministic generation/provenance, bounded asset budgets, resource
-  and clone-isolation tests, staged-bundle resource verification, and staged-app
-  visual QA before marking the phase complete.
-- Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
+- Establish a production-grade native 3D asset and integration system around the
+  **current** canonical RowPlay V4 athlete, without claiming V4 is the final
+  premium character.
+- Versioned upstream-asset synchronisation via
+  `script/sync_rowplay_athlete.py` (no network; pin + SHA-256 verification).
+- RealityKit loading/validation of the bundled V4 USDZ against the contract
+  (19-joint hierarchy, finite rest transforms, sport animation metadata).
+- Deterministic phase-to-animation sampling with independent live/rival clones;
+  native replay clock, equipment, cameras, effects, quality, and Reduced Motion
+  remain authoritative.
+- Equipment-contact validation (logical motion and stable palm/sole contact;
+  minor mesh interpenetration accepted).
+- Native equipment USDA and sport environments (equipment-only; no second human).
+- Quality tiers: Low → complete procedural; Medium/High/Ultra + valid package →
+  V4 athlete + native equipment/environment; any failure → complete procedural.
+- Upgradeable boundary for future athlete versions (V5+).
+
+Explicitly accepted for later work (Phase 12):
+
+- Limited face, hands, and muscle detail; simplified body/clothing; remaining
+  body/equipment interpenetration (`穿模`); stylised low-poly appearance.
 
 Exit criteria:
 
-- Generated assets pass the deterministic contract, resource budgets, and
-  provenance check.
-- Existing rig/contact/effect/camera/rival behavior passes under both
-  procedural low and bundled higher-quality paths.
-- Full local SwiftPM, architecture, staged-bundle, and bounded staged-app
-  visual QA validation passes; PR #72 still requires fresh exact-head GitHub
-  CI before merge. The local evidence does not claim universal visual or GPU
-  performance.
+- Sync `--check`, generator `--check`, focused athlete/asset/rig/scene suites,
+  full `swift test` / `swift build`, staged-app gates pass.
+- PR #72 remains draft until the final #171 refresh gate completes.
 
-Local validation record:
+Refresh gate before PR #72 can become ready:
 
-- `python3 script/generate_replay_assets.py --check`, the focused asset, rig,
-  scene, quality, effect, and ghost suites, `swift test` (1,196 tests total:
-  978 Core, 68 Platform, and 150 Studio; two expected Core skips), `swift
-  build`, architecture scans, and `git diff --check` pass.
-- The staged `.app` passes `--verify`, `--automation`, and `--sign-verify`,
-  and its resource bundle contains all six generated USDA files.
-- RowErg, SkiErg, and BikeErg were checked at every quality choice. Low showed
-  the complete procedural source, while medium/high/ultra selected the
-  bundled source. BikeErg Low-to-Medium retained the seek position; playback
-  pause/resume worked.
-- The current staged pass covered the live participant, past-session and
-  constant-pace rivals, chase/side/overhead/orbit cameras, dark/light
-  appearance, automation/Reduced Motion, and the largest and compact windows
-  available in the environment. A real imported-rival CSV was visible in the
-  native file panel, but the desktop QA bridge could not complete the final
-  selection; current focused tests cover the unchanged importer and imported
-  3D fallback path.
-- A spoken VoiceOver pass, pointer/trackpad gestures, the current-run imported
-  panel selection, Instruments, and GPU profiling were unavailable and are not
-  claimed as complete.
+1. Finish movement-physics changes in PR #171.
+2. Regenerate its GLB, USDZ, and contract.
+3. Obtain the latest #171 commit and hashes.
+4. Rerun the native sync script using that commit.
+5. Rerun focused movement/contact tests and full validation.
+6. Update the source manifest and PR body.
+7. Merge PR #171 first; verify the pin is reachable from `rowplay/main`.
 
 Non-goals:
 
-- Skeletal/IK animation, a second renderer, Metal, SceneKit, custom shaders,
-  runtime asset downloads, third-party model libraries, or asset themes.
-- New replay controls or a 2D redesign.
-- Bluetooth/FTMS/Concept2 PM transport, OAuth, public sharing, new networking,
-  or toolchain/deployment-target/CI changes.
+- Independently authoring a second premium athlete inside Studio.
+- Solving all `穿模` or premium anatomy (Phase 12).
+- Runtime asset downloads, a second renderer, or rewriting replay timing /
+  quality / fallback systems.
+
+### Phase 12 — Premium Athlete and Deformation Upgrade
+
+Status: planned follow-up after Phase 11 integration is stable.
+
+Scope:
+
+- Substantially improved human anatomy and proportions.
+- Better hands, feet, face, hair, and clothing.
+- Higher-quality topology and skin weights.
+- Improved elbow, shoulder, hip, and knee deformation.
+- Muscle and body-shape definition.
+- More refined materials and optional texture/normal detail.
+- Systematic reduction of athlete/equipment interpenetration (`穿模`).
+- Updated visual art direction and approval matrix.
+- V5 or later versioned asset using the **same** Phase 11 integration boundary
+  (sync, RealityKit load/validation, quality selection, live/rival isolation,
+  procedural fallback).
+
+Phase 12 must **not** rewrite:
+
+- Replay timing and seeking.
+- The asset synchronisation pipeline.
+- RealityKit resource loading contracts.
+- Quality selection policy.
+- Live/rival isolation.
+- Procedural fallback.
 
 ## Review Strategy
 

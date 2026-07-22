@@ -6,25 +6,35 @@ import XCTest
 
 @MainActor
 final class ReplayBundledSportRigTests: XCTestCase {
-    func testBundledRigsKeepLogicalPivotsAndVisualContractsForEverySport() async {
+    func testBundledRigsKeepEquipmentVisualsAndCanonicalAthleteContactsForEverySport() async {
         for sport in ReplayAssetCatalog.supportedSports {
             guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport) else {
                 return XCTFail("Expected bundled asset set for \(sport.rawValue)")
             }
 
             let rig = buildRig(sport: sport, assetSet: assetSet)
-            for pivot in athletePivotNames {
-                XCTAssertNotNil(
-                    rig.root.replayDescendant(named: pivot),
-                    "Bundled \(sport.rawValue) rig is missing logical pivot \(pivot)"
-                )
-            }
+            // Equipment visuals remain native-owned.
             for visualName in ReplayAssetCatalog.requiredRigNodeNames(for: sport) {
                 XCTAssertNotNil(
                     rig.root.replayDescendant(named: visualName),
                     "Bundled \(sport.rawValue) rig is missing visual \(visualName)"
                 )
             }
+            // Canonical V4 supplies palm/sole contact markers (renamed for tests).
+            for contact in ["hand-L", "hand-R", "foot-L", "foot-R"] {
+                XCTAssertNotNil(
+                    rig.root.replayDescendant(named: contact),
+                    "Bundled \(sport.rawValue) rig is missing V4 contact \(contact)"
+                )
+            }
+            // Native human body pivots must not appear alongside the V4 athlete.
+            for pivot in ["pelvis", "torso", "visual-pelvis", "visual-torso"] {
+                XCTAssertNil(
+                    rig.root.replayDescendant(named: pivot),
+                    "Bundled \(sport.rawValue) must not mix a second human with V4"
+                )
+            }
+            XCTAssertNotNil(rig.root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName))
         }
     }
 
@@ -33,20 +43,23 @@ final class ReplayBundledSportRigTests: XCTestCase {
             return XCTFail("Expected bundled rower asset set")
         }
         let rig = buildRig(sport: .rower, assetSet: assetSet)
-        rig.applyPose(.rower(ReplayRowerRigPose(
-            joints: ReplayAthleteJointPose(
-                torsoLean: 0.21,
-                shoulderFlexL: -0.18,
-                shoulderFlexR: -0.18,
-                kneeFlexL: 0.35,
-                kneeFlexR: 0.35
-            ),
-            seatZ: -0.12,
-            handleY: 0.72,
-            handleZ: 0.53,
-            oarSweep: 0.2,
-            oarFeather: -0.06
-        )))
+        rig.applyPose(
+            .rower(ReplayRowerRigPose(
+                joints: ReplayAthleteJointPose(
+                    torsoLean: 0.21,
+                    shoulderFlexL: -0.18,
+                    shoulderFlexR: -0.18,
+                    kneeFlexL: 0.35,
+                    kneeFlexR: 0.35
+                ),
+                seatZ: -0.12,
+                handleY: 0.72,
+                handleZ: 0.53,
+                oarSweep: 0.2,
+                oarFeather: -0.06
+            )),
+            motion: ReplayAthleteMotionSample(phase: 1.2, cycleFrac: 0.25, driveFrac: 0.4)
+        )
 
         assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
         assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
@@ -60,19 +73,22 @@ final class ReplayBundledSportRigTests: XCTestCase {
             return XCTFail("Expected bundled SkiErg asset set")
         }
         let rig = buildRig(sport: .skierg, assetSet: assetSet)
-        rig.applyPose(.skierg(ReplaySkiErgRigPose(
-            joints: ReplayAthleteJointPose(
-                torsoLean: 0.12,
-                shoulderFlexL: 0.22,
-                shoulderFlexR: 0.22,
-                kneeFlexL: 0.16,
-                kneeFlexR: 0.16
-            ),
-            hipCompression: 0.25,
-            handleY: 0.57,
-            handleZ: 0.18,
-            poleRotation: -0.22
-        )))
+        rig.applyPose(
+            .skierg(ReplaySkiErgRigPose(
+                joints: ReplayAthleteJointPose(
+                    torsoLean: 0.12,
+                    shoulderFlexL: 0.22,
+                    shoulderFlexR: 0.22,
+                    kneeFlexL: 0.16,
+                    kneeFlexR: 0.16
+                ),
+                hipCompression: 0.25,
+                handleY: 0.57,
+                handleZ: 0.18,
+                poleRotation: -0.22
+            )),
+            motion: ReplayAthleteMotionSample(phase: 0.8, cycleFrac: 0.2, driveFrac: 0.34)
+        )
 
         assertContact(named: "hand-L", with: "handle-L", in: rig)
         assertContact(named: "hand-R", with: "handle-R", in: rig)
@@ -86,20 +102,23 @@ final class ReplayBundledSportRigTests: XCTestCase {
             return XCTFail("Expected bundled BikeErg asset set")
         }
         let rig = buildRig(sport: .bike, assetSet: assetSet)
-        rig.applyPose(.bike(ReplayBikeErgRigPose(
-            joints: ReplayAthleteJointPose(
-                torsoTilt: 0.04,
-                shoulderFlexL: -0.25,
-                shoulderFlexR: -0.25,
-                kneeFlexL: 0.42,
-                kneeFlexR: -0.22
-            ),
-            crankAngle: .pi / 3,
-            wheelAngle: .pi / 4,
-            pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
-            pedalPosR: ReplayPedalPosition(y: -0.18, z: 0),
-            riderSway: 0.03
-        )))
+        rig.applyPose(
+            .bike(ReplayBikeErgRigPose(
+                joints: ReplayAthleteJointPose(
+                    torsoTilt: 0.04,
+                    shoulderFlexL: -0.25,
+                    shoulderFlexR: -0.25,
+                    kneeFlexL: 0.42,
+                    kneeFlexR: -0.22
+                ),
+                crankAngle: .pi / 3,
+                wheelAngle: .pi / 4,
+                pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
+                pedalPosR: ReplayPedalPosition(y: -0.18, z: 0),
+                riderSway: 0.03
+            )),
+            motion: ReplayAthleteMotionSample(phase: 2.1, cycleFrac: 0.4, driveFrac: 0.5)
+        )
 
         assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
         assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
@@ -224,27 +243,19 @@ final class ReplayBundledSportRigTests: XCTestCase {
         XCTAssertEqual(accentMaterialCount(matching: NSColor(Color.green), in: live.root), originalAccentSlots)
     }
 
-    private var athletePivotNames: [String] {
-        [
-            "pelvis", "torso", "head",
-            "upperArm-L", "forearm-L", "hand-L",
-            "upperArm-R", "forearm-R", "hand-R",
-            "thigh-L", "shin-L", "foot-L",
-            "thigh-R", "shin-R", "foot-R",
-        ]
-    }
-
     private func buildRig(
         sport: Sport,
         assetSet: ReplayBundledAssetSet,
         accent: Color = .green
     ) -> ReplaySportRig {
-        ReplaySportRigFactory.build(
+        let athlete = assetSet.makeAthleteInstance(name: "test-v4-\(sport.rawValue)", opacity: 1)
+        return ReplaySportRigFactory.build(
             sport: sport,
             into: ModelEntity(),
             accent: accent,
             opacity: 1,
-            visualProvider: assetSet.rigVisualProvider
+            visualProvider: assetSet.rigVisualProvider,
+            canonicalAthlete: athlete
         )
     }
 

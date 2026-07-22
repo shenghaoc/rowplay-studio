@@ -24,8 +24,10 @@ final class ReplayRowerRig: ReplaySportRig {
     private let footAnchorR = Entity()
     private var oars: [Entity] = []
 
-    // Athlete
+    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
     private let athlete = ReplayAthleteRig()
+    private var canonicalAthlete: ReplayAthleteInstance?
+    private var poseAdapter: ReplayAthletePoseAdapter?
 
     /// Build-time handle orientation (Z rotation to lay cylinder horizontal).
     private let handleBaseOrientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
@@ -36,7 +38,8 @@ final class ReplayRowerRig: ReplaySportRig {
         into parent: ModelEntity,
         accent: Color,
         opacity: Float,
-        visualProvider: (any ReplayRigVisualProvider)? = nil
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
     ) {
         root.name = "rower-rig"
         parent.addChild(root)
@@ -176,21 +179,30 @@ final class ReplayRowerRig: ReplaySportRig {
             oars.append(oar)
         }
 
-        // Athlete body (seated)
-        athlete.build(
-            into: root,
-            seated: true,
-            accent: accent,
-            opacity: opacity,
-            visualProvider: visualProvider
-        )
-        // Position the pelvis on the seat
-        athlete.pelvis.position = SIMD3(0, 0.30, -0.1)
+        // Athlete body (seated). Canonical V4 and procedural paths are exclusive.
+        if let canonicalAthlete {
+            self.canonicalAthlete = canonicalAthlete
+            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
+            canonicalAthlete.attach(to: root)
+            // USDZ root orientation differs from native pivot space; scale and
+            // place so the hips sit on the seat in local rig coordinates.
+            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
+            canonicalAthlete.root.position = SIMD3(0, 0.30, -0.1)
+        } else {
+            athlete.build(
+                into: root,
+                seated: true,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: nil
+            )
+            athlete.pelvis.position = SIMD3(0, 0.30, -0.1)
+        }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose) {
+    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
         guard case .rower(let rowerPose) = pose else {
             assertionFailure("ReplayRowerRig.applyPose received non-rower pose")
             return
@@ -223,16 +235,32 @@ final class ReplayRowerRig: ReplaySportRig {
             )
         }
 
-        // Pelvis follows seat
-        athlete.pelvis.position = SIMD3(0, 0.30, -0.1 + seatZ)
+        let pelvisTarget = SIMD3<Float>(0, 0.30, -0.1 + seatZ)
+        let handL = handleGripL.position(relativeTo: root)
+        let handR = handleGripR.position(relativeTo: root)
+        let footL = footAnchorL.position(relativeTo: root)
+        let footR = footAnchorR.position(relativeTo: root)
 
-        // Apply athlete joint pose (with finite guard inside)
-        athlete.applyPose(rowerPose.joints)
-
-        // Preserve equipment contact at the terminal joints.
-        athlete.handL.setPosition(handleGripL.position(relativeTo: root), relativeTo: root)
-        athlete.handR.setPosition(handleGripR.position(relativeTo: root), relativeTo: root)
-        athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
-        athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
+        if let canonicalAthlete, let poseAdapter, let motion {
+            poseAdapter.apply(sample: motion, sport: .rower, to: canonicalAthlete)
+            _ = ReplayAthleteContactSolver.constrain(
+                instance: canonicalAthlete,
+                targets: ReplayAthleteContactTargets(
+                    pelvis: pelvisTarget,
+                    leftHand: handL,
+                    rightHand: handR,
+                    leftFoot: footL,
+                    rightFoot: footR
+                ),
+                relativeTo: root
+            )
+        } else {
+            athlete.pelvis.position = pelvisTarget
+            athlete.applyPose(rowerPose.joints)
+            athlete.handL.setPosition(handL, relativeTo: root)
+            athlete.handR.setPosition(handR, relativeTo: root)
+            athlete.footL.setPosition(footL, relativeTo: root)
+            athlete.footR.setPosition(footR, relativeTo: root)
+        }
     }
 }
