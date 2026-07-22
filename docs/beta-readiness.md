@@ -36,8 +36,9 @@ ownership, course semantics, cameras, effects, rivals, Reduced Motion, and
 offline demo/automation modes remain unchanged.
 
 The local PR head passes the deterministic resource check, focused asset/rig/
-scene suites, full `swift test` (978 tests with two expected skips), `swift
-build`, architecture scans, whitespace check, and staged `--verify`,
+scene suites, full `swift test` (1,196 tests total: 978 Core, 68 Platform, and
+150 Studio; two expected Core skips), `swift build`, architecture scans,
+whitespace check, and staged `--verify`,
 `--automation`, and `--sign-verify` gates. The resource bundle contains all
 six USDA files. RowErg, SkiErg, and BikeErg were checked at each quality
 selection: low uses the complete procedural path and valid medium/high/ultra

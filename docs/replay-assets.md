@@ -4,7 +4,8 @@
 
 Phase 11 is implemented on RowPlay Studio PR #72. On the local PR head, the
 deterministic generator check, focused asset/rig/scene suites, full `swift
-test` (978 tests, two expected skips), `swift build`, architecture scans,
+test` (1,196 tests total: 978 Core, 68 Platform, and 150 Studio; two expected
+Core skips), `swift build`, architecture scans,
 whitespace check, staged-bundle resource check, staged launch, automation
 launch, and signature verification pass. GitHub CI on the exact pushed head is
 a separate PR gate; its current result is recorded on PR #72.
