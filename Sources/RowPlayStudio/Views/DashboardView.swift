@@ -4,6 +4,14 @@ import RowPlayPlatform
 import SwiftUI
 
 struct DashboardView: View {
+    private static let dateFormatStyle = Date.FormatStyle.dateTime.year().month(.abbreviated).day().locale(.autoupdatingCurrent)
+    private static let measurementFormatStyle = Measurement<UnitLength>.FormatStyle.measurement(width: .wide).locale(.autoupdatingCurrent)
+    private static let durationFormatStyle = Duration.UnitsFormatStyle(
+        allowedUnits: [.hours, .minutes, .seconds],
+        width: .wide,
+        fractionalPart: .show(length: 1)
+    ).locale(.autoupdatingCurrent)
+
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
     var summary: DashboardSummary
@@ -166,7 +174,7 @@ struct DashboardView: View {
                             Text(RowPlayFormatting.pace(pb.pace))
                                 .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(AppDesign.MetricColor.pace)
-                            Text(pb.date, format: .dateTime.year().month(.abbreviated).day())
+                            Text(pb.date, format: Self.dateFormatStyle)
                                 .font(AppDesign.Typography.compactLabel)
                                 .foregroundStyle(.tertiary)
                         }
@@ -204,20 +212,15 @@ struct DashboardView: View {
             distanceText = "Marathon"
         } else {
             distanceText = Measurement(value: pb.distance, unit: UnitLength.meters)
-                .formatted(.measurement(width: .wide))
+                .formatted(Self.measurementFormatStyle)
         }
         return "\(distanceText) \(pb.sport.displayName) Personal Best"
     }
 
     private func pbAccessibilityValue(_ pb: DashboardPersonalBest) -> String {
-        let durationStyle = Duration.UnitsFormatStyle(
-            allowedUnits: [.hours, .minutes, .seconds],
-            width: .wide,
-            fractionalPart: .show(length: 1)
-        )
-        let timeFormatted = Duration.seconds(pb.time).formatted(durationStyle)
-        let paceFormatted = Duration.seconds(pb.pace).formatted(durationStyle)
-        let dateFormatted = pb.date.formatted(.dateTime.year().month(.abbreviated).day())
+        let timeFormatted = Duration.seconds(pb.time).formatted(Self.durationFormatStyle)
+        let paceFormatted = Duration.seconds(pb.pace).formatted(Self.durationFormatStyle)
+        let dateFormatted = pb.date.formatted(Self.dateFormatStyle)
         return "\(timeFormatted), \(paceFormatted) per 500 meters, \(dateFormatted)"
     }
 }

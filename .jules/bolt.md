@@ -16,3 +16,6 @@
 ## 2024-11-23 - Inline FormatStyles in SwiftUI ForEach
 **Learning:** Using inline `.formatted()` calls or `Text(date, format: .dateTime...)` inside SwiftUI views (especially `ForEach` loops) implicitly instantiates a new style format on every evaluation. This causes unnecessary overhead during view rendering.
 **Action:** Always extract `Date.FormatStyle`, `Duration.UnitsFormatStyle`, or `Measurement.FormatStyle` to `static let` properties when used inside SwiftUI views.
+## 2024-05-24 - Cached FormatStyles in SwiftUI
+**Learning:** In SwiftUI, using `.formatted()` or `Text(..., format:)` implicitly instantiates new format styles on every render cycle, which is especially expensive within loops like `ForEach` or VoiceOver derivations.
+**Action:** Always cache `Date.FormatStyle`, `Measurement.FormatStyle`, and `Duration.UnitsFormatStyle` as `static let` properties (appending `.locale(.autoupdatingCurrent)`) to avoid redundant allocations in views.
