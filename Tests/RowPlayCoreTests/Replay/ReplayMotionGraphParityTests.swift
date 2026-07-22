@@ -89,8 +89,10 @@ final class ReplayMotionGraphParityTests: XCTestCase {
                     output[leaf] = number
                 }
             }
-        } else if let number = value as? NSNumber,
-                  CFGetTypeID(number) != CFBooleanGetTypeID() {
+        // The committed graph fixture is intentionally a numeric channel tree;
+        // it contains no boolean leaves. Avoid CoreFoundation type inspection
+        // so this Core test compiles on Linux as well as macOS.
+        } else if let number = value as? NSNumber {
             output[path] = number.doubleValue
         }
         return output
