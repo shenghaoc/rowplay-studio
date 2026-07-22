@@ -46,10 +46,59 @@ final class ReplayEnvironmentAssetTests: XCTestCase {
         XCTAssertTrue(environment.isEnabled)
         XCTAssertEqual(environment.name, "bundled-environment")
         for logicalName in ReplayAssetCatalog.environmentNodeNames {
-            XCTAssertNotNil(environment.replayDescendant(
-                named: ReplayAssetCatalog.bundledPrimName(for: logicalName)
-            ))
+            XCTAssertNotNil(
+                environment.replayDescendant(
+                    named: ReplayAssetCatalog.bundledPrimName(for: logicalName)
+                ),
+                "Bundled environment missing \(logicalName) after clone"
+            )
         }
+        // Contract identity must survive the scene wrapper rename.
+        XCTAssertNotNil(
+            environment.replayDescendant(
+                named: ReplayAssetCatalog.bundledPrimName(for: "environment-root")
+            )
+        )
+    }
+
+    func testMediumBundledSceneFadesGhostEquipmentAndAthlete() async {
+        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
+            return XCTFail("Expected bundled rower asset set")
+        }
+        let scene = Replay3DSceneBuilder.buildScene(
+            sport: .rower,
+            colorScheme: .dark,
+            configuration: ReplayRenderQuality.medium.configuration,
+            effectiveQuality: .medium,
+            bundledAssetSet: assetSet
+        )
+        XCTAssertEqual(scene.visualSource, .bundled)
+
+        func alphas(in entity: Entity) -> [Float] {
+            var values: [Float] = []
+            if let model = entity.components[ModelComponent.self] {
+                for material in model.materials {
+                    if let simple = material as? SimpleMaterial {
+                        values.append(Float(simple.color.tint.cgColor.alpha))
+                    } else if let pbr = material as? PhysicallyBasedMaterial {
+                        values.append(Float(pbr.baseColor.tint.cgColor.alpha))
+                    } else if let unlit = material as? UnlitMaterial {
+                        values.append(Float(unlit.color.tint.cgColor.alpha))
+                    }
+                }
+            }
+            for child in entity.children {
+                values.append(contentsOf: alphas(in: child))
+            }
+            return values
+        }
+
+        let ghostAlphas = alphas(in: scene.ghostRig.root)
+        XCTAssertFalse(ghostAlphas.isEmpty)
+        XCTAssertTrue(
+            ghostAlphas.allSatisfy { $0 <= 0.46 },
+            "Bundled ghost equipment and athlete must be translucent"
+        )
     }
 
     func testMediumQualityFallsBackAtomicallyWhenNoValidSetWasLoaded() {

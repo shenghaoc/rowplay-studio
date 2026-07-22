@@ -196,9 +196,10 @@ enum Replay3DSceneBuilder {
             visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
             canonicalAthlete: resolvedVisualSource == .bundled ? ghostAthlete : nil
         )
-        if resolvedVisualSource != .bundled {
-            ghostRig.applyGhostTranslucency()
-        }
+        // Always fade the full ghost hierarchy — equipment USDA clones do not
+        // inherit the procedural `opacity` argument, and the V4 athlete must
+        // not leave solid equipment obscuring the live racer.
+        ghostRig.applyGhostTranslucency()
 
         // Every wake and spray entity is allocated once with the scene.
         let effectRenderer = ReplayEffectRenderer(

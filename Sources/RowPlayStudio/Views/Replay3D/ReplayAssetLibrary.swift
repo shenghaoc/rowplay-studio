@@ -68,9 +68,15 @@ final class ReplayBundledAssetSet {
 
     func cloneEnvironment() -> Entity {
         let clone = environmentTemplate.clone(recursive: true)
-        clone.name = "bundled-environment"
         clone.isEnabled = true
-        return clone
+        // Keep asset prim names (especially `environment_root`) intact. A
+        // separate wrapper provides the stable scene label without overwriting
+        // contract node identity required by environment validation/tests.
+        let wrapper = Entity()
+        wrapper.name = "bundled-environment"
+        wrapper.addChild(clone)
+        wrapper.isEnabled = true
+        return wrapper
     }
 
     func makeAthleteInstance(name: String, opacity: Float) -> ReplayAthleteInstance? {

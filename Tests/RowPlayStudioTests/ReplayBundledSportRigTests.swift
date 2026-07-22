@@ -218,7 +218,35 @@ final class ReplayBundledSportRigTests: XCTestCase {
             let ghostAlphas = recognizedMaterialAlphas(in: ghost.root)
             XCTAssertFalse(ghostAlphas.isEmpty, "Expected ghost materials in bundled \(sport.rawValue) rig")
             XCTAssertTrue(ghostAlphas.allSatisfy { $0 <= 0.46 })
+            // USDA materials load as PBR; transparent blending must be enabled
+            // or rivals render solid despite tint alpha.
+            XCTAssertGreaterThan(
+                transparentPBRMaterialCount(in: ghost.root),
+                0,
+                "Bundled \(sport.rawValue) ghost must enable PBR transparent blending"
+            )
         }
+    }
+
+    func testBundledBikeErgDoesNotMixProceduralChainStays() async {
+        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .bike) else {
+            return XCTFail("Expected bundled bike asset set")
+        }
+        let bundled = buildRig(sport: .bike, assetSet: assetSet)
+        XCTAssertNil(bundled.root.replayDescendant(named: "chainStay-L"))
+        XCTAssertNil(bundled.root.replayDescendant(named: "chainStay-R"))
+        XCTAssertNotNil(bundled.root.replayDescendant(named: "visual-topTube"))
+
+        let procedural = ReplaySportRigFactory.build(
+            sport: .bike,
+            into: ModelEntity(),
+            accent: .green,
+            opacity: 1,
+            visualProvider: nil,
+            canonicalAthlete: nil
+        )
+        XCTAssertNotNil(procedural.root.replayDescendant(named: "chainStay-L"))
+        XCTAssertNotNil(procedural.root.replayDescendant(named: "chainStay-R"))
     }
 
     func testBundledAccentSlotsAreRecolouredPerIndependentLiveAndGhostClone() async {
@@ -310,6 +338,22 @@ final class ReplayBundledSportRigTests: XCTestCase {
             values.append(contentsOf: recognizedMaterialAlphas(in: child))
         }
         return values
+    }
+
+    private func transparentPBRMaterialCount(in entity: Entity) -> Int {
+        var count = 0
+        if let model = entity.components[ModelComponent.self] {
+            for material in model.materials {
+                guard let pbr = material as? PhysicallyBasedMaterial else { continue }
+                if case .transparent = pbr.blending {
+                    count += 1
+                }
+            }
+        }
+        for child in entity.children {
+            count += transparentPBRMaterialCount(in: child)
+        }
+        return count
     }
 
     private func accentMaterialSlotCount(in entity: Entity) -> Int {

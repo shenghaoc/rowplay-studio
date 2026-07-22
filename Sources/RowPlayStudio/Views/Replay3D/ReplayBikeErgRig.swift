@@ -113,13 +113,17 @@ final class ReplayBikeErgRig: ReplaySportRig {
         topTube.position = SIMD3(0, wheelR + 0.75, -0.15)
         root.addChild(topTube)
 
-        // Chain stays
-        for side: Float in [-1, 1] {
-            let stayMesh = MeshResource.generateBox(size: SIMD3(0.03, 0.03, 0.85))
-            let stay = ModelEntity(mesh: stayMesh, materials: [frameMat])
-            stay.name = "chainStay-\(side > 0 ? "R" : "L")"
-            stay.position = SIMD3(side * 0.06, wheelR + 0.05, 0.4)
-            root.addChild(stay)
+        // Procedural-only chain stays. The bundled bike frame already carries
+        // its own geometry; adding procedural stays on Medium+ would produce a
+        // hybrid frame instead of the complete bundled / complete procedural split.
+        if visualProvider?.usesBundledAssets != true {
+            for side: Float in [-1, 1] {
+                let stayMesh = MeshResource.generateBox(size: SIMD3(0.03, 0.03, 0.85))
+                let stay = ModelEntity(mesh: stayMesh, materials: [frameMat])
+                stay.name = "chainStay-\(side > 0 ? "R" : "L")"
+                stay.position = SIMD3(side * 0.06, wheelR + 0.05, 0.4)
+                root.addChild(stay)
+            }
         }
 
         // Saddle
