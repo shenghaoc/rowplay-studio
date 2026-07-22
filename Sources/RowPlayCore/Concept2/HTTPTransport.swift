@@ -20,26 +20,44 @@ public protocol HTTPTransport: Sendable {
 
 /// URLSession-backed transport for production use.
 ///
-/// By default, creates a session with redirect protection that rejects
-/// HTTPS-to-HTTP downgrade redirects and cross-host HTTPS redirects to
-/// prevent token leakage. A custom `URLSessionConfiguration` can be injected
-/// for testing or special configurations while keeping that protection
-/// installed.
+/// By default, creates a session with:
+/// - An **ephemeral** configuration so HTTP caches, cookies, and credential
+///   stores stay in memory only (never written to disk) — Concept2 responses
+///   and auth material must not land in the shared on-disk URL cache.
+/// - Redirect protection that rejects HTTPS-to-HTTP downgrade redirects and
+///   cross-host HTTPS redirects to prevent token leakage.
+/// - Strict request/resource timeouts to bound hung connections.
+///
+/// A custom `URLSessionConfiguration` can be injected for testing or special
+/// configurations while keeping redirect protection installed.
 public final class URLSessionHTTPTransport: HTTPTransport {
     private let session: URLSession
     private let redirectDelegate: HTTPSRedirectDelegate
 
-    /// Create a transport with built-in HTTPS redirect protection.
+    /// Production-safe session configuration: ephemeral storage + strict timeouts.
     ///
-    /// - Parameter configuration: The URL session configuration to use.
-    public init(configuration: URLSessionConfiguration = {
+    /// Prefer this over `URLSessionConfiguration.default`, which uses the shared
+    /// disk-backed `URLCache` / cookie / credential stores.
+    public static func makeSecureConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
+        // Defense in depth: ephemeral already keeps these out of shared disk
+        // stores; explicitly clear them so callers and tests can assert the
+        // no-persistence contract without relying on platform defaults alone.
+        config.urlCache = nil
+        config.httpCookieStorage = nil
+        config.urlCredentialStorage = nil
         // Security: Enforce strict timeouts to prevent resource exhaustion (DoS)
         // from slow or unresponsive remote servers.
         config.timeoutIntervalForRequest = 30.0
         config.timeoutIntervalForResource = 300.0
         return config
-    }()) {
+    }
+
+    /// Create a transport with built-in HTTPS redirect protection.
+    ///
+    /// - Parameter configuration: The URL session configuration to use.
+    ///   Defaults to ``makeSecureConfiguration()``.
+    public init(configuration: URLSessionConfiguration = URLSessionHTTPTransport.makeSecureConfiguration()) {
         let delegate = HTTPSRedirectDelegate()
         self.redirectDelegate = delegate
         self.session = URLSession(
