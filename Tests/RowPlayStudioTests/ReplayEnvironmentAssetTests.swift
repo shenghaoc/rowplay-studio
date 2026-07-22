@@ -6,152 +6,72 @@ import XCTest
 
 @MainActor
 final class ReplayEnvironmentAssetTests: XCTestCase {
-    func testLowQualityKeepsTheCompleteProceduralSceneEvenWhenAssetsAreAvailable() async {
-        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
-            return XCTFail("Expected bundled rower asset set")
-        }
-
-        let scene = Replay3DSceneBuilder.buildScene(
-            sport: .rower,
-            colorScheme: .dark,
-            configuration: ReplayRenderQuality.low.configuration,
-            effectiveQuality: .low,
-            bundledAssetSet: assetSet
-        )
-
-        XCTAssertEqual(scene.visualSource, .procedural)
-        XCTAssertNil(scene.bundledEnvironment)
-        XCTAssertTrue(scene.groundEntity.isEnabled)
-        XCTAssertNil(scene.root.replayDescendant(named: "bundled-environment"))
+    override func setUp() async throws {
+        ReplayAthleteLibrary.shared.resetCacheForTesting()
+        ReplayAssetLibrary.shared.resetCacheForTesting()
     }
 
-    func testMediumQualityInstallsMatchingBundledEnvironmentAndSuppressesProceduralGround() async {
-        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
-            return XCTFail("Expected bundled rower asset set")
-        }
+    func testEveryQualityUsesCompleteProceduralSceneWhileV4ClipGateRejects() async {
+        for sport in ReplayAssetCatalog.supportedSports {
+            let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            XCTAssertNil(assetSet)
 
-        let scene = Replay3DSceneBuilder.buildScene(
-            sport: .rower,
-            colorScheme: .dark,
-            configuration: ReplayRenderQuality.medium.configuration,
-            effectiveQuality: .medium,
-            bundledAssetSet: assetSet
-        )
+            for quality in ReplayRenderQuality.allCases {
+                let scene = Replay3DSceneBuilder.buildScene(
+                    sport: sport,
+                    colorScheme: .dark,
+                    configuration: quality.configuration,
+                    effectiveQuality: quality,
+                    bundledAssetSet: assetSet
+                )
+                XCTAssertEqual(scene.visualSource, .procedural)
+                XCTAssertNil(scene.bundledEnvironment)
+                XCTAssertTrue(scene.groundEntity.isEnabled)
+                XCTAssertNil(scene.root.replayDescendant(named: "bundled-environment"))
+            }
+        }
+    }
 
-        XCTAssertEqual(scene.visualSource, .bundled)
-        XCTAssertFalse(scene.groundEntity.isEnabled)
-        guard let environment = scene.bundledEnvironment else {
-            return XCTFail("Expected a bundled environment at medium quality")
-        }
-        XCTAssertTrue(environment.isEnabled)
-        XCTAssertEqual(environment.name, "bundled-environment")
-        for logicalName in ReplayAssetCatalog.environmentNodeNames {
-            XCTAssertNotNil(
-                environment.replayDescendant(
-                    named: ReplayAssetCatalog.bundledPrimName(for: logicalName)
-                ),
-                "Bundled environment missing \(logicalName) after clone"
-            )
-        }
-        // Contract identity must survive the scene wrapper rename.
-        XCTAssertNotNil(
-            environment.replayDescendant(
+    func testGeneratedEnvironmentResourcesLoadAndProduceIndependentClones() async throws {
+        for sport in ReplayAssetCatalog.supportedSports {
+            let resource = ReplayAssetCatalog.environmentResource(for: sport)
+            let url = try XCTUnwrap(ReplayAssetLibrary.bundledResourceURL(for: resource))
+            let template = try await Entity(contentsOf: url)
+            let first = template.clone(recursive: true)
+            let second = template.clone(recursive: true)
+
+            XCTAssertFalse(first === second)
+            XCTAssertNotNil(first.replayDescendant(
                 named: ReplayAssetCatalog.bundledPrimName(for: "environment-root")
+            ))
+            XCTAssertNotNil(first.replayDescendant(
+                named: ReplayAssetCatalog.bundledPrimName(for: "environment-ground")
+            ))
+            XCTAssertNotNil(first.replayDescendant(
+                named: ReplayAssetCatalog.bundledPrimName(for: "environment-props")
+            ))
+
+            first.isEnabled = true
+            first.position = SIMD3(3, 0, 0)
+            XCTAssertTrue(first.isEnabled)
+            XCTAssertNotEqual(first.position.x, second.position.x)
+        }
+    }
+
+    func testQualityPolicyWouldUseBundledEnvironmentOnlyForACompleteFutureSet() {
+        XCTAssertEqual(
+            ReplayAssetCatalog.visualSource(for: .low, assetSetIsValid: true),
+            .procedural
+        )
+        for quality in [ReplayRenderQuality.medium, .high, .ultra] {
+            XCTAssertEqual(
+                ReplayAssetCatalog.visualSource(for: quality, assetSetIsValid: true),
+                .bundled
             )
-        )
-    }
-
-    func testMediumBundledSceneFadesGhostEquipmentAndAthlete() async {
-        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
-            return XCTFail("Expected bundled rower asset set")
+            XCTAssertEqual(
+                ReplayAssetCatalog.visualSource(for: quality, assetSetIsValid: false),
+                .procedural
+            )
         }
-        let scene = Replay3DSceneBuilder.buildScene(
-            sport: .rower,
-            colorScheme: .dark,
-            configuration: ReplayRenderQuality.medium.configuration,
-            effectiveQuality: .medium,
-            bundledAssetSet: assetSet
-        )
-        XCTAssertEqual(scene.visualSource, .bundled)
-
-        func alphas(in entity: Entity) -> [Float] {
-            var values: [Float] = []
-            if let model = entity.components[ModelComponent.self] {
-                for material in model.materials {
-                    if let simple = material as? SimpleMaterial {
-                        values.append(Float(simple.color.tint.cgColor.alpha))
-                    } else if let pbr = material as? PhysicallyBasedMaterial {
-                        values.append(Float(pbr.baseColor.tint.cgColor.alpha))
-                    } else if let unlit = material as? UnlitMaterial {
-                        values.append(Float(unlit.color.tint.cgColor.alpha))
-                    }
-                }
-            }
-            for child in entity.children {
-                values.append(contentsOf: alphas(in: child))
-            }
-            return values
-        }
-
-        let ghostAlphas = alphas(in: scene.ghostRig.root)
-        XCTAssertFalse(ghostAlphas.isEmpty)
-        XCTAssertTrue(
-            ghostAlphas.allSatisfy { $0 <= 0.46 },
-            "Bundled ghost equipment and athlete must be translucent"
-        )
-    }
-
-    func testMediumQualityFallsBackAtomicallyWhenNoValidSetWasLoaded() {
-        let scene = Replay3DSceneBuilder.buildScene(
-            sport: .bike,
-            colorScheme: .light,
-            configuration: ReplayRenderQuality.medium.configuration,
-            effectiveQuality: .medium,
-            bundledAssetSet: nil
-        )
-
-        XCTAssertEqual(scene.visualSource, .procedural)
-        XCTAssertNil(scene.bundledEnvironment)
-        XCTAssertTrue(scene.groundEntity.isEnabled)
-        XCTAssertNotNil(scene.root.replayDescendant(named: "bikeerg-rig"))
-    }
-
-    func testMediumQualityRejectsAStaleAssetSetForAnotherSportAtomically() async {
-        guard let rowerSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
-            return XCTFail("Expected bundled rower asset set")
-        }
-
-        let scene = Replay3DSceneBuilder.buildScene(
-            sport: .skierg,
-            colorScheme: .light,
-            configuration: ReplayRenderQuality.medium.configuration,
-            effectiveQuality: .medium,
-            bundledAssetSet: rowerSet
-        )
-
-        XCTAssertEqual(scene.visualSource, .procedural)
-        XCTAssertNil(scene.bundledEnvironment)
-        XCTAssertTrue(scene.groundEntity.isEnabled)
-        XCTAssertNotNil(scene.root.replayDescendant(named: "skierg-rig"))
-        XCTAssertNil(scene.root.replayDescendant(named: "bundled-environment"))
-    }
-
-    func testEnvironmentInstallerReturnsIndependentEnabledClones() async {
-        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .skierg) else {
-            return XCTFail("Expected bundled SkiErg asset set")
-        }
-
-        let firstRoot = Entity()
-        let first = ReplayEnvironmentAssetInstaller.install(assetSet: assetSet, into: firstRoot)
-        let secondRoot = Entity()
-        let second = ReplayEnvironmentAssetInstaller.install(assetSet: assetSet, into: secondRoot)
-
-        XCTAssertFalse(first === second)
-        XCTAssertTrue(first.isEnabled)
-        XCTAssertTrue(second.isEnabled)
-        first.position = SIMD3(3, 0, 0)
-        XCTAssertNotEqual(first.position.x, second.position.x)
-        XCTAssertTrue(firstRoot.children.contains { $0 === first })
-        XCTAssertTrue(secondRoot.children.contains { $0 === second })
     }
 }

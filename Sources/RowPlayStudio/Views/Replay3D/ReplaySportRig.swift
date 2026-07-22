@@ -21,6 +21,9 @@ protocol ReplaySportRig: AnyObject {
     func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?)
     /// Apply ghost translucency to all materials.
     func applyGhostTranslucency()
+    /// Returns and clears a V4 runtime failure that requires rebuilding the
+    /// complete scene through the procedural fallback path.
+    func consumeCanonicalRuntimeFailure() -> Bool
 }
 
 @MainActor
@@ -28,6 +31,11 @@ extension ReplaySportRig {
     func applyPose(_ pose: ReplaySportRigPose) {
         applyPose(pose, motion: nil)
     }
+}
+
+@MainActor
+extension ReplaySportRig {
+    func consumeCanonicalRuntimeFailure() -> Bool { false }
 }
 
 /// Default ghost translucency: recursively applies 0.45 opacity to all materials.
@@ -133,7 +141,10 @@ enum ReplaySportRigTranslucency {
     /// procedural rig, generated USDA assets, and the V4 athlete. Each
     /// live/ghost clone has independent materials, so this never mutates a
     /// cached template.
-    static func apply(to entity: Entity, opacity: Float) {
+    static func apply(to entity: Entity, opacity: Float, excluding excluded: Entity? = nil) {
+        if entity === excluded {
+            return
+        }
         // USDA loading produces generic `Entity` values with a ModelComponent,
         // whereas the procedural path usually produces `ModelEntity`. Replacing
         // the component works for both representations.
@@ -161,7 +172,7 @@ enum ReplaySportRigTranslucency {
             entity.components.set(model)
         }
         for child in entity.children {
-            apply(to: child, opacity: opacity)
+            apply(to: child, opacity: opacity, excluding: excluded)
         }
     }
 }

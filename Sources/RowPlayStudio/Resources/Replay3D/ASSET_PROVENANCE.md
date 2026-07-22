@@ -24,15 +24,32 @@ The fixed generation seed is `20260721`. The assets intentionally contain no
 camera or light prims: the native RealityKit scene remains authoritative for
 camera, lighting, course placement, effects, and fallback behaviour.
 
-## Canonical V4 athlete (upstream, provisional)
+## Canonical V4 athlete (merged upstream handoff)
 
 The production athlete is not authored by RowPlay Studio. It is the canonical
-RowPlay V4 athlete owned by upstream PR #171 and synchronised by
-`script/sync_rowplay_athlete.py` into:
+RowPlay V4 athlete from merged upstream PR #171, pinned to merge commit
+`da0dc73bf295871e9b362511cd5b2c9a9424b325` and synchronised from that exact
+Git tree by `script/sync_rowplay_athlete.py` into:
 
 - `rowplay-athlete-v4.usdz`
 - `rowplay-athlete-v4.contract.json`
 - `rowplay-athlete-v4-source.json`
 
-Low quality and total package failure continue to use the lightweight
-procedural athlete. Premium anatomy and most interpenetration work are Phase 12.
+The pinned handoff hashes are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| GLB | `73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b` |
+| USDZ | `934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e` |
+| Contract | `e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d` |
+
+The current exact USDZ is structurally valid, but it exposes neither the
+contract's three exact sport clip names nor all three required sport clips.
+Studio therefore rejects the entire canonical package atomically instead of
+aliasing a clip or choosing an arbitrary first animation. All quality levels
+currently use the complete procedural athlete, equipment, and environment
+fallback. Once a corrected upstream V4 handoff satisfies the contract, the
+same validation boundary will activate the V4 path without weakening that
+fallback guarantee.
+
+Premium anatomy and systematic interpenetration reduction remain Phase 12.

@@ -382,10 +382,24 @@ Non-goals:
 
 ### Phase 11 - Align Native Replay with the Canonical RowPlay Athlete
 
-Status: in progress on `codex/phase-11-production-3d-assets` (PR #72, **draft**).
-Upstream athlete ownership is provisional PR #171
-(`dba7211bfa94d3f86e60b75921bd5853ec736f55`). PR #72 must not merge before
-PR #171; the pinned snapshot is refreshed mechanically before either final merge.
+Status: implementation and local gates in progress on
+`codex/phase-11-production-3d-assets` (PR #72, **draft**), titled
+`Phase 11: Match native replay to merged RowPlay V4`.
+
+The pin is the final merged RowPlay PR #171 commit
+`da0dc73bf295871e9b362511cd5b2c9a9424b325`; the sync script verifies it is
+reachable from RowPlay `origin/main` and reads that exact Git tree rather than
+a local working-tree HEAD. The source manifest records `merged` status and the
+copied GLB, USDZ, and contract hashes.
+
+There is one active pre-merge blocker: the exact merged USDZ has only an
+underscore-named row animation (`rowplay_v4_row_cycle`) and no contract-named
+SkiErg/BikeErg animations, while its contract requires
+`rowplay-v4-row-cycle`, `rowplay-v4-ski-cycle`, and
+`rowplay-v4-bike-cycle`. Native code intentionally rejects the whole V4
+package instead of aliasing or selecting an arbitrary animation. Consequently
+the app correctly uses the complete procedural scene at every quality until an
+upstream artifact/contract correction produces a consistent final V4 package.
 
 Scope:
 
@@ -394,13 +408,20 @@ Scope:
   premium character.
 - Versioned upstream-asset synchronisation via
   `script/sync_rowplay_athlete.py` (no network; pin + SHA-256 verification).
-- RealityKit loading/validation of the bundled V4 USDZ against the contract
-  (19-joint hierarchy, finite rest transforms, sport animation metadata).
-- Deterministic phase-to-animation sampling with independent live/rival clones;
-  native replay clock, equipment, cameras, effects, quality, and Reduced Motion
-  remain authoritative.
-- Equipment-contact validation (logical motion and stable palm/sole contact;
-  minor mesh interpenetration accepted).
+- RealityKit loading/validation of the bundled V4 USDZ against the contract:
+  19-joint hierarchy, finite rest transforms, and exactly one named sport clip
+  per contract entry.
+- Deterministic phase-to-animation sampling with independent live/rival clones
+  when the full package validates; native replay clock, equipment, cameras,
+  effects, quality, and Reduced Motion remain authoritative.
+- Port the canonical V4 motion graph, sport kinematics, and two-bone
+  constraints into RowPlayCore with a committed 129-phase-per-sport parity
+  corpus generated from the pinned upstream tree.
+- Apply V4 skeletal correction in `prepare -> orientHandsToTargets -> constrain`
+  order; use opaque/depth-writing cool-tinted rival bodies and translucent
+  rival equipment.
+- Equipment-contact validation through skeletal palm/sole constraints rather
+  than marker snapping; minor mesh interpenetration remains accepted.
 - Native equipment USDA and sport environments (equipment-only; no second human).
 - Quality tiers: Low → complete procedural; Medium/High/Ultra + valid package →
   V4 athlete + native equipment/environment; any failure → complete procedural.
@@ -415,17 +436,19 @@ Exit criteria:
 
 - Sync `--check`, generator `--check`, focused athlete/asset/rig/scene suites,
   full `swift test` / `swift build`, staged-app gates pass.
-- PR #72 remains draft until the final #171 refresh gate completes.
+- The exact pinned USDZ exposes all three exact contract clip names through
+  RealityKit, including SkiErg and BikeErg.
+- PR #72 stays draft until both the local and exact-head GitHub gates pass.
 
-Refresh gate before PR #72 can become ready:
+Corrective gate before PR #72 can become ready:
 
-1. Finish movement-physics changes in PR #171.
-2. Regenerate its GLB, USDZ, and contract.
-3. Obtain the latest #171 commit and hashes.
-4. Rerun the native sync script using that commit.
-5. Rerun focused movement/contact tests and full validation.
-6. Update the source manifest and PR body.
-7. Merge PR #171 first; verify the pin is reachable from `rowplay/main`.
+1. Correct the merged upstream USDZ/contract inconsistency at its source.
+2. Obtain a final reachable RowPlay commit and its matching artifact hashes.
+3. Rerun the native sync script using that exact commit.
+4. Confirm the strict clip-gate tests load all three named resources.
+5. Rerun focused movement/contact tests, full validation, staged V4 visual QA,
+   and exact-head GitHub CI.
+6. Update the source manifest, docs, and PR body with that evidence.
 
 Non-goals:
 

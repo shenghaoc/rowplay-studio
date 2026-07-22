@@ -94,8 +94,16 @@ enum Replay3DSceneBuilder {
             // Atomic package: equipment provider plus independent V4 clones.
             let assetSet = matchingAssetSet!
             visualProvider = assetSet.rigVisualProvider
-            liveAthlete = assetSet.makeAthleteInstance(name: "live-v4-athlete", opacity: 1.0)
-            ghostAthlete = assetSet.makeAthleteInstance(name: "ghost-v4-athlete", opacity: 0.45)
+            liveAthlete = assetSet.makeAthleteInstance(
+                sport: sport,
+                name: "live-v4-athlete",
+                isRival: false
+            )
+            ghostAthlete = assetSet.makeAthleteInstance(
+                sport: sport,
+                name: "ghost-v4-athlete",
+                isRival: true
+            )
             // If either athlete clone fails, fall back entirely to procedural.
             if liveAthlete == nil || ghostAthlete == nil {
                 return buildScene(
@@ -196,9 +204,9 @@ enum Replay3DSceneBuilder {
             visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
             canonicalAthlete: resolvedVisualSource == .bundled ? ghostAthlete : nil
         )
-        // Always fade the full ghost hierarchy — equipment USDA clones do not
-        // inherit the procedural `opacity` argument, and the V4 athlete must
-        // not leave solid equipment obscuring the live racer.
+        // Equipment remains translucent for a ghost. Each sport rig excludes
+        // the V4 skinned body, which intentionally stays opaque/depth-writing
+        // with a cool rival tint to avoid transparent triangle-sort seams.
         ghostRig.applyGhostTranslucency()
 
         // Every wake and spray entity is allocated once with the scene.
@@ -232,6 +240,7 @@ enum Replay3DSceneBuilder {
 
     /// Update all entity positions, orientations, and animation state for the
     /// current frame. Called from the `RealityView.update` closure.
+    @discardableResult
     static func updateScene(
         container: Replay3DSceneContainer,
         livePose: ReplayStrokePose,
@@ -248,7 +257,7 @@ enum Replay3DSceneBuilder {
         cameraPreset: ReplayCameraPreset,
         cameraResetGeneration: Int,
         replayDiscontinuityGeneration: Int
-    ) {
+    ) -> Bool {
         let layout = container.layout
 
         // Solve rig pose from stroke pose
@@ -273,6 +282,9 @@ enum Replay3DSceneBuilder {
             liveRigPose,
             motion: ReplayAthleteMotionSample(strokePose: livePose)
         )
+        if container.liveRig.consumeCanonicalRuntimeFailure() {
+            return false
+        }
 
         // Ghost
         if ghostVisible, let ghostPose {
@@ -292,6 +304,9 @@ enum Replay3DSceneBuilder {
                 ghostRigPose,
                 motion: ReplayAthleteMotionSample(strokePose: ghostPose)
             )
+            if container.ghostRig.consumeCanonicalRuntimeFailure() {
+                return false
+            }
         } else {
             container.ghostGroup.isEnabled = false
         }
@@ -322,6 +337,7 @@ enum Replay3DSceneBuilder {
             reduceMotion: reduceMotion,
             resetGeneration: replayDiscontinuityGeneration
         )
+        return true
     }
 
     // MARK: - Course Geometry

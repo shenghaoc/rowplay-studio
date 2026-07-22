@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 aligns native replay with the canonical RowPlay V4 athlete on `codex/phase-11-production-3d-assets` (PR #72, **draft**), consuming a provisional pin from upstream PR #171. PR #72 must not merge before #171; premium athlete art is Phase 12.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 is on `codex/phase-11-production-3d-assets` (PR #72, **draft**) and pins the final merged RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`. It must not merge yet: the exact USDZ and its contract disagree on the three required sport clip names, so the app deliberately uses its complete procedural fallback. Premium athlete art is Phase 12.
 
 ### What Is Implemented
 
@@ -27,20 +27,20 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 
 ### Phase 11 Canonical Athlete Integration (PR #72, draft)
 
-PR #72 aligns native replay with the **canonical RowPlay V4 athlete** from
-upstream PR #171 (provisional pin
-`dba7211bfa94d3f86e60b75921bd5853ec736f55`). Studio owns equipment USDA,
-environments, loading/validation, quality selection, and fallback; it does not
-author the athlete. Low → complete procedural; Medium/High/Ultra + valid
-package → V4 athlete + native equipment/environment; any failure → complete
-procedural. V4 is a stylised baseline; premium anatomy and most `穿模` work are
-Phase 12.
+PR #72 aligns native replay with the **canonical RowPlay V4 athlete** from the
+merged upstream #171 pin. Studio owns equipment USDA, environments,
+loading/validation, quality selection, and fallback; it does not author the
+athlete. The native Core port includes the canonical motion graph, sport
+kinematics, and a 129-phase-per-sport parity corpus; valid V4 instances use
+stateless skeletal constraints and opaque cool-tinted rival bodies.
 
-PR #72 stays **draft** until #171 finishes movement physics, regenerates
-artifacts, and Studio refreshes the pin. Do not merge #72 before #171.
-
-See `docs/replay-assets.md` and `docs/roadmap.md` for the refresh gate and
-accepted visual limitations.
+The final pin is currently an honest hard gate, not a deployed V4 runtime:
+the USDZ exposes only `rowplay_v4_row_cycle`, while the contract requires the
+three hyphenated RowErg/SkiErg/BikeErg resource names. Studio rejects the
+whole package—no aliases or first-animation fallback—and all qualities use the
+complete procedural scene. PR #72 stays **draft** until the upstream artifact
+and contract are made consistent, then all three clips can pass staged visual
+QA. See `docs/replay-assets.md` and `docs/roadmap.md` for the corrective gate.
 
 ## rowplay PR #166 Impact
 

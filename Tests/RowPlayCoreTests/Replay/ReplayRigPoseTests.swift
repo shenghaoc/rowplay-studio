@@ -25,8 +25,8 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerFinishPose() {
-        // At finish: drive = cos(π) = -1, recovery = max(0, -sin(π)) = 0
-        let pose = makeStrokePose(warpedPhase: .pi, amplitude: 1.0)
+        // The canonical graph reaches finish after its row drive window.
+        let pose = makeStrokePose(phase: 0.38 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -40,8 +40,7 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerMidDrivePose() {
-        // Mid-drive: warpedPhase = π/2
-        let pose = makeStrokePose(warpedPhase: .pi / 2, amplitude: 1.0)
+        let pose = makeStrokePose(phase: 0.15 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -56,8 +55,7 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerRecoveryPose() {
-        // Recovery: warpedPhase = 3π/2 → drive = cos(3π/2) ≈ 0, recovery = max(0, -sin(3π/2)) = 1
-        let pose = makeStrokePose(warpedPhase: 3 * .pi / 2, amplitude: 1.0)
+        let pose = makeStrokePose(phase: 0.60 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -71,8 +69,8 @@ final class ReplayRigPoseTests: XCTestCase {
     // MARK: - SkiErg Tests
 
     func testSkiErgTallRecoveryPose() {
-        // Tall recovery: swing = cos(π) = -1, crunch = max(0, 1) = 1
-        let pose = makeStrokePose(warpedPhase: .pi, amplitude: 1.0)
+        // Pole-off completes at 29% of the canonical SkiErg cycle.
+        let pose = makeStrokePose(phase: 0.30 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .skierg, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -115,9 +113,9 @@ final class ReplayRigPoseTests: XCTestCase {
             // Crank angle should match input phase
             XCTAssertEqual(bike.crankAngle, angle, accuracy: 0.001,
                 "Crank angle should match phase at \(angle)")
-            // Wheel angle should be 2.4× crank
-            XCTAssertEqual(bike.wheelAngle, angle * 2.4, accuracy: 0.001,
-                "Wheel angle should be 2.4× crank at \(angle)")
+            // Merged V4 advances wheels from covered distance, not crank phase.
+            XCTAssertEqual(bike.wheelAngle, (angle * 5) / 0.45, accuracy: 0.001,
+                "Wheel angle should follow distance at \(angle)")
             // All values should be finite
             XCTAssertTrue(isFinite(bike.crankAngle))
             XCTAssertTrue(isFinite(bike.wheelAngle))
@@ -206,9 +204,9 @@ final class ReplayRigPoseTests: XCTestCase {
         XCTAssertEqual(bike.wheelAngle, 0, accuracy: 0.001)
     }
 
-    // MARK: - Amplitude/Intensity Influence
+    // MARK: - Canonical Graph Ownership
 
-    func testAmplitudeInfluence() {
+    func testCanonicalGraphOwnsTechniqueInsteadOfLegacyAmplitude() {
         let lowAmp = makeStrokePose(warpedPhase: 0, amplitude: 0.72)
         let highAmp = makeStrokePose(warpedPhase: 0, amplitude: 1.32)
 
@@ -224,11 +222,12 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTFail("Expected rower poses"); return
         }
 
-        // Higher amplitude should produce larger seat travel
-        let lowSeatRange = abs(low.seatZ + 0.1)
-        let highSeatRange = abs(high.seatZ + 0.1)
-        XCTAssertGreaterThan(highSeatRange, lowSeatRange,
-            "Higher amplitude should produce larger seat travel")
+        XCTAssertEqual(low.seatZ, high.seatZ, accuracy: 1e-12)
+        XCTAssertEqual(low.handleZ, high.handleZ, accuracy: 1e-12)
+
+        let lowEffort = ReplayMotionGraph.sampleRower(pose: makeStrokePose(phase: 0.15 * tau, intensity: 0))
+        let highEffort = ReplayMotionGraph.sampleRower(pose: makeStrokePose(phase: 0.15 * tau, intensity: 1))
+        XCTAssertNotEqual(lowEffort.accents.surge.value, highEffort.accents.surge.value)
     }
 
     // MARK: - Edge Cases
@@ -304,7 +303,8 @@ final class ReplayRigPoseTests: XCTestCase {
     private func makeStrokePose(
         warpedPhase: Double = 0,
         phase: Double = 0,
-        amplitude: Double = 1.0
+        amplitude: Double = 1.0,
+        intensity: Double = 0.5
     ) -> ReplayStrokePose {
         ReplayStrokePose(
             index: 0,
@@ -319,7 +319,7 @@ final class ReplayRigPoseTests: XCTestCase {
             strokeMeters: 11,
             rate: 28,
             watts: 200,
-            intensity: 0.5,
+            intensity: intensity,
             amplitude: amplitude,
             fatigue: 0
         )

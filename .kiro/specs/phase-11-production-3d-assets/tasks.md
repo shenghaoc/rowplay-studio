@@ -1,13 +1,40 @@
-> **Revised scope:** Phase 11 aligns native replay with the canonical RowPlay V4 athlete from provisional upstream PR #171. Studio owns equipment/environments, loading, validation, quality, and fallback. V4 is not the final premium athlete; Phase 12 covers premium anatomy and most 穿模. PR #72 remains draft until #171 refresh.
+> **Canonical merged-source amendment (2026-07-22):** The source is merged
+> RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`, pinned
+> with final GLB/USDZ/contract hashes in the source manifest. The exact USDZ
+> lacks the three contract-named clips, so this branch intentionally rejects
+> it as a whole and stays draft. A local alias or first-animation fallback is
+> prohibited; the remaining unchecked V4 visual gate requires an upstream
+> artifact/contract correction.
 
 # Phase 11 - Production-Quality Bundled 3D Assets — Tasks
 
 ## Status Convention
 
-Implementation and local validation are complete on PR #72. A checkbox is
-marked only after the named implementation and its relevant validation are
-complete. Exact-head GitHub CI is an external PR gate and is not implied by
-these committed local checks.
+The original checked list records the completed native equipment/environment
+foundation. The canonical V4 continuation below is authoritative for this PR's
+current readiness. Exact-head GitHub CI remains an external PR gate and is not
+implied by local checks.
+
+## Canonical Merged V4 Continuation
+
+- [x] Pin sync to merged commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`,
+  exact Git-tree reads, reachability verification, final hashes, manifest
+  `merged` status, and `--check` mode.
+- [x] Make the manifest the runtime authority for pin/hash validation rather
+  than duplicating production constants in the loader.
+- [x] Port the V4 motion graph, sport kinematics, and two-bone solver into
+  RowPlayCore; generate and test the 129-phase-per-sport parity corpus.
+- [x] Replace marker snapping with deterministic skeletal correction in
+  `prepare -> orientHandsToTargets -> constrain` order.
+- [x] Require one exact named animation resource for each sport; make load and
+  runtime failures rebuild the complete procedural scene without state loss.
+- [x] Keep V4 rival bodies opaque/depth-writing with a cool tint while keeping
+  rival equipment translucent.
+- [x] Add regression coverage for the actual merged asset/contract mismatch
+  and complete procedural fallback at all quality tiers.
+- [ ] **Blocked upstream:** load and visually validate all three exact
+  contract-named V4 clips (RowErg, SkiErg, BikeErg) in the staged app. The
+  current final USDZ contains only `rowplay_v4_row_cycle`.
 
 ## Spec and Documentation
 
@@ -52,8 +79,9 @@ these committed local checks.
   nodes onto existing logical pivots without duplicating pose application.
 - [x] Preserve named pivots, finite-transform guards, and contact invariants in
   `ReplayAthleteRig` and all sport rig classes.
-- [x] Keep live and rival asset clones/materials independent and make every
-  loaded ghost material translucent.
+- [x] Keep live and rival asset clones/materials independent; make ghost
+  equipment translucent while keeping a validated V4 rival body opaque and
+  cool-tinted.
 - [x] Add `ReplayBundledSportRigTests.swift` for low/bundled rig structure,
   moving sport equipment, contacts, clone isolation, and non-finite safety.
 
@@ -94,8 +122,9 @@ these committed local checks.
 - [x] `./script/build_and_run.sh --automation`
 - [x] `./script/build_and_run.sh --sign-verify`
 - [x] Confirm the staged bundle contains all six generated USDA resources.
-- [x] Inspect RowErg, SkiErg, and BikeErg at low, medium, high, and ultra;
-  confirm low is procedural and valid higher tiers are bundled.
+- [ ] **Blocked upstream:** inspect a validating V4 RowErg, SkiErg, and BikeErg
+  at medium, high, and ultra. The current exact USDZ fails the required clip
+  gate, so all current tiers correctly render the complete procedural fallback.
 - [x] Exercise pause/resume, seek, Low-to-Medium state preservation, and
   automation mode in the staged app.
 - [x] Inspect the live participant, past-session and constant-pace rivals, all

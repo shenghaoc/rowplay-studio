@@ -1,4 +1,10 @@
-> **Revised scope:** Phase 11 aligns native replay with the canonical RowPlay V4 athlete from provisional upstream PR #171. Studio owns equipment/environments, loading, validation, quality, and fallback. V4 is not the final premium athlete; Phase 12 covers premium anatomy and most 穿模. PR #72 remains draft until #171 refresh.
+> **Canonical merged-source amendment (2026-07-22):** The source is merged
+> RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`, verified
+> from its exact Git tree and recorded as `merged` in the runtime manifest. The
+> final USDZ/contract disagree on the required three clip resource names. This
+> design therefore requires an atomic procedural fallback rather than a local
+> alias, arbitrary animation selection, or partial bundled scene. PR #72 stays
+> draft until an upstream artifact/contract correction passes the strict gate.
 
 # Phase 11 - Production-Quality Bundled 3D Assets — Design
 
@@ -15,6 +21,26 @@ course placement, articulated pivots, pose solving, cameras, effects, and
 quality policy continue to define what moves and where it moves.
 
 ## Architecture
+
+### Canonical Motion and Skeletal Correction
+
+`RowPlayCore` owns a direct portable port of the canonical V4 motion graph,
+sport kinematics, and two-bone solver. A committed fixture generated from the
+pinned upstream Git tree contains 129 phase samples per sport. `ReplayRigPose`
+uses those graph channels rather than legacy sine/cosine approximations.
+
+When a future matching V4 package validates, Studio seeks the exact contract
+clip from its native replay clock and applies one stateless skeletal pass:
+
+```text
+prepare -> orientHandsToTargets -> constrain
+```
+
+The pass restores the authored root placement, solves pelvis translation and
+arm/leg chains through `SkeletalPosesComponent`, records branch hints, and
+mirrors contacts to debug markers only after the skeletal result. Rival V4
+bodies use opaque, depth-writing cool-tinted materials while machine equipment
+uses the established translucent ghost treatment.
 
 ```text
 script/generate_replay_assets.py
@@ -115,9 +141,11 @@ logic stays unchanged. The procedural provider remains the low-quality path and
 the only fallback; there is no part-by-part asset substitution.
 
 Live and rival entities always use distinct recursive clones. A ghost operation
-walks only the clone's material instances and converts all supported loaded
-material types to the existing translucent presentation. This prevents shared
-material mutation between a template, live athlete, rival, or subsequent scene.
+walks only the clone's equipment/environment material instances and converts
+supported loaded material types to the existing translucent presentation. The
+V4 skinned body is explicitly excluded and receives an opaque, depth-writing
+cool tint instead. This prevents shared material mutation between a template,
+live athlete, rival, or subsequent scene.
 
 ## Environment Installation
 
@@ -171,13 +199,15 @@ resource loading, node/material contracts, budgets, finite geometry, and
 independent clone behavior. Failure injection verifies that absent, malformed,
 or incomplete assets produce a fully functional procedural scene.
 
-Rig tests run existing structural/contact/non-finite assertions under both low
-procedural and medium bundled construction. Scene tests verify quality source
+Rig tests run existing structural/contact/non-finite assertions under the
+procedural path and, after the exact clip gate validates, under medium bundled
+construction. Until then, explicit regression tests prove that every quality
+selects a complete procedural scene. Scene tests verify quality source
 selection, environment presence only on the bundled path, state-preserving
 quality rebuilds, rival material isolation, effects/camera continuity, and
 reduced-motion behavior. Automated structure checks do not substitute for
-staged-app visual assessment of silhouette, articulation, materials, depth, and
-framing.
+staged-app visual assessment of V4 silhouette, articulation, materials, depth,
+and framing once the upstream package is valid.
 
 ## Validation Discipline
 

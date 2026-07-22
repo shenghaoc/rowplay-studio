@@ -27,6 +27,7 @@ final class ReplayBikeErgRig: ReplaySportRig {
     private let athlete = ReplayAthleteRig()
     private var canonicalAthlete: ReplayAthleteInstance?
     private var poseAdapter: ReplayAthletePoseAdapter?
+    private var canonicalRuntimeFailure = false
 
     // Pedal references for foot attachment
     private let pedalL = Entity()
@@ -222,6 +223,7 @@ final class ReplayBikeErgRig: ReplaySportRig {
             canonicalAthlete.attach(to: rider)
             canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
             canonicalAthlete.root.position = .zero
+            canonicalAthlete.captureBaseRootTransform()
         } else {
             athlete.build(
                 into: rider,
@@ -267,17 +269,29 @@ final class ReplayBikeErgRig: ReplaySportRig {
         if let canonicalAthlete, let poseAdapter, let motion {
             poseAdapter.apply(sample: motion, sport: .bike, to: canonicalAthlete)
             // Contact space is the rig root so pedals and grips stay authoritative.
-            _ = ReplayAthleteContactSolver.constrain(
-                instance: canonicalAthlete,
-                targets: ReplayAthleteContactTargets(
-                    pelvis: rider.position(relativeTo: root),
-                    leftHand: handL,
-                    rightHand: handR,
-                    leftFoot: footL,
-                    rightFoot: footR
-                ),
-                relativeTo: root
+            let targets = ReplayAthleteContactTargets(
+                pelvis: rider.position(relativeTo: root),
+                leftHand: handL,
+                rightHand: handR,
+                leftFoot: footL,
+                rightFoot: footR
             )
+            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+                ReplayAthleteContactSolver.orientHandsToTargets(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                let contactError = ReplayAthleteContactSolver.constrain(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
+                    || !canonicalAthlete.hasFiniteJointTransforms()
+            } else {
+                canonicalRuntimeFailure = true
+            }
             // Keep a local zero under the swaying rider group after world placement.
             _ = pelvisTarget
         } else {
@@ -287,5 +301,18 @@ final class ReplayBikeErgRig: ReplaySportRig {
             athlete.footL.setPosition(footL, relativeTo: root)
             athlete.footR.setPosition(footR, relativeTo: root)
         }
+    }
+
+    func applyGhostTranslucency() {
+        ReplaySportRigTranslucency.apply(
+            to: root,
+            opacity: 0.45,
+            excluding: canonicalAthlete?.athleteEntity
+        )
+    }
+
+    func consumeCanonicalRuntimeFailure() -> Bool {
+        defer { canonicalRuntimeFailure = false }
+        return canonicalRuntimeFailure
     }
 }

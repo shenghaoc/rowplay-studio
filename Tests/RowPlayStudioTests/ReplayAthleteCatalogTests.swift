@@ -4,7 +4,7 @@ import XCTest
 @testable import RowPlayStudio
 
 final class ReplayAthleteCatalogTests: XCTestCase {
-    func testSourceManifestPinsProvisionalUpstreamCommitAndHashes() throws {
+    func testSourceManifestPinsMergedUpstreamCommitAndHashes() throws {
         let data = try Data(contentsOf: try resourceURL(
             name: ReplayAthleteCatalog.sourceManifestResourceName,
             ext: ReplayAthleteCatalog.sourceManifestExtension
@@ -14,13 +14,14 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         guard case .success(let manifest) = parsed else {
             return XCTFail("Failed to parse source manifest")
         }
-        XCTAssertEqual(manifest.pinnedCommit, ReplayAthleteCatalog.pinnedCommit)
-        XCTAssertEqual(manifest.status, "provisional")
+        XCTAssertEqual(manifest.pinnedCommit, Expected.commit)
+        XCTAssertEqual(manifest.status, "merged")
         XCTAssertEqual(manifest.upstreamPR, 171)
-        XCTAssertEqual(manifest.glbSha256, ReplayAthleteCatalog.expectedGLBSHA256)
-        XCTAssertEqual(manifest.usdzSha256, ReplayAthleteCatalog.expectedUSDZSHA256)
-        XCTAssertEqual(manifest.contractSha256, ReplayAthleteCatalog.expectedContractSHA256)
-        XCTAssertEqual(manifest.copiedUsdzSha256, ReplayAthleteCatalog.expectedUSDZSHA256)
+        XCTAssertEqual(manifest.upstreamRepository, "https://github.com/shenghaoc/rowplay")
+        XCTAssertEqual(manifest.glbSha256, Expected.glbSHA256)
+        XCTAssertEqual(manifest.usdzSha256, Expected.usdzSHA256)
+        XCTAssertEqual(manifest.contractSha256, Expected.contractSHA256)
+        XCTAssertEqual(manifest.copiedUsdzSha256, Expected.usdzSHA256)
         XCTAssertTrue(ReplayAthleteCatalog.validateSourceManifest(manifest).isValid)
     }
 
@@ -35,13 +36,20 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         )
         let contractData = try Data(contentsOf: contractURL)
         let usdzData = try Data(contentsOf: usdzURL)
+        let manifestData = try Data(contentsOf: try resourceURL(
+            name: ReplayAthleteCatalog.sourceManifestResourceName,
+            ext: ReplayAthleteCatalog.sourceManifestExtension
+        ))
+        guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: manifestData) else {
+            return XCTFail("Failed to parse source manifest")
+        }
         XCTAssertEqual(
             ReplayAthleteCatalog.sha256Hex(of: contractData),
-            ReplayAthleteCatalog.expectedContractSHA256
+            manifest.contractSha256
         )
         XCTAssertEqual(
             ReplayAthleteCatalog.sha256Hex(of: usdzData),
-            ReplayAthleteCatalog.expectedUSDZSHA256
+            manifest.usdzSha256
         )
 
         let parsed = ReplayAthleteCatalog.parseContract(data: contractData)
@@ -49,11 +57,15 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             return XCTFail("Failed to parse athlete contract")
         }
         XCTAssertEqual(contract.orderedBoneNames, ReplayAthleteCatalog.orderedBoneNames)
+        XCTAssertEqual(contract.schemaVersion, ReplayAthleteCatalog.contractSchemaVersion)
         XCTAssertEqual(contract.clips.count, 3)
         XCTAssertNotNil(contract.clip(for: .rower))
         XCTAssertNotNil(contract.clip(for: .skierg))
         XCTAssertNotNil(contract.clip(for: .bike))
-        XCTAssertTrue(ReplayAthleteCatalog.validateContractHashes(contract).isValid)
+        XCTAssertEqual(contract.clip(for: .rower)?.name, "rowplay-v4-row-cycle")
+        XCTAssertEqual(contract.clip(for: .skierg)?.name, "rowplay-v4-ski-cycle")
+        XCTAssertEqual(contract.clip(for: .bike)?.name, "rowplay-v4-bike-cycle")
+        XCTAssertTrue(ReplayAthleteCatalog.validateContractHashes(contract, manifest: manifest).isValid)
     }
 
     func testClipFractionIsDeterministicAndBounded() {
@@ -141,5 +153,12 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             .appendingPathComponent("Sources/RowPlayStudio/Resources/Replay3D/\(name).\(ext)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: path.path), "Missing \(name).\(ext)")
         return path
+    }
+
+    private enum Expected {
+        static let commit = "da0dc73bf295871e9b362511cd5b2c9a9424b325"
+        static let glbSHA256 = "73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b"
+        static let usdzSHA256 = "934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e"
+        static let contractSHA256 = "e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d"
     }
 }

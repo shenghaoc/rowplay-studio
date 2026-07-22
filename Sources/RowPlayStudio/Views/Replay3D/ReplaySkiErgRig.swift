@@ -25,6 +25,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
     private let athlete = ReplayAthleteRig()
     private var canonicalAthlete: ReplayAthleteInstance?
     private var poseAdapter: ReplayAthletePoseAdapter?
+    private var canonicalRuntimeFailure = false
 
     // MARK: - Build
 
@@ -176,6 +177,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
             canonicalAthlete.attach(to: root)
             canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
             canonicalAthlete.root.position = SIMD3(0, 0.72, 0.02)
+            canonicalAthlete.captureBaseRootTransform()
         } else {
             athlete.build(
                 into: root,
@@ -233,17 +235,29 @@ final class ReplaySkiErgRig: ReplaySportRig {
 
         if let canonicalAthlete, let poseAdapter, let motion {
             poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
-            _ = ReplayAthleteContactSolver.constrain(
-                instance: canonicalAthlete,
-                targets: ReplayAthleteContactTargets(
-                    pelvis: pelvisTarget,
-                    leftHand: handL,
-                    rightHand: handR,
-                    leftFoot: footL,
-                    rightFoot: footR
-                ),
-                relativeTo: root
+            let targets = ReplayAthleteContactTargets(
+                pelvis: pelvisTarget,
+                leftHand: handL,
+                rightHand: handR,
+                leftFoot: footL,
+                rightFoot: footR
             )
+            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+                ReplayAthleteContactSolver.orientHandsToTargets(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                let contactError = ReplayAthleteContactSolver.constrain(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
+                    || !canonicalAthlete.hasFiniteJointTransforms()
+            } else {
+                canonicalRuntimeFailure = true
+            }
         } else {
             athlete.pelvis.position = pelvisTarget
             athlete.applyPose(skiPose.joints)
@@ -252,5 +266,18 @@ final class ReplaySkiErgRig: ReplaySportRig {
             athlete.footL.setPosition(footL, relativeTo: root)
             athlete.footR.setPosition(footR, relativeTo: root)
         }
+    }
+
+    func applyGhostTranslucency() {
+        ReplaySportRigTranslucency.apply(
+            to: root,
+            opacity: 0.45,
+            excluding: canonicalAthlete?.athleteEntity
+        )
+    }
+
+    func consumeCanonicalRuntimeFailure() -> Bool {
+        defer { canonicalRuntimeFailure = false }
+        return canonicalRuntimeFailure
     }
 }
