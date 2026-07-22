@@ -68,18 +68,19 @@ final class ReplayAthleteLibrary {
             return nil
         }
 
-        let contractHash = ReplayAthleteCatalog.sha256Hex(of: contractData)
-        let usdzHash = ReplayAthleteCatalog.sha256Hex(of: usdzData)
-        if contractHash != ReplayAthleteCatalog.expectedContractSHA256
-            || usdzHash != ReplayAthleteCatalog.expectedUSDZSHA256 {
+        guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData),
+              ReplayAthleteCatalog.validateSourceManifest(manifest).isValid else {
             loadFailed = true
             return nil
         }
 
-        guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData),
-              case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData),
-              ReplayAthleteCatalog.validateSourceManifest(manifest).isValid,
-              ReplayAthleteCatalog.validateContractHashes(contract).isValid else {
+        let contractHash = ReplayAthleteCatalog.sha256Hex(of: contractData)
+        let usdzHash = ReplayAthleteCatalog.sha256Hex(of: usdzData)
+        guard contractHash == manifest.contractSha256,
+              usdzHash == manifest.usdzSha256,
+              manifest.copiedUsdzSha256 == usdzHash,
+              case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData),
+              ReplayAthleteCatalog.validateContractHashes(contract, manifest: manifest).isValid else {
             loadFailed = true
             return nil
         }

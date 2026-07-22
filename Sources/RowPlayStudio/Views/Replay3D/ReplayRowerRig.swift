@@ -28,6 +28,7 @@ final class ReplayRowerRig: ReplaySportRig {
     private let athlete = ReplayAthleteRig()
     private var canonicalAthlete: ReplayAthleteInstance?
     private var poseAdapter: ReplayAthletePoseAdapter?
+    private var canonicalRuntimeFailure = false
 
     /// Build-time handle orientation (Z rotation to lay cylinder horizontal).
     private let handleBaseOrientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
@@ -188,6 +189,7 @@ final class ReplayRowerRig: ReplaySportRig {
             // place so the hips sit on the seat in local rig coordinates.
             canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
             canonicalAthlete.root.position = SIMD3(0, 0.30, -0.1)
+            canonicalAthlete.captureBaseRootTransform()
         } else {
             athlete.build(
                 into: root,
@@ -243,17 +245,31 @@ final class ReplayRowerRig: ReplaySportRig {
 
         if let canonicalAthlete, let poseAdapter, let motion {
             poseAdapter.apply(sample: motion, sport: .rower, to: canonicalAthlete)
-            _ = ReplayAthleteContactSolver.constrain(
-                instance: canonicalAthlete,
-                targets: ReplayAthleteContactTargets(
-                    pelvis: pelvisTarget,
-                    leftHand: handL,
-                    rightHand: handR,
-                    leftFoot: footL,
-                    rightFoot: footR
-                ),
-                relativeTo: root
+            let targets = ReplayAthleteContactTargets(
+                pelvis: pelvisTarget,
+                leftHand: handL,
+                rightHand: handR,
+                leftFoot: footL,
+                rightFoot: footR
             )
+            // Arms clear the torso before seat/pelvis closure; the final pass
+            // then locks both palms and soles in the same rig space.
+            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+                ReplayAthleteContactSolver.orientHandsToTargets(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                let contactError = ReplayAthleteContactSolver.constrain(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
+                    || !canonicalAthlete.hasFiniteJointTransforms()
+            } else {
+                canonicalRuntimeFailure = true
+            }
         } else {
             athlete.pelvis.position = pelvisTarget
             athlete.applyPose(rowerPose.joints)
@@ -262,5 +278,18 @@ final class ReplayRowerRig: ReplaySportRig {
             athlete.footL.setPosition(footL, relativeTo: root)
             athlete.footR.setPosition(footR, relativeTo: root)
         }
+    }
+
+    func applyGhostTranslucency() {
+        ReplaySportRigTranslucency.apply(
+            to: root,
+            opacity: 0.45,
+            excluding: canonicalAthlete?.athleteEntity
+        )
+    }
+
+    func consumeCanonicalRuntimeFailure() -> Bool {
+        defer { canonicalRuntimeFailure = false }
+        return canonicalRuntimeFailure
     }
 }

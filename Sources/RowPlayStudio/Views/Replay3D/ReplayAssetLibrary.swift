@@ -79,8 +79,12 @@ final class ReplayBundledAssetSet {
         return wrapper
     }
 
-    func makeAthleteInstance(name: String, opacity: Float) -> ReplayAthleteInstance? {
-        athleteTemplate.makeInstance(name: name, opacity: opacity)
+    func makeAthleteInstance(
+        sport: Sport,
+        name: String,
+        isRival: Bool
+    ) -> ReplayAthleteInstance? {
+        athleteTemplate.makeInstance(sport: sport, name: name, isRival: isRival)
     }
 }
 
@@ -142,12 +146,6 @@ final class ReplayAssetLibrary {
         }
         guard !failedSports.contains(sport) else { return nil }
 
-        // Athlete is shared across sports but required for every bundled set.
-        guard let athleteTemplate = await ReplayAthleteLibrary.shared.athleteTemplate() else {
-            failedSports.insert(sport)
-            return nil
-        }
-
         let resources = ReplayAssetCatalog.resources(for: sport)
         var urls: [ReplayAssetResource: URL] = [:]
         var inspections: [ReplayAssetInspection] = []
@@ -165,7 +163,16 @@ final class ReplayAssetLibrary {
         guard ReplayAssetCatalog.validateAssetSet(
             for: sport,
             inspections: inspections
-        ).isValid,
+        ).isValid else {
+            failedSports.insert(sport)
+            return nil
+        }
+
+        // The athlete is shared across sports but required for every complete
+        // set. Inspect equipment/environment first so an injected malformed
+        // resource is observed and rejected on its own merits rather than
+        // being masked by an unrelated athlete-load failure.
+        guard let athleteTemplate = await ReplayAthleteLibrary.shared.athleteTemplate(),
         let rigURL = urls[ReplayAssetCatalog.rigResource(for: sport)],
         let environmentURL = urls[ReplayAssetCatalog.environmentResource(for: sport)],
         let rigRoot = try? await Entity(contentsOf: rigURL),

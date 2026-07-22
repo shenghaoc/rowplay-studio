@@ -5,13 +5,13 @@
   "canonicalRigModule": "src/lib/replay/rigV4.ts",
   "webRuntimeArtifact": {
     "filename": "rowplay-athlete-v4.glb",
-    "byteCount": 584792,
-    "sha256": "a9a215f07bd39d15daa5c45c5bfbbb1788656ad7916fc39f172c5dcc78129963"
+    "byteCount": 584796,
+    "sha256": "73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b"
   },
   "nativeDerivativeArtifact": {
     "filename": "rowplay-athlete-v4.usdz",
-    "byteCount": 1318259,
-    "sha256": "5591b13c7d58bc4f44194728c1a2fc1c669086232d2f1bd97723672392c50723"
+    "byteCount": 1318256,
+    "sha256": "934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e"
   },
   "coordinateSystem": {
     "units": "metres",
@@ -252,7 +252,7 @@
         }
       },
       {
-        "sport": "skier",
+        "sport": "skierg",
         "name": "rowplay-v4-ski-cycle",
         "durationSeconds": 1,
         "driveEnd": 0.34,

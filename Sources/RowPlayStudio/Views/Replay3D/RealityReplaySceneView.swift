@@ -161,7 +161,7 @@ struct RealityReplaySceneView: View {
             let pose = currentPose()
             let ghostSample = currentGhostSample()
 
-            Replay3DSceneBuilder.updateScene(
+            let sceneUpdated = Replay3DSceneBuilder.updateScene(
                 container: container,
                 livePose: pose,
                 liveDistance: state.currentFrame.d,
@@ -178,6 +178,17 @@ struct RealityReplaySceneView: View {
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
+            if !sceneUpdated, container.visualSource == .bundled {
+                // Drop the entire bundle atomically on a runtime skeletal or
+                // animation failure. Replay/camera state lives outside this
+                // graph identity boundary, so the procedural remake preserves
+                // the active UI and playback state.
+                Task { @MainActor in
+                    guard bundledAssetSet != nil else { return }
+                    bundledAssetSet = nil
+                    assetLoadGeneration &+= 1
+                }
+            }
             if let updateStart {
                 let duration = updateStart.duration(to: clock.now)
                 performanceController.recordSceneUpdateDuration(

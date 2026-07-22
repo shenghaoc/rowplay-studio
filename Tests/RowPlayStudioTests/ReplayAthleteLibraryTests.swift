@@ -11,85 +11,57 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         ReplayAssetLibrary.shared.resetCacheForTesting()
     }
 
-    func testCanonicalUSDZLoadsAsSkinnedAthleteWithRequiredJoints() async throws {
-        guard let template = await ReplayAthleteLibrary.shared.athleteTemplate() else {
-            return XCTFail("Expected V4 athlete template")
-        }
-        XCTAssertEqual(template.jointNames, ReplayAthleteCatalog.orderedJointPaths)
-        XCTAssertEqual(template.contract.orderedBoneNames.count, 19)
-        XCTAssertEqual(template.sourceManifest.pinnedCommit, ReplayAthleteCatalog.pinnedCommit)
+    func testMergedAssetIsAtomicallyRejectedWhenItDoesNotProvideContractClipNames() async throws {
+        let contract = try loadContract()
+        let manifest = try loadSourceManifest()
+        let root = try await Entity(contentsOf: try resourceURL(
+            name: ReplayAthleteCatalog.usdzResourceName,
+            ext: ReplayAthleteCatalog.usdzExtension
+        ))
 
-        let live = try XCTUnwrap(template.makeInstance(name: "live", opacity: 1))
-        let rival = try XCTUnwrap(template.makeInstance(name: "rival", opacity: 0.45))
-        XCTAssertTrue(live.hasFiniteJointTransforms())
-        XCTAssertTrue(rival.hasFiniteJointTransforms())
-        XCTAssertNotEqual(ObjectIdentifier(live.root), ObjectIdentifier(rival.root))
-        XCTAssertNotNil(live.athleteEntity.components[ModelComponent.self])
-        XCTAssertNotNil(live.athleteEntity.components[SkeletalPosesComponent.self])
-        XCTAssertNotNil(live.leftHandContact)
-        XCTAssertNotNil(live.rightFootContact)
+        let requiredNames = Set(ReplayAssetCatalog.supportedSports.map {
+            ReplayAthleteCatalog.expectedClipName(for: $0)
+        })
+        let availableNames = Set(root.availableAnimations.compactMap(\.name))
+
+        // The final merged source has a row-cycle animation under an
+        // underscore name and no contract-named Ski/Bike clips. Do not accept
+        // an arbitrary first animation or a lossy alias: that would animate
+        // the wrong sport while appearing to succeed.
+        XCTAssertTrue(
+            requiredNames.isDisjoint(with: availableNames),
+            "The exact merged artifact unexpectedly gained contract clip names; update the V4 gate."
+        )
+        XCTAssertNil(ReplayAthleteTemplate(
+            root: root,
+            contract: contract,
+            sourceManifest: manifest
+        ))
+
+        let athlete = await ReplayAthleteLibrary.shared.athleteTemplate()
+        XCTAssertNil(athlete)
+        for sport in ReplayAssetCatalog.supportedSports {
+            let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            XCTAssertNil(assetSet, "A missing required V4 clip must reject the complete \(sport.rawValue) set")
+        }
     }
 
-    func testIndependentLiveAndRivalClonesIsolateTranslucency() async throws {
-        guard let template = await ReplayAthleteLibrary.shared.athleteTemplate() else {
-            return XCTFail("Expected V4 athlete template")
+    func testQualitySelectionUsesCompleteProceduralFallbackWhenV4IsRejected() async {
+        for sport in ReplayAssetCatalog.supportedSports {
+            let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            XCTAssertNil(assetSet)
         }
-        let live = try XCTUnwrap(template.makeInstance(name: "live", opacity: 1))
-        let rival = try XCTUnwrap(template.makeInstance(name: "rival", opacity: 0.45))
 
-        let liveBefore = materialAlphas(in: live.root)
-        XCTAssertFalse(liveBefore.isEmpty)
-        XCTAssertTrue(liveBefore.allSatisfy { $0 > 0.9 })
-
-        rival.applyOpacity(0.45)
-        XCTAssertEqual(materialAlphas(in: live.root), liveBefore)
-        let rivalAlphas = materialAlphas(in: rival.root)
-        XCTAssertFalse(rivalAlphas.isEmpty)
-        XCTAssertTrue(rivalAlphas.allSatisfy { $0 <= 0.46 })
-    }
-
-    func testDeterministicPhaseSamplingIsStableAcrossSeeks() async throws {
-        guard let template = await ReplayAthleteLibrary.shared.athleteTemplate() else {
-            return XCTFail("Expected V4 athlete template")
-        }
-        let instance = try XCTUnwrap(template.makeInstance(name: "seek", opacity: 1))
-        let adapter = ReplayAthletePoseAdapter(contract: template.contract)
-
-        let sample = ReplayAthleteMotionSample(phase: 1.5, cycleFrac: 0.3, driveFrac: 0.4)
-        let fraction = adapter.clipFraction(sport: .rower, sample: sample)
-        adapter.apply(sample: sample, sport: .rower, to: instance)
-        adapter.apply(sample: sample, sport: .rower, to: instance)
-        XCTAssertEqual(fraction, adapter.clipFraction(sport: .rower, sample: sample))
-        XCTAssertTrue(instance.hasFiniteJointTransforms())
-    }
-
-    func testBundledPackageRequiresAthleteAndSelectsProceduralWhenMissing() async {
-        // A valid library load includes the athlete template.
-        let set = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower)
-        XCTAssertNotNil(set)
-        XCTAssertNotNil(set?.athleteTemplate)
-
-        // Low quality always selects procedural regardless of package validity.
         XCTAssertEqual(
             ReplayAssetCatalog.visualSource(for: .low, assetSetIsValid: true),
             .procedural
         )
-        XCTAssertEqual(
-            ReplayAssetCatalog.visualSource(for: .medium, assetSetIsValid: true),
-            .bundled
-        )
-        XCTAssertEqual(
-            ReplayAssetCatalog.visualSource(for: .medium, assetSetIsValid: false),
-            .procedural
-        )
-        XCTAssertEqual(
-            ReplayAssetCatalog.visualSource(for: .high, assetSetIsValid: false),
-            .procedural
-        )
-        XCTAssertEqual(
-            ReplayAssetCatalog.visualSource(for: .ultra, assetSetIsValid: true),
-            .bundled
-        )
+        for quality in [ReplayRenderQuality.medium, .high, .ultra] {
+            XCTAssertEqual(
+                ReplayAssetCatalog.visualSource(for: quality, assetSetIsValid: false),
+                .procedural
+            )
+        }
     }
 
     func testProceduralFootRemainsAtAnklePivot() {
@@ -118,22 +90,46 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         XCTAssertTrue(source.contains("bike_equipment_nodes"))
     }
 
-    private func materialAlphas(in entity: Entity) -> [Float] {
-        var values: [Float] = []
-        if let model = entity.components[ModelComponent.self] {
-            for material in model.materials {
-                if let simple = material as? SimpleMaterial {
-                    values.append(Float(simple.color.tint.cgColor.alpha))
-                } else if let pbr = material as? PhysicallyBasedMaterial {
-                    values.append(Float(pbr.baseColor.tint.cgColor.alpha))
-                } else if let unlit = material as? UnlitMaterial {
-                    values.append(Float(unlit.color.tint.cgColor.alpha))
-                }
-            }
+    private func loadContract() throws -> ReplayAthleteContract {
+        let data = try Data(contentsOf: try resourceURL(
+            name: ReplayAthleteCatalog.contractResourceName,
+            ext: ReplayAthleteCatalog.contractExtension
+        ))
+        guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: data) else {
+            throw ReplayTestError.invalidContract
         }
-        for child in entity.children {
-            values.append(contentsOf: materialAlphas(in: child))
-        }
-        return values
+        return contract
     }
+
+    private func loadSourceManifest() throws -> ReplayAthleteSourceManifest {
+        let data = try Data(contentsOf: try resourceURL(
+            name: ReplayAthleteCatalog.sourceManifestResourceName,
+            ext: ReplayAthleteCatalog.sourceManifestExtension
+        ))
+        guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: data) else {
+            throw ReplayTestError.invalidManifest
+        }
+        return manifest
+    }
+
+    private func resourceURL(name: String, ext: String) throws -> URL {
+        // Resolve the exact committed resource for the source-artifact gate.
+        // Production loading is separately exercised through Bundle.module by
+        // ReplayAthleteLibrary / ReplayAssetLibrary above.
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/RowPlayStudio/Resources/Replay3D/\(name).\(ext)")
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ReplayTestError.missingResource
+        }
+        return url
+    }
+}
+
+private enum ReplayTestError: Error {
+    case invalidContract
+    case invalidManifest
+    case missingResource
 }

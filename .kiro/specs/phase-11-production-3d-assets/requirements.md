@@ -1,4 +1,15 @@
-> **Revised scope:** Phase 11 aligns native replay with the canonical RowPlay V4 athlete from provisional upstream PR #171. Studio owns equipment/environments, loading, validation, quality, and fallback. V4 is not the final premium athlete; Phase 12 covers premium anatomy and most 穿模. PR #72 remains draft until #171 refresh.
+> **Canonical merged-source amendment (2026-07-22):** Phase 11 is pinned to
+> merged RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`,
+> not a provisional upstream snapshot. The runtime source manifest must say
+> `merged`, and sync must read that exact reachable Git tree rather than a local
+> working-tree HEAD. Its GLB, USDZ, and contract SHA-256 values are respectively
+> `73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b`,
+> `934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e`, and
+> `e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d`.
+> The exact USDZ currently lacks the three contract-named RealityKit clips,
+> so strict validation must reject it atomically and keep PR #72 draft until
+> upstream supplies a matching final artifact/contract. No clip alias or
+> `availableAnimations.first` compatibility path is allowed.
 
 # Phase 11 - Production-Quality Bundled 3D Assets — Requirements
 
@@ -14,6 +25,16 @@ automation mode.
 This is a native-owned visual-provider phase. It does not create a second
 renderer, skeletal animation system, network asset service, or web dependency.
 The procedural rigs and environments remain the complete, reliable fallback.
+
+### Current V4 Acceptance Gate
+
+The contract requires `rowplay-v4-row-cycle`, `rowplay-v4-ski-cycle`, and
+`rowplay-v4-bike-cycle`, exactly one resource per sport. The exact merged USDZ
+currently exposes only `rowplay_v4_row_cycle`, and no SkiErg/BikeErg counterpart.
+This is a source artifact/contract inconsistency. Until it is corrected,
+Medium/High/Ultra must select the same complete procedural scene as an ordinary
+load failure. The phase is not V4-runtime-complete merely because its native
+port and fallback code compile.
 
 ## R1: Architecture and Scope Boundaries
 
@@ -143,9 +164,11 @@ The procedural rigs and environments remain the complete, reliable fallback.
 - **R6.2** Live and rival rigs receive independent asset clones. Changing a
   rival material must not mutate the live rig, a cached template, or another
   scene.
-- **R6.3** Ghost translucency applies to every material type loaded from USDA,
-  including PBR-style materials, while preserving sport accents on the live
-  participant.
+- **R6.3** Ghost translucency applies to every equipment/environment material
+  type loaded from USDA, including PBR-style materials, while preserving sport
+  accents on the live participant. A validated V4 skinned rival body is the
+  explicit exception: it remains opaque/depth-writing with a cool tint to
+  avoid transparent triangle-sort seams.
 - **R6.4** Imported and constant-pace rivals retain their existing fallback
   articulation. Reduced Motion retains stable neutral poses, and existing wake
   and spray suppression rules remain in force.
@@ -162,8 +185,10 @@ The procedural rigs and environments remain the complete, reliable fallback.
 - **R7.2** Failure tests prove missing, malformed, and incomplete resource sets
   produce an operational complete procedural fallback.
 - **R7.3** Rig tests run existing structural, finite-transform, contact, and
-  ghost-translucency assertions against procedural low-quality and bundled
-  medium-quality paths. They retain all named pivots and sport moving parts.
+  ghost-translucency assertions against the procedural low-quality path and,
+  once a full V4 package validates, the bundled medium-quality path. While the
+  pinned artifact fails the exact clip gate, tests must instead prove the
+  complete procedural fallback for Medium/High/Ultra.
 - **R7.4** Scene tests cover low/procedural versus medium-high-ultra/bundled
   selection, environment installation, quality rebuild continuity, effects,
   cameras, rivals, seeking, Reduced Motion, and functional load failure.

@@ -6,7 +6,7 @@ import XCTest
 
 @MainActor
 final class ReplayAssetLibraryTests: XCTestCase {
-    func testBundledResourcesLoadForEverySupportedSport() async {
+    func testBundledEquipmentResourcesLoadWhileStrictV4GateRejectsCompleteSets() async {
         for sport in ReplayAssetCatalog.supportedSports {
             for resource in ReplayAssetCatalog.resources(for: sport) {
                 guard let url = ReplayAssetLibrary.bundledResourceURL(for: resource) else {
@@ -34,19 +34,28 @@ final class ReplayAssetLibraryTests: XCTestCase {
             }
 
             let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
-            XCTAssertNotNil(assetSet, "Expected complete bundled set for \(sport.rawValue)")
+            XCTAssertNil(
+                assetSet,
+                "The actual merged V4 clip mismatch must reject the complete \(sport.rawValue) set"
+            )
         }
     }
 
-    func testLoadedAssetSetProducesIndependentRigAndEnvironmentClones() async {
-        guard let assetSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower) else {
-            return XCTFail("Expected the generated rower assets to load")
-        }
+    func testEquipmentTemplatesProduceIndependentRigAndEnvironmentClones() async throws {
+        let rig = ReplayAssetCatalog.rigResource(for: .rower)
+        let environment = ReplayAssetCatalog.environmentResource(for: .rower)
+        let rigRoot = try await Entity(contentsOf: try XCTUnwrap(
+            ReplayAssetLibrary.bundledResourceURL(for: rig)
+        ))
+        let provider = try XCTUnwrap(ReplayBundledRigVisualProvider(
+            root: rigRoot,
+            requiredNodeNames: Set(ReplayAssetCatalog.requiredRigNodeNames(for: .rower))
+        ))
 
         guard let visualName = ReplayAssetCatalog.requiredRigNodeNames(for: .rower).first,
-              let firstVisual = assetSet.rigVisualProvider.cloneVisual(named: visualName),
-              let secondVisual = assetSet.rigVisualProvider.cloneVisual(named: visualName) else {
-            return XCTFail("Expected the complete rower visual contract")
+              let firstVisual = provider.cloneVisual(named: visualName),
+              let secondVisual = provider.cloneVisual(named: visualName) else {
+            return XCTFail("Expected the complete rower equipment visual contract")
         }
 
         XCTAssertFalse(firstVisual === secondVisual)
@@ -54,10 +63,12 @@ final class ReplayAssetLibraryTests: XCTestCase {
         XCTAssertNotEqual(firstVisual.position.x, secondVisual.position.x)
         XCTAssertEqual(secondVisual.name, visualName)
 
-        let firstEnvironment = assetSet.cloneEnvironment()
-        let secondEnvironment = assetSet.cloneEnvironment()
+        let environmentRoot = try await Entity(contentsOf: try XCTUnwrap(
+            ReplayAssetLibrary.bundledResourceURL(for: environment)
+        ))
+        let firstEnvironment = environmentRoot.clone(recursive: true)
+        let secondEnvironment = environmentRoot.clone(recursive: true)
         XCTAssertFalse(firstEnvironment === secondEnvironment)
-        XCTAssertEqual(firstEnvironment.name, "bundled-environment")
         XCTAssertNotNil(firstEnvironment.replayDescendant(
             named: ReplayAssetCatalog.bundledPrimName(for: "environment-ground")
         ))
@@ -74,6 +85,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
 
         let firstAttempt = await library.bundledAssetSet(for: .rower)
         XCTAssertNil(firstAttempt)
+        XCTAssertEqual(source.requestedResources, [rig, ReplayAssetCatalog.environmentResource(for: .rower)])
         // A cached failed set must remain a complete fallback, not retry into a
         // partially loaded rig on a subsequent scene update.
         let secondAttempt = await library.bundledAssetSet(for: .rower)
@@ -100,6 +112,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
 
         let assetSet = await library.bundledAssetSet(for: .skierg)
         XCTAssertNil(assetSet)
+        XCTAssertEqual(source.requestedResources, [rig])
     }
 
     func testIncompleteInjectedContractFallsBackAtomically() async throws {
@@ -125,6 +138,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
 
         let assetSet = await library.bundledAssetSet(for: sport)
         XCTAssertNil(assetSet)
+        XCTAssertEqual(source.requestedResources, [rig, environment])
     }
 
     func testEmptyRequiredVisualGeometryFallsBackAtomically() async throws {
@@ -165,12 +179,14 @@ final class ReplayAssetLibraryTests: XCTestCase {
             .missingRequiredNodeGeometry(resource: rig, name: "visual-pedal-R")
         ))
 
-        let library = ReplayAssetLibrary(source: TestResourceSource(urls: [
+        let source = TestResourceSource(urls: [
             rig: emptyRigURL,
             environment: environmentURL,
-        ]))
+        ])
+        let library = ReplayAssetLibrary(source: source)
         let assetSet = await library.bundledAssetSet(for: sport)
         XCTAssertNil(assetSet)
+        XCTAssertEqual(source.requestedResources, [rig, environment])
     }
 
     private func incompleteRigSource(with nodeNames: [String]) -> String {
@@ -206,12 +222,14 @@ final class ReplayAssetLibraryTests: XCTestCase {
 @MainActor
 private final class TestResourceSource: ReplayAssetResourceSource {
     private let urls: [ReplayAssetResource: URL]
+    private(set) var requestedResources: [ReplayAssetResource] = []
 
     init(urls: [ReplayAssetResource: URL]) {
         self.urls = urls
     }
 
     func url(for resource: ReplayAssetResource) -> URL? {
-        urls[resource]
+        requestedResources.append(resource)
+        return urls[resource]
     }
 }
