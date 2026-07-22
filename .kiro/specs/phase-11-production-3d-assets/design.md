@@ -4,8 +4,9 @@
 
 Phase 11 is a native visual-provider upgrade implemented on PR #72. The local
 asset, test, architecture, staged-bundle, and bounded visual-QA gates are
-recorded in the task checklist. PR #72 remains a draft until its pushed head
-receives fresh GitHub CI; this document makes no merge or release claim.
+recorded in the task checklist. GitHub CI on the exact pushed head remains a PR
+gate whose current result belongs in PR metadata, not this committed snapshot;
+this document makes no merge or release claim.
 
 The phase replaces only geometry and static scenery. Native replay timing,
 course placement, articulated pivots, pose solving, cameras, effects, and
@@ -25,9 +26,9 @@ ReplayAssetCatalog ─────── validates names, budgets, bounds, mater
 ReplayAssetLibrary ─────── loads bounded templates and returns clones
         │
 ReplayRigVisualProvider
-├── ReplayProceduralRigVisualProvider
-└── ReplayBundledRigVisualProvider
-        │ attaches visual nodes to existing logical pivots
+├── ReplayProceduralRigVisualProvider ── selects rig-owned mesh builders
+└── ReplayBundledRigVisualProvider ───── supplies authored visual clones
+        │ both preserve existing logical pivots
         ▼
 ReplaySportRig / ReplayAthleteRig / sport rigs
         │ native ReplayRigPoseSolver remains authoritative
@@ -98,15 +99,18 @@ asset contract, not a web-parity fixture and not proof of visual acceptance.
 
 `ReplaySportRig` selects a visual provider when its scene graph is built:
 
-- The procedural provider creates the existing meshes and materials.
+- The procedural provider returns no authored node, explicitly selecting the
+  existing mesh/material builders already owned by each articulated rig.
 - The bundled provider requests a validated sport rig clone and attaches its
   visual children to exactly the same named pivot hierarchy.
 
-Both providers expose the same visual attachment surface. This avoids a second
-`applyPose` implementation and ensures the RowErg seat/handle/oar, SkiErg
-handle/pole/cable, and BikeErg crank/pedal/wheel contact logic stays unchanged.
-The procedural provider remains the low-quality path and the only fallback;
-there is no part-by-part asset substitution.
+Both providers participate in the same attachment decision. Keeping procedural
+construction in its established rig-owned builders avoids duplicating geometry
+code, while the provider boundary still makes source selection explicit. This
+avoids a second `applyPose` implementation and ensures the RowErg
+seat/handle/oar, SkiErg handle/pole/cable, and BikeErg crank/pedal/wheel contact
+logic stays unchanged. The procedural provider remains the low-quality path and
+the only fallback; there is no part-by-part asset substitution.
 
 Live and rival entities always use distinct recursive clones. A ghost operation
 walks only the clone's material instances and converts all supported loaded
@@ -178,6 +182,6 @@ framing.
 The generator check, focused tests, full SwiftPM matrix, architecture scans,
 staged-bundle checks, and visual QA are independent gates. The completed local
 results are recorded in the task checklist and readiness documentation; the
-remaining external gate is GitHub CI on the pushed PR head. The local evidence
+external result is GitHub CI on the exact pushed PR head. The local evidence
 does not establish a universal performance claim or replace the explicitly
-unavailable VoiceOver, gesture, screen-size, Instruments, or GPU checks.
+unavailable spoken VoiceOver, pointer-gesture, Instruments, or GPU checks.

@@ -383,8 +383,8 @@ Non-goals:
 ### Phase 11 - Production-Quality Bundled 3D Assets
 
 Status: implementation and local validation complete on
-`codex/phase-11-production-3d-assets` (PR #72); the draft PR awaits fresh
-GitHub CI on its pushed head.
+`codex/phase-11-production-3d-assets` (PR #72); exact-head GitHub CI remains a
+separate PR merge gate whose current state is recorded on GitHub.
 
 Scope:
 
@@ -431,9 +431,16 @@ Local validation record:
   the complete procedural source, while medium/high/ultra selected the
   bundled source. BikeErg Low-to-Medium retained the seek position; playback
   pause/resume worked.
-- The Phase 11 visual pass did not include a spoken VoiceOver pass, gestures,
-  all rival/live routes, every camera or appearance mode, window-size matrix,
-  Instruments, or GPU profiling; those are not claimed as complete.
+- The current staged pass covered the live participant, past-session and
+  constant-pace rivals, chase/side/overhead/orbit cameras, dark/light
+  appearance, automation/Reduced Motion, and the largest and compact windows
+  available in the environment. A real imported-rival CSV was visible in the
+  native file panel, but the desktop QA bridge could not complete the final
+  selection; current focused tests cover the unchanged importer and imported
+  3D fallback path.
+- A spoken VoiceOver pass, pointer/trackpad gestures, the current-run imported
+  panel selection, Instruments, and GPU profiling were unavailable and are not
+  claimed as complete.
 
 Non-goals:
 

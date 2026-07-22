@@ -2,19 +2,21 @@ import AppKit
 import Foundation
 import RealityKit
 
-/// Supplies visual meshes to an existing logical sport rig.
+/// Selects the visual source for an existing logical sport rig.
 ///
 /// The articulated rig remains the owner of pivots, contacts, and pose
-/// application. A provider only supplies immutable visual templates, which are
-/// recursively cloned during scene construction so live and rival rigs cannot
-/// share mutable entities or materials.
+/// application. A bundled provider supplies immutable visual templates, which
+/// are recursively cloned during scene construction so live and rival rigs
+/// cannot share mutable entities or materials. The procedural provider instead
+/// selects the rig-owned `ReplayMeshFactory` builders by returning no authored
+/// visual node.
 @MainActor
 protocol ReplayRigVisualProvider: AnyObject {
     /// Whether the provider represents a complete validated bundled asset set.
     var usesBundledAssets: Bool { get }
 
-    /// Returns an independent clone of a named visual node, or `nil` when the
-    /// provider cannot supply that node.
+    /// Returns an independent clone of a named authored visual node. `nil`
+    /// selects the established procedural builder at that logical pivot.
     func cloneVisual(named name: String) -> Entity?
 }
 
@@ -49,9 +51,9 @@ final class ReplayAccentRigVisualProvider: ReplayRigVisualProvider {
 extension ReplayRigVisualProvider {
     /// Attaches a bundled visual node to an existing logical pivot.
     ///
-    /// Returning `false` allows callers to construct their procedural visual
-    /// only when a bundled provider was not selected. A valid bundled provider
-    /// contains every required name, so partial visual mixes are impossible.
+    /// Returning `false` tells callers to construct their existing procedural
+    /// visual. A valid bundled provider contains every required name, so a
+    /// selected bundled sport set never produces a partial visual mix.
     @discardableResult
     func attachVisual(named name: String, to parent: Entity) -> Bool {
         guard let visual = cloneVisual(named: name) else { return false }

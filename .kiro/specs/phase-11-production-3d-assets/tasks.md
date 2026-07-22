@@ -4,8 +4,8 @@
 
 Implementation and local validation are complete on PR #72. A checkbox is
 marked only after the named implementation and its relevant validation are
-complete. PR #72 remains a draft until its pushed head has a fresh GitHub CI
-result; that external gate is not implied by these local checks.
+complete. Exact-head GitHub CI is an external PR gate and is not implied by
+these committed local checks.
 
 ## Spec and Documentation
 
@@ -96,10 +96,16 @@ result; that external gate is not implied by these local checks.
   confirm low is procedural and valid higher tiers are bundled.
 - [x] Exercise pause/resume, seek, Low-to-Medium state preservation, and
   automation mode in the staged app.
-- [ ] Inspect live and every rival kind, all cameras, light/dark appearance,
-  Reduced Motion, and minimum/largest available windows.
+- [x] Inspect the live participant, past-session and constant-pace rivals, all
+  cameras, light/dark appearance, Reduced Motion, and the largest/compact
+  windows available in the current environment.
+- [x] Open a real imported-rival CSV in the native panel and verify the current
+  bounded importer plus imported-rival 3D fallback with focused tests. Record
+  that the desktop QA bridge could not perform the final panel selection in
+  this run instead of claiming a current imported-rival screenshot.
 - [x] Record only actually captured screenshots, observations, and unavailable
-  VoiceOver, gesture, screen-size, Instruments, or GPU proof.
+  VoiceOver, pointer-gesture, imported-panel-selection, Instruments, or GPU
+  proof.
 
 ## Final Audit
 
@@ -108,5 +114,5 @@ result; that external gate is not implied by these local checks.
   resource work.
 - [x] Audit architecture imports, privacy-safe diagnostics, no third-party
   assets, no debug output, no conflict markers, and no unrelated changes.
-- [ ] Update PR #72 with actual validation evidence only after the preceding
+- [x] Update PR #72 with actual validation evidence only after the preceding
   gates pass.
