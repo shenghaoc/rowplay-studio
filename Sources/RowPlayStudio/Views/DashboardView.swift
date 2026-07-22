@@ -6,6 +6,7 @@ import SwiftUI
 struct DashboardView: View {
     @ObservedObject var library: WorkoutLibrary
     @EnvironmentObject private var preferences: AppPreferences
+    @Environment(\.locale) private var locale
     var summary: DashboardSummary
     var personalBests: [DashboardPersonalBest]
     var recentPaceWorkouts: [Workout]
@@ -204,20 +205,23 @@ struct DashboardView: View {
             distanceText = "Marathon"
         } else {
             distanceText = Measurement(value: pb.distance, unit: UnitLength.meters)
-                .formatted(.measurement(width: .wide))
+                .formatted(.measurement(width: .wide).locale(locale))
         }
         return "\(distanceText) \(pb.sport.displayName) Personal Best"
     }
 
     private func pbAccessibilityValue(_ pb: DashboardPersonalBest) -> String {
+        // Per-call styles bound to environment locale — not static caches.
         let durationStyle = Duration.UnitsFormatStyle(
             allowedUnits: [.hours, .minutes, .seconds],
             width: .wide,
             fractionalPart: .show(length: 1)
-        )
+        ).locale(locale)
         let timeFormatted = Duration.seconds(pb.time).formatted(durationStyle)
         let paceFormatted = Duration.seconds(pb.pace).formatted(durationStyle)
-        let dateFormatted = pb.date.formatted(.dateTime.year().month(.abbreviated).day())
+        let dateFormatted = pb.date.formatted(
+            .dateTime.year().month(.abbreviated).day().locale(locale)
+        )
         return "\(timeFormatted), \(paceFormatted) per 500 meters, \(dateFormatted)"
     }
 }
