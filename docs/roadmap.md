@@ -422,9 +422,9 @@ Exit criteria:
 Local validation record:
 
 - `python3 script/generate_replay_assets.py --check`, the focused asset, rig,
-  scene, quality, effect, and ghost suites, `swift test` (978 tests, two
-  expected skips), `swift build`, architecture scans, and `git diff --check`
-  pass.
+  scene, quality, effect, and ghost suites, `swift test` (1,196 tests total:
+  978 Core, 68 Platform, and 150 Studio; two expected Core skips), `swift
+  build`, architecture scans, and `git diff --check` pass.
 - The staged `.app` passes `--verify`, `--automation`, and `--sign-verify`,
   and its resource bundle contains all six generated USDA files.
 - RowErg, SkiErg, and BikeErg were checked at every quality choice. Low showed
