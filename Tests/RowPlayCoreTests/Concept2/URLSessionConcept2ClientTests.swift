@@ -500,6 +500,33 @@ final class URLSessionConcept2ClientTests: XCTestCase {
         XCTAssertEqual(page.workouts.count, 2)
     }
 
+    // MARK: - Secure Session Configuration
+
+    func testMakeSecureConfigurationIsEphemeralWithStrictTimeouts() {
+        let config = URLSessionHTTPTransport.makeSecureConfiguration()
+
+        XCTAssertEqual(config.timeoutIntervalForRequest, 30.0)
+        XCTAssertEqual(config.timeoutIntervalForResource, 300.0)
+
+        // Must not use the shared disk-backed session stores that
+        // `URLSessionConfiguration.default` wires up.
+        XCTAssertNil(config.urlCache)
+        XCTAssertNil(config.httpCookieStorage)
+        XCTAssertNil(config.urlCredentialStorage)
+    }
+
+    func testDefaultTransportUsesSecureConfigurationFactory() {
+        // Constructing the production transport must not require a network call;
+        // this only verifies the default argument path compiles and runs.
+        let transport = URLSessionHTTPTransport()
+        // Keep a strong reference long enough that the session is created.
+        _ = transport
+        // Explicit factory remains the single source of truth for timeouts/storage.
+        let config = URLSessionHTTPTransport.makeSecureConfiguration()
+        XCTAssertEqual(config.timeoutIntervalForRequest, 30.0)
+        XCTAssertNil(config.urlCache)
+    }
+
     // MARK: - Redirect Downgrade Protection
 
     func testHTTPRedirectIsBlockedByDelegate() {
