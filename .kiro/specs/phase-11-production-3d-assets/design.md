@@ -1,3 +1,5 @@
+> **Revised scope:** Phase 11 aligns native replay with the canonical RowPlay V4 athlete from provisional upstream PR #171. Studio owns equipment/environments, loading, validation, quality, and fallback. V4 is not the final premium athlete; Phase 12 covers premium anatomy and most 穿模. PR #72 remains draft until #171 refresh.
+
 # Phase 11 - Production-Quality Bundled 3D Assets — Design
 
 ## Status and Design Intent

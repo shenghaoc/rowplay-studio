@@ -21,8 +21,10 @@ final class ReplaySkiErgRig: ReplaySportRig {
     private let footAnchorR = Entity()
     private var poles: [Entity] = []
 
-    // Athlete
+    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
     private let athlete = ReplayAthleteRig()
+    private var canonicalAthlete: ReplayAthleteInstance?
+    private var poseAdapter: ReplayAthletePoseAdapter?
 
     // MARK: - Build
 
@@ -30,7 +32,8 @@ final class ReplaySkiErgRig: ReplaySportRig {
         into parent: ModelEntity,
         accent: Color,
         opacity: Float,
-        visualProvider: (any ReplayRigVisualProvider)? = nil
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
     ) {
         root.name = "skierg-rig"
         parent.addChild(root)
@@ -166,21 +169,28 @@ final class ReplaySkiErgRig: ReplaySportRig {
             poles.append(pole)
         }
 
-        // Athlete body (standing)
-        athlete.build(
-            into: root,
-            seated: false,
-            accent: accent,
-            opacity: opacity,
-            visualProvider: visualProvider
-        )
-        // Position pelvis at hip height
-        athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
+        // Athlete body (standing). Canonical V4 and procedural paths are exclusive.
+        if let canonicalAthlete {
+            self.canonicalAthlete = canonicalAthlete
+            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
+            canonicalAthlete.attach(to: root)
+            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
+            canonicalAthlete.root.position = SIMD3(0, 0.72, 0.02)
+        } else {
+            athlete.build(
+                into: root,
+                seated: false,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: nil
+            )
+            athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
+        }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose) {
+    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
         guard case .skierg(let skiPose) = pose else {
             assertionFailure("ReplaySkiErgRig.applyPose received non-skierg pose")
             return
@@ -214,16 +224,33 @@ final class ReplaySkiErgRig: ReplaySportRig {
             axis: SIMD3(1, 0, 0)
         )
 
-        // Athlete pelvis position adjusted by hip compression
         let compressionOffset = hipCompression * 0.15
-        athlete.pelvis.position = SIMD3(0, 0.72 - compressionOffset, 0.02)
+        let pelvisTarget = SIMD3<Float>(0, 0.72 - compressionOffset, 0.02)
+        let handL = leftHandle.position(relativeTo: root)
+        let handR = rightHandle.position(relativeTo: root)
+        let footL = footAnchorL.position(relativeTo: root)
+        let footR = footAnchorR.position(relativeTo: root)
 
-        // Apply athlete joint pose (with finite guard inside)
-        athlete.applyPose(skiPose.joints)
-
-        athlete.handL.setPosition(leftHandle.position(relativeTo: root), relativeTo: root)
-        athlete.handR.setPosition(rightHandle.position(relativeTo: root), relativeTo: root)
-        athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
-        athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
+        if let canonicalAthlete, let poseAdapter, let motion {
+            poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
+            _ = ReplayAthleteContactSolver.constrain(
+                instance: canonicalAthlete,
+                targets: ReplayAthleteContactTargets(
+                    pelvis: pelvisTarget,
+                    leftHand: handL,
+                    rightHand: handR,
+                    leftFoot: footL,
+                    rightFoot: footR
+                ),
+                relativeTo: root
+            )
+        } else {
+            athlete.pelvis.position = pelvisTarget
+            athlete.applyPose(skiPose.joints)
+            athlete.handL.setPosition(handL, relativeTo: root)
+            athlete.handR.setPosition(handR, relativeTo: root)
+            athlete.footL.setPosition(footL, relativeTo: root)
+            athlete.footR.setPosition(footR, relativeTo: root)
+        }
     }
 }

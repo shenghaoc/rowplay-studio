@@ -33,7 +33,11 @@ final class ReplayAssetCatalogTests: XCTestCase {
         for sport in ReplayAssetCatalog.supportedSports {
             let rigNodes = ReplayAssetCatalog.requiredRigNodeNames(for: sport)
             XCTAssertEqual(rigNodes.count, Set(rigNodes).count)
-            XCTAssertTrue(rigNodes.starts(with: ReplayAssetCatalog.commonRigNodeNames))
+            // Equipment-only: no native human anatomy nodes.
+            for forbidden in ["visual-pelvis", "visual-torso", "visual-head", "visual-hand-L"] {
+                XCTAssertFalse(rigNodes.contains(forbidden))
+            }
+            XCTAssertTrue(ReplayAssetCatalog.commonRigNodeNames.isEmpty)
 
             let environment = ReplayAssetCatalog.environmentResource(for: sport)
             XCTAssertEqual(

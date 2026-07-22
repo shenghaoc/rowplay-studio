@@ -12,9 +12,22 @@ protocol ReplaySportRig: AnyObject {
     /// The root entity of the rig hierarchy.
     var root: Entity { get }
     /// Apply a sport-specific rig pose.
-    func applyPose(_ pose: ReplaySportRigPose)
+    ///
+    /// - Parameters:
+    ///   - pose: Equipment and (procedural) joint targets from the pure solver.
+    ///   - motion: Optional phase sample for V4 animation seeking. When the
+    ///     rig uses the canonical athlete, the adapter samples the authored
+    ///     clip from this value; the native clock remains authoritative.
+    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?)
     /// Apply ghost translucency to all materials.
     func applyGhostTranslucency()
+}
+
+@MainActor
+extension ReplaySportRig {
+    func applyPose(_ pose: ReplaySportRigPose) {
+        applyPose(pose, motion: nil)
+    }
 }
 
 /// Default ghost translucency: recursively applies 0.45 opacity to all materials.
@@ -37,13 +50,16 @@ enum ReplaySportRigFactory {
     ///   - opacity: Material opacity (1.0 for live, <1 for ghost).
     ///   - visualProvider: A complete bundled visual provider, or `nil` for the
     ///     existing procedural mesh path.
+    ///   - canonicalAthlete: Independent V4 athlete instance for Medium+/valid
+    ///     packages. When present the procedural body is not built.
     /// - Returns: A `ReplaySportRig` that can apply poses.
     static func build(
         sport: Sport,
         into parent: ModelEntity,
         accent: Color,
         opacity: Float = 1.0,
-        visualProvider: (any ReplayRigVisualProvider)? = nil
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
     ) -> ReplaySportRig {
         let resolvedVisualProvider: (any ReplayRigVisualProvider)?
         if let visualProvider {
@@ -61,15 +77,33 @@ enum ReplaySportRigFactory {
         switch sport {
         case .rower:
             let rig = ReplayRowerRig()
-            rig.build(into: parent, accent: accent, opacity: opacity, visualProvider: resolvedVisualProvider)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: canonicalAthlete
+            )
             return rig
         case .skierg:
             let rig = ReplaySkiErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity, visualProvider: resolvedVisualProvider)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: canonicalAthlete
+            )
             return rig
         case .bike:
             let rig = ReplayBikeErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity, visualProvider: resolvedVisualProvider)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: canonicalAthlete
+            )
             return rig
         }
     }

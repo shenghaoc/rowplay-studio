@@ -19,19 +19,25 @@ private final class ReplayModuleAssetResourceSource: ReplayAssetResourceSource {
 
 /// A complete validated sport-specific asset set.
 ///
+/// Equipment and environment come from the native USDA package. The athlete is
+/// the upstream V4 USDZ template. All three must validate together — a missing
+/// athlete rejects the whole bundled set so scenes never mix sources.
+///
 /// The templates never enter a live RealityKit scene. Callers receive fresh
 /// clones so live and ghost rigs cannot share mutable entity state.
 @MainActor
 final class ReplayBundledAssetSet {
     let sport: Sport
     let rigVisualProvider: ReplayBundledRigVisualProvider
+    let athleteTemplate: ReplayAthleteTemplate
 
     private let environmentTemplate: Entity
 
     init?(
         sport: Sport,
         rigRoot: Entity,
-        environmentRoot: Entity
+        environmentRoot: Entity,
+        athleteTemplate: ReplayAthleteTemplate
     ) {
         guard let provider = ReplayBundledRigVisualProvider(
             root: rigRoot,
@@ -54,6 +60,7 @@ final class ReplayBundledAssetSet {
 
         self.sport = sport
         self.rigVisualProvider = provider
+        self.athleteTemplate = athleteTemplate
         self.environmentTemplate = environmentRoot
         rigRoot.isEnabled = false
         environmentTemplate.isEnabled = false
@@ -66,6 +73,9 @@ final class ReplayBundledAssetSet {
         return clone
     }
 
+    func makeAthleteInstance(name: String, opacity: Float) -> ReplayAthleteInstance? {
+        athleteTemplate.makeInstance(name: name, opacity: opacity)
+    }
 }
 
 /// Small RealityKit-side geometry predicate shared by the template and rig
@@ -126,6 +136,12 @@ final class ReplayAssetLibrary {
         }
         guard !failedSports.contains(sport) else { return nil }
 
+        // Athlete is shared across sports but required for every bundled set.
+        guard let athleteTemplate = await ReplayAthleteLibrary.shared.athleteTemplate() else {
+            failedSports.insert(sport)
+            return nil
+        }
+
         let resources = ReplayAssetCatalog.resources(for: sport)
         var urls: [ReplayAssetResource: URL] = [:]
         var inspections: [ReplayAssetInspection] = []
@@ -151,7 +167,8 @@ final class ReplayAssetLibrary {
         let set = ReplayBundledAssetSet(
             sport: sport,
             rigRoot: rigRoot,
-            environmentRoot: environmentRoot
+            environmentRoot: environmentRoot,
+            athleteTemplate: athleteTemplate
         ) else {
             failedSports.insert(sport)
             return nil

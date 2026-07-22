@@ -1,0 +1,29 @@
+{
+  "athleteAuthorship": "RowPlay Studio does not author the athlete. The V4 athlete, skeleton, animations, and movement landmarks are owned by the upstream rowplay repository.",
+  "contractSchema": "rowplay.replay.athlete.v4",
+  "contractSchemaVersion": 1,
+  "contractSha256": "96acec971c3247120e71af726388420dd89866437c76c3a417ea267481976dba",
+  "copiedUsdzSha256": "5591b13c7d58bc4f44194728c1a2fc1c669086232d2f1bd97723672392c50723",
+  "expectedCommit": "dba7211bfa94d3f86e60b75921bd5853ec736f55",
+  "glbSha256": "a9a215f07bd39d15daa5c45c5bfbbb1788656ad7916fc39f172c5dcc78129963",
+  "pinnedCommit": "dba7211bfa94d3f86e60b75921bd5853ec736f55",
+  "provenance": {
+    "forbiddenSources": [
+      "downloaded model",
+      "third-party character",
+      "scan",
+      "likeness",
+      "avatar generator",
+      "texture",
+      "user image"
+    ],
+    "licence": "MIT",
+    "owner": "rowplay",
+    "source": "repository-authored Blender 5 parametric skinned athlete"
+  },
+  "status": "provisional",
+  "syncCommand": "python3 script/sync_rowplay_athlete.py --rowplay-repo /Users/shenghaochen/repos/rowplay --expected-commit dba7211bfa94d3f86e60b75921bd5853ec736f55",
+  "upstreamPR": 171,
+  "upstreamRepository": "https://github.com/shenghaoc/rowplay",
+  "usdzSha256": "5591b13c7d58bc4f44194728c1a2fc1c669086232d2f1bd97723672392c50723"
+}

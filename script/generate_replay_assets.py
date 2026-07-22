@@ -70,24 +70,9 @@ class AssetPlan:
     triangle_ceiling: int
 
 
-COMMON_RIG_NODES = (
-    "visual-pelvis",
-    "visual-torso",
-    "visual-head",
-    "visual-upperArm-L",
-    "visual-forearm-L",
-    "visual-hand-L",
-    "visual-upperArm-R",
-    "visual-forearm-R",
-    "visual-hand-R",
-    "visual-thigh-L",
-    "visual-shin-L",
-    "visual-foot-L",
-    "visual-thigh-R",
-    "visual-shin-R",
-    "visual-foot-R",
-)
-
+# Athlete body parts are intentionally absent. The production athlete is the
+# upstream RowPlay V4 USDZ (see script/sync_rowplay_athlete.py). Low quality and
+# total package failure continue to use the lightweight procedural athlete.
 SPORT_RIG_NODES = {
     "rower": (
         "visual-hull",
@@ -132,10 +117,6 @@ ENVIRONMENT_NODES = (
 )
 
 RIG_MATERIALS = (
-    "skin",
-    "hair",
-    "kit",
-    "shoe",
     "accent",
     "metal",
     "rubber",
@@ -150,10 +131,8 @@ ENVIRONMENT_MATERIALS = {
 MATERIAL_VALUES: dict[str, tuple[Vec3, float, float]] = {
     # Category: (base colour, metallic, roughness).  These use the standard
     # UsdPreviewSurface PBR inputs rather than baked lighting or textures.
-    "skin": ((0.79, 0.60, 0.45), 0.0, 0.74),
-    "hair": ((0.13, 0.09, 0.06), 0.0, 0.82),
-    "kit": ((0.08, 0.18, 0.29), 0.0, 0.55),
-    "shoe": ((0.05, 0.06, 0.08), 0.0, 0.78),
+    # Athlete skin/hair/kit/shoe materials live on the upstream V4 athlete, not
+    # in these native equipment/environment packages.
     "accent": ((0.12, 0.62, 0.82), 0.08, 0.42),
     "metal": ((0.46, 0.51, 0.56), 0.82, 0.27),
     "rubber": ((0.035, 0.045, 0.055), 0.0, 0.89),
@@ -396,53 +375,6 @@ def components(*entries: tuple[str, Mesh, str]) -> tuple[Component, ...]:
     return tuple(Component(name, mesh, material) for name, mesh, material in entries)
 
 
-def athlete_nodes() -> dict[str, tuple[Component, ...]]:
-    """Meshes whose origins match native athlete articulation pivots exactly."""
-
-    nodes: dict[str, tuple[Component, ...]] = {
-        "visual-pelvis": components(
-            ("pelvis-shell", ellipsoid(0.145, 0.075, 0.105, center=(0.0, 0.015, 0.0)), "kit"),
-            ("waistband", torus(0.128, 0.012, major_segments=12, minor_segments=5, center=(0.0, 0.070, 0.0)), "accent"),
-        ),
-        "visual-torso": components(
-            ("torso-shell", tapered_cylinder(0.42, 0.145, 0.195, segments=12, center=(0.0, 0.21, 0.0)), "kit"),
-            ("chest-panel", box(0.205, 0.145, 0.022, center=(0.0, 0.28, 0.145)), "accent"),
-        ),
-        "visual-head": components(
-            ("head-shell", ellipsoid(0.108, 0.132, 0.098, center=(0.0, 0.125, 0.0)), "skin"),
-            ("hair-cap", ellipsoid(0.113, 0.060, 0.102, center=(0.0, 0.220, -0.004)), "hair"),
-            ("neck", tapered_cylinder(0.090, 0.050, 0.043, segments=10, center=(0.0, 0.020, 0.0)), "skin"),
-        ),
-    }
-    for side in ("L", "R"):
-        nodes[f"visual-upperArm-{side}"] = components(
-            ("sleeve", tapered_cylinder(0.095, 0.054, 0.048, segments=10, center=(0.0, -0.045, 0.0)), "kit"),
-            ("upper-arm", tapered_cylinder(0.275, 0.041, 0.030, segments=10, center=(0.0, -0.155, 0.0)), "skin"),
-        )
-        nodes[f"visual-forearm-{side}"] = components(
-            ("forearm", tapered_cylinder(0.275, 0.032, 0.023, segments=10, center=(0.0, -0.1375, 0.0)), "skin"),
-            ("wrist-band", torus(0.030, 0.005, major_segments=10, minor_segments=4, center=(0.0, -0.245, 0.0)), "accent"),
-        )
-        nodes[f"visual-hand-{side}"] = components(
-            ("palm", ellipsoid(0.038, 0.032, 0.053, longitude_segments=10, latitude_segments=6, center=(0.0, -0.012, 0.025)), "skin"),
-            ("fingers", tapered_cylinder(0.055, 0.014, 0.010, segments=8, axis="z", center=(0.0, -0.020, 0.067)), "skin"),
-        )
-        nodes[f"visual-thigh-{side}"] = components(
-            ("shorts", tapered_cylinder(0.160, 0.066, 0.072, segments=11, center=(0.0, -0.070, 0.0)), "kit"),
-            ("thigh", tapered_cylinder(0.415, 0.060, 0.042, segments=11, center=(0.0, -0.210, 0.0)), "skin"),
-        )
-        nodes[f"visual-shin-{side}"] = components(
-            ("shin", tapered_cylinder(0.395, 0.043, 0.030, segments=10, center=(0.0, -0.198, 0.0)), "kit"),
-            ("calf-panel", box(0.050, 0.185, 0.018, center=(0.0, -0.200, -0.030)), "accent"),
-        )
-        nodes[f"visual-foot-{side}"] = components(
-            ("shoe-upper", ellipsoid(0.052, 0.032, 0.105, longitude_segments=10, latitude_segments=6, center=(0.0, -0.010, 0.064)), "shoe"),
-            ("sole", box(0.102, 0.018, 0.190, center=(0.0, -0.035, 0.065)), "rubber"),
-            ("lace", box(0.055, 0.010, 0.038, center=(0.0, 0.020, 0.084)), "accent"),
-        )
-    return nodes
-
-
 def rower_equipment_nodes() -> dict[str, tuple[Component, ...]]:
     return {
         "visual-hull": components(
@@ -655,14 +587,13 @@ def bike_environment_nodes() -> dict[str, tuple[Component, ...]]:
 
 
 def make_rig_plan(sport: str) -> AssetPlan:
-    nodes = athlete_nodes()
     equipment_by_sport: dict[str, Callable[[], dict[str, tuple[Component, ...]]]] = {
         "rower": rower_equipment_nodes,
         "skierg": skierg_equipment_nodes,
         "bike": bike_equipment_nodes,
     }
-    nodes.update(equipment_by_sport[sport]())
-    required_nodes = COMMON_RIG_NODES + SPORT_RIG_NODES[sport]
+    nodes = equipment_by_sport[sport]()
+    required_nodes = SPORT_RIG_NODES[sport]
     return AssetPlan(
         filename=f"{sport}-rig.usda",
         sport=sport,
@@ -949,10 +880,13 @@ def json_text(value: object) -> str:
 def provenance_text() -> str:
     return """# Replay 3D Asset Provenance
 
-The six Phase 11 replay assets in this directory are original, project-generated
-work. They contain no third-party model, texture, logo, trademark, download, or
-network-derived source material. Their geometry is generated deterministically
-from the standard-library-only script in this repository.
+## Native equipment and environments
+
+The six Phase 11 equipment and environment USDA assets in this directory are
+original, project-generated work. They contain no third-party model, texture,
+logo, trademark, download, or network-derived source material. Geometry is
+generated deterministically from the standard-library-only script in this
+repository. These files intentionally contain **no human anatomy**.
 
 Regenerate the committed USDA resources and golden contract with:
 
@@ -969,6 +903,19 @@ python3 script/generate_replay_assets.py --check
 The fixed generation seed is `20260721`. The assets intentionally contain no
 camera or light prims: the native RealityKit scene remains authoritative for
 camera, lighting, course placement, effects, and fallback behaviour.
+
+## Canonical V4 athlete (upstream, provisional)
+
+The production athlete is not authored by RowPlay Studio. It is the canonical
+RowPlay V4 athlete owned by upstream PR #171 and synchronised by
+`script/sync_rowplay_athlete.py` into:
+
+- `rowplay-athlete-v4.usdz`
+- `rowplay-athlete-v4.contract.json`
+- `rowplay-athlete-v4-source.json`
+
+Low quality and total package failure continue to use the lightweight
+procedural athlete. Premium anatomy and most interpenetration work are Phase 12.
 """
 
 

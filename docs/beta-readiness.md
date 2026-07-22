@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 bundled 3D assets is implemented and locally validated on `codex/phase-11-production-3d-assets` (PR #72); exact-head GitHub CI remains a separate PR merge gate whose current state is recorded on GitHub.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 aligns native replay with the canonical RowPlay V4 athlete on `codex/phase-11-production-3d-assets` (PR #72, **draft**), consuming a provisional pin from upstream PR #171. PR #72 must not merge before #171; premium athlete art is Phase 12.
 
 ### What Is Implemented
 
@@ -25,39 +25,22 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
 - **Test suite**: the merged baseline and Phase 8C validation passed. Phase 8D adds focused coverage for exact tier budgets, governor calibration/degradation, bounded metrics, preferences, raw playback deltas, graph/effect counts, stable rebuilds, generation de-duplication, and accessibility. Phase 10A adds `ReplayRaceGapTests` (fixture parity and degenerate inputs), expanded `GhostPickTests` (ranked ordering, sanitizers, tie-break), `WorkoutLibraryGhostCandidateTests` (caching, exclusion, default selection), and `ReplayGhostWorkflowTests` (candidate construction and 2D ghost-path origins). The complete matrix passes with only the opt-in authenticated smoke tests skipped when no token is supplied.
 
-### Phase 11 Bundled Assets (PR #72)
+### Phase 11 Canonical Athlete Integration (PR #72, draft)
 
-PR #72 is adding native project-generated USDA rigs and sport-specific scenery
-behind an asset catalog/library and visual-provider boundary. The intended
-behavior is complete procedural visuals at low quality; complete bundled
-visuals at valid medium/high/ultra; and an atomic complete procedural fallback
-for missing, malformed, or incomplete resource sets. Native pose/contact
-ownership, course semantics, cameras, effects, rivals, Reduced Motion, and
-offline demo/automation modes remain unchanged.
+PR #72 aligns native replay with the **canonical RowPlay V4 athlete** from
+upstream PR #171 (provisional pin
+`dba7211bfa94d3f86e60b75921bd5853ec736f55`). Studio owns equipment USDA,
+environments, loading/validation, quality selection, and fallback; it does not
+author the athlete. Low → complete procedural; Medium/High/Ultra + valid
+package → V4 athlete + native equipment/environment; any failure → complete
+procedural. V4 is a stylised baseline; premium anatomy and most `穿模` work are
+Phase 12.
 
-The local PR head passes the deterministic resource check, focused asset/rig/
-scene suites, full `swift test` (1,196 tests total: 978 Core, 68 Platform, and
-150 Studio; two expected Core skips), `swift build`, architecture scans,
-whitespace check, and staged `--verify`,
-`--automation`, and `--sign-verify` gates. The resource bundle contains all
-six USDA files. RowErg, SkiErg, and BikeErg were checked at each quality
-selection: low uses the complete procedural path and valid medium/high/ultra
-use the bundled path. A Low-to-Medium BikeErg switch retained replay time, and
-play/pause still worked.
+PR #72 stays **draft** until #171 finishes movement physics, regenerates
+artifacts, and Studio refreshes the pin. Do not merge #72 before #171.
 
-The current staged-app pass also covered the live participant, past-session and
-constant-pace rivals, chase/side/overhead/orbit cameras, dark/light appearance,
-automation/Reduced Motion, and the largest and compact windows available in
-the environment. Accessibility inspection exposed native controls with clear
-labels, values, and help. A real imported-rival CSV was visible in the native
-file panel, but the desktop QA bridge could not complete the final selection;
-the unchanged bounded importer and imported-rival 3D fallback are covered by
-the current focused tests, while the native panel flow was previously exercised
-for Phase 10B.
-
-This is bounded local evidence, not an all-environment beta claim. A spoken
-VoiceOver run, pointer/trackpad gesture proof, Instruments, and GPU profiling
-were unavailable. Exact-head GitHub CI remains required before merge.
+See `docs/replay-assets.md` and `docs/roadmap.md` for the refresh gate and
+accepted visual limitations.
 
 ## rowplay PR #166 Impact
 

@@ -193,24 +193,10 @@ enum ReplayAssetCatalog {
 
     static let supportedSports: [Sport] = [.rower, .skierg, .bike]
 
-    /// Common athlete visual nodes required by every sport rig asset.
-    static let commonRigNodeNames: [String] = [
-        "visual-pelvis",
-        "visual-torso",
-        "visual-head",
-        "visual-upperArm-L",
-        "visual-forearm-L",
-        "visual-hand-L",
-        "visual-upperArm-R",
-        "visual-forearm-R",
-        "visual-hand-R",
-        "visual-thigh-L",
-        "visual-shin-L",
-        "visual-foot-L",
-        "visual-thigh-R",
-        "visual-shin-R",
-        "visual-foot-R",
-    ]
+    /// Athlete body nodes are not part of the native equipment package. The
+    /// production athlete is the upstream V4 USDZ; Low/fallback use the
+    /// lightweight procedural athlete instead of a second native mannequin.
+    static let commonRigNodeNames: [String] = []
 
     /// Nodes required in every sport environment asset.
     static let environmentNodeNames: [String] = [
@@ -274,7 +260,7 @@ enum ReplayAssetCatalog {
     }
 
     static func requiredRigNodeNames(for sport: Sport) -> [String] {
-        commonRigNodeNames + sportSpecificRigNodeNames(for: sport)
+        sportSpecificRigNodeNames(for: sport)
     }
 
     static func sportSpecificRigNodeNames(for sport: Sport) -> [String] {
@@ -324,7 +310,8 @@ enum ReplayAssetCatalog {
     static func requiredMaterialCategories(for resource: ReplayAssetResource) -> [String] {
         switch (resource.sport, resource.kind) {
         case (_, .rig):
-            ["skin", "hair", "kit", "shoe", "accent", "metal", "rubber"]
+            // Equipment-only materials. Athlete surfaces come from the V4 USDZ.
+            ["accent", "metal", "rubber"]
         case (.rower, .environment):
             ["water", "shore", "foliage", "accent", "metal"]
         case (.skierg, .environment):
@@ -339,8 +326,8 @@ enum ReplayAssetCatalog {
         switch (resource.sport, resource.kind) {
         case (.rower, .rig):
             ReplayAssetBounds(
-                minimum: SIMD3(-2.67, -0.4175, -1.55),
-                maximum: SIMD3(2.67, 0.42, 1.55)
+                minimum: SIMD3(-2.67, -0.255, -1.55),
+                maximum: SIMD3(2.67, 0.255, 1.55)
             )
         case (.rower, .environment):
             ReplayAssetBounds(

@@ -82,12 +82,30 @@ enum Replay3DSceneBuilder {
             for: effectiveQuality,
             assetSetIsValid: matchingAssetSet != nil
         )
-        let visualProvider: (any ReplayRigVisualProvider) = switch visualSource {
+        let visualProvider: (any ReplayRigVisualProvider)?
+        let liveAthlete: ReplayAthleteInstance?
+        let ghostAthlete: ReplayAthleteInstance?
+        switch visualSource {
         case .procedural:
-            ReplayProceduralRigVisualProvider.shared
+            visualProvider = ReplayProceduralRigVisualProvider.shared
+            liveAthlete = nil
+            ghostAthlete = nil
         case .bundled:
-            // `visualSource` can only be `.bundled` when the optional set is non-nil.
-            matchingAssetSet!.rigVisualProvider
+            // Atomic package: equipment provider plus independent V4 clones.
+            let assetSet = matchingAssetSet!
+            visualProvider = assetSet.rigVisualProvider
+            liveAthlete = assetSet.makeAthleteInstance(name: "live-v4-athlete", opacity: 1.0)
+            ghostAthlete = assetSet.makeAthleteInstance(name: "ghost-v4-athlete", opacity: 0.45)
+            // If either athlete clone fails, fall back entirely to procedural.
+            if liveAthlete == nil || ghostAthlete == nil {
+                return buildScene(
+                    sport: sport,
+                    colorScheme: colorScheme,
+                    configuration: configuration,
+                    effectiveQuality: effectiveQuality,
+                    bundledAssetSet: nil
+                )
+            }
         }
 
         let root = Entity()
@@ -127,17 +145,20 @@ enum Replay3DSceneBuilder {
         root.addChild(ground)
 
         // The bundle supplies the complete environment only when its matching
-        // rig also validated. The procedural ground is otherwise retained as a
-        // coherent fallback rather than mixing the two visual sources.
+        // rig and athlete also validated. The procedural ground is otherwise
+        // retained as a coherent fallback rather than mixing visual sources.
+        let resolvedVisualSource: ReplayAssetVisualSource
         let bundledEnvironment: Entity?
-        if visualSource == .bundled, let matchingAssetSet {
+        if visualSource == .bundled, let matchingAssetSet, liveAthlete != nil, ghostAthlete != nil {
             ground.isEnabled = false
             bundledEnvironment = ReplayEnvironmentAssetInstaller.install(
                 assetSet: matchingAssetSet,
                 into: root
             )
+            resolvedVisualSource = .bundled
         } else {
             bundledEnvironment = nil
+            resolvedVisualSource = .procedural
         }
 
         // Course ring
@@ -161,7 +182,8 @@ enum Replay3DSceneBuilder {
         root.addChild(liveGroup)
         let liveRig = ReplaySportRigFactory.build(
             sport: sport, into: liveGroup, accent: .green, opacity: 1.0,
-            visualProvider: visualProvider
+            visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
+            canonicalAthlete: resolvedVisualSource == .bundled ? liveAthlete : nil
         )
 
         // Ghost avatar
@@ -171,9 +193,12 @@ enum Replay3DSceneBuilder {
         root.addChild(ghostGroup)
         let ghostRig = ReplaySportRigFactory.build(
             sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45,
-            visualProvider: visualProvider
+            visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
+            canonicalAthlete: resolvedVisualSource == .bundled ? ghostAthlete : nil
         )
-        ghostRig.applyGhostTranslucency()
+        if resolvedVisualSource != .bundled {
+            ghostRig.applyGhostTranslucency()
+        }
 
         // Every wake and spray entity is allocated once with the scene.
         let effectRenderer = ReplayEffectRenderer(
@@ -197,7 +222,7 @@ enum Replay3DSceneBuilder {
             sport: sport,
             layout: layout,
             configuration: configuration,
-            visualSource: visualSource,
+            visualSource: resolvedVisualSource,
             bundledEnvironment: bundledEnvironment
         )
     }
@@ -242,8 +267,11 @@ enum Replay3DSceneBuilder {
         container.liveGroup.position = SIMD3(Float(livePos.x), bob, Float(livePos.z))
         container.liveGroup.orientation = simd_quatf(angle: Float(liveHeading), axis: SIMD3(0, 1, 0))
 
-        // Apply rig pose to live avatar
-        container.liveRig.applyPose(liveRigPose)
+        // Apply rig pose to live avatar (equipment + V4 phase seek or procedural joints).
+        container.liveRig.applyPose(
+            liveRigPose,
+            motion: ReplayAthleteMotionSample(strokePose: livePose)
+        )
 
         // Ghost
         if ghostVisible, let ghostPose {
@@ -259,7 +287,10 @@ enum Replay3DSceneBuilder {
                 distance: ghostDistance,
                 reduceMotion: reduceMotion
             )
-            container.ghostRig.applyPose(ghostRigPose)
+            container.ghostRig.applyPose(
+                ghostRigPose,
+                motion: ReplayAthleteMotionSample(strokePose: ghostPose)
+            )
         } else {
             container.ghostGroup.isEnabled = false
         }
