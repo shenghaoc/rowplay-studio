@@ -25,7 +25,9 @@ The procedural rigs and environments remain the complete, reliable fallback.
   Charts imports to Core.
 - **R1.4** The current logical sport rigs continue to own named pivots,
   `applyPose`, contact anchors, and finite-transform guards. A visual provider
-  supplies geometry to those pivots; it does not replace the pose solver.
+  selects the visual source for those pivots; bundled providers supply authored
+  geometry, while the procedural provider selects the rigs' established
+  `ReplayMeshFactory` builders. No provider replaces the pose solver.
 - **R1.5** The phase adds no external package, runtime download, toolchain,
   deployment-target, CI-runner, product, target-graph, replay-control, or 2D
   renderer change.
@@ -110,9 +112,9 @@ The procedural rigs and environments remain the complete, reliable fallback.
 ## R5: Providers, Quality, and Fallback
 
 - **R5.1** Geometry selection is isolated behind `ReplayRigVisualProvider`.
-  `ReplayProceduralRigVisualProvider` retains the existing generated geometry;
-  `ReplayBundledRigVisualProvider` attaches validated asset geometry to the
-  same logical pivots.
+  `ReplayProceduralRigVisualProvider` explicitly selects the existing rig-owned
+  generated geometry; `ReplayBundledRigVisualProvider` attaches validated asset
+  geometry to the same logical pivots.
 - **R5.2** `ReplayAssetLibrary` loads and validates templates once per process,
   provides independent recursive clones for live and rival rigs, supports an
   injectable resource source for failure tests, and never loads or traverses

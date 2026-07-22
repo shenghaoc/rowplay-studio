@@ -6,19 +6,27 @@ Phase 11 is implemented on RowPlay Studio PR #72. On the local PR head, the
 deterministic generator check, focused asset/rig/scene suites, full `swift
 test` (978 tests, two expected skips), `swift build`, architecture scans,
 whitespace check, staged-bundle resource check, staged launch, automation
-launch, and signature verification all pass. The PR remains a draft until the
-pushed head receives fresh GitHub CI.
+launch, and signature verification pass. GitHub CI on the exact pushed head is
+a separate PR gate; its current result is recorded on PR #72.
 
 The staged app was checked with RowErg, SkiErg, and BikeErg at low, medium,
 high, and ultra. Low visibly selects the complete existing procedural rig and
 background; valid higher tiers select the complete bundled sport set. A
 BikeErg Low-to-Medium change preserved the seek position, and pause/resume
 continued to work. Captured visual review covered representative bundled and
-procedural scenes, not a universal visual-performance claim.
+procedural scenes, all four camera choices, a live participant, past-session
+and constant-pace rivals, dark and light appearance, automation/Reduced Motion,
+and the largest and compact windows available in this environment. Native
+accessibility inspection exposed clear labels, values, and help for the replay,
+camera, quality, rival, and playback controls.
 
-Not run for this phase: a spoken VoiceOver pass, trackpad/orbit gesture proof,
-all rival kinds and live-mode visual routes, every camera and appearance mode,
-minimum/largest window inspection, Instruments, and GPU profiling.
+A real imported-rival CSV was visible in the native file panel, but the desktop
+QA bridge could not perform the final file selection in this run. The unchanged
+bounded importer and the Phase 11 imported-rival 3D identity/fallback path are
+covered by the current focused tests, and the native panel import flow was
+already exercised when that workflow landed in Phase 10B. Not available for
+this phase: a spoken VoiceOver pass, pointer/trackpad orbit gesture proof,
+Instruments, and GPU profiling.
 
 Phase 11 is native-owned. The app bundles project-generated USD assets for the
 macOS runtime, while the replay clock, pose solver, course, cameras, effects,
@@ -155,10 +163,11 @@ ReplaySportRig (pivots, contacts, applyPose)
                     └── ReplayAssetLibrary / Bundle.module
 ```
 
-The procedural provider preserves the existing generated meshes. The bundled
-provider validates a resource template once, clones it recursively, and maps
-its visual nodes to the same logical pivots. Templates, live rigs, rivals, and
-scenes must never share mutable materials or animation state.
+The procedural provider explicitly selects the existing generated meshes still
+owned by each articulated rig; it does not duplicate those builders. The
+bundled provider validates a resource template once, clones it recursively,
+and maps its visual nodes to the same logical pivots. Templates, live rigs,
+rivals, and scenes must never share mutable materials or animation state.
 
 `ReplayEnvironmentAssetInstaller` adds a bundled background only during scene
 construction. It leaves native lanes, distances, markers, lights, cameras, and

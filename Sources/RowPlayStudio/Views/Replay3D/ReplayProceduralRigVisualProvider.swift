@@ -1,9 +1,11 @@
 import RealityKit
 
-/// The complete low-quality and load-failure visual source.
+/// Selects the complete low-quality and load-failure visual source.
 ///
-/// Returning no template lets the articulated rig keep attaching its existing
-/// deterministic `ReplayMeshFactory` geometry at every pivot.
+/// Procedural geometry remains deliberately owned by the articulated rig's
+/// established `ReplayMeshFactory` builders. Returning no authored template at
+/// every pivot selects those builders without duplicating their geometry or
+/// material construction in a second provider implementation.
 @MainActor
 final class ReplayProceduralRigVisualProvider: ReplayRigVisualProvider {
     static let shared = ReplayProceduralRigVisualProvider()

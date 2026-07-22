@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 bundled 3D assets is implemented and locally validated on `codex/phase-11-production-3d-assets` (PR #72); its draft PR awaits fresh exact-head GitHub CI.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 bundled 3D assets is implemented and locally validated on `codex/phase-11-production-3d-assets` (PR #72); exact-head GitHub CI remains a separate PR merge gate whose current state is recorded on GitHub.
 
 ### What Is Implemented
 
@@ -44,10 +44,19 @@ selection: low uses the complete procedural path and valid medium/high/ultra
 use the bundled path. A Low-to-Medium BikeErg switch retained replay time, and
 play/pause still worked.
 
-This is bounded local evidence, not an all-environment beta claim. The Phase
-11 pass did not include a spoken VoiceOver run, gesture proof, every
-live/rival/camera/appearance route, window-size matrix, Instruments, or GPU
-profiling. Fresh exact-head GitHub CI remains required before merge.
+The current staged-app pass also covered the live participant, past-session and
+constant-pace rivals, chase/side/overhead/orbit cameras, dark/light appearance,
+automation/Reduced Motion, and the largest and compact windows available in
+the environment. Accessibility inspection exposed native controls with clear
+labels, values, and help. A real imported-rival CSV was visible in the native
+file panel, but the desktop QA bridge could not complete the final selection;
+the unchanged bounded importer and imported-rival 3D fallback are covered by
+the current focused tests, while the native panel flow was previously exercised
+for Phase 10B.
+
+This is bounded local evidence, not an all-environment beta claim. A spoken
+VoiceOver run, pointer/trackpad gesture proof, Instruments, and GPU profiling
+were unavailable. Exact-head GitHub CI remains required before merge.
 
 ## rowplay PR #166 Impact
 
@@ -108,11 +117,6 @@ The items below describe the merged baseline, the validation completed for Phase
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
 2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
-3. **Bundled 3D asset readiness is not yet proven**: Phase 11 is implementing
-   project-generated USDA rigs and environments for higher quality tiers, but
-   its deterministic asset check, full validation matrix, staged bundle
-   inspection, and visual acceptance work are still required. Until those gates
-   pass, the app must not claim production-quality bundled 3D assets.
 
 ## Must Not Ship Yet
 
