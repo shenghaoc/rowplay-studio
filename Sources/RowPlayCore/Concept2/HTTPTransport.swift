@@ -33,7 +33,7 @@ public final class URLSessionHTTPTransport: HTTPTransport {
     ///
     /// - Parameter configuration: The URL session configuration to use.
     public init(configuration: URLSessionConfiguration = {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.ephemeral
         // Security: Enforce strict timeouts to prevent resource exhaustion (DoS)
         // from slow or unresponsive remote servers.
         config.timeoutIntervalForRequest = 30.0
