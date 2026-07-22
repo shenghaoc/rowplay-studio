@@ -130,8 +130,9 @@ enum ReplaySportRigFiniteGuard {
 @MainActor
 enum ReplaySportRigTranslucency {
     /// Recursively apply opacity to every built-in material type used by the
-    /// procedural rig and generated USDA assets. Each live/ghost provider clone
-    /// has independent materials, so this never mutates a cached template.
+    /// procedural rig, generated USDA assets, and the V4 athlete. Each
+    /// live/ghost clone has independent materials, so this never mutates a
+    /// cached template.
     static func apply(to entity: Entity, opacity: Float) {
         // USDA loading produces generic `Entity` values with a ModelComponent,
         // whereas the procedural path usually produces `ModelEntity`. Replacing
@@ -143,7 +144,12 @@ enum ReplaySportRigTranslucency {
                     return sm
                 }
                 if var pbr = mat as? PhysicallyBasedMaterial {
+                    // UsdPreviewSurface loads as PBR. Tint alpha alone stays
+                    // opaque; transparent blending is required for ghosts.
                     pbr.baseColor.tint = pbr.baseColor.tint.withAlphaComponent(CGFloat(opacity))
+                    pbr.blending = .transparent(
+                        opacity: PhysicallyBasedMaterial.Opacity(scale: opacity)
+                    )
                     return pbr
                 }
                 if var unlit = mat as? UnlitMaterial {
