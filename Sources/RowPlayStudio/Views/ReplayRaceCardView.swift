@@ -61,9 +61,14 @@ struct ReplayRaceCardView: View {
 
                 Spacer(minLength: 12)
 
-                Text("rowplay · local race card")
-                    .font(.system(size: 14, weight: .medium).monospaced())
-                    .foregroundStyle(ink2)
+                HStack(spacing: 0) {
+                    Text("rowplay ")
+                    Text("·").accessibilityHidden(true)
+                    Text(" local race card")
+                }
+                .font(.system(size: 14, weight: .medium).monospaced())
+                .foregroundStyle(ink2)
+                .accessibilityElement(children: .combine)
             }
             .padding(32)
         }

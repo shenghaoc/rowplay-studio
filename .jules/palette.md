@@ -13,3 +13,6 @@
 ## 2026-07-20 - [UX: Disabled Button Explanations]
 **Learning:** Hiding UI elements completely when their prerequisites aren't met (e.g. hiding "Replay Workout" when there's no stroke data) causes confusion. Users may think the feature was removed or wonder where it is. Showing the button but disabling it and adding a tooltip/hint explaining *why* it's disabled is far better UX.
 **Action:** When a button's required data or state is unavailable, prefer `.disabled(true)` paired with a dynamic `.help()` and `.accessibilityHint()` explaining the reason over conditionally rendering (hiding) the button.
+## 2024-03-24 - Accessibility grouping for hidden decorative characters
+**Learning:** When using `HStack` with `.accessibilityHidden(true)` on decorative character elements (like `·`) to hide them from VoiceOver while retaining them visually, VoiceOver may read the remaining `Text` elements separately, breaking the flow of a single string.
+**Action:** Always apply `.accessibilityElement(children: .combine)` to the parent container when splitting a single semantic text string into multiple views just to hide punctuation.
