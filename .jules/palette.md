@@ -13,3 +13,7 @@
 ## 2026-07-20 - [UX: Disabled Button Explanations]
 **Learning:** Hiding UI elements completely when their prerequisites aren't met (e.g. hiding "Replay Workout" when there's no stroke data) causes confusion. Users may think the feature was removed or wonder where it is. Showing the button but disabling it and adding a tooltip/hint explaining *why* it's disabled is far better UX.
 **Action:** When a button's required data or state is unavailable, prefer `.disabled(true)` paired with a dynamic `.help()` and `.accessibilityHint()` explaining the reason over conditionally rendering (hiding) the button.
+
+## 2026-07-25 - Provide VoiceOver hints for disabled buttons
+**Learning:** Sighted mouse users can read the `.help()` tooltips explaining why an action is unavailable, but without an `.accessibilityHint()`, VoiceOver users only hear "Dimmed", leaving them guessing why they can't perform an action.
+**Action:** When a button's required data or state is unavailable, pair `.disabled(true)` with both a dynamic `.help()` tooltip for mouse users and a corresponding `.accessibilityHint()` to provide context to screen reader users.
