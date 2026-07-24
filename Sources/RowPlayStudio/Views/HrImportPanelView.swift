@@ -92,7 +92,18 @@ struct HrImportPanelView: View {
     }
 
     private func loadSamples(from url: URL) throws -> [HrSample] {
-        let data = try Data(contentsOf: url)
+        let fileHandle = try FileHandle(forReadingFrom: url)
+        defer { try? fileHandle.close() }
+
+        // Security: Prevent DoS via memory exhaustion by limiting file size to 5 MB
+        let maxSize = 5 * 1024 * 1024
+        guard let data = try fileHandle.read(upToCount: maxSize + 1) else {
+            throw HrImportPanelError.unreadableFile
+        }
+        if data.count > maxSize {
+            throw HrImportPanelError.fileTooLarge
+        }
+
         if url.pathExtension.lowercased() == "json" {
             return try decodeJSONSamples(data)
         }
@@ -156,6 +167,7 @@ private struct HrSampleDTO: Decodable {
 private enum HrImportPanelError: LocalizedError {
     case unreadableFile
     case notEnoughSamples
+    case fileTooLarge
 
     var errorDescription: String? {
         switch self {
@@ -163,6 +175,8 @@ private enum HrImportPanelError: LocalizedError {
             return "The selected file could not be read as UTF-8 text."
         case .notEnoughSamples:
             return "At least two valid HR samples are required."
+        case .fileTooLarge:
+            return "The selected file is too large. Maximum size is 5 MB."
         }
     }
 }
