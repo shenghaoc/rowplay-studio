@@ -73,6 +73,9 @@ struct SettingsView: View {
                     .help(isTokenEmpty
                           ? "Enter a token to save"
                           : "Save your Concept2 API access token to the keychain")
+                    .accessibilityHint(isTokenEmpty
+                                       ? "Enter a token to save"
+                                       : "Saves your Concept2 API access token to the keychain")
 
                     Button {
                         Task {
@@ -85,6 +88,9 @@ struct SettingsView: View {
                     .help(!syncController.canSync
                           ? "Cannot sync right now"
                           : "Sync workouts from your Concept2 Logbook")
+                    .accessibilityHint(!syncController.canSync
+                                       ? "Cannot sync right now"
+                                       : "Syncs workouts from your Concept2 Logbook")
 
                     Spacer()
 
@@ -97,6 +103,9 @@ struct SettingsView: View {
                     .help(cannotDisconnect
                           ? "Cannot disconnect right now"
                           : "Disconnect your Concept2 account and delete local data")
+                    .accessibilityHint(cannotDisconnect
+                                       ? "Cannot disconnect right now"
+                                       : "Disconnects your Concept2 account and deletes local data")
                 }
 
                 if syncController.syncState.inProgress {

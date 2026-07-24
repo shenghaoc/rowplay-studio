@@ -104,6 +104,9 @@ struct ContentView: View {
                 .help(syncController.isLoading
                       ? "Cannot reload while syncing"
                       : "Fetch the latest workouts from your Concept2 Logbook")
+                .accessibilityHint(syncController.isLoading
+                                   ? "Cannot reload while syncing"
+                                   : "Fetches the latest workouts from your Concept2 Logbook")
                 .keyboardShortcut("r", modifiers: .command)
             }
         }

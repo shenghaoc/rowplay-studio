@@ -40,6 +40,9 @@ struct WorkoutFileActionsView: View {
                     .help(hasNoShareableData
                           ? "Share Package requires stroke data or splits"
                           : "Export a portable share package with workout data")
+                    .accessibilityHint(hasNoShareableData
+                                       ? "Share Package requires stroke data or splits"
+                                       : "Exports a portable share package with workout data")
                 }
                 .buttonStyle(.bordered)
 
