@@ -41,4 +41,4 @@
 ## 2026-07-11 - Denial of Service (DoS) via Unbounded File Reads in HR Import
 **Vulnerability:** The HR file import mechanism used `Data(contentsOf:)` to read the entire contents of a selected file directly into memory. A maliciously crafted or unintentionally massive file could cause the application to consume all available memory and crash (Out-Of-Memory DoS).
 **Learning:** `Data(contentsOf:)` is dangerous when dealing with files of unknown or unbounded size (such as those selected via a file picker), as it loads the full file into memory at once. It should not be used for user-provided files without first ensuring a size limit.
-**Prevention:** Instead of `Data(contentsOf:)`, use `FileHandle` to read the file in chunks up to a safe maximum size limit (e.g., 5 MB for HR data). If the file exceeds this limit, abort the read and throw an error to prevent memory exhaustion.
+**Prevention:** Instead of `Data(contentsOf:)`, use `FileHandle` to read the file in chunks up to a safe maximum size limit (e.g., 5 MB for HR data). Propagate chunk I/O errors as read failures rather than treating them as EOF, and reject files that exceed the limit before parsing.

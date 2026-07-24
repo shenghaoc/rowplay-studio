@@ -92,31 +92,7 @@ struct HrImportPanelView: View {
     }
 
     private func loadSamples(from url: URL) throws -> [HrSample] {
-        let handle: FileHandle
-        do {
-            handle = try FileHandle(forReadingFrom: url)
-        } catch {
-            throw HrImportPanelError.unreadableFile
-        }
-        defer { try? handle.close() }
-
-        let maximumBytes = 5 * 1024 * 1024 // 5 MB limit
-        var data = Data()
-        data.reserveCapacity(min(maximumBytes + 1, 1_048_576))
-
-        let readLimit = maximumBytes + 1
-        while data.count < readLimit {
-            let remaining = readLimit - data.count
-            let requestSize = min(remaining, 1_048_576)
-            guard let chunk = try? handle.read(upToCount: requestSize), !chunk.isEmpty else {
-                break
-            }
-            data.append(chunk)
-        }
-
-        guard data.count <= maximumBytes else {
-            throw HrImportPanelError.fileTooLarge
-        }
+        let data = try readBoundedFileData(from: url, maximumBytes: Self.maximumImportFileBytes)
 
         if url.pathExtension.lowercased() == "json" {
             return try decodeJSONSamples(data)
@@ -130,6 +106,41 @@ struct HrImportPanelView: View {
             throw HrImportPanelError.unreadableFile
         }
         return parseCSVSampleText(text)
+    }
+
+    /// Reads no more than `maximumBytes + 1`, so oversized files are rejected
+    /// without allocating their entire contents. Chunked reads avoid short-read
+    /// truncation, and I/O failures surface as `unreadableFile` instead of EOF.
+    private func readBoundedFileData(from url: URL, maximumBytes: Int) throws -> Data {
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
+            throw HrImportPanelError.unreadableFile
+        }
+        defer { try? handle.close() }
+
+        let readLimit = maximumBytes + 1
+        var data = Data()
+        data.reserveCapacity(min(readLimit, 1_048_576))
+
+        do {
+            while data.count < readLimit {
+                let remaining = readLimit - data.count
+                let requestSize = min(remaining, 1_048_576)
+                guard let chunk = try handle.read(upToCount: requestSize), !chunk.isEmpty else {
+                    break
+                }
+                data.append(chunk)
+            }
+        } catch {
+            throw HrImportPanelError.unreadableFile
+        }
+
+        guard data.count <= maximumBytes else {
+            throw HrImportPanelError.fileTooLarge
+        }
+        return data
     }
 
     private func decodeJSONSamples(_ data: Data) throws -> [HrSample] {
@@ -186,11 +197,16 @@ private enum HrImportPanelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadableFile:
-            return "The selected file could not be read as UTF-8 text."
+            return "The selected file could not be read."
         case .notEnoughSamples:
             return "At least two valid HR samples are required."
         case .fileTooLarge:
             return "The selected file exceeds the maximum allowed size (5 MB)."
         }
     }
+}
+
+private extension HrImportPanelView {
+    /// Cap for user-selected HR import payloads (JSON/CSV sample series).
+    static let maximumImportFileBytes = 5 * 1024 * 1024
 }
