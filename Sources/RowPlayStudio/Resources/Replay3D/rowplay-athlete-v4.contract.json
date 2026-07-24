@@ -1,0 +1,365 @@
+{
+  "schema": "rowplay.replay.athlete.v4",
+  "schemaVersion": 1,
+  "canonicalSourceModule": "scripts/build-replay-athlete-v4-blender.py",
+  "canonicalRigModule": "src/lib/replay/rigV4.ts",
+  "webRuntimeArtifact": {
+    "filename": "rowplay-athlete-v4.glb",
+    "byteCount": 584796,
+    "sha256": "73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b"
+  },
+  "nativeDerivativeArtifact": {
+    "filename": "rowplay-athlete-v4.usdz",
+    "byteCount": 1318256,
+    "sha256": "934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e"
+  },
+  "coordinateSystem": {
+    "units": "metres",
+    "upAxis": "+Y",
+    "forwardAxis": "+Z",
+    "handedness": "right-handed",
+    "rootOrientation": {
+      "translation": [0, 0, 0],
+      "rotationQuaternion": [0, 0, 0, 1],
+      "scale": [1, 1, 1]
+    }
+  },
+  "mesh": {
+    "rootName": "rowplay-v4-athlete-root",
+    "meshName": "v4Athlete",
+    "skinnedMeshes": 1,
+    "primitives": 1,
+    "vertices": 7420,
+    "triangles": 14240,
+    "topologyComponents": 24,
+    "skins": 1,
+    "materials": 1,
+    "materialSlots": 1
+  },
+  "bones": {
+    "count": 19,
+    "orderedNames": [
+      "v4Hips",
+      "v4Spine",
+      "v4Chest",
+      "v4Neck",
+      "v4Head",
+      "v4LeftClavicle",
+      "v4LeftUpperArm",
+      "v4LeftForearm",
+      "v4LeftHand",
+      "v4RightClavicle",
+      "v4RightUpperArm",
+      "v4RightForearm",
+      "v4RightHand",
+      "v4LeftUpperLeg",
+      "v4LeftLowerLeg",
+      "v4LeftFoot",
+      "v4RightUpperLeg",
+      "v4RightLowerLeg",
+      "v4RightFoot"
+    ],
+    "hierarchy": [
+      {
+        "name": "v4Hips",
+        "parent": null,
+        "restLocalTransform": {
+          "translation": [0, 1.02, 0],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4Spine",
+        "parent": "v4Hips",
+        "restLocalTransform": {
+          "translation": [0, 0.19, 0],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4Chest",
+        "parent": "v4Spine",
+        "restLocalTransform": {
+          "translation": [0, 0.235, 0.012],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4Neck",
+        "parent": "v4Chest",
+        "restLocalTransform": {
+          "translation": [0, 0.145, 0.018],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4Head",
+        "parent": "v4Neck",
+        "restLocalTransform": {
+          "translation": [0, 0.105, 0.02],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftClavicle",
+        "parent": "v4Chest",
+        "restLocalTransform": {
+          "translation": [-0.18, 0.095, 0.01],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftUpperArm",
+        "parent": "v4LeftClavicle",
+        "restLocalTransform": {
+          "translation": [-0.06, -0.02, 0.006],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftForearm",
+        "parent": "v4LeftUpperArm",
+        "restLocalTransform": {
+          "translation": [-0.365, -0.128, 0.051],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftHand",
+        "parent": "v4LeftForearm",
+        "restLocalTransform": {
+          "translation": [-0.354, -0.108, 0.06],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightClavicle",
+        "parent": "v4Chest",
+        "restLocalTransform": {
+          "translation": [0.18, 0.095, 0.01],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightUpperArm",
+        "parent": "v4RightClavicle",
+        "restLocalTransform": {
+          "translation": [0.06, -0.02, 0.006],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightForearm",
+        "parent": "v4RightUpperArm",
+        "restLocalTransform": {
+          "translation": [0.365, -0.128, 0.051],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightHand",
+        "parent": "v4RightForearm",
+        "restLocalTransform": {
+          "translation": [0.354, -0.108, 0.06],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftUpperLeg",
+        "parent": "v4Hips",
+        "restLocalTransform": {
+          "translation": [-0.13, -0.025, 0],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftLowerLeg",
+        "parent": "v4LeftUpperLeg",
+        "restLocalTransform": {
+          "translation": [0, -0.49, 0.038],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4LeftFoot",
+        "parent": "v4LeftLowerLeg",
+        "restLocalTransform": {
+          "translation": [0, -0.475, 0.065],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightUpperLeg",
+        "parent": "v4Hips",
+        "restLocalTransform": {
+          "translation": [0.13, -0.025, 0],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightLowerLeg",
+        "parent": "v4RightUpperLeg",
+        "restLocalTransform": {
+          "translation": [0, -0.49, 0.038],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      },
+      {
+        "name": "v4RightFoot",
+        "parent": "v4RightLowerLeg",
+        "restLocalTransform": {
+          "translation": [0, -0.475, 0.065],
+          "rotationQuaternion": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        }
+      }
+    ]
+  },
+  "animation": {
+    "clips": [
+      {
+        "sport": "rower",
+        "name": "rowplay-v4-row-cycle",
+        "durationSeconds": 1,
+        "driveEnd": 0.38,
+        "phaseLandmarks": {
+          "catch": 0,
+          "legDrive": 0.08,
+          "bodyOpen": 0.3,
+          "finish": 0.38,
+          "handsAway": 0.54,
+          "bodyOver": 0.72,
+          "slide": 0.88,
+          "loop": 1
+        }
+      },
+      {
+        "sport": "skierg",
+        "name": "rowplay-v4-ski-cycle",
+        "durationSeconds": 1,
+        "driveEnd": 0.34,
+        "phaseLandmarks": {
+          "reach": 0,
+          "plant": 0.12,
+          "loadedPull": 0.24,
+          "driveEnd": 0.34,
+          "release": 0.58,
+          "recover": 0.78,
+          "loop": 1
+        }
+      },
+      {
+        "sport": "bike",
+        "name": "rowplay-v4-bike-cycle",
+        "durationSeconds": 1,
+        "driveEnd": 0.5,
+        "phaseLandmarks": {
+          "leftTop": 0,
+          "leftPower": 0.25,
+          "opposed": 0.5,
+          "rightPower": 0.75,
+          "loop": 1
+        }
+      }
+    ],
+    "clipTracks": 60
+  },
+  "contacts": [
+    {
+      "bone": "v4LeftHand",
+      "role": "left-hand",
+      "localOffset": [-0.08, -0.01, 0.035]
+    },
+    {
+      "bone": "v4RightHand",
+      "role": "right-hand",
+      "localOffset": [0.08, -0.01, 0.035]
+    },
+    {
+      "bone": "v4LeftFoot",
+      "role": "left-foot",
+      "localOffset": [0, -0.055, 0.13]
+    },
+    {
+      "bone": "v4RightFoot",
+      "role": "right-foot",
+      "localOffset": [0, -0.055, 0.13]
+    }
+  ],
+  "surfaces": [
+    {
+      "role": "athlete-fabric",
+      "source": "vertex-color kit regions"
+    },
+    {
+      "role": "athlete-skin",
+      "source": "vertex-color skin regions"
+    },
+    {
+      "role": "athlete-shorts",
+      "source": "vertex-color pelvis/thigh kit regions"
+    },
+    {
+      "role": "athlete-footwear",
+      "source": "vertex-color shoe regions"
+    },
+    {
+      "role": "athlete-hair",
+      "source": "vertex-color hair regions"
+    },
+    {
+      "role": "athlete-trim",
+      "source": "vertex-color jersey/shoe accent regions"
+    }
+  ],
+  "provenance": {
+    "owner": "rowplay",
+    "licence": "MIT",
+    "source": "repository-authored Blender 5 parametric skinned athlete",
+    "authoringTool": "Blender 5.2 LTS",
+    "authoringScript": "scripts/build-replay-athlete-v4-blender.py",
+    "rigAndClipSource": "src/lib/replay/rigV4.ts",
+    "forbiddenSources": [
+      "downloaded model",
+      "third-party character",
+      "scan",
+      "likeness",
+      "avatar generator",
+      "texture",
+      "user image"
+    ],
+    "nativeDerivative": "Generated by Blender 5.2 from the canonical GLB; do not remodel."
+  },
+  "validation": {
+    "buildCommands": [
+      "pnpm run build:replay-rig-v4",
+      "pnpm run build:replay-rig-v4-usdz",
+      "pnpm run build:replay-rig-v4-contract"
+    ],
+    "validationCommands": [
+      "pnpm run validate:replay-assets",
+      "pnpm run check",
+      "pnpm run validate:locales",
+      "pnpm run test:e2e:smoke",
+      "git diff --check"
+    ]
+  }
+}

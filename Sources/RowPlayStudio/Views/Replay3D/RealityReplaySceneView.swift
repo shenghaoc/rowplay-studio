@@ -27,6 +27,8 @@ struct RealityReplaySceneView: View {
     @State private var cameraController = ReplayCameraController()
     @State private var performanceController: ReplayPerformanceController
     @State private var lastTickDate: Date?
+    @State private var bundledAssetSet: ReplayBundledAssetSet?
+    @State private var assetLoadGeneration = 0
 
     private var sport: Sport { detail.workout.sport }
 
@@ -65,7 +67,8 @@ struct RealityReplaySceneView: View {
                     workoutID: detail.id,
                     rivalID: rival?.id,
                     sportRawValue: sport.rawValue
-                )
+                ),
+                assetGeneration: assetLoadGeneration
             ) {
                 realityContent(timeline: timeline, configuration: configuration)
             }
@@ -75,6 +78,22 @@ struct RealityReplaySceneView: View {
             performanceController.resetForNewScene(selectedQuality: selectedQuality)
             effectiveQuality = performanceController.effectiveQuality
             resetPerformanceTiming()
+        }
+        .task(id: sport) {
+            // Clear the previous sport before awaiting. A missing/invalid pair
+            // intentionally remains nil so the builder selects the complete
+            // procedural scene; generation guards reject a late prior result.
+            assetLoadGeneration &+= 1
+            let requestGeneration = assetLoadGeneration
+            bundledAssetSet = nil
+            let loadedSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            guard !Task.isCancelled,
+                  requestGeneration == assetLoadGeneration,
+                  loadedSet?.sport == sport else {
+                return
+            }
+            bundledAssetSet = loadedSet
+            assetLoadGeneration &+= 1
         }
         .onChange(of: state.playing) { _, playing in
             if playing {
@@ -124,7 +143,9 @@ struct RealityReplaySceneView: View {
             let container = Replay3DSceneBuilder.buildScene(
                 sport: sport,
                 colorScheme: colorScheme,
-                configuration: configuration
+                configuration: configuration,
+                effectiveQuality: performanceController.effectiveQuality,
+                bundledAssetSet: bundledAssetSet
             )
             make.add(container.root)
             sceneState.container = container
@@ -140,7 +161,7 @@ struct RealityReplaySceneView: View {
             let pose = currentPose()
             let ghostSample = currentGhostSample()
 
-            Replay3DSceneBuilder.updateScene(
+            let sceneUpdated = Replay3DSceneBuilder.updateScene(
                 container: container,
                 livePose: pose,
                 liveDistance: state.currentFrame.d,
@@ -157,6 +178,17 @@ struct RealityReplaySceneView: View {
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
+            if !sceneUpdated, container.visualSource == .bundled {
+                // Drop the entire bundle atomically on a runtime skeletal or
+                // animation failure. Replay/camera state lives outside this
+                // graph identity boundary, so the procedural remake preserves
+                // the active UI and playback state.
+                Task { @MainActor in
+                    guard bundledAssetSet != nil else { return }
+                    bundledAssetSet = nil
+                    assetLoadGeneration &+= 1
+                }
+            }
             if let updateStart {
                 let duration = updateStart.duration(to: clock.now)
                 performanceController.recordSceneUpdateDuration(
@@ -440,6 +472,17 @@ struct RealityReplaySceneView: View {
 struct Replay3DQualityGraphIdentity: Hashable {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let assetGeneration: Int
+
+    init(
+        effectiveQuality: ReplayRenderQuality,
+        sceneIdentity: Replay3DSceneIdentity,
+        assetGeneration: Int = 0
+    ) {
+        self.effectiveQuality = effectiveQuality
+        self.sceneIdentity = sceneIdentity
+        self.assetGeneration = assetGeneration
+    }
 }
 
 /// Production identity boundary that limits quality and rival changes to the
@@ -448,22 +491,26 @@ struct Replay3DQualityGraphIdentity: Hashable {
 struct Replay3DQualityRebuildBoundary<Content: View>: View {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let assetGeneration: Int
     private let content: Content
 
     init(
         effectiveQuality: ReplayRenderQuality,
         sceneIdentity: Replay3DSceneIdentity,
+        assetGeneration: Int = 0,
         @ViewBuilder content: () -> Content
     ) {
         self.effectiveQuality = effectiveQuality
         self.sceneIdentity = sceneIdentity
+        self.assetGeneration = assetGeneration
         self.content = content()
     }
 
     var body: some View {
         content.id(Replay3DQualityGraphIdentity(
             effectiveQuality: effectiveQuality,
-            sceneIdentity: sceneIdentity
+            sceneIdentity: sceneIdentity,
+            assetGeneration: assetGeneration
         ))
     }
 }

@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), and Phase 10A past-session ghost replay (PR #61). Phase 10B complete rival workflow (constant pace, imported CSV/TCX/FIT rivals, finish verdict, local race report/card export) is implemented on branch `codex/phase-10b-complete-rival-workflow`.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), and the Phase 10B complete rival workflow (PR #64). Phase 11 is on `codex/phase-11-production-3d-assets` (PR #72, **draft**) and pins the final merged RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`. It must not merge yet: the exact USDZ and its contract disagree on the three required sport clip names, so the app deliberately uses its complete procedural fallback. Premium athlete art is Phase 12.
 
 ### What Is Implemented
 
@@ -19,11 +19,28 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 - **Phase 8C replay cameras and sport effects — merged as PR #57**: Renderer-neutral chase, side, overhead, and orbit camera solving; accessible 3D camera selection/reset and orbit gestures; fixed-capacity deterministic RowErg foam/blade-spray and SkiErg snow/pole-spray effects; lower-opacity ghost wakes; BikeErg effect suppression; and reduced-motion/seek resets. The unavailable trackpad-magnification, production-route ghost, and exact-1440x900 proof remains documented rather than rewritten as complete.
 - **Phase 8D adaptive replay quality — merged as PR #58**: Persisted low, medium, high, and ultra quality ceilings with medium as the default; exact quality-specific course/effect entity budgets; calibrated sticky one-tier degradation with no automatic upgrade; raw-before-clamp sampling; stable inner-scene rebuilds; a bounded 120-sample metrics accumulator; and privacy-safe selection, degradation, and window telemetry. Available runtime evidence is recorded below without claiming universal or final production performance.
 - **Phase 10A past-session ghost replay — merged as PR #61**: Ranked ghost candidate selection with user-visible rival picker; `ReplayRaceGap` live gap helpers (metres, seconds, absolute time, ghost sampling); `WorkoutLibrary` ghost candidate caching; 2D ghost stroke path on replay canvas; live ahead/behind gap display; 3D ghost pose integration with context clearing on rival change.
-- **Phase 10B complete rival workflow — implementation complete on branch**: Generic `ReplayRival` for past-session, constant-pace, and imported CSV/TCX/FIT rivals; bounded security-scoped file reads; streaming quoted CSV; strict namespace-insensitive TCX XML parsing with encoding-independent DTD rejection; bounded FIT validation; `ReplayRaceResult` finish/winner/tie/DNF semantics with interpolated distance crossings; finish verdict UI; minimized local race report JSON and race-card PNG export/share with privacy-safe rival distance/time/pace metrics but without imported filenames or internal workout/session identifiers (no public URL); correct bounded 2D paths and 3D support for all rival kinds with fallback articulation for non-genuine traces.
+- **Phase 10B complete rival workflow — merged as PR #64**: Generic `ReplayRival` for past-session, constant-pace, and imported CSV/TCX/FIT rivals; bounded security-scoped file reads; streaming quoted CSV; strict namespace-insensitive TCX XML parsing with encoding-independent DTD rejection; bounded FIT validation; `ReplayRaceResult` finish/winner/tie/DNF semantics with interpolated distance crossings; finish verdict UI; minimized local race report JSON and race-card PNG export/share with privacy-safe rival distance/time/pace metrics but without imported filenames or internal workout/session identifiers (no public URL); correct bounded 2D paths and 3D support for all rival kinds with fallback articulation for non-genuine traces.
 - **Native shell**: `NavigationSplitView` layout, sidebar with sort/sport pickers, dashboard with metric tiles and PB highlights, workout detail with replay/tools, settings with mock-only hardware status.
 - **Settings wiring**: `demoModeEnabled` controls demo data loading, `reduceReplayMotion` lowers replay animation frame rate, `preferredDistanceUnit` switches distance formatting between metric and imperial, `replayRenderQuality` persists the selected 3D ceiling with a medium fallback, and the Concept2 section manages token save/sync/disconnect. Effective quality and performance state are never persisted.
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
 - **Test suite**: the merged baseline and Phase 8C validation passed. Phase 8D adds focused coverage for exact tier budgets, governor calibration/degradation, bounded metrics, preferences, raw playback deltas, graph/effect counts, stable rebuilds, generation de-duplication, and accessibility. Phase 10A adds `ReplayRaceGapTests` (fixture parity and degenerate inputs), expanded `GhostPickTests` (ranked ordering, sanitizers, tie-break), `WorkoutLibraryGhostCandidateTests` (caching, exclusion, default selection), and `ReplayGhostWorkflowTests` (candidate construction and 2D ghost-path origins). The complete matrix passes with only the opt-in authenticated smoke tests skipped when no token is supplied.
+
+### Phase 11 Canonical Athlete Integration (PR #72, draft)
+
+PR #72 aligns native replay with the **canonical RowPlay V4 athlete** from the
+merged upstream #171 pin. Studio owns equipment USDA, environments,
+loading/validation, quality selection, and fallback; it does not author the
+athlete. The native Core port includes the canonical motion graph, sport
+kinematics, and a 129-phase-per-sport parity corpus; valid V4 instances use
+stateless skeletal constraints and opaque cool-tinted rival bodies.
+
+The final pin is currently an honest hard gate, not a deployed V4 runtime:
+the USDZ exposes only `rowplay_v4_row_cycle`, while the contract requires the
+three hyphenated RowErg/SkiErg/BikeErg resource names. Studio rejects the
+whole package—no aliases or first-animation fallback—and all qualities use the
+complete procedural scene. PR #72 stays **draft** until the upstream artifact
+and contract are made consistent, then all three clips can pass staged visual
+QA. See `docs/replay-assets.md` and `docs/roadmap.md` for the corrective gate.
 
 ## rowplay PR #166 Impact
 
@@ -47,7 +64,7 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 
 ## Verified
 
-The items below describe the merged baseline, the validation completed for Phase 8C before PR #57 merged, the Phase 8D evidence collected on that review branch, and the Phase 10B evidence collected on its ready-for-review branch. They do not claim unavailable visual or profiling cases passed.
+The items below describe the merged baseline, the validation completed for Phase 8C before PR #57 merged, the Phase 8D evidence collected on that review branch, and the Phase 10B evidence that preceded PR #64. They do not include unrun Phase 11 validation or claim unavailable visual or profiling cases passed.
 
 - `swift test` — all tests pass with no failures.
 - `swift build` — clean build.
@@ -84,7 +101,6 @@ The items below describe the merged baseline, the validation completed for Phase
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
 2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
-3. **3D assets remain procedural**: No imported USD/USDZ athlete or equipment assets exist. Phase 8C does not claim final production asset fidelity.
 
 ## Must Not Ship Yet
 
