@@ -115,6 +115,9 @@ struct ReplayRivalControlView: View {
                     ? "A rival file is already being imported"
                     : "Choose a CSV, TCX, or FIT rival file")
                 #endif
+                .accessibilityHint(isImportingRival
+                    ? "A rival file is already being imported"
+                    : "Opens a file picker to choose a CSV, TCX, or FIT rival file")
             } label: {
                 Label("Replay rival", systemImage: "person.2.fill")
                     .labelStyle(.iconOnly)
