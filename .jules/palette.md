@@ -17,3 +17,7 @@
 ## 2026-07-25 - Provide VoiceOver hints for disabled buttons
 **Learning:** Sighted mouse users can read the `.help()` tooltips explaining why an action is unavailable, but without an `.accessibilityHint()`, VoiceOver users only hear "Dimmed", leaving them guessing why they can't perform an action.
 **Action:** When a button's required data or state is unavailable, pair `.disabled(true)` with both a dynamic `.help()` tooltip for mouse users and a corresponding `.accessibilityHint()` to provide context to screen reader users.
+
+## 2026-10-24 - Accessibility grouping for heterogeneous layout attributes
+**Learning:** Even standard horizontal layouts of distinct textual attributes (like date, time, and tags) can cause fractured screen reading if not explicitly grouped.
+**Action:** Apply `.accessibilityElement(children: .ignore)` and construct a unified comma-separated `.accessibilityLabel` to merge independent metadata elements in an HStack into a single, cohesive phrase for VoiceOver.

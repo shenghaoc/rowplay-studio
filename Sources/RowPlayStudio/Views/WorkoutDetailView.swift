@@ -67,6 +67,20 @@ struct WorkoutDetailView: View {
         }
     }
 
+    private var headerAccessibilityLabel: String {
+        var parts = [
+            detail.workout.date.formatted(date: .abbreviated, time: .omitted),
+            detail.workout.date.formatted(date: .omitted, time: .shortened)
+        ]
+        if let source = detail.workout.source {
+            parts.append(source)
+        }
+        if detail.workout.isInterval {
+            parts.append("Intervals")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
             HStack(alignment: .firstTextBaseline) {
@@ -90,6 +104,8 @@ struct WorkoutDetailView: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(headerAccessibilityLabel)
 
             if let comments = detail.workout.comments {
                 Text(comments)
