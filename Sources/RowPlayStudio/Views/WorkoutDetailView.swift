@@ -67,11 +67,16 @@ struct WorkoutDetailView: View {
         }
     }
 
+    private var headerDateString: String {
+        detail.workout.date.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private var headerTimeString: String {
+        detail.workout.date.formatted(date: .omitted, time: .shortened)
+    }
+
     private var headerAccessibilityLabel: String {
-        var parts = [
-            detail.workout.date.formatted(date: .abbreviated, time: .omitted),
-            detail.workout.date.formatted(date: .omitted, time: .shortened)
-        ]
+        var parts = [headerDateString, headerTimeString]
         if let source = detail.workout.source {
             parts.append(source)
         }
@@ -93,8 +98,8 @@ struct WorkoutDetailView: View {
             }
 
             HStack(spacing: AppDesign.Spacing.medium) {
-                Text(detail.workout.date, style: .date)
-                Text(detail.workout.date, style: .time)
+                Text(headerDateString)
+                Text(headerTimeString)
                 if let source = detail.workout.source {
                     Text(source)
                 }
