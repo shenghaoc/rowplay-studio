@@ -67,6 +67,25 @@ struct WorkoutDetailView: View {
         }
     }
 
+    private var headerDateString: String {
+        detail.workout.date.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private var headerTimeString: String {
+        detail.workout.date.formatted(date: .omitted, time: .shortened)
+    }
+
+    private var headerAccessibilityLabel: String {
+        var parts = [headerDateString, headerTimeString]
+        if let source = detail.workout.source {
+            parts.append(source)
+        }
+        if detail.workout.isInterval {
+            parts.append("Intervals")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: AppDesign.Spacing.medium) {
             HStack(alignment: .firstTextBaseline) {
@@ -79,8 +98,8 @@ struct WorkoutDetailView: View {
             }
 
             HStack(spacing: AppDesign.Spacing.medium) {
-                Text(detail.workout.date, style: .date)
-                Text(detail.workout.date, style: .time)
+                Text(headerDateString)
+                Text(headerTimeString)
                 if let source = detail.workout.source {
                     Text(source)
                 }
@@ -90,6 +109,8 @@ struct WorkoutDetailView: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(headerAccessibilityLabel)
 
             if let comments = detail.workout.comments {
                 Text(comments)
