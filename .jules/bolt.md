@@ -23,9 +23,3 @@
 ## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
 **Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
 **Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.
-## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
-**Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
-**Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.
-## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
-**Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
-**Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.
