@@ -20,3 +20,6 @@
 ## 2026-07-22 - Do not reintroduce static FormatStyle caches in DashboardView
 **Learning:** PR #73 reverted static FormatStyle caches across Studio views after review found i18n regressions. A follow-up Bolt task re-proposed the same DashboardView `static let` pattern; that direction remains incorrect.
 **Action:** Keep Dashboard PB dates as `Text(..., format:)` (environment-aware). Bind accessibility measurement/duration/date strings to `@Environment(\.locale)` with per-call styles. Do not re-add `private static let …FormatStyle` for SwiftUI UI strings.
+## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
+**Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
+**Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.

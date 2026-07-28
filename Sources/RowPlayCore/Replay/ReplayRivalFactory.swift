@@ -1,7 +1,14 @@
 import Foundation
+import Synchronization
 
 /// Builds portable ``ReplayRival`` values for past-session, constant-pace, and imported traces.
 public enum ReplayRivalFactory: Sendable {
+
+    private static let dateFormatter = Mutex({
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        return formatter
+    }())
 
     // MARK: - Past session
 
@@ -182,9 +189,7 @@ public enum ReplayRivalFactory: Sendable {
     private static func sessionDateLabel(_ date: Date) -> String {
         // Locale-independent stable label for identity/export contexts.
         // UI layers reformat with the user's locale.
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        return formatter.string(from: date)
+        return dateFormatter.withLock { $0.string(from: date) }
     }
 
     private static func stableDoubleKey(_ value: Double) -> String {
