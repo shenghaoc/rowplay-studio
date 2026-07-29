@@ -21,3 +21,7 @@
 ## 2026-07-27 - Accessibility grouping for heterogeneous layout attributes
 **Learning:** Even standard horizontal layouts of distinct textual attributes (like date, time, and tags) can cause fractured screen reading if not explicitly grouped.
 **Action:** Apply `.accessibilityElement(children: .ignore)` and construct a unified comma-separated `.accessibilityLabel` to merge independent metadata elements in an HStack into a single, cohesive phrase for VoiceOver.
+
+## 2026-07-31 - Preserve Text flow over HStack separation for Accessibility
+**Learning:** In SwiftUI, splitting a single `Text` view into an `HStack` of multiple `Text` views to individually hide decorative characters (like '·') from VoiceOver using `.accessibilityHidden(true)` is an anti-pattern. This breaks SwiftUI's built-in text wrapping, potentially causing truncation or layout issues on narrow screens, and combined `accessibilityElement(children: .combine)` still fails to insert necessary natural reading pauses, creating run-on sentences.
+**Action:** Keep visual text layout within a single interpolated `Text` view (which wraps perfectly) and handle the auditory experience by providing an explicit `.accessibilityLabel` where the decorative separators are replaced with semantic punctuation like commas for natural VoiceOver pauses.

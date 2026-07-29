@@ -54,6 +54,8 @@ struct RowPlayStudioApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(!syncController.canSync)
+                .help(!syncController.canSync ? "Connect a logbook to sync" : "Sync Concept2 Logbook")
+                .accessibilityHint(!syncController.canSync ? "Requires logbook connection" : "Syncs logbook with Concept2")
 
                 Button("Reload Workout Library") {
                     Task {
@@ -62,6 +64,8 @@ struct RowPlayStudioApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(syncController.isLoading)
+                .help(syncController.isLoading ? "Currently loading workouts" : "Reload Workout Library")
+                .accessibilityHint(syncController.isLoading ? "Currently loading workouts" : "Reloads the workout library")
             }
         }
         #endif
