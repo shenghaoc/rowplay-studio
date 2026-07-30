@@ -23,3 +23,7 @@
 ## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
 **Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
 **Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.
+
+## 2024-11-23 - Intermediate Array Allocations from Higher-Order Functions
+**Learning:** In Swift, chaining higher-order functional array methods like `.reduce`, `.map`, and `.filter` creates intermediate array allocations. When executed on large arrays (like hundreds of parsed workouts during aggregation), this unnecessarily consumes memory and CPU.
+**Action:** Optimize data aggregations by replacing chained functional array methods with a single `for` loop to accumulate all required values in O(1) extra space.
