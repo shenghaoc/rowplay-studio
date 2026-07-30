@@ -244,23 +244,20 @@ struct ReplayRivalControlView: View {
         )
         let secondsLabel = ReplayRivalGapFormatting.secondsLabel(gapSeconds)
 
-        return HStack(spacing: AppDesign.Spacing.small) {
+        return (
             Text(shortLabel)
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
-
-            Text(distanceLabel)
+            + Text(" ")
+            + Text(distanceLabel)
                 .font(AppDesign.Typography.compactLabel.monospacedDigit())
                 .foregroundStyle(gapColor)
-
-            Text("·")
+            + Text(" · ")
                 .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
-
-            Text(secondsLabel)
+            + Text(secondsLabel)
                 .font(AppDesign.Typography.compactLabel.monospacedDigit())
                 .foregroundStyle(gapColor)
-        }
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Race gap against \(shortLabel)")
         .accessibilityValue("\(distanceLabel), \(secondsLabel)")
