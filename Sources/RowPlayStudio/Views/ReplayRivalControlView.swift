@@ -244,23 +244,25 @@ struct ReplayRivalControlView: View {
         )
         let secondsLabel = ReplayRivalGapFormatting.secondsLabel(gapSeconds)
 
-        return (
-            Text(shortLabel)
-                .font(AppDesign.Typography.compactLabel)
-                .foregroundStyle(.secondary)
-            + Text(" ")
-            + Text(distanceLabel)
-                .font(AppDesign.Typography.compactLabel.monospacedDigit())
-                .foregroundStyle(gapColor)
-            + Text(" · ")
-                .foregroundStyle(.tertiary)
-            + Text(secondsLabel)
-                .font(AppDesign.Typography.compactLabel.monospacedDigit())
-                .foregroundStyle(gapColor)
-        )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Race gap against \(shortLabel)")
-        .accessibilityValue("\(distanceLabel), \(secondsLabel)")
+        let shortText = Text(shortLabel)
+            .font(AppDesign.Typography.compactLabel)
+            .foregroundStyle(.secondary)
+
+        let distanceText = Text(distanceLabel)
+            .font(AppDesign.Typography.compactLabel.monospacedDigit())
+            .foregroundStyle(gapColor)
+
+        let dotText = Text(" · ")
+            .foregroundStyle(.tertiary)
+
+        let secondsText = Text(secondsLabel)
+            .font(AppDesign.Typography.compactLabel.monospacedDigit())
+            .foregroundStyle(gapColor)
+
+        return (shortText + Text(" ") + distanceText + dotText + secondsText)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Race gap against \(shortLabel)")
+            .accessibilityValue("\(distanceLabel), \(secondsLabel)")
     }
 
     private func rivalShortLabel(_ rival: ReplayRival) -> String {
