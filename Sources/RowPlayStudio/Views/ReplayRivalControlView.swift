@@ -253,7 +253,7 @@ struct ReplayRivalControlView: View {
             .foregroundColor(gapColor)
 
         let dotText = Text(" · ")
-            .foregroundColor(.tertiary)
+            .foregroundColor(.secondary)
 
         let secondsText = Text(secondsLabel)
             .font(AppDesign.Typography.compactLabel.monospacedDigit())
