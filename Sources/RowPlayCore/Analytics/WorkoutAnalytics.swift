@@ -81,7 +81,7 @@ public enum WorkoutAnalytics: Sendable {
     }
 
     public static func dashboardSummary(for workouts: [Workout]) -> DashboardSummary {
-        // Bolt ⚡: Single O(N) pass to prevent multiple array traversals
+        // Single O(N) pass to prevent multiple array traversals.
         var totalDistance: Double = 0
         var challengeDistance: Double = 0
         var totalTime: TimeInterval = 0
@@ -108,7 +108,7 @@ public enum WorkoutAnalytics: Sendable {
         let grouped = Dictionary(grouping: workouts, by: \.sport)
 
         return grouped.map { sport, sportWorkouts in
-            // Bolt ⚡: Single O(N) pass, avoiding map/filter intermediate array allocations
+            // Single O(N) pass, avoiding map/filter intermediate array allocations.
             var distance: Double = 0
             var time: TimeInterval = 0
             var bestPace: TimeInterval = 0

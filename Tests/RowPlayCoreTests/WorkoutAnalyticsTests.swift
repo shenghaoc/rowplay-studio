@@ -93,4 +93,47 @@ final class WorkoutAnalyticsTests: XCTestCase {
 
         XCTAssertEqual(recent.map(\.id), [3, 4])
     }
+
+    func testSummariseBySportComputesBestPaceAndLongestDistance() throws {
+        let workouts = [
+            makeWorkout(id: 1, sport: .rower, distance: 2_000, time: 480),  // pace 120
+            makeWorkout(id: 2, sport: .rower, distance: 5_000, time: 1_250), // pace 125
+            makeWorkout(id: 3, sport: .rower, distance: 3_000, time: 690),   // pace 115
+            makeWorkout(id: 4, sport: .skierg, distance: 1_000, time: 250),  // pace 125
+        ]
+
+        let bySport = WorkoutAnalytics.summariseBySport(workouts)
+
+        let rower = try XCTUnwrap(bySport.first { $0.sport == .rower })
+        XCTAssertEqual(rower.sessions, 3)
+        XCTAssertEqual(rower.distance, 10_000, accuracy: 0.0001)
+        XCTAssertEqual(rower.time, 480 + 1_250 + 690, accuracy: 0.0001)
+        XCTAssertEqual(rower.bestPace, 115, accuracy: 0.0001)
+        XCTAssertEqual(rower.longestDistance, 5_000, accuracy: 0.0001)
+
+        let skierg = try XCTUnwrap(bySport.first { $0.sport == .skierg })
+        XCTAssertEqual(skierg.sessions, 1)
+        XCTAssertEqual(skierg.bestPace, 125, accuracy: 0.0001)
+        XCTAssertEqual(skierg.longestDistance, 1_000, accuracy: 0.0001)
+    }
+
+    func testSummariseBySportReturnsZeroBestPaceWithoutPositivePace() {
+        let workouts = [
+            Workout(
+                id: 9,
+                date: Date(timeIntervalSince1970: 1_700_000_000),
+                sport: .rower,
+                distance: 0,
+                time: 0,
+                pace: 0,
+                workoutType: "test",
+                hasStrokeData: false
+            )
+        ]
+
+        let bySport = WorkoutAnalytics.summariseBySport(workouts)
+
+        XCTAssertEqual(bySport.first?.bestPace, 0)
+        XCTAssertEqual(bySport.first?.longestDistance, 0)
+    }
 }
