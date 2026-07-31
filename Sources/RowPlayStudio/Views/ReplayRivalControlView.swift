@@ -246,19 +246,19 @@ struct ReplayRivalControlView: View {
 
         let nameText = Text(shortLabel)
             .font(AppDesign.Typography.compactLabel)
-            .foregroundColor(Color.secondary)
+            .foregroundStyle(.secondary)
 
         let distanceText = Text(distanceLabel)
             .font(AppDesign.Typography.compactLabel.monospacedDigit())
-            .foregroundColor(gapColor)
+            .foregroundStyle(gapColor)
 
         let separatorText = Text(" · ")
             .font(AppDesign.Typography.compactLabel)
-            .foregroundColor(Color.secondary.opacity(0.5))
+            .foregroundStyle(.tertiary)
 
         let secondsText = Text(secondsLabel)
             .font(AppDesign.Typography.compactLabel.monospacedDigit())
-            .foregroundColor(gapColor)
+            .foregroundStyle(gapColor)
 
         return Text("\(nameText) \(distanceText)\(separatorText)\(secondsText)")
             .accessibilityElement(children: .ignore)
