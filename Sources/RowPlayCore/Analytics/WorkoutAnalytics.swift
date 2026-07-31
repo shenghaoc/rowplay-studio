@@ -85,7 +85,7 @@ public enum WorkoutAnalytics: Sendable {
         var challengeDistance = 0.0
         var totalTime: TimeInterval = 0
 
-        // ⚡ Bolt: Single pass accumulation to avoid multiple O(N) `.reduce()` calls
+        // Single pass accumulation to avoid multiple O(N) `.reduce()` calls.
         for workout in workouts {
             totalDistance += workout.distance
             challengeDistance += RowPlayFormatting.challengeDistance(for: workout)
@@ -113,8 +113,8 @@ public enum WorkoutAnalytics: Sendable {
             var bestPace: TimeInterval?
             var longest = 0.0
 
-            // ⚡ Bolt: Accumulate values in a single pass to eliminate intermediate allocations
-            // from chained `.reduce`, `.map`, and `.filter` calls.
+            // Accumulate values in a single pass to avoid intermediate arrays from
+            // chained `.reduce`, `.map`, and `.filter` calls.
             for workout in sportWorkouts {
                 distance += workout.distance
                 time += workout.time
