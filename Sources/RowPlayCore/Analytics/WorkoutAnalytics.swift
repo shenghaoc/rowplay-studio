@@ -81,9 +81,17 @@ public enum WorkoutAnalytics: Sendable {
     }
 
     public static func dashboardSummary(for workouts: [Workout]) -> DashboardSummary {
-        let totalDistance = workouts.reduce(0) { $0 + $1.distance }
-        let challengeDistance = workouts.reduce(0) { $0 + RowPlayFormatting.challengeDistance(for: $1) }
-        let totalTime = workouts.reduce(0) { $0 + $1.time }
+        // Bolt ⚡: Single O(N) pass to prevent multiple array traversals
+        var totalDistance: Double = 0
+        var challengeDistance: Double = 0
+        var totalTime: TimeInterval = 0
+
+        for workout in workouts {
+            totalDistance += workout.distance
+            challengeDistance += RowPlayFormatting.challengeDistance(for: workout)
+            totalTime += workout.time
+        }
+
         let averagePace = totalDistance > 0 ? totalTime / (totalDistance / 500) : 0
 
         return DashboardSummary(
@@ -100,11 +108,24 @@ public enum WorkoutAnalytics: Sendable {
         let grouped = Dictionary(grouping: workouts, by: \.sport)
 
         return grouped.map { sport, sportWorkouts in
-            let distance = sportWorkouts.reduce(0) { $0 + $1.distance }
-            let time = sportWorkouts.reduce(0) { $0 + $1.time }
+            // Bolt ⚡: Single O(N) pass, avoiding map/filter intermediate array allocations
+            var distance: Double = 0
+            var time: TimeInterval = 0
+            var bestPace: TimeInterval = 0
+            var longest: Double = 0
+
+            for workout in sportWorkouts {
+                distance += workout.distance
+                time += workout.time
+                if workout.pace > 0 {
+                    if bestPace == 0 || workout.pace < bestPace {
+                        bestPace = workout.pace
+                    }
+                }
+                longest = max(longest, workout.distance)
+            }
+
             let averagePace = distance > 0 ? time / (distance / 500) : 0
-            let bestPace = sportWorkouts.map(\.pace).filter { $0 > 0 }.min() ?? 0
-            let longest = sportWorkouts.map(\.distance).max() ?? 0
 
             return SportSummary(
                 sport: sport,

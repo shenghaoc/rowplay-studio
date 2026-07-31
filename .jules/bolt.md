@@ -23,3 +23,7 @@
 ## 2024-11-23 - ISO8601DateFormatter allocation in ReplayRivalFactory
 **Learning:** `ReplayRivalFactory.sessionDateLabel` instantiated a new `ISO8601DateFormatter` on every call. This was inefficient, especially since generating rivals could happen often in contexts like updating identity caches.
 **Action:** When a deterministic, non-localized date string is needed, use a statically cached `ISO8601DateFormatter` wrapped in a `Mutex` to prevent concurrent access issues, rather than instantiating one inline on every call.
+
+## 2024-11-23 - Higher-Order Functions in Hot Paths
+**Learning:** Chaining higher-order array methods like `reduce`, `map`, and `filter` creates intermediate array allocations and causes multiple O(N) traversals of the data. When used on large arrays (like workouts) or inside properties evaluated frequently, this impacts performance.
+**Action:** Replace chained higher-order functions with a single `for` loop to accumulate values in a single O(N) pass without extra memory allocations.
