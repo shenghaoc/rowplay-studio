@@ -166,8 +166,17 @@ struct WorkoutStrokeAnalysisView: View {
     }
 
     static func computePaceChartDomain(strokes: [Stroke]) -> ClosedRange<Double> {
-        let paces = strokes.map(\.pace).filter { $0.isFinite && $0 > 0 }
-        guard let fastest = paces.min(), let slowest = paces.max() else {
+        var fastest: Double?
+        var slowest: Double?
+        for stroke in strokes {
+            let pace = stroke.pace
+            if pace.isFinite && pace > 0 {
+                fastest = fastest.map { min($0, pace) } ?? pace
+                slowest = slowest.map { max($0, pace) } ?? pace
+            }
+        }
+
+        guard let fastest = fastest, let slowest = slowest else {
             return -180 ... -60
         }
         let padding = max((slowest - fastest) * 0.12, 3)

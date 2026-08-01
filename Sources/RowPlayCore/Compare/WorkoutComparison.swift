@@ -399,14 +399,22 @@ public enum WorkoutComparison: Sendable {
 
     /// Pace coefficient of variation (%).
     private static func computePaceConsistency(strokes: [Stroke], splits: [Split]) -> Double {
-        let paces = strokes.map { $0.pace }.filter { $0 > 0 }
+        var paces: [Double] = []
+        for stroke in strokes {
+            if stroke.pace > 0 {
+                paces.append(stroke.pace)
+            }
+        }
         if paces.count >= 2 {
             return coefficientOfVariation(paces)
         }
-        let splitPaces = splits
-            .filter { $0.isRest != true }
-            .map { $0.pace }
-            .filter { $0 > 0 }
+
+        var splitPaces: [Double] = []
+        for split in splits {
+            if split.isRest != true && split.pace > 0 {
+                splitPaces.append(split.pace)
+            }
+        }
         return coefficientOfVariation(splitPaces)
     }
 

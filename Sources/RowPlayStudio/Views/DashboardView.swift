@@ -69,8 +69,17 @@ struct DashboardView: View {
     }
 
     static func recentPaceChartDomain(for workouts: [Workout]) -> ClosedRange<Double> {
-        let paces = workouts.map(\.pace).filter { $0.isFinite && $0 > 0 }
-        if let fastest = paces.min(), let slowest = paces.max() {
+        var fastest: Double?
+        var slowest: Double?
+        for workout in workouts {
+            let pace = workout.pace
+            if pace.isFinite && pace > 0 {
+                fastest = fastest.map { min($0, pace) } ?? pace
+                slowest = slowest.map { max($0, pace) } ?? pace
+            }
+        }
+
+        if let fastest = fastest, let slowest = slowest {
             let padding = max((slowest - fastest) * 0.12, 3)
             return -(slowest + padding) ... -(fastest - padding)
         }
