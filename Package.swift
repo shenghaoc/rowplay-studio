@@ -64,7 +64,10 @@ let targets: [Target] = [
     ),
     .executableTarget(
         name: "RowPlayStudio",
-        dependencies: ["RowPlayPlatform", "RowPlayCore"]
+        dependencies: ["RowPlayPlatform", "RowPlayCore"],
+        resources: [
+            .copy("Resources/ReplayReference")
+        ]
     ),
     makeCoreTestTarget(),
     .testTarget(

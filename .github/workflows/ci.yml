@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - 'codex/phase-11-*'
 
 jobs:
   # RowPlayCore: Pure Swift domain logic — test on Linux for cross-platform validation
