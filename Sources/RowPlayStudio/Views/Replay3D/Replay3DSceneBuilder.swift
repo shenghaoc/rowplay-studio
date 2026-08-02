@@ -20,6 +20,7 @@ final class Replay3DSceneContainer {
     let sport: Sport
     let layout: ReplayCourseLayout
     let configuration: ReplayRenderConfiguration
+    let visualSource: ReplayAssetVisualSource
 
     init(
         root: Entity,
@@ -35,7 +36,8 @@ final class Replay3DSceneContainer {
         effectRenderer: ReplayEffectRenderer,
         sport: Sport,
         layout: ReplayCourseLayout,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        visualSource: ReplayAssetVisualSource
     ) {
         self.root = root
         self.camera = camera
@@ -51,6 +53,7 @@ final class Replay3DSceneContainer {
         self.sport = sport
         self.layout = layout
         self.configuration = configuration
+        self.visualSource = visualSource
     }
 }
 
@@ -64,8 +67,54 @@ enum Replay3DSceneBuilder {
     static func buildScene(
         sport: Sport,
         colorScheme: ColorScheme,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        effectiveQuality: ReplayRenderQuality = .high,
+        bundledAssetSet: ReplayBundledAssetSet? = nil
     ) -> Replay3DSceneContainer {
+        // A just-finished async load for a previous sport must never lend its
+        // common visual nodes to the next sport. Treat a mismatched set exactly
+        // like a failed load so rig and environment selection stay atomic.
+        let matchingAssetSet = bundledAssetSet?.sport == sport ? bundledAssetSet : nil
+        let visualSource = ReplayAssetCatalog.visualSource(
+            for: effectiveQuality,
+            assetSetIsValid: matchingAssetSet != nil
+        )
+        let visualProvider: (any ReplayRigVisualProvider)?
+        let liveAthlete: ReplayAthleteInstance?
+        let ghostAthlete: ReplayAthleteInstance?
+        switch visualSource {
+        case .procedural:
+            visualProvider = ReplayProceduralRigVisualProvider.shared
+            liveAthlete = nil
+            ghostAthlete = nil
+        case .bundled:
+            // Atomic package: equipment provider plus independent V4 clones.
+            let assetSet = matchingAssetSet!
+            visualProvider = assetSet.rigVisualProvider
+            liveAthlete = assetSet.makeAthleteInstance(
+                sport: sport,
+                name: "live-v4-athlete",
+                isRival: false,
+                quality: effectiveQuality
+            )
+            ghostAthlete = assetSet.makeAthleteInstance(
+                sport: sport,
+                name: "ghost-v4-athlete",
+                isRival: true,
+                quality: effectiveQuality
+            )
+            // If either athlete clone fails, fall back entirely to procedural.
+            if liveAthlete == nil || ghostAthlete == nil {
+                return buildScene(
+                    sport: sport,
+                    colorScheme: colorScheme,
+                    configuration: configuration,
+                    effectiveQuality: effectiveQuality,
+                    bundledAssetSet: nil
+                )
+            }
+        }
+
         let root = Entity()
         root.name = "scene-root"
 
@@ -102,6 +151,13 @@ enum Replay3DSceneBuilder {
         ground.position = SIMD3(0, -0.05, 0)
         root.addChild(ground)
 
+        // Athlete and equipment are selected as one atomic source. Venue
+        // replacement remains owned by the environment stack layer.
+        let resolvedVisualSource: ReplayAssetVisualSource =
+            visualSource == .bundled && liveAthlete != nil && ghostAthlete != nil
+                ? .bundled
+                : .procedural
+
         // Course ring
         let courseEntity = Entity()
         courseEntity.name = "course"
@@ -122,7 +178,9 @@ enum Replay3DSceneBuilder {
         liveGroup.name = "live-athlete"
         root.addChild(liveGroup)
         let liveRig = ReplaySportRigFactory.build(
-            sport: sport, into: liveGroup, accent: .green, opacity: 1.0
+            sport: sport, into: liveGroup, accent: .green, opacity: 1.0,
+            visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
+            canonicalAthlete: resolvedVisualSource == .bundled ? liveAthlete : nil
         )
 
         // Ghost avatar
@@ -131,8 +189,13 @@ enum Replay3DSceneBuilder {
         ghostGroup.isEnabled = false
         root.addChild(ghostGroup)
         let ghostRig = ReplaySportRigFactory.build(
-            sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45
+            sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45,
+            visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
+            canonicalAthlete: resolvedVisualSource == .bundled ? ghostAthlete : nil
         )
+        // Equipment remains translucent for a ghost. Each sport rig excludes
+        // the V4 skinned body, which intentionally stays opaque/depth-writing
+        // with a cool rival tint to avoid transparent triangle-sort seams.
         ghostRig.applyGhostTranslucency()
 
         // Every wake and spray entity is allocated once with the scene.
@@ -156,7 +219,8 @@ enum Replay3DSceneBuilder {
             effectRenderer: effectRenderer,
             sport: sport,
             layout: layout,
-            configuration: configuration
+            configuration: configuration,
+            visualSource: resolvedVisualSource
         )
     }
 
@@ -164,6 +228,7 @@ enum Replay3DSceneBuilder {
 
     /// Update all entity positions, orientations, and animation state for the
     /// current frame. Called from the `RealityView.update` closure.
+    @discardableResult
     static func updateScene(
         container: Replay3DSceneContainer,
         livePose: ReplayStrokePose,
@@ -180,7 +245,7 @@ enum Replay3DSceneBuilder {
         cameraPreset: ReplayCameraPreset,
         cameraResetGeneration: Int,
         replayDiscontinuityGeneration: Int
-    ) {
+    ) -> Bool {
         let layout = container.layout
 
         // Solve rig pose from stroke pose
@@ -200,8 +265,14 @@ enum Replay3DSceneBuilder {
         container.liveGroup.position = SIMD3(Float(livePos.x), bob, Float(livePos.z))
         container.liveGroup.orientation = simd_quatf(angle: Float(liveHeading), axis: SIMD3(0, 1, 0))
 
-        // Apply rig pose to live avatar
-        container.liveRig.applyPose(liveRigPose)
+        // Apply rig pose to live avatar (equipment + V4 phase seek or procedural joints).
+        container.liveRig.applyPose(
+            liveRigPose,
+            motion: ReplayAthleteMotionSample(strokePose: livePose)
+        )
+        if container.liveRig.consumeCanonicalRuntimeFailure() {
+            return false
+        }
 
         // Ghost
         if ghostVisible, let ghostPose {
@@ -217,7 +288,13 @@ enum Replay3DSceneBuilder {
                 distance: ghostDistance,
                 reduceMotion: reduceMotion
             )
-            container.ghostRig.applyPose(ghostRigPose)
+            container.ghostRig.applyPose(
+                ghostRigPose,
+                motion: ReplayAthleteMotionSample(strokePose: ghostPose)
+            )
+            if container.ghostRig.consumeCanonicalRuntimeFailure() {
+                return false
+            }
         } else {
             container.ghostGroup.isEnabled = false
         }
@@ -248,6 +325,7 @@ enum Replay3DSceneBuilder {
             reduceMotion: reduceMotion,
             resetGeneration: replayDiscontinuityGeneration
         )
+        return true
     }
 
     // MARK: - Course Geometry

@@ -11,7 +11,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
         library.resetCacheForTesting()
 
         for sport in ReplayAssetCatalog.supportedSports {
-            guard let set = await library.bundledEquipmentSet(for: sport) else {
+            guard let set = await library.bundledAssetSet(for: sport) else {
                 return XCTFail("Expected validated equipment for \(sport.rawValue)")
             }
             XCTAssertEqual(set.sport, sport)
@@ -51,12 +51,12 @@ final class ReplayAssetLibraryTests: XCTestCase {
             ))
         )
         var reports: [(Sport, ReplayAssetLoadFailure)] = []
-        let library = ReplayAssetLibrary(source: source) { sport, failure in
+        let library = ReplayAssetLibrary(source: source, failureReporter: { sport, failure in
             reports.append((sport, failure))
-        }
+        })
 
-        let first = await library.bundledEquipmentSet(for: .rower)
-        let second = await library.bundledEquipmentSet(for: .rower)
+        let first = await library.bundledAssetSet(for: .rower)
+        let second = await library.bundledAssetSet(for: .rower)
         XCTAssertNil(first)
         XCTAssertNil(second)
         XCTAssertEqual(source.packageRequests, 1)
@@ -87,7 +87,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        let set = await library.bundledEquipmentSet(for: sport)
+        let set = await library.bundledAssetSet(for: sport)
         XCTAssertNil(set)
         XCTAssertEqual(library.lastFailures[sport], .contractHashMismatch)
     }
@@ -114,8 +114,8 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        async let first = library.bundledEquipmentSet(for: sport)
-        async let second = library.bundledEquipmentSet(for: sport)
+        async let first = library.bundledAssetSet(for: sport)
+        async let second = library.bundledAssetSet(for: sport)
         let results = await (first, second)
 
         XCTAssertNotNil(results.0)
@@ -152,8 +152,8 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        async let rower = library.bundledEquipmentSet(for: .rower)
-        async let bike = library.bundledEquipmentSet(for: .bike)
+        async let rower = library.bundledAssetSet(for: .rower)
+        async let bike = library.bundledAssetSet(for: .bike)
         let results = await (rower, bike)
 
         XCTAssertNotNil(results.0)

@@ -21,12 +21,21 @@ final class ReplaySkiErgRig: ReplaySportRig {
     private let footAnchorR = Entity()
     private var poles: [Entity] = []
 
-    // Athlete
+    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
     private let athlete = ReplayAthleteRig()
+    private var canonicalAthlete: ReplayAthleteInstance?
+    private var poseAdapter: ReplayAthletePoseAdapter?
+    private var canonicalRuntimeFailure = false
 
     // MARK: - Build
 
-    func build(into parent: ModelEntity, accent: Color, opacity: Float) {
+    func build(
+        into parent: ModelEntity,
+        accent: Color,
+        opacity: Float,
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
+    ) {
         root.name = "skierg-rig"
         parent.addChild(root)
 
@@ -51,25 +60,38 @@ final class ReplaySkiErgRig: ReplaySportRig {
         // Frame posts
         let postMesh = MeshResource.generateBox(size: SIMD3(0.08, 1.8, 0.08))
         for x: Float in [-0.3, 0.3] {
-            let post = ModelEntity(mesh: postMesh, materials: [postMat])
+            let post = Entity()
             post.name = "post-\(x > 0 ? "R" : "L")"
+            let visualName = x > 0 ? "visual-post-R" : "visual-post-L"
+            if visualProvider?.attachVisual(named: visualName, to: post) != true {
+                let postModel = ModelEntity(mesh: postMesh, materials: [postMat])
+                postModel.name = "post-model-\(x > 0 ? "R" : "L")"
+                post.addChild(postModel)
+            }
             post.position = SIMD3(x, 0.9, -0.5)
             root.addChild(post)
         }
 
         // Top bar
-        let topBarMesh = MeshResource.generateBox(size: SIMD3(0.7, 0.06, 0.06))
-        let topBar = ModelEntity(mesh: topBarMesh, materials: [postMat])
+        let topBar = Entity()
         topBar.name = "topBar"
+        if visualProvider?.attachVisual(named: "visual-topBar", to: topBar) != true {
+            let topBarMesh = MeshResource.generateBox(size: SIMD3(0.7, 0.06, 0.06))
+            let topBarModel = ModelEntity(mesh: topBarMesh, materials: [postMat])
+            topBarModel.name = "topBar-model"
+            topBar.addChild(topBarModel)
+        }
         topBar.position = SIMD3(0, 1.8, -0.5)
         root.addChild(topBar)
 
         // Cable/pulley
         cable.name = "cable"
-        let cableMesh = MeshResource.generateCylinder(height: 1.2, radius: 0.01)
-        let cableModel = ModelEntity(mesh: cableMesh, materials: [cableMat])
-        cableModel.name = "cable-model"
-        cable.addChild(cableModel)
+        if visualProvider?.attachVisual(named: "visual-cable", to: cable) != true {
+            let cableMesh = MeshResource.generateCylinder(height: 1.2, radius: 0.01)
+            let cableModel = ModelEntity(mesh: cableMesh, materials: [cableMat])
+            cableModel.name = "cable-model"
+            cable.addChild(cableModel)
+        }
         cable.position = SIMD3(0, 1.2, -0.5)
         root.addChild(cable)
 
@@ -77,23 +99,32 @@ final class ReplaySkiErgRig: ReplaySportRig {
         let handleMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 0.25))
 
         leftHandle.name = "handle-L"
-        let leftModel = ModelEntity(mesh: handleMesh, materials: [handleMat])
-        leftModel.name = "handle-model-L"
-        leftHandle.addChild(leftModel)
+        if visualProvider?.attachVisual(named: "visual-handle-L", to: leftHandle) != true {
+            let leftModel = ModelEntity(mesh: handleMesh, materials: [handleMat])
+            leftModel.name = "handle-model-L"
+            leftHandle.addChild(leftModel)
+        }
         leftHandle.position = SIMD3(-0.15, 0.8, 0.1)
         root.addChild(leftHandle)
 
         rightHandle.name = "handle-R"
-        let rightModel = ModelEntity(mesh: handleMesh, materials: [handleMat])
-        rightModel.name = "handle-model-R"
-        rightHandle.addChild(rightModel)
+        if visualProvider?.attachVisual(named: "visual-handle-R", to: rightHandle) != true {
+            let rightModel = ModelEntity(mesh: handleMesh, materials: [handleMat])
+            rightModel.name = "handle-model-R"
+            rightHandle.addChild(rightModel)
+        }
         rightHandle.position = SIMD3(0.15, 0.8, 0.1)
         root.addChild(rightHandle)
 
         // Platform
-        let platformMesh = MeshResource.generateBox(size: SIMD3(0.8, 0.06, 0.6))
-        let platform = ModelEntity(mesh: platformMesh, materials: [accentMat])
+        let platform = Entity()
         platform.name = "platform"
+        if visualProvider?.attachVisual(named: "visual-platform", to: platform) != true {
+            let platformMesh = MeshResource.generateBox(size: SIMD3(0.8, 0.06, 0.6))
+            let platformModel = ModelEntity(mesh: platformMesh, materials: [accentMat])
+            platformModel.name = "platform-model"
+            platform.addChild(platformModel)
+        }
         platform.position = SIMD3(0, 0.03, 0)
         footAnchorL.name = "foot-anchor-L"
         footAnchorL.position = SIMD3(-0.12, 0.03, 0)
@@ -107,45 +138,61 @@ final class ReplaySkiErgRig: ReplaySportRig {
         for side: Float in [-1, 1] {
             let pole = Entity()
             pole.name = "pole-\(side > 0 ? "R" : "L")"
+            let visualName = side > 0 ? "visual-pole-R" : "visual-pole-L"
+            if visualProvider?.attachVisual(named: visualName, to: pole) != true {
+                // Shaft
+                let shaftMesh = MeshResource.generateCylinder(height: 1.2, radius: 0.015)
+                let shaft = ModelEntity(mesh: shaftMesh, materials: [poleMat])
+                shaft.position = SIMD3(0, -0.6, 0)
+                shaft.name = "shaft"
+                pole.addChild(shaft)
 
-            // Shaft
-            let shaftMesh = MeshResource.generateCylinder(height: 1.2, radius: 0.015)
-            let shaft = ModelEntity(mesh: shaftMesh, materials: [poleMat])
-            shaft.position = SIMD3(0, -0.6, 0)
-            shaft.name = "shaft"
-            pole.addChild(shaft)
+                // Grip
+                let gripMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 0.16))
+                let gripMat = ReplayMeshFactory.metalMaterial(
+                    NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 1),
+                    opacity: opacity
+                )
+                let grip = ModelEntity(mesh: gripMesh, materials: [gripMat])
+                grip.name = "grip"
+                pole.addChild(grip)
 
-            // Grip
-            let gripMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.06, 0.16))
-            let gripMat = ReplayMeshFactory.metalMaterial(
-                NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 1),
-                opacity: opacity
-            )
-            let grip = ModelEntity(mesh: gripMesh, materials: [gripMat])
-            grip.name = "grip"
-            pole.addChild(grip)
-
-            // Basket
-            let basketMesh = MeshResource.generateCylinder(height: 0.03, radius: 0.06)
-            let basket = ModelEntity(mesh: basketMesh, materials: [accentMat])
-            basket.position = SIMD3(0, -1.15, 0)
-            basket.name = "basket"
-            pole.addChild(basket)
+                // Basket
+                let basketMesh = MeshResource.generateCylinder(height: 0.03, radius: 0.06)
+                let basket = ModelEntity(mesh: basketMesh, materials: [accentMat])
+                basket.position = SIMD3(0, -1.15, 0)
+                basket.name = "basket"
+                pole.addChild(basket)
+            }
 
             pole.position = SIMD3(side * 0.15, 0.8, 0.1)
             root.addChild(pole)
             poles.append(pole)
         }
 
-        // Athlete body (standing)
-        athlete.build(into: root, seated: false, accent: accent, opacity: opacity)
-        // Position pelvis at hip height
-        athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
+        // Athlete body (standing). Canonical V4 and procedural paths are exclusive.
+        if let canonicalAthlete {
+            self.canonicalAthlete = canonicalAthlete
+            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
+            canonicalAthlete.attach(to: root)
+            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
+            canonicalAthlete.root.position = SIMD3(0, 0.72, 0.02)
+            canonicalAthlete.captureBaseRootTransform()
+        } else {
+            athlete.build(
+                into: root,
+                seated: false,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: nil
+            )
+            athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
+        }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose) {
+    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
         guard case .skierg(let skiPose) = pose else {
             assertionFailure("ReplaySkiErgRig.applyPose received non-skierg pose")
             return
@@ -179,16 +226,58 @@ final class ReplaySkiErgRig: ReplaySportRig {
             axis: SIMD3(1, 0, 0)
         )
 
-        // Athlete pelvis position adjusted by hip compression
         let compressionOffset = hipCompression * 0.15
-        athlete.pelvis.position = SIMD3(0, 0.72 - compressionOffset, 0.02)
+        let pelvisTarget = SIMD3<Float>(0, 0.72 - compressionOffset, 0.02)
+        let handL = leftHandle.position(relativeTo: root)
+        let handR = rightHandle.position(relativeTo: root)
+        let footL = footAnchorL.position(relativeTo: root)
+        let footR = footAnchorR.position(relativeTo: root)
 
-        // Apply athlete joint pose (with finite guard inside)
-        athlete.applyPose(skiPose.joints)
+        if let canonicalAthlete, let poseAdapter, let motion {
+            poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
+            let targets = ReplayAthleteContactTargets(
+                pelvis: pelvisTarget,
+                leftHand: handL,
+                rightHand: handR,
+                leftFoot: footL,
+                rightFoot: footR
+            )
+            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+                ReplayAthleteContactSolver.orientHandsToTargets(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                let contactError = ReplayAthleteContactSolver.constrain(
+                    instance: canonicalAthlete,
+                    targets: targets,
+                    relativeTo: root
+                )
+                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
+                    || !canonicalAthlete.hasFiniteJointTransforms()
+            } else {
+                canonicalRuntimeFailure = true
+            }
+        } else {
+            athlete.pelvis.position = pelvisTarget
+            athlete.applyPose(skiPose.joints)
+            athlete.handL.setPosition(handL, relativeTo: root)
+            athlete.handR.setPosition(handR, relativeTo: root)
+            athlete.footL.setPosition(footL, relativeTo: root)
+            athlete.footR.setPosition(footR, relativeTo: root)
+        }
+    }
 
-        athlete.handL.setPosition(leftHandle.position(relativeTo: root), relativeTo: root)
-        athlete.handR.setPosition(rightHandle.position(relativeTo: root), relativeTo: root)
-        athlete.footL.setPosition(footAnchorL.position(relativeTo: root), relativeTo: root)
-        athlete.footR.setPosition(footAnchorR.position(relativeTo: root), relativeTo: root)
+    func applyGhostTranslucency() {
+        ReplaySportRigTranslucency.apply(
+            to: root,
+            opacity: 0.45,
+            excluding: canonicalAthlete?.athleteEntity
+        )
+    }
+
+    func consumeCanonicalRuntimeFailure() -> Bool {
+        defer { canonicalRuntimeFailure = false }
+        return canonicalRuntimeFailure
     }
 }

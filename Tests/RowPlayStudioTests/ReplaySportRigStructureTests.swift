@@ -404,12 +404,62 @@ final class ReplaySportRigStructureTests: XCTestCase {
         }
     }
 
+    // MARK: - Procedural Fallback Remains Available
+
+    func testProceduralFallbackAvailableAtEveryPivot() {
+        // The low-quality provider intentionally supplies no authored nodes,
+        // leaving ReplayMeshFactory as the complete visual source.
+        for sport: Sport in [.rower, .skierg, .bike] {
+            let rig = buildRig(
+                sport: sport,
+                visualProvider: ReplayProceduralRigVisualProvider.shared
+            )
+            let names = allEntityNames(in: rig.root)
+            let hasProceduralTorso = names.contains("torso-model")
+            XCTAssertTrue(hasProceduralTorso,
+                          "\(sport) rig should use procedural torso at low quality")
+        }
+    }
+
+    func testMissingAssetsProduceCompleteFunctionalRig() {
+        // A missing provider represents a failed asset set. It must retain all
+        // pivots and pose behavior through the complete procedural fallback.
+        for sport: Sport in [.rower, .skierg, .bike] {
+            let rig = buildRig(sport: sport)
+            let pose = makeTestPose(sport: sport)
+            rig.applyPose(pose)
+            // After applying pose, all transforms must be finite
+            XCTAssertTrue(allTransformsFinite(in: rig.root),
+                          "\(sport) rig should have finite transforms without catalog")
+            // Every required pivot entity must exist
+            let names = allEntityNames(in: rig.root)
+            let requiredPivots = ["pelvis", "torso", "head",
+                                   "upperArm-L", "upperArm-R",
+                                   "forearm-L", "forearm-R",
+                                   "hand-L", "hand-R",
+                                   "thigh-L", "thigh-R",
+                                   "shin-L", "shin-R",
+                                   "foot-L", "foot-R"]
+            for pivot in requiredPivots {
+                XCTAssert(names.contains(pivot),
+                          "\(sport) rig missing pivot entity: \(pivot)")
+            }
+        }
+    }
+
     // MARK: - Helpers
 
-    private func buildRig(sport: Sport) -> ReplaySportRig {
+    private func buildRig(
+        sport: Sport,
+        visualProvider: (any ReplayRigVisualProvider)? = nil
+    ) -> ReplaySportRig {
         let parent = ModelEntity()
         return ReplaySportRigFactory.build(
-            sport: sport, into: parent, accent: .green, opacity: 1.0
+            sport: sport,
+            into: parent,
+            accent: .green,
+            opacity: 1.0,
+            visualProvider: visualProvider
         )
     }
 

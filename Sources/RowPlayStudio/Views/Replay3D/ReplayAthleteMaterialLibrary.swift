@@ -243,6 +243,27 @@ final class ReplayAthleteMaterialLibrary {
         return result
     }
 
+    /// Generates every tier's maps once during the async asset load. Scene
+    /// building runs synchronously inside RealityView's `make` closure, so the
+    /// tier a later quality change selects must already be resident.
+    func prewarm(
+        _ qualities: [ReplayRenderQuality] = ReplayRenderQuality.allCases
+    ) async {
+        for quality in qualities {
+            _ = await detailMaps(for: quality)
+        }
+    }
+
+    /// Cache-only accessor for the synchronous scene-build path. A miss means
+    /// the tier was never prewarmed or its generation failed; the caller must
+    /// select the complete procedural scene rather than render an athlete with
+    /// unbound surfaces.
+    func cachedDetailMaps(
+        for quality: ReplayRenderQuality
+    ) -> [ReplayAthleteSurfaceRole: TextureResource]? {
+        cache[quality.rawValue]
+    }
+
     func resetCacheForTesting() {
         for task in inFlight.values { task.cancel() }
         inFlight.removeAll()
