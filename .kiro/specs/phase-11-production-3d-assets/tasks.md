@@ -25,7 +25,7 @@ claim that the complete phase or visual QA matrix is finished.
       solving, independent sculls, course skis/poles, road-bike contact
       geometry, wrist orientation, release/recovery, complete authored
       composites at High/Ultra, and independent live/rival instances.
-- [ ] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
+- [x] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.
 - [ ] **7/8 Environments and quality** — add the three venue stories,
       materials, lighting profiles, quality-tier differentiation, and atomic
