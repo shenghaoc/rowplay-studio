@@ -256,26 +256,37 @@ public enum WorkoutAnalytics: Sendable {
             return nil
         }
 
-        guard let firstDate = points.map(\.x).min() else {
-            return nil
+        var firstDate = points[0].x
+        for point in points {
+            if point.x < firstDate {
+                firstDate = point.x
+            }
         }
 
-        let dayPoints = points.map { point in
-            ((point.x.timeIntervalSince(firstDate) / 86_400), point.y)
+        var sumX = 0.0
+        var sumY = 0.0
+        var lastX = 0.0
+
+        for point in points {
+            let x = point.x.timeIntervalSince(firstDate) / 86_400
+            sumX += x
+            sumY += point.y
+            if x > lastX {
+                lastX = x
+            }
         }
 
-        let count = Double(dayPoints.count)
-        let sumX = dayPoints.reduce(0) { $0 + $1.0 }
-        let sumY = dayPoints.reduce(0) { $0 + $1.1 }
+        let count = Double(points.count)
         let meanX = sumX / count
         let meanY = sumY / count
 
         var numerator = 0.0
         var denominator = 0.0
 
-        for point in dayPoints {
-            numerator += (point.0 - meanX) * (point.1 - meanY)
-            denominator += pow(point.0 - meanX, 2)
+        for point in points {
+            let x = point.x.timeIntervalSince(firstDate) / 86_400
+            numerator += (x - meanX) * (point.y - meanY)
+            denominator += (x - meanX) * (x - meanX)
         }
 
         guard denominator != 0 else {
@@ -284,7 +295,6 @@ public enum WorkoutAnalytics: Sendable {
 
         let slope = numerator / denominator
         let intercept = meanY - slope * meanX
-        let lastX = dayPoints.map(\.0).max() ?? 0
         let y0 = intercept
         let y1 = intercept + slope * lastX
 
