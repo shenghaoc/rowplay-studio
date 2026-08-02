@@ -20,6 +20,7 @@ func makeCoreTestTarget(dependencies: [Target.Dependency] = ["RowPlayCore"]) -> 
             .copy("Fixtures/replay-race-result-parity.json"),
             .copy("Fixtures/replay-current-main-motion.json"),
             .copy("Fixtures/replay-current-main-grips.json"),
+            .copy("Fixtures/replay-current-main-equipment.json"),
         ]
     )
 }

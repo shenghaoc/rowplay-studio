@@ -11,7 +11,7 @@ claim that the complete phase or visual QA matrix is finished.
 - [x] **2/8 Portable Core contracts** — add current motion tables, quaternion
       math, grip geometry and surfaces, hand closure, sport grip contracts,
       parity fixtures, and Linux-compatible tests.
-- [ ] **3/8 Equipment assets** — introduce per-sport native equipment assets,
+- [x] **3/8 Equipment assets** — introduce per-sport native equipment assets,
       dimensional contracts, catalogs, libraries, providers, and atomic
       fallback while retaining the existing runtime until validation passes.
 - [ ] **4/8 Athlete runtime** — load the production athlete, apply materials,
