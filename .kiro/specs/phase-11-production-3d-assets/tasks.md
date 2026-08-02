@@ -8,7 +8,7 @@ claim that the complete phase or visual QA matrix is finished.
       preserve manifests and hashes, add sync/export/conversion/validation
       tooling, and bundle the inert reference artifacts without replacing the
       existing runtime.
-- [ ] **2/8 Portable Core contracts** — add current motion tables, quaternion
+- [x] **2/8 Portable Core contracts** — add current motion tables, quaternion
       math, grip geometry and surfaces, hand closure, sport grip contracts,
       parity fixtures, and Linux-compatible tests.
 - [ ] **3/8 Equipment assets** — introduce per-sport native equipment assets,
