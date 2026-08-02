@@ -69,21 +69,22 @@ struct DashboardView: View {
     }
 
     static func recentPaceChartDomain(for workouts: [Workout]) -> ClosedRange<Double> {
-        var fastest: Double?
-        var slowest: Double?
+        var fastest = Double.infinity
+        var slowest = -Double.infinity
+        var hasValidPace = false
         for workout in workouts {
             let pace = workout.pace
-            if pace.isFinite && pace > 0 {
-                fastest = fastest.map { min($0, pace) } ?? pace
-                slowest = slowest.map { max($0, pace) } ?? pace
-            }
+            guard pace.isFinite, pace > 0 else { continue }
+            hasValidPace = true
+            fastest = min(fastest, pace)
+            slowest = max(slowest, pace)
         }
 
-        if let fastest = fastest, let slowest = slowest {
-            let padding = max((slowest - fastest) * 0.12, 3)
-            return -(slowest + padding) ... -(fastest - padding)
+        guard hasValidPace else {
+            return -180 ... -60
         }
-        return -180 ... -60
+        let padding = max((slowest - fastest) * 0.12, 3)
+        return -(slowest + padding) ... -(fastest - padding)
     }
 
     // MARK: - Charts

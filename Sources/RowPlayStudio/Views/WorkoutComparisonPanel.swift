@@ -111,8 +111,16 @@ struct WorkoutComparisonPanel: View {
     }
 
     static func paceChartDomain(for paces: [Double]) -> ClosedRange<Double> {
-        let validPaces = paces.filter { $0.isFinite && $0 > 0 }
-        guard let fastest = validPaces.min(), let slowest = validPaces.max() else {
+        var fastest = Double.infinity
+        var slowest = -Double.infinity
+        var hasValidPace = false
+        for pace in paces {
+            guard pace.isFinite, pace > 0 else { continue }
+            hasValidPace = true
+            fastest = min(fastest, pace)
+            slowest = max(slowest, pace)
+        }
+        guard hasValidPace else {
             return -180 ... -60
         }
         let padding = max((slowest - fastest) * 0.12, 3)

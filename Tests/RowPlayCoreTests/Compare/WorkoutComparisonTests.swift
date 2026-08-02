@@ -178,6 +178,70 @@ final class WorkoutComparisonTests: XCTestCase {
         XCTAssertGreaterThan(stats.paceConsistency, 0)
     }
 
+    func testSideStatsPaceConsistencyUsesStrokePacesWhenAvailable() {
+        let strokes = [
+            makeStroke(t: 0, d: 0, pace: 110),
+            makeStroke(t: 1, d: 10, pace: 130),
+            makeStroke(t: 2, d: 20, pace: 120),
+        ]
+        // Rest splits with extreme pace variance that would dominate if strokes were ignored.
+        let splits = [
+            Split(index: 0, distance: 500, time: 120, pace: 90),
+            Split(index: 1, distance: 500, time: 120, pace: 200, isRest: true),
+            Split(index: 2, distance: 500, time: 120, pace: 150),
+        ]
+        let withStrokes = WorkoutComparison.sideStats(
+            makeDetail(workout: makeWorkout(), strokes: strokes, splits: splits)
+        )
+        let splitsOnly = WorkoutComparison.sideStats(
+            makeDetail(workout: makeWorkout(), splits: [
+                Split(index: 0, distance: 500, time: 120, pace: 110),
+                Split(index: 1, distance: 500, time: 120, pace: 130),
+                Split(index: 2, distance: 500, time: 120, pace: 120),
+            ])
+        )
+
+        // Same pace samples → same CV whether sourced from strokes or splits.
+        XCTAssertEqual(withStrokes.paceConsistency, splitsOnly.paceConsistency, accuracy: 0.0001)
+        XCTAssertGreaterThan(withStrokes.paceConsistency, 0)
+    }
+
+    func testSideStatsPaceConsistencyIgnoresRestSplitsAndNeedsTwoSamples() {
+        let oneSplit = WorkoutComparison.sideStats(
+            makeDetail(workout: makeWorkout(), splits: [
+                Split(index: 0, distance: 500, time: 120, pace: 120),
+            ])
+        )
+        XCTAssertEqual(oneSplit.paceConsistency, 0)
+
+        let restOnly = WorkoutComparison.sideStats(
+            makeDetail(workout: makeWorkout(), splits: [
+                Split(index: 0, distance: 500, time: 30, pace: 90, isRest: true),
+                Split(index: 1, distance: 500, time: 30, pace: 200, isRest: true),
+            ])
+        )
+        XCTAssertEqual(restOnly.paceConsistency, 0)
+
+        let oneStroke = WorkoutComparison.sideStats(
+            makeDetail(workout: makeWorkout(), strokes: [makeStroke(t: 0, d: 0, pace: 120)])
+        )
+        XCTAssertEqual(oneStroke.paceConsistency, 0)
+    }
+
+    func testSideStatsPaceConsistencyMatchesKnownPopulationCV() {
+        // paces: 100, 200 → mean 150, variance ((-50)^2+(50)^2)/2 = 2500, stddev 50
+        // CV% = 50/150 * 100 ≈ 33.333...
+        let detail = makeDetail(
+            workout: makeWorkout(),
+            strokes: [
+                makeStroke(t: 0, d: 0, pace: 100),
+                makeStroke(t: 1, d: 10, pace: 200),
+            ]
+        )
+        let stats = WorkoutComparison.sideStats(detail)
+        XCTAssertEqual(stats.paceConsistency, 100.0 / 3.0, accuracy: 0.0001)
+    }
+
     // MARK: - Interval Compare
 
     func testCompareIntervalRepsBothInterval() {

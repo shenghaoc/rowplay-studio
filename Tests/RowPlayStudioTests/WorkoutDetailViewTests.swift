@@ -55,6 +55,35 @@ final class WorkoutDetailViewTests: XCTestCase {
         XCTAssertEqual(WorkoutDetailView.powerText(for: .rower, pace: 1), "-")
     }
 
+    func testPaceChartDomainMakesFasterPacesPlotHigher() {
+        let strokes = [
+            Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 200),
+            Stroke(t: 1, d: 10, pace: 90, cadence: 30, watts: 250),
+        ]
+        let domain = WorkoutStrokeAnalysisView.computePaceChartDomain(strokes: strokes)
+
+        XCTAssertTrue(domain.contains(-120))
+        XCTAssertTrue(domain.contains(-90))
+        XCTAssertGreaterThan(-90, -120)
+        XCTAssertFalse(domain.contains(0))
+    }
+
+    func testPaceChartDomainFallsBackForInvalidInput() {
+        let strokes = [
+            Stroke(t: 0, d: 0, pace: .nan, cadence: 28, watts: 0),
+            Stroke(t: 1, d: 10, pace: .infinity, cadence: 28, watts: 0),
+            Stroke(t: 2, d: 20, pace: 0, cadence: 28, watts: 0),
+        ]
+        XCTAssertEqual(
+            WorkoutStrokeAnalysisView.computePaceChartDomain(strokes: strokes),
+            -180 ... -60
+        )
+        XCTAssertEqual(
+            WorkoutStrokeAnalysisView.computePaceChartDomain(strokes: []),
+            -180 ... -60
+        )
+    }
+
     private func makeStrokes(count: Int) -> [Stroke] {
         (0..<count).map { index in
             Stroke(
