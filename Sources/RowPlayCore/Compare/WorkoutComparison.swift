@@ -398,26 +398,47 @@ public enum WorkoutComparison: Sendable {
     }
 
     /// Pace coefficient of variation (%).
+    /// Prefers stroke paces when at least two positive samples exist; otherwise falls back to non-rest splits.
+    /// Computed without intermediate pace arrays (two O(N) passes, O(1) auxiliary space).
     private static func computePaceConsistency(strokes: [Stroke], splits: [Split]) -> Double {
-        let paces = strokes.map { $0.pace }.filter { $0 > 0 }
-        if paces.count >= 2 {
-            return coefficientOfVariation(paces)
+        if let strokeCV = coefficientOfVariation(
+            count: strokes.count,
+            valueAt: { strokes[$0].pace },
+            include: { strokes[$0].pace > 0 }
+        ) {
+            return strokeCV
         }
-        let splitPaces = splits
-            .filter { $0.isRest != true }
-            .map { $0.pace }
-            .filter { $0 > 0 }
-        return coefficientOfVariation(splitPaces)
+
+        return coefficientOfVariation(
+            count: splits.count,
+            valueAt: { splits[$0].pace },
+            include: { splits[$0].isRest != true && splits[$0].pace > 0 }
+        ) ?? 0
     }
 
-    private static func coefficientOfVariation(_ paces: [Double]) -> Double {
-        guard paces.count >= 2 else { return 0 }
+    /// Population coefficient of variation (%). Returns `nil` when fewer than two samples match `include`.
+    private static func coefficientOfVariation(
+        count: Int,
+        valueAt: (Int) -> Double,
+        include: (Int) -> Bool
+    ) -> Double? {
+        var sampleCount = 0
+        var sum = 0.0
+        for index in 0..<count where include(index) {
+            sum += valueAt(index)
+            sampleCount += 1
+        }
+        guard sampleCount >= 2 else { return nil }
 
-        let mean = paces.reduce(0, +) / Double(paces.count)
+        let mean = sum / Double(sampleCount)
         guard mean > 0 else { return 0 }
 
-        let variance = paces.reduce(0) { $0 + pow($1 - mean, 2) } / Double(paces.count)
-        let stddev = sqrt(variance)
+        var sumSquaredDeviation = 0.0
+        for index in 0..<count where include(index) {
+            let delta = valueAt(index) - mean
+            sumSquaredDeviation += delta * delta
+        }
+        let stddev = sqrt(sumSquaredDeviation / Double(sampleCount))
         return (stddev / mean) * 100
     }
 }

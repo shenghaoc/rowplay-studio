@@ -55,6 +55,41 @@ final class DashboardViewTests: XCTestCase {
         XCTAssertEqual(DashboardView.recentPaceAccessibilityDescription([]), "No data")
     }
 
+    func testRecentPaceChartDomainMakesFasterPacesPlotHigher() {
+        let domain = DashboardView.recentPaceChartDomain(for: [
+            makeWorkout(id: 1, pace: 120),
+            makeWorkout(id: 2, pace: 90),
+        ])
+
+        XCTAssertTrue(domain.contains(-120))
+        XCTAssertTrue(domain.contains(-90))
+        XCTAssertGreaterThan(-90, -120)
+        XCTAssertFalse(domain.contains(0))
+    }
+
+    func testRecentPaceChartDomainFallsBackForInvalidInput() {
+        let workouts = [
+            makeWorkout(id: 1, pace: .nan),
+            makeWorkout(id: 2, pace: .infinity),
+            makeWorkout(id: 3, pace: 0),
+            makeWorkout(id: 4, pace: -10),
+        ]
+        XCTAssertEqual(DashboardView.recentPaceChartDomain(for: workouts), -180 ... -60)
+        XCTAssertEqual(DashboardView.recentPaceChartDomain(for: []), -180 ... -60)
+    }
+
+    func testRecentPaceChartDomainIgnoresInvalidAmongValid() {
+        let domain = DashboardView.recentPaceChartDomain(for: [
+            makeWorkout(id: 1, pace: .nan),
+            makeWorkout(id: 2, pace: 100),
+            makeWorkout(id: 3, pace: 0),
+            makeWorkout(id: 4, pace: 140),
+        ])
+        XCTAssertTrue(domain.contains(-100))
+        XCTAssertTrue(domain.contains(-140))
+        XCTAssertFalse(domain.contains(0))
+    }
+
     private func makeWorkout(id: Int, pace: TimeInterval) -> Workout {
         Workout(
             id: id,
