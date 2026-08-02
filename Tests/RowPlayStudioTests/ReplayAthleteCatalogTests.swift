@@ -4,42 +4,33 @@ import XCTest
 @testable import RowPlayStudio
 
 final class ReplayAthleteCatalogTests: XCTestCase {
-    func testSourceManifestPinsMergedUpstreamCommitAndHashes() throws {
-        let data = try Data(contentsOf: try resourceURL(
-            name: ReplayAthleteCatalog.sourceManifestResourceName,
-            ext: ReplayAthleteCatalog.sourceManifestExtension
-        ))
+    /// The exact RowPlay main commit the reference bundle is pinned to.
+    /// Updated only by re-running `script/sync_rowplay_reference.py`.
+    static let pinnedRowPlayMain = "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6"
+
+    func testSourceManifestPinsCurrentMainAndHashes() throws {
+        let data = try Data(contentsOf: try referenceURL("athlete/rowplay-athlete-source.json"))
 
         let parsed = ReplayAthleteCatalog.parseSourceManifest(data: data)
         guard case .success(let manifest) = parsed else {
             return XCTFail("Failed to parse source manifest")
         }
-        XCTAssertEqual(manifest.pinnedCommit, Expected.commit)
-        XCTAssertEqual(manifest.status, "merged")
-        XCTAssertEqual(manifest.upstreamPR, 171)
-        XCTAssertEqual(manifest.upstreamRepository, "https://github.com/shenghaoc/rowplay")
-        XCTAssertEqual(manifest.glbSha256, Expected.glbSHA256)
-        XCTAssertEqual(manifest.usdzSha256, Expected.usdzSHA256)
-        XCTAssertEqual(manifest.contractSha256, Expected.contractSHA256)
-        XCTAssertEqual(manifest.copiedUsdzSha256, Expected.usdzSHA256)
+        XCTAssertEqual(manifest.pinnedCommit, Self.pinnedRowPlayMain)
+        XCTAssertEqual(manifest.contractSchema, "rowplay.replay.athlete.v4")
+        XCTAssertEqual(manifest.semanticBoneCount, 19)
+        XCTAssertEqual(manifest.helperCount, 32)
+        XCTAssertEqual(manifest.totalBoneCount, 51)
         XCTAssertTrue(ReplayAthleteCatalog.validateSourceManifest(manifest).isValid)
     }
 
     func testBundledContractAndUSDZHashesMatchThePin() throws {
-        let contractURL = try resourceURL(
-            name: ReplayAthleteCatalog.contractResourceName,
-            ext: ReplayAthleteCatalog.contractExtension
+        let contractData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
         )
-        let usdzURL = try resourceURL(
-            name: ReplayAthleteCatalog.usdzResourceName,
-            ext: ReplayAthleteCatalog.usdzExtension
+        let usdzData = try Data(contentsOf: try referenceURL("athlete/rowplay-athlete-v4.usdz"))
+        let manifestData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-source.json")
         )
-        let contractData = try Data(contentsOf: contractURL)
-        let usdzData = try Data(contentsOf: usdzURL)
-        let manifestData = try Data(contentsOf: try resourceURL(
-            name: ReplayAthleteCatalog.sourceManifestResourceName,
-            ext: ReplayAthleteCatalog.sourceManifestExtension
-        ))
         guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: manifestData) else {
             return XCTFail("Failed to parse source manifest")
         }
@@ -56,16 +47,80 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         guard case .success(let contract) = parsed else {
             return XCTFail("Failed to parse athlete contract")
         }
-        XCTAssertEqual(contract.orderedBoneNames, ReplayAthleteCatalog.orderedBoneNames)
         XCTAssertEqual(contract.schemaVersion, ReplayAthleteCatalog.contractSchemaVersion)
+        XCTAssertEqual(contract.semanticBones.count, 19)
+        XCTAssertEqual(contract.helpers.count, 32)
+        XCTAssertEqual(contract.totalBoneCount, 51)
         XCTAssertEqual(contract.clips.count, 3)
-        XCTAssertNotNil(contract.clip(for: .rower))
-        XCTAssertNotNil(contract.clip(for: .skierg))
-        XCTAssertNotNil(contract.clip(for: .bike))
         XCTAssertEqual(contract.clip(for: .rower)?.name, "rowplay-v4-row-cycle")
         XCTAssertEqual(contract.clip(for: .skierg)?.name, "rowplay-v4-ski-cycle")
         XCTAssertEqual(contract.clip(for: .bike)?.name, "rowplay-v4-bike-cycle")
-        XCTAssertTrue(ReplayAthleteCatalog.validateContractHashes(contract, manifest: manifest).isValid)
+        XCTAssertEqual(contract.surfaces.count, 8)
+        for role in ReplayAthleteCatalog.requiredSurfaceRoles {
+            XCTAssertTrue(
+                contract.surfaces.contains { $0.role == role },
+                "missing surface role \(role)"
+            )
+        }
+        XCTAssertTrue(ReplayAthleteCatalog.validateContract(contract, manifest: manifest).isValid)
+    }
+
+    func testHelperHierarchyDescribesTenDigitChains() throws {
+        let contractData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
+        )
+        guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData) else {
+            return XCTFail("contract parse failed")
+        }
+        for side in ["Left", "Right"] {
+            XCTAssertEqual(contract.parentName(of: "v4\(side)Fingers"), "v4\(side)Hand")
+            XCTAssertEqual(contract.parentName(of: "v4\(side)Thumb"), "v4\(side)Hand")
+            for digit in ["Index", "Middle", "Ring", "Pinky"] {
+                XCTAssertEqual(
+                    contract.parentName(of: "v4\(side)\(digit)Proximal"),
+                    "v4\(side)Fingers"
+                )
+                XCTAssertEqual(
+                    contract.parentName(of: "v4\(side)\(digit)Intermediate"),
+                    "v4\(side)\(digit)Proximal"
+                )
+                XCTAssertEqual(
+                    contract.parentName(of: "v4\(side)\(digit)Distal"),
+                    "v4\(side)\(digit)Intermediate"
+                )
+            }
+            XCTAssertEqual(
+                contract.parentName(of: "v4\(side)ThumbIntermediate"),
+                "v4\(side)Thumb"
+            )
+            XCTAssertEqual(
+                contract.parentName(of: "v4\(side)ThumbDistal"),
+                "v4\(side)ThumbIntermediate"
+            )
+        }
+    }
+
+    func testBundledMotionTableMatchesContract() throws {
+        let contractData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
+        )
+        guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData) else {
+            return XCTFail("contract parse failed")
+        }
+        let manifestData = try Data(
+            contentsOf: try referenceURL("motion/rowplay-motion-manifest.json")
+        )
+        let binData = try Data(contentsOf: try referenceURL("motion/rowplay-motion.bin"))
+        let table = try ReplayAthleteMotionTable(manifestData: manifestData, binData: binData)
+        XCTAssertEqual(table.boneNames, contract.semanticBoneNames)
+        XCTAssertEqual(table.sourceCommit, Self.pinnedRowPlayMain)
+        XCTAssertGreaterThanOrEqual(table.samplesPerSport, 257)
+        for sport in [Sport.rower, .skierg, .bike] {
+            let tableClip = try XCTUnwrap(table.clips[sport])
+            let contractClip = try XCTUnwrap(contract.clip(for: sport))
+            XCTAssertEqual(tableClip.clipName, contractClip.name)
+            XCTAssertEqual(tableClip.driveEnd, contractClip.driveEnd, accuracy: 1e-12)
+        }
     }
 
     func testClipFractionIsDeterministicAndBounded() {
@@ -92,11 +147,9 @@ final class ReplayAthleteCatalogTests: XCTestCase {
     }
 
     func testDenseCycleSequencingRespectsDriveLandmarksForAllSports() throws {
-        let contractURL = try resourceURL(
-            name: ReplayAthleteCatalog.contractResourceName,
-            ext: ReplayAthleteCatalog.contractExtension
+        let contractData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
         )
-        let contractData = try Data(contentsOf: contractURL)
         guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData) else {
             return XCTFail("contract parse failed")
         }
@@ -142,23 +195,16 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         }
     }
 
-    private func resourceURL(name: String, ext: String) throws -> URL {
-        // Production code loads via Bundle.module on RowPlayStudio. Tests also
-        // resolve the committed resource path so pin checks do not depend on
-        // test-bundle resource copying.
+    private func referenceURL(_ relativePath: String) throws -> URL {
+        // Production code loads via Bundle.module on RowPlayStudio.  Tests
+        // also resolve the committed resource path so pin checks do not
+        // depend on test-bundle resource copying.
         let path = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("Sources/RowPlayStudio/Resources/Replay3D/\(name).\(ext)")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: path.path), "Missing \(name).\(ext)")
+            .appendingPathComponent("Sources/RowPlayStudio/Resources/ReplayReference/\(relativePath)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path.path), "Missing \(relativePath)")
         return path
-    }
-
-    private enum Expected {
-        static let commit = "da0dc73bf295871e9b362511cd5b2c9a9424b325"
-        static let glbSHA256 = "73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b"
-        static let usdzSHA256 = "934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e"
-        static let contractSHA256 = "e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d"
     }
 }

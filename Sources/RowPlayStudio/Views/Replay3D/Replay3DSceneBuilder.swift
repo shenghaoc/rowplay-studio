@@ -152,22 +152,21 @@ enum Replay3DSceneBuilder {
         ground.position = SIMD3(0, -0.05, 0)
         root.addChild(ground)
 
-        // The bundle supplies the complete environment only when its matching
-        // rig and athlete also validated. The procedural ground is otherwise
-        // retained as a coherent fallback rather than mixing visual sources.
-        let resolvedVisualSource: ReplayAssetVisualSource
-        let bundledEnvironment: Entity?
-        if visualSource == .bundled, let matchingAssetSet, liveAthlete != nil, ghostAthlete != nil {
-            ground.isEnabled = false
-            bundledEnvironment = ReplayEnvironmentAssetInstaller.install(
-                assetSet: matchingAssetSet,
-                into: root
-            )
-            resolvedVisualSource = .bundled
-        } else {
-            bundledEnvironment = nil
-            resolvedVisualSource = .procedural
-        }
+        // Premium environments are built natively from the pinned venue plan
+        // at every tier; they are no longer coupled to the equipment package.
+        // The simple procedural ground remains only as the runtime-failure
+        // fallback beneath the venue.
+        let resolvedVisualSource: ReplayAssetVisualSource =
+            visualSource == .bundled && liveAthlete != nil && ghostAthlete != nil
+                ? .bundled
+                : .procedural
+        let bundledEnvironment = installEnvironment(
+            into: root,
+            sport: sport,
+            quality: effectiveQuality,
+            colorScheme: colorScheme,
+            proceduralGround: ground
+        )
 
         // Course ring
         let courseEntity = Entity()
@@ -314,7 +313,9 @@ enum Replay3DSceneBuilder {
         cameraController.update(
             camera: container.camera,
             layout: layout,
+            sport: sport,
             distance: liveDistance,
+            rivalDistance: ghostVisible ? ghostDistance : nil,
             deltaTime: deltaTime,
             playbackTickGeneration: playbackTickGeneration,
             preset: cameraPreset,
@@ -338,6 +339,30 @@ enum Replay3DSceneBuilder {
             resetGeneration: replayDiscontinuityGeneration
         )
         return true
+    }
+
+    // MARK: - Environment
+
+    /// Install the native premium venue for the sport.  Returns the venue
+    /// root, or `nil` when construction fails — in which case the procedural
+    /// ground stays enabled as the coherent fallback.
+    private static func installEnvironment(
+        into root: Entity,
+        sport: Sport,
+        quality: ReplayRenderQuality,
+        colorScheme: ColorScheme,
+        proceduralGround: ModelEntity
+    ) -> Entity? {
+        guard let environment = ReplayEnvironmentInstaller.install(
+            sport: sport,
+            quality: quality,
+            colorScheme: colorScheme
+        ) else {
+            return nil
+        }
+        proceduralGround.isEnabled = false
+        root.addChild(environment)
+        return environment
     }
 
     // MARK: - Course Geometry

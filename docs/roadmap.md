@@ -380,109 +380,67 @@ Non-goals:
 
 - Public share URLs, network rivals, persisted rival selection, deep links, leaderboards, OAuth, Bluetooth, external dependencies, full FIT SDK, GPX, new 3D assets.
 
-### Phase 11 - Align Native Replay with the Canonical RowPlay Athlete
+### Phase 11 - Port the Current RowPlay Replay Experience
 
-Status: implementation and local gates in progress on
-`codex/phase-11-production-3d-assets` (PR #72, **draft**), titled
-`Phase 11: Match native replay to merged RowPlay V4`.
+Status: implementation on `codex/phase-11-production-3d-assets` (PR #72,
+**draft**), titled `Phase 11: Port the current RowPlay replay experience to
+native macOS`.
 
-The pin is the final merged RowPlay PR #171 commit
-`da0dc73bf295871e9b362511cd5b2c9a9424b325`; the sync script verifies it is
-reachable from RowPlay `origin/main` and reads that exact Git tree rather than
-a local working-tree HEAD. The source manifest records `merged` status and the
-copied GLB, USDZ, and contract hashes.
-
-There is one active pre-merge blocker: the exact merged USDZ has only an
-underscore-named row animation (`rowplay_v4_row_cycle`) and no contract-named
-SkiErg/BikeErg animations, while its contract requires
-`rowplay-v4-row-cycle`, `rowplay-v4-ski-cycle`, and
-`rowplay-v4-bike-cycle`. Native code intentionally rejects the whole V4
-package instead of aliasing or selecting an arbitrary animation. Consequently
-the app correctly uses the complete procedural scene at every quality until an
-upstream artifact/contract correction produces a consistent final V4 package.
+The reference is the current RowPlay `main` commit pinned in
+`Sources/RowPlayStudio/Resources/ReplayReference/rowplay-source.json`;
+`script/sync_rowplay_reference.py` reads that exact Git tree (never a working
+directory) and records every artifact hash. The merged web layers #172-#194
+(production anatomical athlete, grip infrastructure, RowErg/SkiErg/BikeErg
+equipment and mechanics, premium environments, renderer3d module split) are
+all ancestors of the pin.
 
 Scope:
 
-- Establish a production-grade native 3D asset and integration system around the
-  **current** canonical RowPlay V4 athlete, without claiming V4 is the final
-  premium character.
-- Versioned upstream-asset synchronisation via
-  `script/sync_rowplay_athlete.py` (no network; pin + SHA-256 verification).
-- RealityKit loading/validation of the bundled V4 USDZ against the contract:
-  19-joint hierarchy, finite rest transforms, and exactly one named sport clip
-  per contract entry.
-- Deterministic phase-to-animation sampling with independent live/rival clones
-  when the full package validates; native replay clock, equipment, cameras,
-  effects, quality, and Reduced Motion remain authoritative.
-- Port the canonical V4 motion graph, sport kinematics, and two-bone
-  constraints into RowPlayCore with a committed 129-phase-per-sport parity
-  corpus generated from the pinned upstream tree.
-- Apply V4 skeletal correction in `prepare -> orientHandsToTargets -> constrain`
-  order; use opaque/depth-writing cool-tinted rival bodies and translucent
-  rival equipment.
-- Equipment-contact validation through skeletal palm/sole constraints rather
-  than marker snapping; minor mesh interpenetration remains accepted.
-- Native equipment USDA and sport environments (equipment-only; no second human).
-- Quality tiers: Low → complete procedural; Medium/High/Ultra + valid package →
-  V4 athlete + native equipment/environment; any failure → complete procedural.
-- Upgradeable boundary for future athlete versions (V5+).
-
-Explicitly accepted for later work (Phase 12):
-
-- Limited face, hands, and muscle detail; simplified body/clothing; remaining
-  body/equipment interpenetration (`穿模`); stylised low-poly appearance.
-
-Exit criteria:
-
-- Sync `--check`, generator `--check`, focused athlete/asset/rig/scene suites,
-  full `swift test` / `swift build`, staged-app gates pass.
-- The exact pinned USDZ exposes all three exact contract clip names through
-  RealityKit, including SkiErg and BikeErg.
-- PR #72 stays draft until both the local and exact-head GitHub gates pass.
-
-Corrective gate before PR #72 can become ready:
-
-1. Correct the merged upstream USDZ/contract inconsistency at its source.
-2. Obtain a final reachable RowPlay commit and its matching artifact hashes.
-3. Rerun the native sync script using that exact commit.
-4. Confirm the strict clip-gate tests load all three named resources.
-5. Rerun focused movement/contact tests, full validation, staged V4 visual QA,
-   and exact-head GitHub CI.
-6. Update the source manifest, docs, and PR body with that evidence.
+- Current-main reference bundle (athlete USDZ + sealed 51-joint contract,
+  sampled `rowplay-motion.bin`, converted equipment USDZ packages, CC0
+  environment maps, regenerated parity fixtures) with reproducible hashes.
+- Production athlete activation: contract-driven validation (19 semantic
+  bones + 32 grip helpers), motion-table bone driving (no
+  `availableAnimations` dependency), deterministic direct/shuffled seeks,
+  independent live/rival instances, atomic fallback.
+- Grip system in RowPlayCore: measured hand channel, digit-closure solver,
+  per-sport contracts (scull rubber + thumb stop, pole fist, wrapped hood
+  enclosure), install-time solve with cached per-frame application.
+- Equipment and mechanics parity: single scull (oarlocks ±0.88 m, rigid oar
+  yaw solve, blade square/feather), course skier (1.90 m skis, 1.37 m poles,
+  course-space basket planting), true-scale road bicycle (0.670 m wheels,
+  ≈0.999 m wheelbase, 30° knee flexion at BDC, analytic cut-out saddle).
+- 2D sport scenes replacing the timeline placeholder; the graph remains only
+  a secondary overlay.
+- Premium venue stories (morning-glass basin, blue-hour Nordic stadium,
+  evening indoor velodrome) with the four-tier quality contract; the old
+  six-file USDA package is deleted.
+- Per-sport chase cameras with rival-pair framing, Reduced Motion behavior,
+  and the opaque cool-tinted rival body.
 
 Non-goals:
 
-- Independently authoring a second premium athlete inside Studio.
-- Solving all `穿模` or premium anatomy (Phase 12).
-- Runtime asset downloads, a second renderer, or rewriting replay timing /
-  quality / fallback systems.
+- Independently authoring a second athlete inside Studio.
+- Redesigning current web mechanics or visuals.
+- Runtime downloads, a second renderer or replay clock, custom Metal
+  shaders, toolchain changes.
 
-### Phase 12 — Premium Athlete and Deformation Upgrade
+### Phase 12 — Beyond-Parity Polish (optional)
 
-Status: planned follow-up after Phase 11 integration is stable.
+Status: optional follow-up. Current RowPlay already ships the production
+anatomical athlete, so Phase 12 is **not** “replace the mannequin”.
 
-Scope:
+Scope (all optional, using the same Phase 11 integration boundary):
 
-- Substantially improved human anatomy and proportions.
-- Better hands, feet, face, hair, and clothing.
-- Higher-quality topology and skin weights.
-- Improved elbow, shoulder, hip, and knee deformation.
-- Muscle and body-shape definition.
-- More refined materials and optional texture/normal detail.
-- Systematic reduction of athlete/equipment interpenetration (`穿模`).
-- Updated visual art direction and approval matrix.
-- V5 or later versioned asset using the **same** Phase 11 integration boundary
-  (sync, RealityKit load/validation, quality selection, live/rival isolation,
-  procedural fallback).
+- Native-specific advanced material/shader work within RealityKit limits.
+- Remaining deformation refinements.
+- Further contact/intersection (穿模) polish.
+- Optional higher-end scene effects.
+- Future cross-platform athlete version upgrades as upstream evolves.
 
-Phase 12 must **not** rewrite:
-
-- Replay timing and seeking.
-- The asset synchronisation pipeline.
-- RealityKit resource loading contracts.
-- Quality selection policy.
-- Live/rival isolation.
-- Procedural fallback.
+Phase 12 must **not** rewrite replay timing/seeking, the reference
+synchronisation pipeline, loading contracts, quality selection, live/rival
+isolation, or the procedural fallback.
 
 ## Review Strategy
 

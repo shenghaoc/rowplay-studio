@@ -1,56 +1,89 @@
 import AppKit
+import Foundation
 import RealityKit
+import RowPlayCore
 
-/// A validated bundled rig template.
+/// Bundled visual source backed by one converted equipment package.
 ///
+/// The provider holds the immutable loaded package root and resolves visuals
+/// by their RowPlay source names (`equipment:row:oar-rig`,
+/// `equipment:row:oar-rig:grip`, …), translating to the USD-safe exported
+/// prim names recorded in the sidecar contract.  Every lookup returns a fresh
+/// recursive clone, so live and rival rigs never share entities or materials.
 /// The initializer is all-or-nothing: a missing required node fails the whole
-/// provider so scene construction selects the complete procedural fallback
-/// rather than mixing authored and generated geometry.
+/// provider so scene construction selects the complete procedural fallback.
 @MainActor
 final class ReplayBundledRigVisualProvider: ReplayRigVisualProvider {
-    let usesBundledAssets = true
+    private let root: Entity
+    private let contract: ReplayEquipmentPackageContract
+    private var templateCache: [String: Entity] = [:]
 
-    private let templates: [String: Entity]
+    init?(root: Entity, contract: ReplayEquipmentPackageContract) {
+        guard ReplayAssetCatalog.validatePackageContract(contract) else { return nil }
+        self.root = root
+        self.contract = contract
 
-    init?(root: Entity, requiredNodeNames: Set<String>) {
-        var loaded: [String: Entity] = [:]
-        for name in requiredNodeNames {
-            guard let entity = root.replayDescendant(
-                named: ReplayAssetCatalog.bundledPrimName(for: name)
-            ), ReplayAssetGeometry.hasModel(in: entity) else {
+        // Every required node must resolve in the loaded package with real
+        // geometry beneath it; a partially converted package selects the
+        // complete procedural fallback instead.
+        let requiredNames = ReplayAssetCatalog.requiredCompositeSourceNames(for: contract.sport)
+            + ReplayAssetCatalog.requiredLeafSourceNames(for: contract.sport)
+        for sourceName in requiredNames {
+            guard let node = contract.node(sourceName: sourceName),
+                  let entity = root.replayDescendant(named: node.exportedName),
+                  ReplayAssetGeometry.hasModel(in: entity) else {
                 return nil
             }
-            loaded[name] = entity
+            templateCache[sourceName] = entity
         }
-        self.templates = loaded
+        root.isEnabled = false
     }
 
+    var usesBundledAssets: Bool { true }
+
+    var sport: Sport { contract.sport }
+
     func cloneVisual(named name: String) -> Entity? {
-        guard let template = templates[name] else { return nil }
+        let template: Entity?
+        if let cached = templateCache[name] {
+            template = cached
+        } else if let node = contract.node(sourceName: name) {
+            template = root.replayDescendant(named: node.exportedName)
+        } else if let exported = exportedPartName(for: name) {
+            template = root.replayDescendant(named: exported)
+        } else {
+            template = nil
+        }
+        guard let template else { return nil }
+        templateCache[name] = template
         let clone = template.clone(recursive: true)
-        clone.name = name
+        clone.isEnabled = true
         return clone
     }
 
-    /// Recolours only the authored `accent` material slots. The deterministic
-    /// generator names those meshes `material_accent_*`, so selection is
-    /// semantic rather than a fragile comparison against a rendered colour.
-    /// The caller owns a recursive clone, never a cached template.
+    /// Resolve a `template:part` source path to its exported prim name.
+    private func exportedPartName(for sourceName: String) -> String? {
+        for node in contract.nodes {
+            if let part = node.parts.first(where: { $0.sourceName == sourceName }) {
+                return part.exportedName
+            }
+        }
+        return nil
+    }
+
+    /// Recolour a cloned bundled visual with the scene accent.  Bundled
+    /// materials load as PBR; tint the base colour while keeping the material
+    /// opaque and depth-writing.
     static func applyAccent(_ accent: NSColor, to entity: Entity) {
-        if entity.name.hasPrefix("material_accent_"),
-           var model = entity.components[ModelComponent.self] {
+        if var model = entity.components[ModelComponent.self] {
             model.materials = model.materials.map { material in
-                if var simple = material as? SimpleMaterial {
-                    simple.color.tint = accent.withAlphaComponent(simple.color.tint.cgColor.alpha)
-                    return simple
-                }
                 if var pbr = material as? PhysicallyBasedMaterial {
-                    pbr.baseColor.tint = accent.withAlphaComponent(pbr.baseColor.tint.cgColor.alpha)
+                    pbr.baseColor.tint = accent
                     return pbr
                 }
-                if var unlit = material as? UnlitMaterial {
-                    unlit.color.tint = accent.withAlphaComponent(unlit.color.tint.cgColor.alpha)
-                    return unlit
+                if var simple = material as? SimpleMaterial {
+                    simple.color.tint = accent
+                    return simple
                 }
                 return material
             }
@@ -58,6 +91,32 @@ final class ReplayBundledRigVisualProvider: ReplayRigVisualProvider {
         }
         for child in entity.children {
             applyAccent(accent, to: child)
+        }
+    }
+
+    /// Apply controlled rival translucency to a cloned bundled equipment
+    /// visual.  Unlike the deforming athlete body — which stays opaque with a
+    /// cool tint — equipment may use real alpha, matching the web's
+    /// `finalizeAvatar` ghost pass.
+    static func applyGhostTranslucency(_ opacity: Double, to entity: Entity) {
+        let alpha = Float(min(max(opacity, 0), 1))
+        if var model = entity.components[ModelComponent.self] {
+            model.materials = model.materials.map { material in
+                if var pbr = material as? PhysicallyBasedMaterial {
+                    pbr.blending = .transparent(opacity: .init(floatLiteral: alpha))
+                    return pbr
+                }
+                if var simple = material as? SimpleMaterial {
+                    let tint = simple.color.tint.usingColorSpace(.deviceRGB) ?? simple.color.tint
+                    simple.color.tint = tint.withAlphaComponent(CGFloat(alpha))
+                    return simple
+                }
+                return material
+            }
+            entity.components.set(model)
+        }
+        for child in entity.children {
+            applyGhostTranslucency(opacity, to: child)
         }
     }
 }

@@ -67,7 +67,7 @@ let targets: [Target] = [
         name: "RowPlayStudio",
         dependencies: ["RowPlayPlatform", "RowPlayCore"],
         resources: [
-            .process("Resources")
+            .copy("Resources/ReplayReference")
         ]
     ),
     makeCoreTestTarget(),

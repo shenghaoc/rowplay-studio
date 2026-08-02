@@ -1,0 +1,56 @@
+{
+  "artifacts": {
+    "athleteContract": {
+      "byteCount": 27593,
+      "sha256": "62dd814ba6113ca57419aac42905233f8e07589846be5c3a25bbadcf55d63dd3",
+      "sourcePath": "static/replay-assets/rowplay-athlete-v4.contract.json"
+    },
+    "athleteGlb": {
+      "byteCount": 4584320,
+      "sha256": "a564a4dbd4922e2ba76ef21a23f5bf0eb1b0180846548f9d7110e55ffd8f760e",
+      "sourcePath": "static/replay-assets/rowplay-athlete-v4.glb"
+    },
+    "athleteUsdz": {
+      "byteCount": 11565117,
+      "sha256": "cf65202b8360183be57308130226173171ac67d8d900e02f40ba3879569b569a",
+      "sourcePath": "static/replay-assets/rowplay-athlete-v4.usdz"
+    },
+    "equipmentSourceGlb": {
+      "byteCount": 733864,
+      "sha256": "31418f4808b30fa786830129b0b637fc025b6e5ddbb539d848fc8cab74806925",
+      "sourcePath": "static/replay-assets/rowplay-rigs-v3.glb"
+    }
+  },
+  "athlete": {
+    "contractSchema": "rowplay.replay.athlete.v4",
+    "contractSchemaVersion": 1,
+    "helperCount": 32,
+    "materialRoleCount": 8,
+    "semanticBoneCount": 19,
+    "totalBoneCount": 51
+  },
+  "consumptionStatement": "RowPlay Studio consumes the production cross-platform replay reference owned by rowplay main; it does not independently redesign the athlete, mechanics, grips or visual contracts.",
+  "generationCommands": [
+    "python3 script/sync_rowplay_reference.py --rowplay-repo <rowplay> --expected-commit 4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+    "<blender> --background --python script/convert_rowplay_equipment.py -- --rowplay-repo <rowplay> --expected-commit 4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+    "node script/export_rowplay_native_parity.mjs --rowplay-repo <rowplay> --commit 4d96480e7c6fb382f800555bd3aa463d9fe5b1a6"
+  ],
+  "pinnedRowPlayMainCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "runtimeDownloads": "none \u2014 every artifact ships in the app bundle",
+  "sourcePRLineage": [
+    172,
+    173,
+    174,
+    175,
+    176,
+    178,
+    179,
+    180,
+    181,
+    191,
+    192,
+    193,
+    194
+  ],
+  "upstreamRepository": "https://github.com/shenghaoc/rowplay"
+}

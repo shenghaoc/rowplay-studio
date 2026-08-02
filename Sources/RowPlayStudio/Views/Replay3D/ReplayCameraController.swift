@@ -28,7 +28,9 @@ final class ReplayCameraController {
     func update(
         camera: PerspectiveCamera,
         layout: ReplayCourseLayout,
+        sport: Sport,
         distance: Double,
+        rivalDistance: Double? = nil,
         deltaTime: TimeInterval,
         playbackTickGeneration: UInt64,
         preset: ReplayCameraPreset,
@@ -81,11 +83,14 @@ final class ReplayCameraController {
 
         let participantPosition = layout.position(at: safeDistance)
         let courseTangent = layout.tangent(at: safeDistance)
+        let rivalPosition = rivalDistance.map { layout.ghostPosition(at: $0) }
         let targetPose = ReplayCameraSolver.targetPose(
             preset: preset,
+            sport: sport,
             participant: participantPosition,
             tangent: courseTangent,
             speed: smoothedSpeed,
+            rival: rivalPosition,
             orbit: orbit,
             reduceMotion: reduceMotion
         )
@@ -185,7 +190,7 @@ final class ReplayCameraController {
         )
         let fieldOfView = finiteFloat(pose.fieldOfViewDegrees, fallback: 46)
 
-        camera.camera.fieldOfViewInDegrees = min(51, max(46, fieldOfView))
+        camera.camera.fieldOfViewInDegrees = min(52, max(36, fieldOfView))
         camera.look(at: target, from: position, relativeTo: nil)
     }
 

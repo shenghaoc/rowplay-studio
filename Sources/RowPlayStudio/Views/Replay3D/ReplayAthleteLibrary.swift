@@ -2,9 +2,12 @@ import Foundation
 import RealityKit
 import RowPlayCore
 
-/// Loads and validates the bundled V4 athlete from `Bundle.module`.
+/// Loads and validates the bundled production athlete from the
+/// `ReplayReference` bundle: contract, source manifest, native USDZ, and the
+/// sampled motion table.
 ///
-/// Failed loads are cached so scene rebuilds remain deterministic and never
+/// Failure is atomic — a package that fails any gate yields no template, and
+/// the failure is cached so scene rebuilds remain deterministic and never
 /// retry a broken package on every SwiftUI update.
 @MainActor
 final class ReplayAthleteLibrary {
@@ -47,15 +50,28 @@ final class ReplayAthleteLibrary {
 
         guard let contractURL = bundledURL(
             name: ReplayAthleteCatalog.contractResourceName,
-            extension: ReplayAthleteCatalog.contractExtension
+            extension: ReplayAthleteCatalog.contractExtension,
+            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
         ),
         let sourceURL = bundledURL(
             name: ReplayAthleteCatalog.sourceManifestResourceName,
-            extension: ReplayAthleteCatalog.sourceManifestExtension
+            extension: ReplayAthleteCatalog.sourceManifestExtension,
+            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
         ),
         let usdzURL = bundledURL(
             name: ReplayAthleteCatalog.usdzResourceName,
-            extension: ReplayAthleteCatalog.usdzExtension
+            extension: ReplayAthleteCatalog.usdzExtension,
+            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
+        ),
+        let motionManifestURL = bundledURL(
+            name: ReplayAthleteCatalog.motionManifestResourceName,
+            extension: ReplayAthleteCatalog.motionManifestExtension,
+            subdirectory: ReplayAthleteCatalog.motionSubdirectory
+        ),
+        let motionBinURL = bundledURL(
+            name: ReplayAthleteCatalog.motionBinResourceName,
+            extension: ReplayAthleteCatalog.motionBinExtension,
+            subdirectory: ReplayAthleteCatalog.motionSubdirectory
         ) else {
             loadFailed = true
             return nil
@@ -63,7 +79,9 @@ final class ReplayAthleteLibrary {
 
         guard let contractData = try? Data(contentsOf: contractURL),
               let sourceData = try? Data(contentsOf: sourceURL),
-              let usdzData = try? Data(contentsOf: usdzURL) else {
+              let usdzData = try? Data(contentsOf: usdzURL),
+              let motionManifestData = try? Data(contentsOf: motionManifestURL),
+              let motionBinData = try? Data(contentsOf: motionBinURL) else {
             loadFailed = true
             return nil
         }
@@ -78,18 +96,40 @@ final class ReplayAthleteLibrary {
         let usdzHash = ReplayAthleteCatalog.sha256Hex(of: usdzData)
         guard contractHash == manifest.contractSha256,
               usdzHash == manifest.usdzSha256,
-              manifest.copiedUsdzSha256 == usdzHash,
               case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData),
-              ReplayAthleteCatalog.validateContractHashes(contract, manifest: manifest).isValid else {
+              ReplayAthleteCatalog.validateContract(contract, manifest: manifest).isValid else {
             loadFailed = true
             return nil
+        }
+
+        // The motion table must come from the same pinned tree and match the
+        // contract's semantic hierarchy exactly.
+        guard let motionTable = try? ReplayAthleteMotionTable(
+            manifestData: motionManifestData,
+            binData: motionBinData
+        ),
+        motionTable.boneNames == contract.semanticBoneNames,
+        motionTable.sourceCommit == manifest.pinnedCommit,
+        motionTable.clips.count == 3 else {
+            loadFailed = true
+            return nil
+        }
+        for sport in [Sport.rower, .skierg, .bike] {
+            guard let tableClip = motionTable.clips[sport],
+                  let contractClip = contract.clip(for: sport),
+                  tableClip.clipName == contractClip.name,
+                  abs(tableClip.driveEnd - contractClip.driveEnd) < 1e-9 else {
+                loadFailed = true
+                return nil
+            }
         }
 
         guard let root = try? await Entity(contentsOf: usdzURL),
               let template = ReplayAthleteTemplate(
                 root: root,
                 contract: contract,
-                sourceManifest: manifest
+                sourceManifest: manifest,
+                motionTable: motionTable
               ) else {
             loadFailed = true
             return nil
@@ -99,12 +139,9 @@ final class ReplayAthleteLibrary {
         return template
     }
 
-    private func bundledURL(name: String, extension ext: String) -> URL? {
+    private func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {
         let bundle = Bundle.module
-        return bundle.url(
-            forResource: name,
-            withExtension: ext,
-            subdirectory: ReplayAthleteCatalog.resourceSubdirectory
-        ) ?? bundle.url(forResource: name, withExtension: ext)
+        return bundle.url(forResource: name, withExtension: ext, subdirectory: subdirectory)
+            ?? bundle.url(forResource: name, withExtension: ext)
     }
 }

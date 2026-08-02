@@ -1,221 +1,125 @@
-> **Canonical merged-source amendment (2026-07-22):** Phase 11 is pinned to
-> merged RowPlay PR #171 commit `da0dc73bf295871e9b362511cd5b2c9a9424b325`,
-> not a provisional upstream snapshot. The runtime source manifest must say
-> `merged`, and sync must read that exact reachable Git tree rather than a local
-> working-tree HEAD. Its GLB, USDZ, and contract SHA-256 values are respectively
-> `73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b`,
-> `934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e`, and
-> `e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d`.
-> The exact USDZ currently lacks the three contract-named RealityKit clips,
-> so strict validation must reject it atomically and keep PR #72 draft until
-> upstream supplies a matching final artifact/contract. No clip alias or
-> `availableAnimations.first` compatibility path is allowed.
+# Phase 11 — Current RowPlay Parity: Requirements
 
-# Phase 11 - Production-Quality Bundled 3D Assets — Requirements
+Phase 11 catches the native app up to current RowPlay `main` — not the
+historical PR #171 / V4-mannequin milestone it originally targeted.  The
+authoritative reference is the exact pinned `main` commit recorded in
+`Sources/RowPlayStudio/Resources/ReplayReference/rowplay-source.json`.
 
-## Overview
+## R1 — Pinned current-main reference bundle
 
-Phase 11 upgrades the native RealityKit replay presentation from wholly procedural
-placeholder visuals to bundled, deterministic, project-authored 3D assets for
-RowErg, SkiErg, and BikeErg. It preserves the existing native replay clock,
-`ReplayRigPoseSolver`, logical pivot hierarchy, contact invariants, cameras,
-effects, quality policy, rival workflow, 2D renderer, demo mode, and
-automation mode.
+1.1 All replay reference artifacts (athlete USDZ + contract, motion table,
+equipment packages, environment maps, parity fixtures) are read from one
+pinned RowPlay `main` git tree, never from a working directory.
+1.2 Every manifest records the pinned commit, source paths, SHA-256 and
+sizes; `script/validate_rowplay_reference.py` verifies internal consistency
+without the sibling checkout.
+1.3 No runtime downloads; the bundle ships in the app.
 
-This is a native-owned visual-provider phase. It does not create a second
-renderer, skeletal animation system, network asset service, or web dependency.
-The procedural rigs and environments remain the complete, reliable fallback.
+## R2 — Production athlete activation
 
-### Current V4 Acceptance Gate
+2.1 The production anatomical athlete (19 semantic bones + 32 visual grip
+helpers = 51 joints, one skinned mesh, 8 surface roles) loads, validates
+against the live contract — not a hard-coded name list — and activates at
+every quality tier.
+2.2 Base motion is driven from the sampled `rowplay-motion.bin` table
+(≥257 phases per sport, linear translation/scale, shortest-path normalized
+rotation interpolation), never from `availableAnimations` clip names.
+2.3 Every seek rebuilds the pose from the bind pose plus the table: direct
+and shuffled seeks are deterministic; no state accumulates.
+2.4 Contact correction applies only after base-pose sampling; digit closure
+rides the corrected hands.
+2.5 Live and rival instances keep independent skeletons, helpers, materials
+and motion state.  Failure at any gate falls back atomically to the complete
+procedural scene.
 
-The contract requires `rowplay-v4-row-cycle`, `rowplay-v4-ski-cycle`, and
-`rowplay-v4-bike-cycle`, exactly one resource per sport. The exact merged USDZ
-currently exposes only `rowplay_v4_row_cycle`, and no SkiErg/BikeErg counterpart.
-This is a source artifact/contract inconsistency. Until it is corrected,
-Medium/High/Ultra must select the same complete procedural scene as an ordinary
-load failure. The phase is not V4-runtime-complete merely because its native
-port and fallback code compile.
+## R3 — Grip system
 
-## R1: Architecture and Scope Boundaries
+3.1 The hand grip channel model and digit-closure solver are ported to
+RowPlayCore as portable, unit-testable math (`ReplayGripGeometry`,
+`ReplayHandClosure`, `ReplayGripSurface`) with the sport contracts
+(`ReplayRowGripContract`, `ReplaySkiGripContract`, `ReplayBikeGripContract`).
+3.2 RowErg: each hand encloses its own 23 mm scull rubber; the thumb closes
+on the flat handle end; sequential first-contact closure.
+3.3 SkiErg: both fists close on independent 16 mm pole grips with thumb
+opposition 1.75; sequential first-contact closure.
+3.4 BikeErg: palms are supported on the 18 mm hood bodies with the wrapped
+final-enclosure search; four fingers reach the far side, the thumb hooks
+underneath.
+3.5 Closures are solved once at install and cached; per-frame work applies
+cached helper rotations only.
 
-- **R1.1** Dependency direction remains `RowPlayStudio -> RowPlayPlatform ->
-  RowPlayCore`.
-- **R1.2** USDA generation, resource loading, RealityKit entities, materials,
-  and environment installation belong in `RowPlayStudio` only.
-- **R1.3** `RowPlayCore` keeps the portable replay timing, course layout,
-  stroke pose, rig pose, contact targets, quality policy, and performance
-  policy. Phase 11 does not add UI, RealityKit, AppKit, Combine, Security, or
-  Charts imports to Core.
-- **R1.4** The current logical sport rigs continue to own named pivots,
-  `applyPose`, contact anchors, and finite-transform guards. A visual provider
-  selects the visual source for those pivots; bundled providers supply authored
-  geometry, while the procedural provider selects the rigs' established
-  `ReplayMeshFactory` builders. No provider replaces the pose solver.
-- **R1.5** The phase adds no external package, runtime download, toolchain,
-  deployment-target, CI-runner, product, target-graph, replay-control, or 2D
-  renderer change.
+## R4 — 2D replay scenes
 
-## R2: Deterministic Bundled Asset Pipeline
+4.1 2D replay is a sport scene, not a timeline/dot: real course, live and
+optional rival, start/finish and progress cues, equipment, articulated
+participant, current movement phase.  Any time/distance graph is only a
+secondary overlay.
+4.2 RowErg: racing shell, aft-facing rower, sliding seat, fixed stretcher,
+two rigid sculls through oarlocks, blade square/feather, drive/recovery
+sequencing from the motion graph.
+4.3 SkiErg: course skier with parallel skis, boots, two poles with grips and
+baskets; planted baskets stay course-fixed through the loaded interval; no
+indoor tower/cable/platform.
+4.4 BikeErg: road bicycle with correctly signed distance-driven wheel
+rotation and cadence-driven opposed cranks, in the indoor timber velodrome.
+4.5 One motion source (`ReplayMotionGraph`); no second animation clock.
 
-- **R2.1** `script/generate_replay_assets.py` uses only the Python standard
-  library, fixed ordering, and fixed deterministic inputs. It makes no network
-  request and has no download path.
-- **R2.2** The generator writes readable ASCII USDA resources under
-  `Sources/RowPlayStudio/Resources/Replay3D/`:
+## R5 — Equipment
 
-  - `rower-rig.usda`
-  - `skierg-rig.usda`
-  - `bike-rig.usda`
-  - `rower-environment.usda`
-  - `skierg-environment.usda`
-  - `bike-environment.usda`
+5.1 Equipment dimensions come from the ported Core contracts: RowErg single
+scull (oarlocks ±0.88 m at 0.51 m, scull grips 23 mm with thumb stops,
+stretcher −48°), SkiErg (1.90 m skis, 1.37 m rigid poles, plant 0.46 m
+lateral / 0.24 m forward), BikeErg (0.670 m wheels, ≈0.999 m wheelbase, 73°
+head/seat angles, 30° knee flexion at BDC, analytic winged/cut-out saddle).
+5.2 High and Ultra use the converted authored V3 composites (Blender
+conversion preserving names/transforms/bounds; sidecar contracts; fail on
+missing or duplicated parts).  Low and Medium use procedural equipment built
+from the same contracts.
+5.3 No central indoor-rower handle; no SkiErg machine in the course scene;
+the athlete is never scaled to fit equipment.
 
-- **R2.3** Running `python3 script/generate_replay_assets.py --check` must
-  reject stale generated output and contract violations without rewriting
-  committed resources.
-- **R2.4** `ASSET_PROVENANCE.md` records that the files are original
-  project-generated work, their source inputs, and the exact regeneration
-  command. No third-party model, logo, trademark, scan, likeness, or ambiguous
-  redistribution licence may be introduced.
-- **R2.5** Assets are packaged as SwiftPM resources and load only from
-  `Bundle.module` at runtime.
-- **R2.6** No rig asset exceeds 18,000 triangles, no environment asset exceeds
-  30,000 triangles, and the six generated assets together remain below 15 MiB.
-- **R2.7** All generated geometry is non-empty and has finite transforms and
-  normals. Required node names are unique. Assets contain no camera or light;
-  native camera and lighting remain authoritative.
+## R6 — Environments and quality tiers
 
-## R3: Visual Direction
+6.1 The three venue stories are ported natively: RowErg morning-glass regatta
+basin; SkiErg blue-hour Nordic stadium; BikeErg evening indoor velodrome with
+the black/red/blue/côte-d'azur line grammar.
+6.2 Quality tiers follow the current contract: a valid production package is
+usable at every tier; the procedural renderer is a failure fallback only.
+Adjacent tiers are materially different (feature counts, texture usage: CC0
+maps at High, +normal maps at Ultra; athlete detail maps 128/256/512 px at
+Medium/High/Ultra).
+6.3 The six-file USDA rig/environment package is removed.
 
-- **R3.1** Athlete assets use a cohesive, non-photorealistic silhouette with
-  tapered/rounded anatomy, readable head and hair, kit, hands, shoes, and
-  smooth joint transitions rather than visibly assembled primitives.
-- **R3.2** Equipment has sport-recognisable silhouettes and moving parts:
-  hull/seat/handle/oars for RowErg; frame/handles/poles/cable for SkiErg; and
-  frame/wheels/cranks/pedals/handlebar for BikeErg.
-- **R3.3** Materials use a restrained palette with base, accent, metal, trim,
-  and environment categories. Surface treatment conveys base colour,
-  roughness, and metallic distinction without custom shaders.
-- **R3.4** Environments add depth without taking over course semantics:
-  RowErg has water, shoreline, buoys, dock, and restrained vegetation; SkiErg
-  has snow, conifers, gates, and snowbanks; BikeErg has a paved or velodrome
-  course, barriers, banners, and trackside depth.
-- **R3.5** Assets contain no branding or trademark-like marks. Their scale,
-  orientation, pivots, and art direction remain coherent across all sports.
+## R7 — Camera, rival, fallback
 
-## R4: Asset Contract
+7.1 Sport-specific rear three-quarter chase rigs (rower 4.05/1.78/0.88/2.16
+aim 0.84 FOV 40; ski 3.15/2.3/0.9/1.86 aim 1.14 FOV 42; bike
+3.12/1.96/0.58/1.92 aim 0.92 FOV 42) with speed FOV breathing (+2°) and
+rival pullback (flat 1.05 m plus span-fitted framing of the pair midpoint).
+7.2 Reduced Motion pins the FOV, widens the static frame, snaps the camera,
+and uses one representative pose per sport without hiding the subject.
+7.3 The rival's skinned body stays opaque, cool-tinted (34 % toward the ghost
+teal), depth-tested and depth-writing; rival equipment may use controlled
+translucency.
+7.4 Loading or runtime failure switches the entire inner replay graph to the
+complete procedural fallback, preserving time, play/pause, speed, camera,
+quality preference and rival selection; permanent failures are cached.
 
-- **R4.1** `ReplayAssetCatalog` is the single source of truth for resource
-  names, kind, sport association, required nodes, material categories, bounds,
-  and budgets. The golden `replay-asset-contract.json` records the same
-  deterministic contract for tests.
-- **R4.2** Every rig declares these common visual nodes:
+## R8 — Tests and parity
 
-  ```text
-  visual-pelvis, visual-torso, visual-head,
-  visual-upperArm-L, visual-forearm-L, visual-hand-L,
-  visual-upperArm-R, visual-forearm-R, visual-hand-R,
-  visual-thigh-L, visual-shin-L, visual-foot-L,
-  visual-thigh-R, visual-shin-R, visual-foot-R
-  ```
+8.1 Web-parity fixtures are regenerated from the pinned tree with source
+commit, file hashes, generator version and sample counts; CI consumes only
+committed fixtures.
+8.2 Coverage includes: motion-graph channel parity, grip closure parity for
+both hands of all three sports, equipment constant/function parity, 2D
+kinematics parity, athlete activation/determinism/independence, fallback
+atomicity, camera framing, Reduced Motion, and finite transforms across
+dense cycles.
 
-- **R4.3** The RowErg rig additionally declares `visual-hull`,
-  `visual-deck-stripe`, `visual-footplate`, `visual-rail`, `visual-seat`,
-  `visual-handle`, `visual-oar-port`, and `visual-oar-starboard`.
-- **R4.4** The SkiErg rig additionally declares `visual-post-L`,
-  `visual-post-R`, `visual-topBar`, `visual-platform`, `visual-handle-L`,
-  `visual-handle-R`, `visual-pole-L`, `visual-pole-R`, and `visual-cable`.
-- **R4.5** The BikeErg rig additionally declares `visual-wheel-front`,
-  `visual-wheel-rear`, `visual-downTube`, `visual-seatTube`,
-  `visual-topTube`, `visual-cranks`, `visual-chainRing`, `visual-pedal-L`,
-  `visual-pedal-R`, `visual-handlebar`, and `visual-saddle`.
-- **R4.6** Every environment declares `environment-root`,
-  `environment-ground`, and `environment-props`.
+## R9 — Privacy and accessibility
 
-## R5: Providers, Quality, and Fallback
-
-- **R5.1** Geometry selection is isolated behind `ReplayRigVisualProvider`.
-  `ReplayProceduralRigVisualProvider` explicitly selects the existing rig-owned
-  generated geometry; `ReplayBundledRigVisualProvider` attaches validated asset
-  geometry to the same logical pivots.
-- **R5.2** `ReplayAssetLibrary` loads and validates templates once per process,
-  provides independent recursive clones for live and rival rigs, supports an
-  injectable resource source for failure tests, and never loads or traverses
-  assets in a per-frame update.
-- **R5.3** `.low` quality always uses the existing procedural rig and generic
-  procedural environment. `.medium`, `.high`, and `.ultra` use bundled visuals
-  only when that sport's complete asset set validates.
-- **R5.4** Missing, malformed, incomplete, or incompatible assets select the
-  complete procedural sport rig and environment. A scene must never combine
-  some bundled body/equipment/environment parts with procedural substitutes.
-- **R5.5** A quality graph rebuild switches visual sources without resetting
-  replay time, play/pause state, speed, camera preset, orbit state, or rival
-  selection. It retains existing quality governor semantics.
-- **R5.6** `ReplayEnvironmentAssetInstaller` installs the sport-specific
-  environment at medium quality or above and suppresses only the generic
-  background it replaces. The native 400-metre layout, lanes, markers, start /
-  finish line, camera, lights, wakes, and catch effects remain native-owned.
-
-## R6: Rigs, Rivals, Reduced Motion, and Accessibility
-
-- **R6.1** Existing articulation and contact invariants remain authoritative:
-  RowErg hands/feet/pelvis/oars, SkiErg hands/feet/poles/cable, and BikeErg
-  hands/feet/pelvis/pedals/cranks retain their current targets.
-- **R6.2** Live and rival rigs receive independent asset clones. Changing a
-  rival material must not mutate the live rig, a cached template, or another
-  scene.
-- **R6.3** Ghost translucency applies to every equipment/environment material
-  type loaded from USDA, including PBR-style materials, while preserving sport
-  accents on the live participant. A validated V4 skinned rival body is the
-  explicit exception: it remains opaque/depth-writing with a cool tint to
-  avoid transparent triangle-sort seams.
-- **R6.4** Imported and constant-pace rivals retain their existing fallback
-  articulation. Reduced Motion retains stable neutral poses, and existing wake
-  and spray suppression rules remain in force.
-- **R6.5** The 3D surface remains a single meaningful accessibility element.
-  Decorative asset node names are hidden from VoiceOver, no new visual-source
-  control is exposed, and existing keyboard controls remain operable.
-
-## R7: Tests and Validation
-
-- **R7.1** Asset tests cover resource presence in `Bundle.module`, USDA loading,
-  required nodes, material categories, finite transforms/normals/bounds,
-  triangle and size budgets, absence of cameras/lights, clone independence,
-  and generator `--check`.
-- **R7.2** Failure tests prove missing, malformed, and incomplete resource sets
-  produce an operational complete procedural fallback.
-- **R7.3** Rig tests run existing structural, finite-transform, contact, and
-  ghost-translucency assertions against the procedural low-quality path and,
-  once a full V4 package validates, the bundled medium-quality path. While the
-  pinned artifact fails the exact clip gate, tests must instead prove the
-  complete procedural fallback for Medium/High/Ultra.
-- **R7.4** Scene tests cover low/procedural versus medium-high-ultra/bundled
-  selection, environment installation, quality rebuild continuity, effects,
-  cameras, rivals, seeking, Reduced Motion, and functional load failure.
-- **R7.5** Required validation includes the generator check, focused asset and
-  replay suites, Core/Platform architecture scans, full `swift test`, `swift
-  build`, `git diff --check`, staged-bundle checks, and staged-app visual QA.
-  A task is complete only when its corresponding proof has actually passed.
-
-## R8: Privacy and Performance
-
-- **R8.1** Assets contain no user data. Asset errors/logs never disclose tokens,
-  workout data, file paths, filenames, or other private values. Any fallback
-  log uses only a fixed public resource identifier and is emitted at most once
-  per failed resource.
-- **R8.2** Templates load only during scene construction and use a bounded
-  cache. Per-frame work changes existing transforms/material state only; it
-  performs no disk I/O, asset traversal, mesh generation, or unbounded
-  allocation.
-- **R8.3** Phase 11 preserves existing adaptive-quality measurements. It does
-  not claim a performance improvement, universal frame rate, or final
-  production readiness without measured evidence.
-- **R8.4** Demo and automation modes remain deterministic and offline.
-
-## Non-Goals
-
-- A new animation, skeletal, inverse-kinematics, or renderer system.
-- Metal, SceneKit, custom shaders, runtime downloads, external model loaders,
-  third-party assets, asset marketplace, or user-selectable visual themes.
-- New replay controls, a 2D redesign, networking, Bluetooth/FTMS/Concept2 PM
-  transport, OAuth, public sharing, or unrelated UI cleanup.
+9.1 Synthetic demo data only; no workout IDs, filenames, paths, tokens or
+user metrics in generated manifests; `PrivacySafeLogger` categories only.
+9.2 2D and 3D each expose one meaningful semantic replay element (sport,
+time, progress, pace, rival, gap); decorative drawing stays hidden from
+VoiceOver; controls remain keyboard operable in every quality/fallback state.

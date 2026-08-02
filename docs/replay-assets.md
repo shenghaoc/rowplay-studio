@@ -1,141 +1,105 @@
-# Replay 3D Assets
+# Replay Reference Assets
 
-## Current Status
+RowPlay Studio consumes the production cross-platform replay reference owned
+by RowPlay `main`.  Studio does not independently redesign the athlete, its
+mechanics, the grip contracts, or the visual direction — it ports them into
+native architecture (RealityKit, SwiftUI Canvas) and owns only the macOS
+delivery.
 
-Phase 11 is implemented on RowPlay Studio PR #72 (**draft**), titled
-`Phase 11: Match native replay to merged RowPlay V4`.
+The integration is pinned to the current RowPlay `main` commit recorded in
+`Sources/RowPlayStudio/Resources/ReplayReference/rowplay-source.json`.  Every
+bundled artifact records its upstream path, SHA-256, and byte count there or
+in a sibling manifest, so the whole bundle is reproducible from the pinned
+tree.
 
-The integration is pinned to the final merged RowPlay PR #171 commit:
+## Bundle layout
 
-```text
-da0dc73bf295871e9b362511cd5b2c9a9424b325
+```
+Sources/RowPlayStudio/Resources/ReplayReference/
+  rowplay-source.json                  pinned commit + artifact hashes + lineage
+  athlete/
+    rowplay-athlete-v4.usdz            production anatomical athlete (native derivative)
+    rowplay-athlete-v4.contract.json   sealed contract: 19 semantic bones + 32 grip
+                                       helpers (51 total), 8 material surface roles,
+                                       3 sport clips, contacts, rest transforms
+    rowplay-athlete-source.json        athlete provenance manifest
+  motion/
+    rowplay-motion.bin                 sampled base motion: 3 sports x 257 phases x
+                                       19 semantic bones x TRS (little-endian f32)
+    rowplay-motion-manifest.json       layout, clip durations, drive ends, landmarks
+  equipment/
+    rowplay-row-equipment.usdz         converted V3 composites (Blender, dev-time)
+    rowplay-ski-equipment.usdz
+    rowplay-bike-equipment.usdz
+    rowplay-*-equipment.contract.json  node/part/material sidecars (USD-safe names)
+    rowplay-equipment-manifest.json    package hashes + source GLB hash
+  environment/
+    environment-manifest.json          texture hashes + provenance pointer
+    textures/<family>/...              13 CC0 material families (diffuse/normal/rough)
+  parity/                              regenerated web-parity fixtures
 ```
 
-`script/sync_rowplay_athlete.py` reads that exact Git tree, verifies that the
-commit is reachable from `rowplay`'s `origin/main`, verifies every copied
-hash, and records a `merged` source manifest. It never reads a local RowPlay
-working-tree `HEAD`.
+## Regenerating the bundle
 
-| Artifact | SHA-256 |
-| --- | --- |
-| GLB | `73e0ece3e6c6de5a7a020a5097b172ca3e0ed8315c27ff604159b144fa90547b` |
-| USDZ | `934b0d3af0454f60a84dde76f95b77121919f5ad7cfc366684a670ae5d99658e` |
-| Contract | `e9fb56f372ac1ea44ee5ccaf1d00b5a975e1eb4a1a2ee7843ab9e53609fb189d` |
+All generation is development-time only; the app performs no runtime
+downloads and no runtime asset network access.
 
-## Hard Runtime Gate
+```bash
+ROWPLAY_MAIN="$(git -C ../rowplay rev-parse origin/main)"
 
-The final upstream contract requires one exact animation resource for each
-sport:
+python3 script/sync_rowplay_reference.py \
+  --rowplay-repo ../rowplay --expected-commit "$ROWPLAY_MAIN"
 
-| Sport | Required resource name |
-| --- | --- |
-| RowErg | `rowplay-v4-row-cycle` |
-| SkiErg | `rowplay-v4-ski-cycle` |
-| BikeErg | `rowplay-v4-bike-cycle` |
+"$BLENDER_BIN" --background --python script/convert_rowplay_equipment.py -- \
+  --rowplay-repo ../rowplay --expected-commit "$ROWPLAY_MAIN"
 
-The exact final USDZ does not provide those RealityKit animation-resource
-names. Its USD content contains only an authored row animation named
-`rowplay_v4_row_cycle` (underscore spelling), with no SkiErg or BikeErg
-counterparts. This is an upstream artifact/contract inconsistency, not a
-native aliasing issue.
+node script/export_rowplay_native_parity.mjs \
+  --rowplay-repo ../rowplay --commit "$ROWPLAY_MAIN"
 
-Studio deliberately rejects the complete V4 package when that gate fails:
+python3 script/validate_rowplay_reference.py   # CI-safe committed-bundle gate
+```
 
-- it does not select `availableAnimations.first`;
-- it does not translate underscore names or reuse the row animation for other
-  sports;
-- it does not mix a rejected V4 body with bundled equipment or environments;
-- Medium, High, and Ultra rebuild as the complete procedural scene, preserving
-  replay state and camera state; Low remains procedural by design.
-
-The strict rejection is covered by `ReplayAthleteLibraryTests` and
-`ReplayBundledSportRigTests`. It is the correct current behavior, but it also
-means PR #72 cannot be marked ready or claimed as a successful V4 runtime
-handoff until the upstream source is internally consistent. The required
-upstream resolution is a corrected final USDZ with the three contract-named
-clips, or an upstream contract/artifact revision with matching hashes. A local
-compatibility alias would violate the Phase 11 contract and is intentionally
-not an acceptable substitute.
+`sync_rowplay_reference.py --check` verifies the committed bundle against the
+pinned tree (requires the sibling checkout); `validate_rowplay_reference.py`
+verifies internal consistency from the committed files alone.
 
 ## Ownership
 
-| Asset class | Owner | Location |
-| --- | --- | --- |
-| V4 skinned athlete, skeleton, animation contract | Merged RowPlay PR #171 | Synced into `Resources/Replay3D/rowplay-athlete-v4.*` |
-| Equipment geometry (RowErg / SkiErg / BikeErg) | RowPlay Studio | Generated `*-rig.usda` |
-| Sport environments | RowPlay Studio | Generated `*-environment.usda` |
-| Replay clock, cameras, lights, effects, course | RowPlay Studio | Existing native systems |
-| Low / validation-failure athlete | RowPlay Studio | Procedural `ReplayAthleteRig` |
+| Piece | Owner | Native consumption |
+|---|---|---|
+| Production anatomical athlete, 51-bone skeleton, clips, landmarks | RowPlay `main` | `ReplayAthleteLibrary` loads the USDZ; `ReplayAthleteMotionTable` drives the 19 semantic bones from `rowplay-motion.bin` — never from `availableAnimations` names |
+| Grip channel + digit closure mechanics | RowPlay `handGrip.ts` | Ported to `RowPlayCore` (`ReplayGripGeometry`, `ReplayHandClosure`, sport contracts); solved once at install, cached per frame |
+| Equipment dimensions and contacts | RowPlay `rowRig.ts` / `skiEquipment.ts` / `bikeRig.js` / `bikeSaddle.js` | Ported to `RowPlayCore` contracts; authored V3 composites converted to USDZ for High/Ultra |
+| Premium venue stories and tiers | RowPlay `renderer3dEnvironment.ts` | Ported natively (`ReplayEnvironment*`), consuming the bundled CC0 maps |
+| 2D venue + participant scenes | RowPlay `renderer.ts` | Ported natively (`Replay2D*`) |
+| RealityKit integration, macOS delivery | RowPlay Studio | — |
 
-## Synchronisation
+## Athlete integrity gates
 
-```bash
-python3 script/sync_rowplay_athlete.py \
-  --rowplay-repo /path/to/rowplay \
-  --expected-commit da0dc73bf295871e9b362511cd5b2c9a9424b325
+A package that fails any gate atomically selects the complete procedural
+fallback (never a mixed scene):
 
-python3 script/sync_rowplay_athlete.py \
-  --rowplay-repo /path/to/rowplay \
-  --expected-commit da0dc73bf295871e9b362511cd5b2c9a9424b325 \
-  --check
-```
+1. source manifest parses, pins one 40-hex commit, and hash-matches the
+   contract and USDZ;
+2. contract declares the exact semantic + helper hierarchy with finite rest
+   transforms and all 8 surface roles;
+3. the motion table matches the contract's semantic bones, clip names, and
+   drive ends, and comes from the same pinned commit;
+4. the loaded USDZ skeleton exposes every contract bone exactly once with
+   finite transforms.
 
-The source manifest is the runtime authority for the commit and SHA-256
-values. Runtime code validates its schema, `merged` status, repository and PR
-identity, and copied USDZ/contract hashes before RealityKit loading.
+## Texture provenance
 
-## Native Motion and Constraints
+The 13 environment families are Poly Haven CC0-1.0 assets shipped as 512 px
+JPEG derivatives; creators and upstream identities are recorded in
+`ASSET_PROVENANCE.md` and hash-pinned in `environment-manifest.json`.  The
+venues are generic illustrative environments — never a reconstruction of a
+real venue, route, weather, or time of day.
 
-The portable Core layer ports the canonical V4 motion graph, sport kinematics,
-and two-bone solver. The committed parity fixture has 129 phase samples per
-sport (387 samples total), generated from the pinned upstream Git tree; the
-test compares native channels to that source without a hand-maintained
-approximation.
+## Phase 12 scope
 
-When a corrected V4 template passes the clip gate, Studio seeks its exact
-sport clip from the native replay clock, then runs one deterministic skeletal
-pass in this order:
-
-```text
-prepare -> orientHandsToTargets -> constrain
-```
-
-The pass restores the base root placement on each seek/frame, adjusts pelvis
-translation and arm/leg chains from `SkeletalPosesComponent`, applies terminal
-orientations and per-limb branch hints, and uses contact markers only as
-diagnostic mirrors. It does not snap a marker to an equipment target. Rival V4
-bodies use an opaque, depth-writing cool tint; only their equipment remains
-translucent.
-
-## Quality and Fallback
-
-| Quality / state | Athlete | Equipment / environment |
-| --- | --- | --- |
-| Low | Existing procedural | Existing procedural |
-| Medium / High / Ultra, complete validated package | Canonical V4 | Native bundled USDA |
-| Any source, contract, clip, or runtime failure | Complete procedural | Complete procedural |
-
-The fallback is scene-wide and state-preserving. It never changes replay time,
-play state, speed, camera preset/orbit state, or rival selection.
-
-## Equipment Generation
-
-```bash
-python3 script/generate_replay_assets.py
-python3 script/generate_replay_assets.py --check
-```
-
-Resources:
-
-```text
-Sources/RowPlayStudio/Resources/Replay3D/
-├── rower-rig.usda / skierg-rig.usda / bike-rig.usda
-├── rower-environment.usda / skierg-environment.usda / bike-environment.usda
-├── rowplay-athlete-v4.usdz
-├── rowplay-athlete-v4.contract.json
-├── rowplay-athlete-v4-source.json
-└── ASSET_PROVENANCE.md
-```
-
-Phase 12 remains the future premium anatomy/deformation work. It must reuse
-this sync, validation, motion, and fallback boundary rather than bypass it.
+Current RowPlay already ships the production anatomical athlete, so Phase 12
+is no longer "replace the mannequin".  It is optional work beyond parity:
+native-specific material/shader refinement, remaining deformation polish,
+further contact/intersection polish, optional higher-end scene effects, and
+future cross-platform athlete version upgrades.

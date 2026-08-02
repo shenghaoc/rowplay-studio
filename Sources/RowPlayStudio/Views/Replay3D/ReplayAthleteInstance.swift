@@ -4,24 +4,35 @@ import RealityKit
 import RowPlayCore
 import simd
 
-/// Immutable loaded V4 athlete template.
+/// Immutable loaded production-athlete template.
 ///
-/// The template entity never enters a live scene. Callers receive independent
-/// clones so live and rival athletes cannot share skeleton, material, or
-/// animation controller state.
+/// The template entity never enters a live scene.  Callers receive
+/// independent clones so live and rival athletes cannot share skeleton,
+/// material, grip, or motion state.  The authored base motion comes from the
+/// bundled `rowplay-motion.bin` table — never from
+/// `Entity.availableAnimations`, whose clip names RealityKit does not
+/// guarantee to preserve across USDZ conversion.
 @MainActor
 final class ReplayAthleteTemplate {
     let contract: ReplayAthleteContract
     let sourceManifest: ReplayAthleteSourceManifest
+    let motionTable: ReplayAthleteMotionTable
     let jointNames: [String]
 
+    /// Skeleton joint index for each motion-table bone, in table order.
+    let semanticJointIndices: [Int]
+    /// Skeleton joint index for each contract helper, in contract order.
+    let helperJointIndices: [Int]
+    /// Bind pose captured from the loaded asset.
+    let restTransforms: [Transform]
+
     private let rootTemplate: Entity
-    private let animationResources: [Sport: AnimationResource]
 
     init?(
         root: Entity,
         contract: ReplayAthleteContract,
-        sourceManifest: ReplayAthleteSourceManifest
+        sourceManifest: ReplayAthleteSourceManifest,
+        motionTable: ReplayAthleteMotionTable
     ) {
         guard let athlete = root.findEntity(named: ReplayAthleteCatalog.skinnedMeshName)
                 ?? root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName) else {
@@ -31,14 +42,49 @@ final class ReplayAthleteTemplate {
             return nil
         }
         guard let poses = athlete.components[SkeletalPosesComponent.self],
-              let pose = poses.poses.first else {
+              let pose = poses.poses.default ?? poses.poses.first else {
             return nil
         }
         let names = pose.jointNames
-        guard names.count == ReplayAthleteCatalog.orderedJointPaths.count,
-              names == ReplayAthleteCatalog.orderedJointPaths else {
+        guard names.count == pose.jointTransforms.count else {
             return nil
         }
+
+        // Index every joint by its leaf bone name; the full hierarchy path is
+        // an asset-conversion detail the contract does not own.
+        var indexByLeafName: [String: Int] = [:]
+        for (index, path) in names.enumerated() {
+            let leaf = path.split(separator: "/").last.map(String.init) ?? path
+            // First occurrence wins; a duplicated leaf name is a contract
+            // violation caught below.
+            if indexByLeafName[leaf] != nil {
+                return nil
+            }
+            indexByLeafName[leaf] = index
+        }
+
+        // The loaded skeleton must expose the exact semantic and helper
+        // hierarchy the live contract declares.
+        var semanticIndices: [Int] = []
+        semanticIndices.reserveCapacity(motionTable.boneNames.count)
+        for bone in motionTable.boneNames {
+            guard let index = indexByLeafName[bone] else {
+                return nil
+            }
+            semanticIndices.append(index)
+        }
+        guard motionTable.boneNames == contract.semanticBoneNames else {
+            return nil
+        }
+        var helperIndices: [Int] = []
+        helperIndices.reserveCapacity(contract.helpers.count)
+        for helper in contract.helpers {
+            guard let index = indexByLeafName[helper.name] else {
+                return nil
+            }
+            helperIndices.append(index)
+        }
+
         for transform in pose.jointTransforms {
             let t = transform.translation
             let r = transform.rotation.vector
@@ -52,22 +98,6 @@ final class ReplayAthleteTemplate {
             }
         }
 
-        // A valid package needs exactly one resource for every contract sport.
-        // The current merged USDZ fails this gate, which intentionally selects
-        // atomic procedural fallback; arbitrarily choosing one authored clip
-        // would silently animate Ski/Bike with the row resource.
-        var resources: [Sport: AnimationResource] = [:]
-        for clip in contract.clips {
-            let matches = root.availableAnimations.filter { $0.name == clip.name }
-            guard matches.count == 1 else {
-                return nil
-            }
-            resources[clip.sport] = matches[0]
-        }
-        guard resources.count == 3 else {
-            return nil
-        }
-
         // Disable any authored light so native lighting remains authoritative.
         if let light = root.findEntity(named: "env_light") {
             light.isEnabled = false
@@ -75,9 +105,12 @@ final class ReplayAthleteTemplate {
 
         self.contract = contract
         self.sourceManifest = sourceManifest
+        self.motionTable = motionTable
         self.jointNames = names
+        self.semanticJointIndices = semanticIndices
+        self.helperJointIndices = helperIndices
+        self.restTransforms = Array(pose.jointTransforms)
         self.rootTemplate = root
-        self.animationResources = resources
         rootTemplate.isEnabled = false
     }
 
@@ -86,7 +119,13 @@ final class ReplayAthleteTemplate {
         name: String,
         isRival: Bool
     ) -> ReplayAthleteInstance? {
-        guard let animationResource = animationResources[sport] else { return nil }
+        guard motionTable.clips[sport] != nil else { return nil }
+        guard let gripController = ReplayAthleteGripController(
+            contract: contract,
+            sport: sport
+        ) else {
+            return nil
+        }
         let clone = rootTemplate.clone(recursive: true)
         clone.name = name
         clone.isEnabled = true
@@ -100,19 +139,17 @@ final class ReplayAthleteTemplate {
         let instance = ReplayAthleteInstance(
             root: clone,
             athleteEntity: athlete,
-            contract: contract,
-            jointNames: jointNames,
+            template: self,
             sport: sport,
-            animationResource: animationResource
+            gripController: gripController
         )
-        if isRival {
-            instance.applyRivalBodyStyle()
-        }
+        instance.applyBodyStyle(isRival: isRival)
         return instance
     }
 }
 
-/// Independent live or rival V4 athlete instance.
+/// Independent live or rival production-athlete instance driven by the
+/// sampled motion table.
 @MainActor
 final class ReplayAthleteInstance {
     let root: Entity
@@ -121,12 +158,15 @@ final class ReplayAthleteInstance {
     let jointNames: [String]
     let sport: Sport
     let selectedClipName: String
+    let gripController: ReplayAthleteGripController
 
-    private let animationResource: AnimationResource
-    private var playbackController: AnimationPlaybackController?
-    private var lastSampledFraction: Double?
+    private let template: ReplayAthleteTemplate
     private var baseRootTransform: Transform?
     private var constraintPose: SkeletalPose?
+
+    /// Reusable per-seek buffers — no allocation on the sample path.
+    private var sampleBuffer: [ReplayAthleteBoneTransform]
+    private var workingTransforms: [Transform]
 
     let leftHandContact: Entity?
     let rightHandContact: Entity?
@@ -136,18 +176,37 @@ final class ReplayAthleteInstance {
     fileprivate init(
         root: Entity,
         athleteEntity: Entity,
-        contract: ReplayAthleteContract,
-        jointNames: [String],
+        template: ReplayAthleteTemplate,
         sport: Sport,
-        animationResource: AnimationResource
+        gripController: ReplayAthleteGripController
     ) {
         self.root = root
         self.athleteEntity = athleteEntity
-        self.contract = contract
-        self.jointNames = jointNames
+        self.template = template
+        self.contract = template.contract
+        self.jointNames = template.jointNames
         self.sport = sport
-        self.selectedClipName = animationResource.name ?? ""
-        self.animationResource = animationResource
+        self.selectedClipName = template.contract.clip(for: sport)?.name ?? ""
+        self.gripController = gripController
+        self.sampleBuffer = Array(
+            repeating: ReplayAthleteBoneTransform(),
+            count: template.motionTable.boneNames.count
+        )
+
+        // Working pose starts at bind; helper joints are pre-composed with
+        // the install-time grip closure once — per frame only the semantic
+        // bones are rewritten from the motion table.
+        var transforms = template.restTransforms
+        for (offset, helper) in template.contract.helpers.enumerated() {
+            let jointIndex = template.helperJointIndices[offset]
+            if let solved = gripController.solvedRotation(forHelper: helper.name) {
+                var transform = transforms[jointIndex]
+                transform.rotation = solved
+                transforms[jointIndex] = transform
+            }
+        }
+        self.workingTransforms = transforms
+
         self.leftHandContact = root.findEntity(named: "v4LeftHandContact")
             ?? root.replayDescendant(named: "v4LeftHandContact")
         self.rightHandContact = root.findEntity(named: "v4RightHandContact")
@@ -166,7 +225,6 @@ final class ReplayAthleteInstance {
 
     func attach(to parent: Entity) {
         parent.addChild(root)
-        ensurePlaybackController()
     }
 
     /// Capture the configured rig placement after its parent has been chosen.
@@ -176,39 +234,74 @@ final class ReplayAthleteInstance {
         baseRootTransform = root.transform
     }
 
-    /// Seek the authored animation to a normalized clip fraction in [0, 1).
+    /// Seek the authored base motion to a normalized clip fraction in [0, 1).
     ///
-    /// Playback speed is always zero so the native replay clock owns time.
+    /// The pose is rebuilt from the bind pose plus the sampled table every
+    /// seek — direct and shuffled seeks are deterministic by construction, and
+    /// no state from a previous frame can accumulate.  Digit-closure helper
+    /// rotations were composed once at install and ride their corrected hand
+    /// parents.
     func seek(toClipFraction fraction: Double) {
-        let clamped = ReplayAthleteCatalog.wrapUnit(fraction)
-        ensurePlaybackController()
-        guard let controller = playbackController else {
-            return
+        template.motionTable.sample(sport: sport, fraction: fraction, into: &sampleBuffer)
+        for (tableIndex, jointIndex) in template.semanticJointIndices.enumerated() {
+            let sampled = sampleBuffer[tableIndex]
+            let scale = SIMD3<Float>(
+                Float(sampled.scale.x),
+                Float(sampled.scale.y),
+                Float(sampled.scale.z)
+            )
+            let rotation = simd_quatf(
+                ix: Float(sampled.rotation.x),
+                iy: Float(sampled.rotation.y),
+                iz: Float(sampled.rotation.z),
+                r: Float(sampled.rotation.w)
+            )
+            let translation = SIMD3<Float>(
+                Float(sampled.translation.x),
+                Float(sampled.translation.y),
+                Float(sampled.translation.z)
+            )
+            workingTransforms[jointIndex] = Transform(
+                scale: scale,
+                rotation: rotation,
+                translation: translation
+            )
         }
-        let duration = max(animationResource.definition.duration, 1e-4)
-        controller.speed = 0
-        controller.time = clamped * duration
-        lastSampledFraction = clamped
+        writePose(transforms: workingTransforms)
         constraintPose = nil
     }
 
     func stopAnimation() {
-        root.stopAllAnimations(recursive: true)
-        playbackController = nil
-        lastSampledFraction = nil
         constraintPose = nil
     }
 
-    /// The V4 body stays in the opaque depth-writing pass. Transparent skin
-    /// sorting causes visible torso/limb seams, so rival identity is a cool
-    /// tint rather than generic ghost translucency.
-    func applyRivalBodyStyle() {
-        applyRivalBodyStyle(to: athleteEntity)
+    /// The production body stays in the opaque depth-writing pass.
+    /// Transparent skin sorting causes visible torso/limb seams, so identity
+    /// is a restrained cool tint over the authored surface, never alpha: the
+    /// rival blends 34% toward the ghost teal, the live athlete 14% toward
+    /// the live violet — the merged RowPlay `styleInstance` constants.
+    func applyBodyStyle(isRival: Bool) {
+        let tint: NSColor
+        if isRival {
+            tint = Self.blendTowardWhite(red: 0x17, green: 0x6b, blue: 0x8c, amount: 0.34)
+        } else {
+            tint = Self.blendTowardWhite(red: 0x52, green: 0x40, blue: 0xce, amount: 0.14)
+        }
+        applyBodyTint(tint, to: athleteEntity)
+    }
+
+    private static func blendTowardWhite(red: Int, green: Int, blue: Int, amount: Double) -> NSColor {
+        NSColor(
+            calibratedRed: 1 - amount + amount * Double(red) / 255,
+            green: 1 - amount + amount * Double(green) / 255,
+            blue: 1 - amount + amount * Double(blue) / 255,
+            alpha: 1
+        )
     }
 
     func hasFiniteJointTransforms() -> Bool {
         guard let poses = athleteEntity.components[SkeletalPosesComponent.self],
-              let pose = poses.poses.first else {
+              let pose = poses.poses.default ?? poses.poses.first else {
             return false
         }
         for transform in pose.jointTransforms {
@@ -234,9 +327,9 @@ final class ReplayAthleteInstance {
         }
     }
 
-    /// Begin one deterministic skeletal correction pass from the authored clip
-    /// sample. The caller must use `prepare → orientHandsToTargets → constrain`
-    /// in a single frame.
+    /// Begin one deterministic skeletal correction pass from the sampled base
+    /// pose.  The caller must use `prepare → orient → constrain` in a single
+    /// frame.
     func beginConstraintPass() -> Bool {
         if baseRootTransform == nil {
             baseRootTransform = root.transform
@@ -272,6 +365,19 @@ final class ReplayAthleteInstance {
         constraintPose = pose
     }
 
+    private func writePose(transforms: [Transform]) {
+        guard var component = athleteEntity.components[SkeletalPosesComponent.self],
+              var pose = component.poses.default ?? component.poses.first,
+              pose.jointTransforms.count == transforms.count else {
+            return
+        }
+        for index in transforms.indices {
+            pose.jointTransforms[index] = transforms[index]
+        }
+        component.poses.default = pose
+        athleteEntity.components.set(component)
+    }
+
     func contactSpec(role: String) -> ReplayAthleteContactSpec? {
         contract.contacts.first { $0.role == role }
     }
@@ -291,11 +397,21 @@ final class ReplayAthleteInstance {
         }
         let matrices = skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(index) else { return nil }
-        let offset = SIMD3<Float>(
-            Float(spec.localOffset.x),
-            Float(spec.localOffset.y),
-            Float(spec.localOffset.z)
-        )
+        // The authored palm-surface contact is replaced with the sport's
+        // grip-channel centre for hands, so the contact solver drives the
+        // enclosed channel — not the skin — onto the equipment axis.
+        let offset: SIMD3<Float>
+        if spec.role == "left-hand" || spec.role == "right-hand" {
+            let side: Double = spec.role == "left-hand" ? -1 : 1
+            let channel = ReplayAthleteGripController.effectorOffset(for: sport, side: side)
+            offset = SIMD3(Float(channel.x), Float(channel.y), Float(channel.z))
+        } else {
+            offset = SIMD3(
+                Float(spec.localOffset.x),
+                Float(spec.localOffset.y),
+                Float(spec.localOffset.z)
+            )
+        }
         let local = ReplayAthleteInstance.point(offset, transformedBy: matrices[index])
         return athleteEntity.convert(position: local, to: space)
     }
@@ -306,7 +422,10 @@ final class ReplayAthleteInstance {
         }
         let matrices = skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(index) else { return nil }
-        return athleteEntity.convert(position: ReplayAthleteInstance.point(.zero, transformedBy: matrices[index]), to: space)
+        return athleteEntity.convert(
+            position: ReplayAthleteInstance.point(.zero, transformedBy: matrices[index]),
+            to: space
+        )
     }
 
     func skeletalJointMatrices(for pose: SkeletalPose) -> [simd_float4x4] {
@@ -336,15 +455,6 @@ final class ReplayAthleteInstance {
         contactEntity(role: role)?.setPosition(position, relativeTo: space)
     }
 
-    private func ensurePlaybackController() {
-        guard playbackController == nil else {
-            return
-        }
-        let controller = root.playAnimation(animationResource.repeat())
-        controller.speed = 0
-        playbackController = controller
-    }
-
     private static func point(_ position: SIMD3<Float>, transformedBy matrix: simd_float4x4) -> SIMD3<Float> {
         let value = matrix * SIMD4(position.x, position.y, position.z, 1)
         guard value.x.isFinite, value.y.isFinite, value.z.isFinite, value.w.isFinite,
@@ -354,9 +464,8 @@ final class ReplayAthleteInstance {
         return SIMD3(value.x, value.y, value.z) / value.w
     }
 
-    private func applyRivalBodyStyle(to entity: Entity) {
+    private func applyBodyTint(_ tint: NSColor, to entity: Entity) {
         if var model = entity.components[ModelComponent.self] {
-            let tint = NSColor(calibratedRed: 0.52, green: 0.46, blue: 0.86, alpha: 1)
             model.materials = model.materials.map { material in
                 if var pbr = material as? PhysicallyBasedMaterial {
                     pbr.baseColor.tint = tint
@@ -376,7 +485,7 @@ final class ReplayAthleteInstance {
             entity.components.set(model)
         }
         for child in entity.children {
-            applyRivalBodyStyle(to: child)
+            applyBodyTint(tint, to: child)
         }
     }
 }

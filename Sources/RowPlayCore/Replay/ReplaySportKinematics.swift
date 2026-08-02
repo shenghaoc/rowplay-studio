@@ -93,16 +93,35 @@ public enum ReplaySportKinematics {
         )
     }
 
-    /// Resolve the continuous down → back → recovery SkiErg elbow branch.
+    /// Resolve the shared down-elbow → press → recovery SkiErg elbow branch.
+    ///
+    /// The bend vector stays on one continuous arc in the sagittal plane.  At
+    /// the plant the elbows hang below the up-forward shoulder→hand chord —
+    /// the compact SkiErg catch.  The press swings the elbow aft early, so the
+    /// loaded pull drives the elbows down-back past the ribs; the recovery
+    /// retraces the same arc instead of closing a full circle over the top,
+    /// which would sweep the bend hint through straight-up and degenerate the
+    /// two-bone plane.
     public static func solveSkierElbowDirection(
         _ kinematics: ReplaySkierKinematics
     ) -> ReplaySkierElbowDirection {
         let sweep = clampUnit(kinematics.poleSweep)
+        // vertical = cos(angle), foreAft = sin(angle): 0 is straight up,
+        // +π/2 is horizontal-forward.  Plant: down, tilted slightly forward.
+        // Pole-off: down-back.  The press completes the aft swing in the
+        // first 45% of the sweep so the deep load never hands the branch to
+        // the lateral floor.
+        let plantAngle = 2.9
+        let poleOffAngle = Double.pi + 1.1
+        let pressSweep = clampUnit(sweep / 0.45)
+        let pressEase = pressSweep * pressSweep * (3 - 2 * pressSweep)
         let angle: Double
         if kinematics.cycle <= ReplayMotionGraph.skiPoleOffCycle {
-            angle = .pi + sweep * (.pi / 2)
+            angle = plantAngle + pressEase * (poleOffAngle - plantAngle)
         } else {
-            angle = .pi * 1.5 - (1 - sweep) * (.pi / 2)
+            // Recovery retraces the press arc: sweep decays 1 → 0 after
+            // pole-off, taking the elbow back up the same forward-down path.
+            angle = poleOffAngle + (1 - sweep) * (plantAngle - poleOffAngle)
         }
         return ReplaySkierElbowDirection(vertical: cos(angle), foreAft: sin(angle))
     }

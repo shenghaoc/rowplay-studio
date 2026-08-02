@@ -1,0 +1,90 @@
+{
+  "boneNames": [
+    "v4Hips",
+    "v4Spine",
+    "v4Chest",
+    "v4Neck",
+    "v4Head",
+    "v4LeftClavicle",
+    "v4LeftUpperArm",
+    "v4LeftForearm",
+    "v4LeftHand",
+    "v4RightClavicle",
+    "v4RightUpperArm",
+    "v4RightForearm",
+    "v4RightHand",
+    "v4LeftUpperLeg",
+    "v4LeftLowerLeg",
+    "v4LeftFoot",
+    "v4RightUpperLeg",
+    "v4RightLowerLeg",
+    "v4RightFoot"
+  ],
+  "clips": [
+    {
+      "animatedTrackCount": 20,
+      "clipName": "rowplay-v4-row-cycle",
+      "driveEnd": 0.38,
+      "durationSeconds": 1.0,
+      "phaseLandmarks": {
+        "bodyOpen": 0.3,
+        "bodyOver": 0.72,
+        "catch": 0.0,
+        "finish": 0.38,
+        "handsAway": 0.54,
+        "legDrive": 0.08,
+        "loop": 1.0,
+        "slide": 0.88
+      },
+      "sport": "rower"
+    },
+    {
+      "animatedTrackCount": 20,
+      "clipName": "rowplay-v4-ski-cycle",
+      "driveEnd": 0.34,
+      "durationSeconds": 1.0,
+      "phaseLandmarks": {
+        "driveEnd": 0.34,
+        "loadedPull": 0.24,
+        "loop": 1.0,
+        "plant": 0.12,
+        "reach": 0.0,
+        "recover": 0.78,
+        "release": 0.58
+      },
+      "sport": "skierg"
+    },
+    {
+      "animatedTrackCount": 20,
+      "clipName": "rowplay-v4-bike-cycle",
+      "driveEnd": 0.5,
+      "durationSeconds": 1.0,
+      "phaseLandmarks": {
+        "leftPower": 0.25,
+        "leftTop": 0.0,
+        "loop": 1.0,
+        "opposed": 0.5,
+        "rightPower": 0.75
+      },
+      "sport": "bike"
+    }
+  ],
+  "floatsPerBone": 10,
+  "formatVersion": 2,
+  "interpolation": {
+    "rotation": "shortest-path normalized (slerp source keys)",
+    "scale": "linear",
+    "translation": "linear"
+  },
+  "layout": "float32-little-endian [sport][phase][bone][tx ty tz rx ry rz rw sx sy sz]",
+  "motionBinByteCount": 585960,
+  "motionBinSha256": "52cee22a7b8989dc321115b6e300cb3b42cc87ec903b013f7be9e7a22e4607fe",
+  "samplesPerSport": 257,
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "sourceGlbSha256": "a564a4dbd4922e2ba76ef21a23f5bf0eb1b0180846548f9d7110e55ffd8f760e",
+  "sports": [
+    "rower",
+    "skierg",
+    "bike"
+  ]
+}

@@ -189,6 +189,7 @@ public enum ReplayMotionGraph: Equatable, Sendable {
     public static let skiElbowLoadCycle = 0.11
     public static let skiPoleReleaseStartCycle = 0.245
     public static let skiPoleOffCycle = 0.29
+    public static let skiPoleFlightApexCycle = 0.42
     public static let skiPoleApproachStartCycle = 0.88
     public static let skiPreplantStartCycle = 0.94
 
@@ -210,20 +211,31 @@ public enum ReplayMotionGraph: Equatable, Sendable {
         let recovery = 1 - drive
 
         let legs = pulse(cycle, 0, drive * 0.56, drive + recovery * 0.34, 1)
+        // The body opens through the middle of the drive and is essentially
+        // open by 0.80 of it: the shoulder's aft travel is what geometrically
+        // releases the rigid handle toward the chest.
         let torso = pulse(
             cycle,
-            drive * 0.12,
-            drive * 0.82,
-            drive + recovery * 0.13,
-            drive + recovery * 0.66
+            drive * 0.3,
+            drive * 0.8,
+            drive + recovery * 0.18,
+            drive + recovery * 0.58
         )
+        // The draw window is the single authored velocity profile for the arm
+        // pull; opening at 0.68 of the drive puts visible flexion onset near
+        // 0.72–0.76 and keeps the cruise readable at stroke rate.  Hands away
+        // over the first 0.30 of the recovery clears the released grips while
+        // the torso is still laid back.
         let arms = add(
-            cruiseRamp(cycle, drive * 0.78, drive * 0.995),
-            scale(quinticRamp(cycle, drive, drive + recovery * 0.34), -1)
+            cruiseRamp(cycle, drive * 0.68, drive * 0.995),
+            scale(quinticRamp(cycle, drive, drive + recovery * 0.3), -1)
         )
         let handle = add(scale(legs, 0.42), scale(torso, 0.32), scale(arms, 0.26))
         let shoulders = add(scale(torso, 0.45), scale(arms, 0.55))
-        let driveBladeWater = pulse(cycle, -drive * 0.1, 0, drive * 0.78, drive * 0.95)
+        // Burial holds through the entire drive — the arm draw is still
+        // propulsive — and the spoon extracts in the first stretch of the
+        // recovery.
+        let driveBladeWater = pulse(cycle, -drive * 0.1, 0, drive, drive + recovery * 0.08)
         let preCatchBladeWater = quinticRamp(cycle, drive + recovery * 0.82, 1)
         let bladeWater = add(driveBladeWater, preCatchBladeWater)
         let bladeFeather = pulse(
@@ -283,7 +295,13 @@ public enum ReplayMotionGraph: Equatable, Sendable {
             scale(quinticRamp(cycle, 0.72, 1), -1)
         )
         let poleLift = bump(cycle, skiPoleOffCycle, 1)
-        let poleFlight = pulse(cycle, skiPoleOffCycle, 0.42, skiPoleApproachStartCycle, 1)
+        let poleFlight = pulse(
+            cycle,
+            skiPoleOffCycle,
+            skiPoleFlightApexCycle,
+            skiPoleApproachStartCycle,
+            1
+        )
         let polePlant = add(
             invert(quinticRamp(cycle, skiPoleReleaseStartCycle, skiPoleOffCycle)),
             quinticRamp(cycle, skiPreplantStartCycle, 1)

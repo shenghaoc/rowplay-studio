@@ -118,8 +118,8 @@ public struct ReplayCameraPose: Equatable, Sendable {
             || !targetY.isFinite
             || !targetZ.isFinite
             || !fieldOfViewDegrees.isFinite
-            || fieldOfViewDegrees < 46
-            || fieldOfViewDegrees > 51
+            || fieldOfViewDegrees < 36
+            || fieldOfViewDegrees > 52
         self.positionX = positionX.isFinite ? positionX : 0
         self.positionY = positionY.isFinite ? positionY : 3.6
         self.positionZ = positionZ.isFinite ? positionZ : -5.8
@@ -127,8 +127,8 @@ public struct ReplayCameraPose: Equatable, Sendable {
         self.targetY = targetY.isFinite ? targetY : 0.85
         self.targetZ = targetZ.isFinite ? targetZ : 0
         self.fieldOfViewDegrees = min(
-            51,
-            max(46, fieldOfViewDegrees.isFinite ? fieldOfViewDegrees : 46)
+            52,
+            max(36, fieldOfViewDegrees.isFinite ? fieldOfViewDegrees : 46)
         )
     }
 
@@ -165,16 +165,54 @@ public struct ReplayCameraPose: Equatable, Sendable {
     }
 }
 
+/// Per-sport rear three-quarter chase rig ported from the merged RowPlay
+/// `CAMERA_RIGS` and `BASE_CAMERA_FOV` tables.
+public struct ReplayCameraChaseRig: Equatable, Sendable {
+    public let back: Double
+    public let height: Double
+    public let ahead: Double
+    public let lateral: Double
+    public let aimY: Double
+    public let baseFieldOfView: Double
+
+    public static func rig(for sport: Sport) -> ReplayCameraChaseRig {
+        switch sport {
+        case .rower:
+            ReplayCameraChaseRig(
+                back: 4.05, height: 1.78, ahead: 0.88, lateral: 2.16, aimY: 0.84,
+                baseFieldOfView: 40
+            )
+        case .skierg:
+            ReplayCameraChaseRig(
+                back: 3.15, height: 2.3, ahead: 0.9, lateral: 1.86, aimY: 1.14,
+                baseFieldOfView: 42
+            )
+        case .bike:
+            ReplayCameraChaseRig(
+                back: 3.12, height: 1.96, ahead: 0.58, lateral: 1.92, aimY: 0.92,
+                baseFieldOfView: 42
+            )
+        }
+    }
+}
+
 /// Deterministic, renderer-neutral camera target and smoothing solver.
 public enum ReplayCameraSolver: Sendable {
     public static let positionDampingRate = 7.5
     public static let fieldOfViewDampingRate = 2.5
+    /// FOV breathing gain above the walking-speed threshold.
+    public static let speedFieldOfViewGain = 2.0
+    /// Flat pullback added whenever a rival is on course.
+    public static let rivalPullback = 1.05
 
     public static func targetPose(
         preset: ReplayCameraPreset,
+        sport: Sport = .rower,
         participant: ReplayPosition,
         tangent: ReplayPosition,
         speed: Double,
+        rival: ReplayPosition? = nil,
+        aspect: Double = 1.6,
         orbit: ReplayCameraOrbit = ReplayCameraOrbit(),
         reduceMotion: Bool = false
     ) -> ReplayCameraPose {
@@ -184,26 +222,56 @@ public enum ReplayCameraSolver: Sendable {
         let direction = normalizedHorizontal(x: tangent.x, z: tangent.z, fallbackX: 1, fallbackZ: 0)
         let rightX = -direction.z
         let rightZ = direction.x
-        let radial = normalizedHorizontal(
-            x: px,
-            z: pz,
-            fallbackX: rightX,
-            fallbackZ: rightZ
-        )
 
         let pose: ReplayCameraPose
         switch preset {
         case .chase:
+            let rig = ReplayCameraChaseRig.rig(for: sport)
             let replaySpeed = speed.isFinite ? max(0, speed) : 0
             let speedFraction = min(1, max(0, (replaySpeed - 3) / 6))
+            // Rival comparison: focus the lane midpoint and pull back so the
+            // pair's true angular span fits the horizontal frustum with a
+            // sport margin — the framing scales with actual separation, not a
+            // fixed multiplier.
+            var focusX = px
+            var focusZ = pz
+            var back = rig.back
+            var height = rig.height
+            let fieldOfView: Double
+            if reduceMotion {
+                // Reduced Motion widens the static frame instead of animating
+                // FOV or lagging the camera.
+                back += 0.8
+                height += 0.7
+                fieldOfView = rig.baseFieldOfView
+            } else {
+                fieldOfView = rig.baseFieldOfView + speedFraction * speedFieldOfViewGain
+            }
+            if let rival {
+                let rx = finite(rival.x, fallback: px)
+                let rz = finite(rival.z, fallback: pz)
+                back += rivalPullback
+                focusX = (px + rx) / 2
+                focusZ = (pz + rz) / 2
+                let spanX = px - rx
+                let spanZ = pz - rz
+                let comparisonSpan = (spanX * spanX + spanZ * spanZ).squareRoot()
+                let margin = sport == .rower ? 1.6 : 1.1
+                let verticalHalf = fieldOfView * .pi / 360
+                let safeAspect = aspect.isFinite && aspect > 0.2 ? aspect : 1.6
+                let horizontalHalf = atan(tan(verticalHalf) * safeAspect)
+                let requiredBack = (comparisonSpan / 2 + margin)
+                    / max(0.05, tan(horizontalHalf) * 0.9)
+                back += max(0, requiredBack - back)
+            }
             pose = ReplayCameraPose(
-                positionX: px - direction.x * 5.8 + radial.x * 1.1,
-                positionY: py + 3.6,
-                positionZ: pz - direction.z * 5.8 + radial.z * 1.1,
-                targetX: px + direction.x * 4.4,
-                targetY: py + 0.85,
-                targetZ: pz + direction.z * 4.4,
-                fieldOfViewDegrees: 46 + speedFraction * 5
+                positionX: focusX - direction.x * back + rightX * rig.lateral,
+                positionY: py + height,
+                positionZ: focusZ - direction.z * back + rightZ * rig.lateral,
+                targetX: focusX + direction.x * rig.ahead,
+                targetY: py + rig.aimY,
+                targetZ: focusZ + direction.z * rig.ahead,
+                fieldOfViewDegrees: fieldOfView
             )
         case .side:
             pose = ReplayCameraPose(
