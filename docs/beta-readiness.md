@@ -10,7 +10,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 - **Analytics**: `WorkoutAnalytics` (summaries, distance/duration bands, trends), `PersonalBests` (standard-distance PB detection), `PerformancePredictor` (Paul's Law).
 - **Query/filter/sort**: `WorkoutQuery` engine with sport, date, distance/duration chips, search, PB-only filtering, and multi-field sorting.
 - **Replay engine**: Sampling (`sampleAt`/`sampleIndexAt`), motion timing, comparability guard, ghost selection, sport themes, inspector helpers, and a `ReplayState` playback state machine.
-- **Replay renderer**: SwiftUI Canvas 2D replay surface with playback controls, scrubber, speed picker, and telemetry overlay.
+- **Replay renderer**: three-sport SwiftUI Canvas replay scenes plus the RealityKit production-asset path, with playback controls, scrubber, speed picker, camera/quality controls, rivals, and secondary telemetry.
 - **Concept2 sync**: Settings saves a BYOT token through Keychain, `Workout > Sync Concept2 Logbook` and Settings run `WorkoutSyncCoordinator`, synced workouts persist through `SQLiteWorkoutCache`, the workout library loads cache/demo/empty state on launch without requiring a token, `SyncStateTracker` reports status, and disconnect clears token/cache/library data.
 - **Workout tools**: Comparison (verdict, side stats, interval reps, distance overlay), rep detection, CSV/JSON export, HR import/merge, annotation model/store, and local share package.
 - **Live mode**: State machine, polling cadence with backoff, `LiveSource` protocol, `MockLiveSource`, `DemoLiveSampleGenerator`, and a native live-mode panel.
@@ -84,7 +84,12 @@ The items below describe the merged baseline, the validation completed for Phase
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
 2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
-3. **Phase 11 production 3D QA is not complete**: The V4 athlete and authored High/Ultra equipment are now bundled, while Low/Medium equipment intentionally remains contract-driven procedural. Final staged visual and performance evidence remains part of stack layer 8 before Phase 11 acceptance.
+3. **Phase 11 is not merged yet**: production USDZ athlete/equipment, venues,
+   current motion/grip contracts, and three-sport 2D replay are implemented in
+   the PR #90 replacement stack. The V4 athlete is bundled at every tier, with
+   authored equipment at High/Ultra and contract-driven procedural equipment
+   intentionally retained at Low/Medium. None of it is a shipped capability
+   until all eight layers pass exact-head CI/review and merge bottom-up.
 
 ## Must Not Ship Yet
 

@@ -32,7 +32,7 @@ claim that the complete phase or visual QA matrix is finished.
       materials, planar native-course mapping, and quality-tier differentiation.
       Environment geometry is non-failable; individual texture slots retain
       scalar PBR when a bundled map is unavailable.
-- [ ] **8/8 Camera, rival, effects, and final QA** — finish scene wiring and
+- [x] **8/8 Camera, rival, effects, and final QA** — finish scene wiring and
       run the staged-app matrix across renderers, sports, tiers, themes, rival
       modes, and Reduced Motion before claiming Phase 11 acceptance.
 

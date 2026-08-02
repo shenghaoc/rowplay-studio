@@ -68,7 +68,7 @@ final class ReplayCameraTests: XCTestCase {
         )
 
         XCTAssertTrue(pose.isFinite)
-        XCTAssertEqual(pose.fieldOfViewDegrees, 46)
+        XCTAssertEqual(pose.fieldOfViewDegrees, 40)
     }
 
     func testChaseFieldOfViewStaysWithinRequiredBounds() {
@@ -79,12 +79,12 @@ final class ReplayCameraTests: XCTestCase {
                 tangent: tangent,
                 speed: speed
             ).fieldOfViewDegrees
-            XCTAssertGreaterThanOrEqual(fov, 46)
-            XCTAssertLessThanOrEqual(fov, 51)
+            XCTAssertGreaterThanOrEqual(fov, 40)
+            XCTAssertLessThanOrEqual(fov, 42)
         }
 
-        XCTAssertEqual(pose(for: .chase, speed: 3).fieldOfViewDegrees, 46)
-        XCTAssertEqual(pose(for: .chase, speed: 9).fieldOfViewDegrees, 51)
+        XCTAssertEqual(pose(for: .chase, speed: 3).fieldOfViewDegrees, 40)
+        XCTAssertEqual(pose(for: .chase, speed: 9).fieldOfViewDegrees, 42)
     }
 
     func testNonChasePresetsUseStableFieldOfView() {
@@ -109,6 +109,57 @@ final class ReplayCameraTests: XCTestCase {
         XCTAssertEqual(result.positionZ, target.positionZ)
         XCTAssertEqual(result.targetX, target.targetX)
         XCTAssertEqual(result.fieldOfViewDegrees, 46)
+    }
+
+    func testChaseRigUsesSportSpecificFraming() {
+        let poses = Sport.allCases.map { sport in
+            ReplayCameraSolver.targetPose(
+                preset: .chase,
+                sport: sport,
+                participant: participant,
+                tangent: tangent,
+                speed: 3
+            )
+        }
+        XCTAssertEqual(poses.map(\.fieldOfViewDegrees), [40, 42, 42])
+        XCTAssertEqual(Set(poses.map(\.positionY)).count, 3)
+        XCTAssertEqual(Set(poses.map(\.positionZ)).count, 3)
+    }
+
+    func testRivalFramingTargetsMidpointAndPullsBackForSeparation() {
+        let solo = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6
+        )
+        let rival = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: (x: 12, y: 0, z: 42)
+        )
+        XCTAssertEqual(rival.targetZ, 36, accuracy: 0.0001)
+        XCTAssertLessThan(rival.positionX, solo.positionX)
+    }
+
+    func testReducedMotionUsesStaticSportFieldOfView() {
+        for sport in Sport.allCases {
+            let slow = ReplayCameraSolver.targetPose(
+                preset: .chase, sport: sport, participant: participant,
+                tangent: tangent, speed: 0, reduceMotion: true
+            )
+            let fast = ReplayCameraSolver.targetPose(
+                preset: .chase, sport: sport, participant: participant,
+                tangent: tangent, speed: 100, reduceMotion: true
+            )
+            XCTAssertEqual(slow.fieldOfViewDegrees, fast.fieldOfViewDegrees)
+            XCTAssertEqual(slow.positionX, fast.positionX)
+            XCTAssertEqual(slow.positionZ, fast.positionZ)
+        }
     }
 
     func testDampingIsEquivalentAcrossFrameRates() {

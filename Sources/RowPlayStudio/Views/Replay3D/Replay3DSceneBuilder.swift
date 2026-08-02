@@ -346,7 +346,9 @@ enum Replay3DSceneBuilder {
         cameraController.update(
             camera: container.camera,
             layout: layout,
+            sport: sport,
             distance: liveDistance,
+            rivalDistance: ghostVisible ? ghostDistance : nil,
             deltaTime: deltaTime,
             playbackTickGeneration: playbackTickGeneration,
             preset: cameraPreset,
