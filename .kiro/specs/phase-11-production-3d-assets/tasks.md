@@ -27,7 +27,7 @@ claim that the complete phase or visual QA matrix is finished.
       composites at High/Ultra, and independent live/rival instances.
 - [x] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.
-- [ ] **7/8 Environments and quality** — add the three venue stories,
+- [x] **7/8 Environments and quality** — add the three venue stories,
       materials, lighting profiles, quality-tier differentiation, and atomic
       environment fallback.
 - [ ] **8/8 Camera, rival, effects, and final QA** — finish scene wiring and

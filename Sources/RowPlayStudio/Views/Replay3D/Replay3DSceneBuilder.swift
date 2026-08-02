@@ -24,6 +24,7 @@ final class Replay3DSceneContainer {
     /// of this choice because it remains active at every tier once validated.
     let visualSource: ReplayAssetVisualSource
     let usesCanonicalAthlete: Bool
+    let bundledEnvironment: Entity?
 
     init(
         root: Entity,
@@ -42,6 +43,7 @@ final class Replay3DSceneContainer {
         configuration: ReplayRenderConfiguration,
         visualSource: ReplayAssetVisualSource,
         usesCanonicalAthlete: Bool
+        bundledEnvironment: Entity?
     ) {
         self.root = root
         self.camera = camera
@@ -59,6 +61,7 @@ final class Replay3DSceneContainer {
         self.configuration = configuration
         self.visualSource = visualSource
         self.usesCanonicalAthlete = usesCanonicalAthlete
+        self.bundledEnvironment = bundledEnvironment
     }
 }
 
@@ -177,6 +180,15 @@ enum Replay3DSceneBuilder {
             requestedEquipmentSource == .bundled && usesCanonicalAthlete
                 ? .bundled
                 : .procedural
+        let bundledEnvironment = ReplayEnvironmentInstaller.install(
+            sport: sport,
+            quality: effectiveQuality,
+            colorScheme: colorScheme
+        )
+        if let bundledEnvironment {
+            ground.isEnabled = false
+            root.addChild(bundledEnvironment)
+        }
 
         // Course ring
         let courseEntity = Entity()
@@ -242,6 +254,7 @@ enum Replay3DSceneBuilder {
             configuration: configuration,
             visualSource: resolvedVisualSource,
             usesCanonicalAthlete: usesCanonicalAthlete
+            bundledEnvironment: bundledEnvironment
         )
     }
 
