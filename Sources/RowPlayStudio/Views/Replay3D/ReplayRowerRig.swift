@@ -244,7 +244,7 @@ final class ReplayRowerRig: ReplaySportRig {
         let footR = footAnchorR.position(relativeTo: root)
 
         if let canonicalAthlete, let poseAdapter, let motion {
-            poseAdapter.apply(sample: motion, sport: .rower, to: canonicalAthlete)
+            let sampled = poseAdapter.apply(sample: motion, sport: .rower, to: canonicalAthlete)
             let targets = ReplayAthleteContactTargets(
                 pelvis: pelvisTarget,
                 leftHand: handL,
@@ -254,7 +254,9 @@ final class ReplayRowerRig: ReplaySportRig {
             )
             // Arms clear the torso before seat/pelvis closure; the final pass
             // then locks both palms and soles in the same rig space.
-            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+            if sampled,
+               canonicalAthlete.hasFiniteJointTransforms(),
+               ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
                 ReplayAthleteContactSolver.orientHandsToTargets(
                     instance: canonicalAthlete,
                     targets: targets,

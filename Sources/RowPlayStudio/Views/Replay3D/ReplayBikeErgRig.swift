@@ -267,7 +267,7 @@ final class ReplayBikeErgRig: ReplaySportRig {
         let footR = pedalR.position(relativeTo: root)
 
         if let canonicalAthlete, let poseAdapter, let motion {
-            poseAdapter.apply(sample: motion, sport: .bike, to: canonicalAthlete)
+            let sampled = poseAdapter.apply(sample: motion, sport: .bike, to: canonicalAthlete)
             // Contact space is the rig root so pedals and grips stay authoritative.
             let targets = ReplayAthleteContactTargets(
                 pelvis: rider.position(relativeTo: root),
@@ -276,7 +276,9 @@ final class ReplayBikeErgRig: ReplaySportRig {
                 leftFoot: footL,
                 rightFoot: footR
             )
-            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+            if sampled,
+               canonicalAthlete.hasFiniteJointTransforms(),
+               ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
                 ReplayAthleteContactSolver.orientHandsToTargets(
                     instance: canonicalAthlete,
                     targets: targets,

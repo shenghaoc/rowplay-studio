@@ -220,6 +220,67 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
     }
 
+    func testMissingAthleteRejectsTheWholeBundledSet() async throws {
+        let sport = Sport.rower
+        let resource = ReplayEquipmentPackageResource(sport: sport)
+        let source = TestEquipmentResourceSource(
+            manifest: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: ReplayAssetCatalog.equipmentManifestName,
+                extension: ReplayAssetCatalog.equipmentManifestExtension,
+                subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+            )),
+            packages: [sport: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.packageName,
+                extension: resource.packageExtension,
+                subdirectory: resource.subdirectory
+            ))],
+            contracts: [sport: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.contractName,
+                extension: resource.contractExtension,
+                subdirectory: resource.subdirectory
+            ))]
+        )
+        let library = ReplayAssetLibrary(
+            source: source,
+            athleteTemplateProvider: { nil }
+        )
+
+        let set = await library.bundledAssetSet(for: sport)
+
+        XCTAssertNil(set)
+        XCTAssertEqual(library.lastFailures[sport], .athleteUnavailable)
+    }
+
+    func testManifestRequiresExactlyOnePackageForEverySupportedSport() async throws {
+        let bundled = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+            name: ReplayAssetCatalog.equipmentManifestName,
+            extension: ReplayAssetCatalog.equipmentManifestExtension,
+            subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+        ))
+        let data = try Data(contentsOf: bundled)
+        let root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let packages = try XCTUnwrap(root["packages"] as? [[String: Any]])
+
+        for invalidPackages in [Array(packages.dropLast()), packages + [packages[0]]] {
+            var invalidRoot = root
+            invalidRoot["packages"] = invalidPackages
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("rowplay-equipment-manifest-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: invalidRoot, options: [.sortedKeys])
+                .write(to: url, options: .atomic)
+            defer { try? FileManager.default.removeItem(at: url) }
+
+            let library = ReplayAssetLibrary(
+                source: TestEquipmentResourceSource(manifest: url)
+            )
+            let set = await library.bundledAssetSet(for: .rower)
+            XCTAssertNil(set)
+            XCTAssertEqual(library.lastFailures[.rower], .manifestInvalid)
+        }
+    }
+
     private func parsedContract(
         data: Data,
         sport: Sport

@@ -20,7 +20,7 @@ struct ReplayAthleteContactError: Equatable, Sendable {
     var rightFoot: Float
     var pelvis: Float
 
-    var maximumPalmError: Float { max(leftHand, rightHand) }
+    var maximumGripChannelError: Float { max(leftHand, rightHand) }
     var maximumSoleError: Float { max(leftFoot, rightFoot) }
 }
 
@@ -32,9 +32,11 @@ struct ReplayAthleteContactError: Equatable, Sendable {
 /// snapping a helper entity to the machine.
 @MainActor
 enum ReplayAthleteContactSolver {
-    /// Soft residual budget for a sampled asset whose limb lengths cannot
-    /// reach every procedural equipment configuration exactly.
-    static let softContactBudgetMeters: Float = 0.12
+    /// Grip channels must remain visually locked to their equipment axes.
+    static let gripChannelContactBudgetMeters: Float = 0.01
+    /// Feet and pelvis retain a wider anatomical reach budget because sampled
+    /// asset proportions cannot match every procedural machine exactly.
+    static let reachContactBudgetMeters: Float = 0.12
 
     /// A finite but visibly detached skeleton is a failed canonical asset at
     /// runtime too. Let the scene builder take its complete procedural path
@@ -47,7 +49,10 @@ enum ReplayAthleteContactSolver {
             error.rightFoot,
             error.pelvis,
         ]
-        return values.allSatisfy { $0.isFinite && $0 <= softContactBudgetMeters }
+        return values.allSatisfy(\.isFinite)
+            && error.maximumGripChannelError <= gripChannelContactBudgetMeters
+            && error.maximumSoleError <= reachContactBudgetMeters
+            && error.pelvis <= reachContactBudgetMeters
     }
 
     /// Reset the instance to the authored clip sample and its configured root
@@ -213,17 +218,12 @@ enum ReplayAthleteContactSolver {
         branchHint: SIMD3<Float>,
         terminalUp: SIMD3<Float>
     ) {
-        guard let contact = instance.contactSpec(role: role),
+        guard let offset = instance.effectiveContactOffset(role: role),
               let upper = instance.jointIndex(named: names.upper, in: pose),
               let lower = instance.jointIndex(named: names.lower, in: pose),
               let terminal = instance.jointIndex(named: names.terminal, in: pose) else {
             return
         }
-        let offset = SIMD3<Float>(
-            Float(contact.localOffset.x),
-            Float(contact.localOffset.y),
-            Float(contact.localOffset.z)
-        )
         var matrices = instance.skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(upper), matrices.indices.contains(lower), matrices.indices.contains(terminal) else {
             return

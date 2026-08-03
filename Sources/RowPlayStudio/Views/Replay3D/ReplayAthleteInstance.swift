@@ -352,7 +352,10 @@ final class ReplayAthleteInstance {
             sport: sport,
             fraction: fraction,
             into: &sampleBuffer
-        ) else { return false }
+        ) else {
+            constraintPose = nil
+            return false
+        }
         for (tableIndex, jointIndex) in template.semanticJointIndices.enumerated() {
             let sampled = sampleBuffer[tableIndex]
             let scale = SIMD3<Float>(
@@ -548,6 +551,31 @@ final class ReplayAthleteInstance {
         contract.contacts.first { $0.role == role }
     }
 
+    /// The exact terminal-local point constrained and measured for a contact.
+    /// Hand roles retain the authored palm point and add the fitted sport
+    /// channel displacement; feet retain the authored sole offset unchanged.
+    func effectiveContactOffset(role: ReplayAthleteContactRole) -> SIMD3<Float>? {
+        guard let spec = contactSpec(role: role) else { return nil }
+        let value: SIMD3<Double>
+        switch role {
+        case .leftHand:
+            var referencePalm = ReplayGripGeometry.handPalmContact
+            referencePalm.x *= -1
+            value = spec.localOffset + (
+                ReplayAthleteGripController.effectorOffset(for: sport, side: .left)
+                    - referencePalm
+            )
+        case .rightHand:
+            value = spec.localOffset + (
+                ReplayAthleteGripController.effectorOffset(for: sport, side: .right)
+                    - ReplayGripGeometry.handPalmContact
+            )
+        case .leftFoot, .rightFoot:
+            value = spec.localOffset
+        }
+        return SIMD3(Float(value.x), Float(value.y), Float(value.z))
+    }
+
     func jointIndex(named bone: String, in pose: SkeletalPose) -> Int? {
         if let exact = pose.jointNames.firstIndex(of: bone) {
             return exact
@@ -561,26 +589,12 @@ final class ReplayAthleteInstance {
     ) -> SIMD3<Float>? {
         guard let pose = currentConstraintPose(),
               let spec = contactSpec(role: role),
-              let index = jointIndex(named: spec.bone, in: pose) else {
+              let index = jointIndex(named: spec.bone, in: pose),
+              let offset = effectiveContactOffset(role: role) else {
             return nil
         }
         let matrices = skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(index) else { return nil }
-        // The authored palm-surface contact is replaced with the sport's
-        // grip-channel centre for hands, so the contact solver drives the
-        // enclosed channel — not the skin — onto the equipment axis.
-        let offset: SIMD3<Float>
-        if spec.role == .leftHand || spec.role == .rightHand {
-            let side: ReplayHandSide = spec.role == .leftHand ? .left : .right
-            let channel = ReplayAthleteGripController.effectorOffset(for: sport, side: side)
-            offset = SIMD3(Float(channel.x), Float(channel.y), Float(channel.z))
-        } else {
-            offset = SIMD3(
-                Float(spec.localOffset.x),
-                Float(spec.localOffset.y),
-                Float(spec.localOffset.z)
-            )
-        }
         let local = ReplayAthleteInstance.point(offset, transformedBy: matrices[index])
         return athleteEntity.convert(position: local, to: space)
     }

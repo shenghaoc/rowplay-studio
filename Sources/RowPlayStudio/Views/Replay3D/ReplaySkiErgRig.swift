@@ -234,7 +234,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
         let footR = footAnchorR.position(relativeTo: root)
 
         if let canonicalAthlete, let poseAdapter, let motion {
-            poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
+            let sampled = poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
             let targets = ReplayAthleteContactTargets(
                 pelvis: pelvisTarget,
                 leftHand: handL,
@@ -242,7 +242,9 @@ final class ReplaySkiErgRig: ReplaySportRig {
                 leftFoot: footL,
                 rightFoot: footR
             )
-            if canonicalAthlete.hasFiniteJointTransforms(), ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
+            if sampled,
+               canonicalAthlete.hasFiniteJointTransforms(),
+               ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
                 ReplayAthleteContactSolver.orientHandsToTargets(
                     instance: canonicalAthlete,
                     targets: targets,
