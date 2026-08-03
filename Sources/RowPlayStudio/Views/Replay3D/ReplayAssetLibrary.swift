@@ -76,55 +76,123 @@ enum ReplayAssetGeometry {
     }
 }
 
+enum ReplayAssetLoadFailure: String, Equatable, Sendable {
+    case manifestInvalid
+    case packageMissing
+    case contractMissing
+    case packageUnreadable
+    case contractUnreadable
+    case packageHashMismatch
+    case contractHashMismatch
+    case contractInvalid
+    case packageLoadFailed
+    case providerInvalid
+}
+
 /// Loads, hash-checks, contract-checks, and caches per-sport equipment.
 /// Failures are cached so a broken package selects one coherent procedural
 /// fallback instead of being retried during render updates.
 @MainActor
 final class ReplayAssetLibrary {
     static let shared = ReplayAssetLibrary(source: ReplayModuleAssetResourceSource())
+    private static let logger = PrivacySafeLogger(category: "replay-assets")
 
     private let source: any ReplayAssetResourceSource
+    private let failureReporter: (Sport, ReplayAssetLoadFailure) -> Void
     private var loadedSets: [Sport: ReplayBundledEquipmentSet] = [:]
     private var failedSports = Set<Sport>()
+    private var inFlightLoads: [Sport: Task<ReplayBundledEquipmentSet?, Never>] = [:]
     private var manifestPackages: [Sport: (sha256: String, contractSha256: String)]?
     private var manifestLoadFailed = false
+    private(set) var lastFailures: [Sport: ReplayAssetLoadFailure] = [:]
 
-    init(source: any ReplayAssetResourceSource) {
+    init(
+        source: any ReplayAssetResourceSource,
+        failureReporter: ((Sport, ReplayAssetLoadFailure) -> Void)? = nil
+    ) {
         self.source = source
+        self.failureReporter = failureReporter ?? { sport, failure in
+            ReplayAssetLibrary.logger.warn(
+                "Replay equipment package rejected",
+                sport.rawValue,
+                failure.rawValue
+            )
+        }
     }
 
     func bundledEquipmentSet(for sport: Sport) async -> ReplayBundledEquipmentSet? {
         if let cached = loadedSets[sport] { return cached }
         guard !failedSports.contains(sport) else { return nil }
+        if let inFlight = inFlightLoads[sport] {
+            return await inFlight.value
+        }
+        let task: Task<ReplayBundledEquipmentSet?, Never> = Task {
+            @MainActor [weak self] () -> ReplayBundledEquipmentSet? in
+            guard let self else { return nil }
+            return await self.loadEquipmentSet(for: sport)
+        }
+        inFlightLoads[sport] = task
+        let result = await task.value
+        inFlightLoads[sport] = nil
+        return result
+    }
+
+    private func loadEquipmentSet(for sport: Sport) async -> ReplayBundledEquipmentSet? {
+        if let cached = loadedSets[sport] { return cached }
+        guard !failedSports.contains(sport) else { return nil }
         guard let expected = loadManifest()?[sport] else {
-            failedSports.insert(sport)
-            return nil
+            return reject(sport, because: .manifestInvalid)
         }
 
         let resource = ReplayEquipmentPackageResource(sport: sport)
-        guard let packageURL = source.packageURL(for: resource),
-              let contractURL = source.contractURL(for: resource),
-              let packageData = try? Data(contentsOf: packageURL),
-              let contractData = try? Data(contentsOf: contractURL),
-              Self.sha256Hex(of: packageData) == expected.sha256,
-              Self.sha256Hex(of: contractData) == expected.contractSha256,
-              let contract = ReplayAssetCatalog.parsePackageContract(
-                  data: contractData,
-                  sport: sport
-              ),
-              ReplayAssetCatalog.validatePackageContract(contract),
-              let root = try? await Entity(contentsOf: packageURL),
-              let set = ReplayBundledEquipmentSet(
-                  sport: sport,
-                  equipmentRoot: root,
-                  equipmentContract: contract
-              ) else {
-            failedSports.insert(sport)
-            return nil
+        guard let packageURL = source.packageURL(for: resource) else {
+            return reject(sport, because: .packageMissing)
+        }
+        guard let contractURL = source.contractURL(for: resource) else {
+            return reject(sport, because: .contractMissing)
+        }
+        guard let packageData = try? Data(contentsOf: packageURL) else {
+            return reject(sport, because: .packageUnreadable)
+        }
+        guard let contractData = try? Data(contentsOf: contractURL) else {
+            return reject(sport, because: .contractUnreadable)
+        }
+        guard Self.sha256Hex(of: packageData) == expected.sha256 else {
+            return reject(sport, because: .packageHashMismatch)
+        }
+        guard Self.sha256Hex(of: contractData) == expected.contractSha256 else {
+            return reject(sport, because: .contractHashMismatch)
+        }
+        guard let contract = ReplayAssetCatalog.parsePackageContract(
+            data: contractData,
+            sport: sport
+        ), ReplayAssetCatalog.validatePackageContract(contract) else {
+            return reject(sport, because: .contractInvalid)
+        }
+        guard let root = try? await Entity(contentsOf: packageURL) else {
+            return reject(sport, because: .packageLoadFailed)
+        }
+        guard let set = ReplayBundledEquipmentSet(
+            sport: sport,
+            equipmentRoot: root,
+            equipmentContract: contract
+        ) else {
+            return reject(sport, because: .providerInvalid)
         }
 
         loadedSets[sport] = set
         return set
+    }
+
+    private func reject(
+        _ sport: Sport,
+        because failure: ReplayAssetLoadFailure
+    ) -> ReplayBundledEquipmentSet? {
+        if failedSports.insert(sport).inserted {
+            lastFailures[sport] = failure
+            failureReporter(sport, failure)
+        }
+        return nil
     }
 
     private func loadManifest() -> [Sport: (sha256: String, contractSha256: String)]? {
@@ -161,8 +229,13 @@ final class ReplayAssetLibrary {
     func resetCacheForTesting() {
         loadedSets.removeAll()
         failedSports.removeAll()
+        for task in inFlightLoads.values {
+            task.cancel()
+        }
+        inFlightLoads.removeAll()
         manifestPackages = nil
         manifestLoadFailed = false
+        lastFailures.removeAll()
     }
 
     static func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {

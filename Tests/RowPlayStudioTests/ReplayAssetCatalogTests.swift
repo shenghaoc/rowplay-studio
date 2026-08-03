@@ -136,13 +136,35 @@ final class ReplayAssetCatalogTests: XCTestCase {
             nodes: skiNodes(dropLeaf: "equipment:ski:pole-basket")
         )
         XCTAssertFalse(ReplayAssetCatalog.validatePackageContract(missingLeaf))
+
+        let duplicatedPart = ReplayEquipmentPackageContract(
+            sport: .skierg,
+            sourceCommit: intact.sourceCommit,
+            sourceGlbSha256: intact.sourceGlbSha256,
+            nodes: skiNodes(duplicatePart: true)
+        )
+        XCTAssertFalse(ReplayAssetCatalog.validatePackageContract(duplicatedPart))
+    }
+
+    func testPackageParserRejectsSidecarForAnotherSport() throws {
+        let resource = ReplayEquipmentPackageResource(sport: .rower)
+        let url = try committedReferenceURL(
+            "equipment/\(resource.contractName).\(resource.contractExtension)"
+        )
+        var root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        root["sport"] = "bike"
+        let mismatched = try JSONSerialization.data(withJSONObject: root)
+        XCTAssertNil(ReplayAssetCatalog.parsePackageContract(data: mismatched, sport: .rower))
     }
 
     private func skiNodes(
         dropPart: String? = nil,
-        dropLeaf: String? = nil
+        dropLeaf: String? = nil,
+        duplicatePart: Bool = false
     ) -> [ReplayEquipmentNodeSpec] {
-        let parts = ReplayAssetCatalog.requiredParts["equipment:ski:ski-assembly"]!
+        var parts = ReplayAssetCatalog.requiredParts["equipment:ski:ski-assembly"]!
             .filter { $0 != dropPart }
             .sorted()
             .map { part in
@@ -153,6 +175,9 @@ final class ReplayAssetCatalogTests: XCTestCase {
                     materialRole: "equipment-dark"
                 )
             }
+        if duplicatePart, let first = parts.first {
+            parts.append(first)
+        }
         var nodes = [
             ReplayEquipmentNodeSpec(
                 kind: "composite",

@@ -19,7 +19,7 @@ struct ReplayEquipmentPackageResource: Hashable, Sendable {
     var contractExtension: String { "json" }
     var subdirectory: String { ReplayAssetCatalog.equipmentSubdirectory }
 
-    private var slug: String {
+    var slug: String {
         switch sport {
         case .rower: "row"
         case .skierg: "ski"
@@ -138,8 +138,9 @@ enum ReplayAssetCatalog {
         quality == .high || quality == .ultra
     }
 
-    /// A valid production package is usable at every tier; the procedural
-    /// renderer is a load/runtime-failure fallback, not the Low tier.
+    /// Bundled equipment is intentionally selected only at High and Ultra.
+    /// Low and Medium use the dimensional procedural renderer; at High and
+    /// Ultra that same renderer is the coherent load/runtime-failure fallback.
     static func visualSource(
         for effectiveQuality: ReplayRenderQuality,
         assetSetIsValid: Bool
@@ -154,6 +155,7 @@ enum ReplayAssetCatalog {
         sport: Sport
     ) -> ReplayEquipmentPackageContract? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              root["sport"] as? String == ReplayEquipmentPackageResource(sport: sport).slug,
               let sourceCommit = root["sourceCommit"] as? String,
               let sourceGlbSha256 = root["sourceGlbSha256"] as? String,
               let rawNodes = root["nodes"] as? [[String: Any]] else {
