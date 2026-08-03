@@ -113,6 +113,11 @@ struct LiveModePanelView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .tint(library.liveState.intervalSec == sec ? .accentColor : .secondary)
+                    .accessibilityAddTraits(library.liveState.intervalSec == sec ? .isSelected : [])
+                    .accessibilityHint("Sets the live polling interval to \(intervalLabel(sec))")
+                    #if os(macOS)
+                    .help("Set polling interval to \(intervalLabel(sec))")
+                    #endif
                 }
             }
         }
