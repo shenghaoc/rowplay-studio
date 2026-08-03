@@ -54,22 +54,27 @@ public enum PersonalBests: Sendable {
         for workouts: [Workout],
         sport: Sport?
     ) -> [(distance: Double, workout: Workout)] {
-        let filtered = sport.map { s in workouts.filter { $0.sport == s } } ?? workouts
-        var bests: [(distance: Double, workout: Workout)] = []
+        var bestsByDistance: [Double: Workout] = [:]
 
-        for target in standardDistances {
-            guard let best = bestWorkout(in: filtered, for: target) else { continue }
-            bests.append((distance: target, workout: best))
+        for workout in workouts {
+            guard workout.time > 0 else { continue }
+            if let sport = sport, workout.sport != sport { continue }
+
+            for target in standardDistances {
+                if abs(workout.distance - target) <= target * distanceTolerance {
+                    if let existingBest = bestsByDistance[target] {
+                        if workout.time < existingBest.time {
+                            bestsByDistance[target] = workout
+                        }
+                    } else {
+                        bestsByDistance[target] = workout
+                    }
+                }
+            }
         }
 
-        return bests
-    }
-
-    private static func bestWorkout(in workouts: [Workout], for target: Double) -> Workout? {
-        workouts
-            .filter { workout in
-                abs(workout.distance - target) <= target * distanceTolerance && workout.time > 0
-            }
-            .min { a, b in a.time < b.time }
+        return standardDistances.compactMap { target in
+            bestsByDistance[target].map { (target, $0) }
+        }
     }
 }
