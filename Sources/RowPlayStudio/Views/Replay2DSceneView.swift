@@ -3,6 +3,20 @@ import Foundation
 import RowPlayCore
 import SwiftUI
 
+private enum Replay2DParticipantKinematics {
+    case rower(ReplayRowerKinematics)
+    case skierg(ReplaySkierKinematics)
+    case bike(ReplayBikeKinematics)
+
+    static func solve(sport: Sport, pose: ReplayStrokePose) -> Self {
+        switch sport {
+        case .rower: .rower(ReplaySportKinematics.solveRower(pose))
+        case .skierg: .skierg(ReplaySportKinematics.solveSkier(pose))
+        case .bike: .bike(ReplaySportKinematics.solveBike(pose))
+        }
+    }
+}
+
 /// Sport-authentic Canvas replay. Time and distance remain visible as a
 /// secondary HUD while the venue and articulated participants carry the scene.
 struct Replay2DSceneView: View {
@@ -110,7 +124,7 @@ struct Replay2DSceneView: View {
             )
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(sport.displayName) workout replay")
+        .accessibilityLabel(Self.canvasAccessibilityLabel(for: sport))
         .accessibilityValue(canvasAccessibilityValue)
     }
 
@@ -127,15 +141,15 @@ struct Replay2DSceneView: View {
         isRival: Bool
     ) {
         let resolvedPose = reduceMotion ? Replay2DStyle.reducedPose(for: sport) : pose
+        let kinematics = Replay2DParticipantKinematics.solve(sport: sport, pose: resolvedPose)
         let surge: Double
         let vertical: Double
-        switch sport {
-        case .rower:
-            let kinematics = ReplaySportKinematics.solveRower(resolvedPose)
-            surge = reduceMotion ? 0 : kinematics.surge * Replay2DStyle.surgePixels(for: sport) * resolvedPose.amplitude
-            vertical = reduceMotion ? 0 : kinematics.vertical * Replay2DStyle.bobAmplitude * resolvedPose.amplitude
-        case .skierg:
-            surge = reduceMotion ? 0 : ReplaySportKinematics.solveSkier(resolvedPose).surge
+        switch kinematics {
+        case .rower(let rower):
+            surge = reduceMotion ? 0 : rower.surge * Replay2DStyle.surgePixels(for: sport) * resolvedPose.amplitude
+            vertical = reduceMotion ? 0 : rower.vertical * Replay2DStyle.bobAmplitude * resolvedPose.amplitude
+        case .skierg(let skierg):
+            surge = reduceMotion ? 0 : skierg.surge
                 * Replay2DStyle.surgePixels(for: sport) * resolvedPose.amplitude
             vertical = 0
         case .bike:
@@ -171,24 +185,24 @@ struct Replay2DSceneView: View {
         figureContext.translateBy(x: figureX, y: courseY)
         figureContext.scaleBy(x: Replay2DStyle.athleteScale, y: Replay2DStyle.athleteScale)
         figureContext.translateBy(x: -figureX, y: -courseY)
-        switch sport {
-        case .rower:
+        switch kinematics {
+        case .rower(let rower):
             Replay2DRowRenderer.draw(
                 figureContext,
                 avatar: avatar,
-                kinematics: ReplaySportKinematics.solveRower(resolvedPose)
+                kinematics: rower
             )
-        case .skierg:
+        case .skierg(let skierg):
             Replay2DSkiRenderer.draw(
                 figureContext,
                 avatar: avatar,
-                kinematics: ReplaySportKinematics.solveSkier(resolvedPose)
+                kinematics: skierg
             )
-        case .bike:
+        case .bike(let bike):
             Replay2DBikeRenderer.draw(
                 figureContext,
                 avatar: avatar,
-                kinematics: ReplaySportKinematics.solveBike(resolvedPose)
+                kinematics: bike
             )
         }
 
@@ -245,7 +259,9 @@ struct Replay2DSceneView: View {
             phase: stablePhase(distance: frame.d),
             rate: frame.cadence
         )
-        guard let context = livePoseContext, !detail.strokes.isEmpty else { return fallback }
+        let initialContext = Self.aggregates(for: detail.strokes, sport: sport).0
+        guard let context = livePoseContext ?? initialContext,
+              !detail.strokes.isEmpty else { return fallback }
         let absoluteTime = frame.t + (detail.strokes.first?.t ?? 0)
         return pose(
             at: absoluteTime,
@@ -274,7 +290,9 @@ struct Replay2DSceneView: View {
             phase: stablePhase(distance: frame.d),
             rate: frame.cadence
         )
-        guard rival.hasGenuineStrokeData, let context = rivalPoseContext else {
+        let initialContext = Self.aggregates(for: rival.strokes, sport: sport).0
+        guard rival.hasGenuineStrokeData,
+              let context = rivalPoseContext ?? initialContext else {
             return (fallback, frame.d)
         }
         let origin = rival.strokes.first?.t ?? 0
@@ -318,16 +336,22 @@ struct Replay2DSceneView: View {
     }
 
     private func rebuildPoseContexts() {
-        (livePoseContext, liveMedianHR) = aggregates(for: detail.strokes)
+        (livePoseContext, liveMedianHR) = Self.aggregates(for: detail.strokes, sport: sport)
         if let rival, rival.hasGenuineStrokeData {
-            (rivalPoseContext, rivalMedianHR) = aggregates(for: rival.strokes)
+            (rivalPoseContext, rivalMedianHR) = Self.aggregates(
+                for: rival.strokes,
+                sport: sport
+            )
         } else {
             rivalPoseContext = nil
             rivalMedianHR = 0
         }
     }
 
-    private func aggregates(for strokes: [Stroke]) -> (ReplayStrokePoseContext?, Int) {
+    private static func aggregates(
+        for strokes: [Stroke],
+        sport: Sport
+    ) -> (ReplayStrokePoseContext?, Int) {
         guard !strokes.isEmpty else { return (nil, 0) }
         let watts = strokes.map(\.watts)
         let distances = strokes.indices.dropFirst().compactMap { index -> Double? in
@@ -350,7 +374,7 @@ struct Replay2DSceneView: View {
         return (context, medianHR)
     }
 
-    private func median(_ values: [Double], fallback: Double) -> Double {
+    private static func median(_ values: [Double], fallback: Double) -> Double {
         let sorted = values.filter(\.isFinite).sorted()
         guard !sorted.isEmpty else { return fallback }
         let middle = sorted.count / 2
@@ -366,13 +390,35 @@ struct Replay2DSceneView: View {
 
     private var canvasAccessibilityValue: String {
         let frame = state.currentFrame
+        let ghostDistance = rival.map {
+            ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: $0.strokes)
+        }
+        return Self.canvasAccessibilityValue(
+            sport: sport,
+            frame: frame,
+            distanceUnit: distanceUnit,
+            reduceMotion: reduceMotion,
+            ghostDistance: ghostDistance
+        )
+    }
+
+    static func canvasAccessibilityLabel(for sport: Sport) -> String {
+        "\(sport.displayName) workout replay"
+    }
+
+    static func canvasAccessibilityValue(
+        sport: Sport,
+        frame: ReplayFrame,
+        distanceUnit: DistanceUnit,
+        reduceMotion: Bool,
+        ghostDistance: Double?
+    ) -> String {
         var parts = [
             "Time \(RowPlayFormatting.time(frame.t, tenths: true))",
             "Distance \(RowPlayFormatting.distance(frame.d, unit: distanceUnit))",
             reduceMotion ? "Reduced motion" : "Animated \(sport.displayName) athlete",
         ]
-        if let rival {
-            let ghostDistance = ReplayRaceGap.ghostDistance(elapsed: state.time, strokes: rival.strokes)
+        if let ghostDistance {
             let gap = ReplayRaceGap.raceGapMeters(playerDistance: frame.d, ghostDistance: ghostDistance)
             parts.append(ReplayRivalGapFormatting.metersLabel(gap, unit: distanceUnit))
         }

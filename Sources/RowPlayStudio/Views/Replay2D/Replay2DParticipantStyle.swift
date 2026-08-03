@@ -11,17 +11,29 @@ import SwiftUI
 
 extension Color {
     /// `#rrggbb` parser for the verbatim palette tables copied from renderer.ts.
-    init(replay2DHex hex: String) {
+    init?(replay2DHex hex: String) {
         let cleaned = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
         guard cleaned.count == 6, let value = UInt64(cleaned, radix: 16) else {
-            self = .accentColor
-            return
+            return nil
         }
         self.init(
             red: Double((value >> 16) & 0xFF) / 255.0,
             green: Double((value >> 8) & 0xFF) / 255.0,
             blue: Double(value & 0xFF) / 255.0
         )
+    }
+
+    /// Palette literals are programmer-owned data and must never silently
+    /// turn into the user's accent colour when mistyped.
+    static func requiredReplay2DHex(
+        _ hex: String,
+        file: StaticString = #fileID,
+        line: UInt = #line
+    ) -> Color {
+        guard let color = Color(replay2DHex: hex) else {
+            preconditionFailure("Invalid replay palette hex at \(file):\(line)")
+        }
+        return color
     }
 }
 
@@ -56,56 +68,56 @@ struct Replay2DCanvasColors {
 
     /// Web `COLORS_LIGHT` — values verbatim.
     static let light = Replay2DCanvasColors(
-        tickMajor: Color(replay2DHex: "#bed0d7"),
-        tickMinor: Color(replay2DHex: "#d0dbdf"),
-        tickText: Color(replay2DHex: "#4a6470"),
-        laneLine: Color(replay2DHex: "#bed0d7"),
-        bibFill: Color(replay2DHex: "#f0f4f6"),
-        bibText: Color(replay2DHex: "#0f2a36"),
-        bibDot: Color(replay2DHex: "#f7fafb"),
-        finishDark: Color(replay2DHex: "#0f2a36"),
-        finishLight: Color(replay2DHex: "#f7fafb"),
-        labelBg: Color(replay2DHex: "#f7fafb"),
-        labelText: Color(replay2DHex: "#0f2a36"),
-        courseFill: Color(replay2DHex: "#e4ecef"),
-        live: Color(replay2DHex: "#5240ce"),
-        ghost: Color(replay2DHex: "#176b8c"),
-        skyTop: Color(replay2DHex: "#f2f7f9"),
-        skyBottom: Color(replay2DHex: "#e3edf1"),
-        markerCap: Color(replay2DHex: "#9fb8c2"),
-        foam: Color(replay2DHex: "#ffffff"),
-        shadow: Color(replay2DHex: "#0f2a36"),
-        skin: Color(replay2DHex: "#bb7053"),
-        skinShade: Color(replay2DHex: "#8e4f3d"),
-        hair: Color(replay2DHex: "#263840"),
-        shoe: Color(replay2DHex: "#172a33")
+        tickMajor: Color.requiredReplay2DHex("#bed0d7"),
+        tickMinor: Color.requiredReplay2DHex("#d0dbdf"),
+        tickText: Color.requiredReplay2DHex("#4a6470"),
+        laneLine: Color.requiredReplay2DHex("#bed0d7"),
+        bibFill: Color.requiredReplay2DHex("#f0f4f6"),
+        bibText: Color.requiredReplay2DHex("#0f2a36"),
+        bibDot: Color.requiredReplay2DHex("#f7fafb"),
+        finishDark: Color.requiredReplay2DHex("#0f2a36"),
+        finishLight: Color.requiredReplay2DHex("#f7fafb"),
+        labelBg: Color.requiredReplay2DHex("#f7fafb"),
+        labelText: Color.requiredReplay2DHex("#0f2a36"),
+        courseFill: Color.requiredReplay2DHex("#e4ecef"),
+        live: Color.requiredReplay2DHex("#5240ce"),
+        ghost: Color.requiredReplay2DHex("#176b8c"),
+        skyTop: Color.requiredReplay2DHex("#f2f7f9"),
+        skyBottom: Color.requiredReplay2DHex("#e3edf1"),
+        markerCap: Color.requiredReplay2DHex("#9fb8c2"),
+        foam: Color.requiredReplay2DHex("#ffffff"),
+        shadow: Color.requiredReplay2DHex("#0f2a36"),
+        skin: Color.requiredReplay2DHex("#bb7053"),
+        skinShade: Color.requiredReplay2DHex("#8e4f3d"),
+        hair: Color.requiredReplay2DHex("#263840"),
+        shoe: Color.requiredReplay2DHex("#172a33")
     )
 
     /// Web `COLORS_DARK` — values verbatim.
     static let dark = Replay2DCanvasColors(
-        tickMajor: Color(replay2DHex: "#3d505a"),
-        tickMinor: Color(replay2DHex: "#2e3d45"),
-        tickText: Color(replay2DHex: "#8aa2ac"),
-        laneLine: Color(replay2DHex: "#3d505a"),
-        bibFill: Color(replay2DHex: "#1c2a32"),
-        bibText: Color(replay2DHex: "#dce6ea"),
-        bibDot: Color(replay2DHex: "#0f2a36"),
-        finishDark: Color(replay2DHex: "#dce6ea"),
-        finishLight: Color(replay2DHex: "#0f2a36"),
-        labelBg: Color(replay2DHex: "#0f2a36"),
-        labelText: Color(replay2DHex: "#dce6ea"),
-        courseFill: Color(replay2DHex: "#142128"),
-        live: Color(replay2DHex: "#8c7cf0"),
-        ghost: Color(replay2DHex: "#3aa8cc"),
-        skyTop: Color(replay2DHex: "#0e1d26"),
-        skyBottom: Color(replay2DHex: "#0a151c"),
-        markerCap: Color(replay2DHex: "#3d505a"),
-        foam: Color(replay2DHex: "#bcd3dd"),
-        shadow: Color(replay2DHex: "#000000"),
-        skin: Color(replay2DHex: "#e2a27f"),
-        skinShade: Color(replay2DHex: "#ad6c54"),
-        hair: Color(replay2DHex: "#78919c"),
-        shoe: Color(replay2DHex: "#d9e4e8")
+        tickMajor: Color.requiredReplay2DHex("#3d505a"),
+        tickMinor: Color.requiredReplay2DHex("#2e3d45"),
+        tickText: Color.requiredReplay2DHex("#8aa2ac"),
+        laneLine: Color.requiredReplay2DHex("#3d505a"),
+        bibFill: Color.requiredReplay2DHex("#1c2a32"),
+        bibText: Color.requiredReplay2DHex("#dce6ea"),
+        bibDot: Color.requiredReplay2DHex("#0f2a36"),
+        finishDark: Color.requiredReplay2DHex("#dce6ea"),
+        finishLight: Color.requiredReplay2DHex("#0f2a36"),
+        labelBg: Color.requiredReplay2DHex("#0f2a36"),
+        labelText: Color.requiredReplay2DHex("#dce6ea"),
+        courseFill: Color.requiredReplay2DHex("#142128"),
+        live: Color.requiredReplay2DHex("#8c7cf0"),
+        ghost: Color.requiredReplay2DHex("#3aa8cc"),
+        skyTop: Color.requiredReplay2DHex("#0e1d26"),
+        skyBottom: Color.requiredReplay2DHex("#0a151c"),
+        markerCap: Color.requiredReplay2DHex("#3d505a"),
+        foam: Color.requiredReplay2DHex("#bcd3dd"),
+        shadow: Color.requiredReplay2DHex("#000000"),
+        skin: Color.requiredReplay2DHex("#e2a27f"),
+        skinShade: Color.requiredReplay2DHex("#ad6c54"),
+        hair: Color.requiredReplay2DHex("#78919c"),
+        shoe: Color.requiredReplay2DHex("#d9e4e8")
     )
 
     static func palette(darkTheme: Bool) -> Replay2DCanvasColors {
@@ -119,19 +131,9 @@ struct Replay2DCanvasColors {
 enum Replay2DStyle {
     static let padLeading: Double = 58
     static let padTrailing: Double = 30
-    static let waterBandHeight: Double = 34
     static let bobAmplitude: Double = 4.6
     /// Keep the athlete as the primary read inside the taller authored venue.
     static let athleteScale: Double = 2.32
-    /// Splash droplets per lane; small and brief, so a tiny pool suffices.
-    static let splashCapacity = 28
-    /// Canvas y grows downward, so droplet gravity is positive (px/s²).
-    static let splashGravity: Double = 300
-    static let streakAlphas: [Double] = [0.35, 0.28, 0.22, 0.16]
-    static let streakLengthFactors: [Double] = [1, 0.75, 0.55, 0.4]
-    static let streakYOffsets: [Double] = [-3, 0, 3, -5]
-    static let skiGrooveDash: [CGFloat] = [6, 7]
-    static let bikeBoardJointDash: [CGFloat] = [30, 18]
     static let bikeWheelSpokeCount = 6
     /// Stable mid-drive pose used when decorative athlete motion is reduced.
     static let reducedPosePhase = Double.pi * 0.5
@@ -167,14 +169,6 @@ enum Replay2DStyle {
         case .bike: 85
         }
         return ReplayStrokePose.fallback(sport: sport, phase: reducedPosePhase, rate: rate)
-    }
-
-    /// Map pace (seconds per 500m) to a speed-streak length, clamped to [6, 22].
-    static func streakLength(pace: Double) -> Double {
-        guard pace > 0, pace.isFinite else { return 6 }
-        let clamped = max(90, min(200, pace))
-        let t = (clamped - 90) / (200 - 90)
-        return 22 - t * (22 - 6)
     }
 
     static func clamp01(_ value: Double) -> Double {
