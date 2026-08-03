@@ -1,5 +1,12 @@
 import Foundation
 
+/// Anatomical hand side. Grip geometry accepts only the two mirrored sides;
+/// callers cannot accidentally pass zero or an arbitrary scale factor.
+public enum ReplayHandSide: Double, CaseIterable, Sendable {
+    case left = -1
+    case right = 1
+}
+
 /// The held **equipment** surface a hand closes on.
 ///
 /// `radius` is the rendered rubber, shaft, or hood body — not the hand's
@@ -122,12 +129,12 @@ public struct ReplayHandDigitChain: Equatable, Sendable {
     /// to its parent; `parentName` walks the hierarchy.  Chains that cannot be
     /// completed back to the hand bone are skipped, mirroring the web loader.
     public static func collect(
-        side: Double,
+        side: ReplayHandSide,
         handBoneName: String,
         restLocalTransform: (String) -> (translation: SIMD3<Double>, rotation: ReplayQuaternion)?,
         parentName: (String) -> String?
     ) -> [ReplayHandDigitChain] {
-        let prefix = side < 0 ? "v4Left" : "v4Right"
+        let prefix = side == .left ? "v4Left" : "v4Right"
         let digits: [(ReplayHandDigit, [String])] = [
             (.index, ["\(prefix)IndexProximal", "\(prefix)IndexIntermediate", "\(prefix)IndexDistal"]),
             (.middle, ["\(prefix)MiddleProximal", "\(prefix)MiddleIntermediate", "\(prefix)MiddleDistal"]),
@@ -178,7 +185,7 @@ public struct ReplayHandDigitChain: Equatable, Sendable {
                     ReplayHandDigitJoint(helper: name, position: position, quaternion: quaternion)
                 )
             }
-            guard complete, joints.count >= 3 else { continue }
+            guard complete, joints.count == 3 else { continue }
             let span = joints[2].position - joints[1].position
             let spanLength = (span.x * span.x + span.y * span.y + span.z * span.z).squareRoot()
             let tipLength = max(0.012, spanLength * 0.92)

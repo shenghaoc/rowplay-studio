@@ -69,7 +69,10 @@ public enum ReplayGripGeometry {
     /// when held.  `handChannelCentre(handFistRadius)` reproduces the pinned
     /// SkiErg fist centre exactly; larger radii seat proportionally further
     /// from the palm.  x mirrors by side.
-    public static func handChannelCentre(radius: Double, side: Double) -> SIMD3<Double> {
+    public static func handChannelCentre(
+        radius: Double,
+        side: ReplayHandSide
+    ) -> SIMD3<Double> {
         let seat = handGripSeatFlesh + radius
         var centre = handPalmContact + handPalmNormalIn * seat
         centre.x *= mirrorSign(side)
@@ -77,7 +80,7 @@ public enum ReplayGripGeometry {
     }
 
     /// Hand-local curl axis, mirrored the way the shipped rig mirrors hands.
-    public static func handCurlAxis(side: Double) -> SIMD3<Double> {
+    public static func handCurlAxis(side: ReplayHandSide) -> SIMD3<Double> {
         let mirror = mirrorSign(side)
         return normalize(
             SIMD3(
@@ -91,18 +94,18 @@ public enum ReplayGripGeometry {
     /// Curl axis signed from the pinky side toward the index/thumb side.
     /// Grip frames must use this signed form or the left thumb lands on the
     /// wrong end of a stopped handle.
-    public static func handCurlAxisThumbward(side: Double) -> SIMD3<Double> {
+    public static func handCurlAxisThumbward(side: ReplayHandSide) -> SIMD3<Double> {
         handCurlAxis(side: side) * mirrorSign(side)
     }
 
-    public static func handLongAxis(side: Double) -> SIMD3<Double> {
+    public static func handLongAxis(side: ReplayHandSide) -> SIMD3<Double> {
         let mirror = mirrorSign(side)
         return normalize(
             SIMD3(mirror * handLongAxisRight.x, handLongAxisRight.y, handLongAxisRight.z)
         )
     }
 
-    public static func handPalmNormalOut(side: Double) -> SIMD3<Double> {
+    public static func handPalmNormalOut(side: ReplayHandSide) -> SIMD3<Double> {
         let mirror = mirrorSign(side)
         return normalize(
             SIMD3(
@@ -129,7 +132,7 @@ public enum ReplayGripGeometry {
     ///     resolving the remaining spin; defaults to the channel-centre
     ///     construction ray.
     public static func orientHandToGripChannel(
-        side: Double,
+        side: ReplayHandSide,
         radius: Double,
         shaftDirThumbward: SIMD3<Double>,
         rollReference: SIMD3<Double>,
@@ -168,7 +171,7 @@ public enum ReplayGripGeometry {
     /// bounded so the sport-requested palm side remains authoritative.
     public static func refineGripSpinForWrist(
         hand: ReplayQuaternion,
-        side: Double,
+        side: ReplayHandSide,
         shaftDir: SIMD3<Double>,
         forearmDir: SIMD3<Double>,
         maxPalmDeviation: Double
@@ -191,7 +194,7 @@ public enum ReplayGripGeometry {
     /// preserved.
     public static func refineGripTiltForWrist(
         hand: ReplayQuaternion,
-        side: Double,
+        side: ReplayHandSide,
         forearmDir: SIMD3<Double>,
         comfort: Double,
         maxTilt: Double,
@@ -212,9 +215,12 @@ public enum ReplayGripGeometry {
         return ReplayQuaternion(axis: palm, angle: clamped) * hand
     }
 
-    static func mirrorSign(_ side: Double) -> Double {
-        if side < 0 { return -1 }
-        return 1
+    static func mirrorSign(_ side: ReplayHandSide) -> Double {
+        side.rawValue
+    }
+
+    static func mirrorSign(_ value: Double) -> Double {
+        value < 0 ? -1 : 1
     }
 
     static func normalize(_ vector: SIMD3<Double>) -> SIMD3<Double> {

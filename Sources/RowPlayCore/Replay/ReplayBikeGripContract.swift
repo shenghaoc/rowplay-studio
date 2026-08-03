@@ -135,7 +135,7 @@ public enum ReplayBikeGripContract {
     /// enclosure uses the opt-in wrapped finger-stage search so four fingers
     /// reach the far side while every phalanx segment remains
     /// collision-bounded, and the opposing thumb hooks underneath.
-    public static func gripClosureOptions(side: Double) -> ReplayHandGripClosureOptions {
+    public static func gripClosureOptions(side: ReplayHandSide) -> ReplayHandGripClosureOptions {
         ReplayHandGripClosureOptions(
             side: side,
             surface: ReplayHandGripSurface(radius: hoodRadius),

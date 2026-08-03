@@ -3,19 +3,19 @@ import XCTest
 
 final class ReplayGripContractTests: XCTestCase {
     func testSportClosureOptionsMatchPinnedEquipmentChannels() {
-        let row = ReplayRowGripContract.gripClosureOptions(side: -1)
+        let row = ReplayRowGripContract.gripClosureOptions(side: .left)
         XCTAssertEqual(row.surface.radius, 0.023)
         XCTAssertEqual(row.surface.thumbEndAxial, 0.04)
         XCTAssertEqual(row.thumbOppose, 0.3)
         XCTAssertFalse(row.wrapFingerStages)
 
-        let ski = ReplaySkiGripContract.gripClosureOptions(side: 1)
+        let ski = ReplaySkiGripContract.gripClosureOptions(side: .right)
         XCTAssertEqual(ski.surface.radius, 0.016)
         XCTAssertNil(ski.surface.thumbEndAxial)
         XCTAssertEqual(ski.thumbOppose, 1.75)
         XCTAssertFalse(ski.wrapFingerStages)
 
-        let bike = ReplayBikeGripContract.gripClosureOptions(side: 1)
+        let bike = ReplayBikeGripContract.gripClosureOptions(side: .right)
         XCTAssertEqual(bike.surface.radius, 0.018)
         XCTAssertNil(bike.surface.thumbEndAxial)
         XCTAssertEqual(bike.thumbOppose, 1.56)
@@ -23,14 +23,14 @@ final class ReplayGripContractTests: XCTestCase {
     }
 
     func testGripChannelMirrorsWithoutChangingSeatDepth() {
-        let left = ReplayGripGeometry.handChannelCentre(radius: 0.023, side: -1)
-        let right = ReplayGripGeometry.handChannelCentre(radius: 0.023, side: 1)
+        let left = ReplayGripGeometry.handChannelCentre(radius: 0.023, side: .left)
+        let right = ReplayGripGeometry.handChannelCentre(radius: 0.023, side: .right)
         XCTAssertEqual(left.x, -right.x, accuracy: 1e-12)
         XCTAssertEqual(left.y, right.y, accuracy: 1e-12)
         XCTAssertEqual(left.z, right.z, accuracy: 1e-12)
 
-        let leftLong = ReplayGripGeometry.handLongAxis(side: -1)
-        let rightLong = ReplayGripGeometry.handLongAxis(side: 1)
+        let leftLong = ReplayGripGeometry.handLongAxis(side: .left)
+        let rightLong = ReplayGripGeometry.handLongAxis(side: .right)
         XCTAssertEqual(leftLong.x, -rightLong.x, accuracy: 1e-12)
         XCTAssertEqual(leftLong.y, rightLong.y, accuracy: 1e-12)
         XCTAssertEqual(leftLong.z, rightLong.z, accuracy: 1e-12)

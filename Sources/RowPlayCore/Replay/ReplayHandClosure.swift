@@ -2,7 +2,7 @@ import Foundation
 
 /// Options for one hand's digit closure around an equipment surface.
 public struct ReplayHandGripClosureOptions: Sendable {
-    public let side: Double
+    public let side: ReplayHandSide
     public let surface: ReplayHandGripSurface
     /// Base opposition (local Z at the thumb root) bringing the thumb across.
     public let thumbOppose: Double
@@ -16,7 +16,7 @@ public struct ReplayHandGripClosureOptions: Sendable {
     public let wrapFingerStages: Bool
 
     public init(
-        side: Double,
+        side: ReplayHandSide,
         surface: ReplayHandGripSurface,
         thumbOppose: Double,
         fingerFlesh: Double? = nil,
@@ -63,7 +63,9 @@ public enum ReplayHandClosure {
     static let contactBand = 0.004
     static let bisectionIterations = 28
 
-    /// Close every digit of one hand around an equipment surface.  The
+    /// Close every digit of one hand around an equipment surface. Returns
+    /// `nil` unless at least one complete, three-joint digit chain is supplied.
+    /// The
     /// capsule axis runs through `handChannelCentre(radius:side:)` along the
     /// hand's curl axis, thumb-ward positive.  Penetration is minimised, not
     /// forbidden: where no pose in anatomical range clears the surface the
@@ -71,7 +73,9 @@ public enum ReplayHandClosure {
     public static func solve(
         chains: [ReplayHandDigitChain],
         options: ReplayHandGripClosureOptions
-    ) -> ReplayHandGripClosure {
+    ) -> ReplayHandGripClosure? {
+        guard !chains.isEmpty,
+              chains.allSatisfy({ $0.joints.count == fingerStageLimits.count }) else { return nil }
         let surface = options.surface
         let fingerFlesh = options.fingerFlesh ?? defaultDigitFlesh
         // Pose the finger chains into the fitted carrying cup before any
@@ -379,7 +383,10 @@ public enum ReplayHandClosure {
     /// cup rotation about the `v4*Fingers` node, exactly the composition the
     /// renderer applies to the live helper (`rest × R_y(-side·cup)`).  Chains
     /// without a cup node (thumbs, minimal test rigs) pass through untouched.
-    static func cupChain(_ chain: ReplayHandDigitChain, side: Double) -> ReplayHandDigitChain {
+    static func cupChain(
+        _ chain: ReplayHandDigitChain,
+        side: ReplayHandSide
+    ) -> ReplayHandDigitChain {
         guard let cup = chain.cupNode else { return chain }
         let roll = ReplayQuaternion(
             axis: SIMD3(0, 1, 0),

@@ -329,7 +329,7 @@ public enum ReplayRigPoseSolver {
         // Mirrors merged `renderer3d.ts`: wheels advance from course distance,
         // while crank/pedal timing comes from the graph's circular state.
         let wheelAngle = finite(distance, fallback: 0) / 0.45
-        let crankRadius: Double = 0.18
+        let crankRadius = ReplayBikeGripContract.crankRadius
         let cosCrank = graph.leftPedal.rotation.cos
         let sinCrank = graph.leftPedal.rotation.sin
         let pedalYL = crankRadius * cosCrank
@@ -409,8 +409,8 @@ public enum ReplayRigPoseSolver {
                 ),
                 crankAngle: 0,
                 wheelAngle: 0,
-                pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
-                pedalPosR: ReplayPedalPosition(y: -0.18, z: 0),
+                pedalPosL: ReplayPedalPosition(y: ReplayBikeGripContract.crankRadius, z: 0),
+                pedalPosR: ReplayPedalPosition(y: -ReplayBikeGripContract.crankRadius, z: 0),
                 riderSway: 0
             ))
         }

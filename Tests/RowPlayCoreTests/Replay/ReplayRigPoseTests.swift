@@ -123,6 +123,16 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTAssertTrue(isFinite(bike.pedalPosL.z))
             XCTAssertTrue(isFinite(bike.pedalPosR.y))
             XCTAssertTrue(isFinite(bike.pedalPosR.z))
+            XCTAssertEqual(
+                hypot(bike.pedalPosL.y, bike.pedalPosL.z),
+                ReplayBikeGripContract.crankRadius,
+                accuracy: 0.001
+            )
+            XCTAssertEqual(
+                hypot(bike.pedalPosR.y, bike.pedalPosR.z),
+                ReplayBikeGripContract.crankRadius,
+                accuracy: 0.001
+            )
         }
     }
 
@@ -134,9 +144,9 @@ final class ReplayRigPoseTests: XCTestCase {
         guard case .bike(let bike) = result else {
             XCTFail("Expected bike pose"); return
         }
-        // Pedals should be 180° apart: L at (0.18, 0), R at (-0.18, 0)
-        XCTAssertEqual(bike.pedalPosL.y, 0.18, accuracy: 0.001)
-        XCTAssertEqual(bike.pedalPosR.y, -0.18, accuracy: 0.001)
+        // Pedals should be 180° apart at the contract-owned crank radius.
+        XCTAssertEqual(bike.pedalPosL.y, ReplayBikeGripContract.crankRadius, accuracy: 0.001)
+        XCTAssertEqual(bike.pedalPosR.y, -ReplayBikeGripContract.crankRadius, accuracy: 0.001)
     }
 
     func testBikeErgThighAnglesDoNotFlipAtBottomOfStroke() {

@@ -57,7 +57,7 @@ public enum ReplaySkiGripContract {
 
     /// Grip closure options for one SkiErg hand: sequential first-contact
     /// closure on the continuous pole shaft.
-    public static func gripClosureOptions(side: Double) -> ReplayHandGripClosureOptions {
+    public static func gripClosureOptions(side: ReplayHandSide) -> ReplayHandGripClosureOptions {
         ReplayHandGripClosureOptions(
             side: side,
             surface: ReplayHandGripSurface(radius: poleGripRadius),

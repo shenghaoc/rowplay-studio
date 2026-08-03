@@ -92,7 +92,7 @@ public enum ReplayRowGripContract {
     /// Grip closure options for one RowErg hand: sequential first-contact
     /// closure around the 23 mm rubber, with the thumb closing axially onto
     /// the flat handle end.
-    public static func gripClosureOptions(side: Double) -> ReplayHandGripClosureOptions {
+    public static func gripClosureOptions(side: ReplayHandSide) -> ReplayHandGripClosureOptions {
         ReplayHandGripClosureOptions(
             side: side,
             surface: ReplayHandGripSurface(

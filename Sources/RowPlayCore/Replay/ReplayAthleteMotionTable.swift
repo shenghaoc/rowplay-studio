@@ -79,7 +79,10 @@ public struct ReplayAthleteMotionTable: Sendable {
         guard let clipsRaw = root["clips"] as? [[String: Any]] else {
             throw LoadError.invalidManifest("clips")
         }
-        let sourceCommit = root["sourceCommit"] as? String ?? ""
+        guard let sourceCommit = root["sourceCommit"] as? String,
+              !sourceCommit.isEmpty else {
+            throw LoadError.invalidManifest("sourceCommit")
+        }
 
         var sports: [Sport] = []
         for raw in sportsRaw {
@@ -96,10 +99,12 @@ public struct ReplayAthleteMotionTable: Sendable {
                   let clipName = raw["clipName"] as? String,
                   let duration = raw["durationSeconds"] as? Double,
                   let driveEnd = raw["driveEnd"] as? Double,
+                  let landmarks = raw["phaseLandmarks"] as? [String: Double],
+                  !landmarks.isEmpty,
+                  landmarks.values.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }),
                   duration > 0, driveEnd > 0, driveEnd < 1 else {
                 throw LoadError.invalidManifest("clip entry")
             }
-            let landmarks = raw["phaseLandmarks"] as? [String: Double] ?? [:]
             clips[sport] = ClipInfo(
                 sport: sport,
                 clipName: clipName,
@@ -154,12 +159,13 @@ public struct ReplayAthleteMotionTable: Sendable {
     /// Sample every bone's local transform at a wrapped clip fraction,
     /// writing into a caller-owned buffer sized `boneNames.count`.
     /// O(bones); no allocation, no lookup by name.
+    @discardableResult
     public func sample(
         sport: Sport,
         fraction: Double,
         into output: inout [ReplayAthleteBoneTransform]
-    ) {
-        guard let base = sportOffsets[sport], output.count == boneNames.count else { return }
+    ) -> Bool {
+        guard let base = sportOffsets[sport], output.count == boneNames.count else { return false }
         let wrapped = Self.wrapUnit(fraction)
         let scaled = wrapped * Double(samplesPerSport)
         let lowerPhase = Int(scaled) % samplesPerSport
@@ -199,6 +205,7 @@ public struct ReplayAthleteMotionTable: Sendable {
                 scale: scale
             )
         }
+        return true
     }
 
     public static func wrapUnit(_ value: Double) -> Double {
