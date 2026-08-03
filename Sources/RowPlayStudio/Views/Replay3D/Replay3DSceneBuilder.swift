@@ -186,6 +186,9 @@ enum Replay3DSceneBuilder {
             colorScheme: colorScheme
         )
         if let bundledEnvironment {
+            let authoredLoopRadius = ReplayEnvironmentPlan.plan(for: sport).course.loopRadius
+            let venueScale = Float(layout.loopRadius / authoredLoopRadius)
+            bundledEnvironment.scale = SIMD3(repeating: venueScale)
             ground.isEnabled = false
             root.addChild(bundledEnvironment)
         }

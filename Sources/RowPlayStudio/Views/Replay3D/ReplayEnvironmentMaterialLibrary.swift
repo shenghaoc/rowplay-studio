@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import RealityKit
+import RowPlayCore
 
 /// The provenance-recorded CC0 surface families bundled with the app under
 /// `ReplayReference/environment/textures/<family>/`.
@@ -60,6 +61,11 @@ enum ReplayEnvironmentTextureSlot: String, Sendable {
     }
 }
 
+enum ReplayEnvironmentTextureFailure: String, Equatable, Sendable {
+    case missingResource
+    case loadFailed
+}
+
 /// Loads and caches the bundled CC0 texture triplets and assembles the venue
 /// materials the environment builder uses.
 ///
@@ -70,17 +76,45 @@ enum ReplayEnvironmentTextureSlot: String, Sendable {
 /// broken map must never replace the authored tint.
 @MainActor
 final class ReplayEnvironmentMaterialLibrary {
+    static let shared = ReplayEnvironmentMaterialLibrary()
+    private static let logger = PrivacySafeLogger(category: "replay-environment-texture")
     /// Environment detail threshold at which surface maps switch on (High).
     static let texturedDetailThreshold = 2
     /// Environment detail threshold at which normal maps join (Ultra).
     static let normalMappedDetailThreshold = 3
 
-    private let bundle: Bundle
+    private let resourceResolver: (ReplayEnvironmentTextureFamily, ReplayEnvironmentTextureSlot) -> URL?
+    private let textureLoader: (URL, TextureResource.Semantic) throws -> TextureResource
+    private let failureReporter: (String, ReplayEnvironmentTextureFailure) -> Void
     private var textureCache: [String: TextureResource] = [:]
     private var failedTextureKeys: Set<String> = []
 
-    init(bundle: Bundle = .module) {
-        self.bundle = bundle
+    init(
+        bundle: Bundle = .module,
+        resourceResolver: ((ReplayEnvironmentTextureFamily, ReplayEnvironmentTextureSlot) -> URL?)? = nil,
+        textureLoader: ((URL, TextureResource.Semantic) throws -> TextureResource)? = nil,
+        failureReporter: ((String, ReplayEnvironmentTextureFailure) -> Void)? = nil
+    ) {
+        self.resourceResolver = resourceResolver ?? { family, slot in
+            bundle.url(
+                forResource: "\(family.fileBaseName)-\(slot.fileSuffix)",
+                withExtension: "jpg",
+                subdirectory: family.subdirectory
+            )
+        }
+        self.textureLoader = textureLoader ?? { url, semantic in
+            try TextureResource.load(
+                contentsOf: url,
+                options: .init(semantic: semantic)
+            )
+        }
+        self.failureReporter = failureReporter ?? { key, failure in
+            ReplayEnvironmentMaterialLibrary.logger.warn(
+                "Replay environment texture rejected",
+                key,
+                failure.rawValue
+            )
+        }
     }
 
     // MARK: - Materials
@@ -151,23 +185,28 @@ final class ReplayEnvironmentMaterialLibrary {
         if failedTextureKeys.contains(key) {
             return nil
         }
-        guard
-            let url = bundle.url(
-                forResource: "\(family.fileBaseName)-\(slot.fileSuffix)",
-                withExtension: "jpg",
-                subdirectory: family.subdirectory
-            ),
-            let resource = try? TextureResource.load(
-                contentsOf: url,
-                options: .init(semantic: slot.semantic)
-            )
-        else {
-            // Missing or undecodable map: fall back to the solid authored
-            // color for this slot, exactly like the web's onError path.
-            failedTextureKeys.insert(key)
+        guard let url = resourceResolver(family, slot) else {
+            reject(key: key, because: .missingResource)
             return nil
         }
-        textureCache[key] = resource
-        return resource
+        do {
+            let resource = try textureLoader(url, slot.semantic)
+            textureCache[key] = resource
+            return resource
+        } catch {
+            // Missing or undecodable maps retain the scalar authored material;
+            // diagnostics use stable bundle keys and never raw filesystem paths.
+            reject(key: key, because: .loadFailed)
+            return nil
+        }
+    }
+
+    private func reject(
+        key: String,
+        because failure: ReplayEnvironmentTextureFailure
+    ) {
+        if failedTextureKeys.insert(key).inserted {
+            failureReporter(key, failure)
+        }
     }
 }

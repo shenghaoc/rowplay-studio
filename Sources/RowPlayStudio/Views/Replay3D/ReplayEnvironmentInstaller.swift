@@ -17,7 +17,7 @@ enum ReplayEnvironmentInstaller {
         let plan = ReplayEnvironmentPlan.plan(for: sport)
         let profile = ReplayQualitySceneProfile.profile(for: quality)
         let theme: ReplayEnvironmentTheme = colorScheme == .dark ? .dark : .light
-        let materials = ReplayEnvironmentMaterialLibrary()
+        let materials = ReplayEnvironmentMaterialLibrary.shared
         let root = Entity()
         root.name = "premium-environment-\(sport.rawValue)-\(quality.rawValue)"
 
@@ -48,13 +48,34 @@ enum ReplayEnvironmentInstaller {
         switch sport {
         case .rower:
             guard let venue = plan.rower else { return nil }
-            buildRower(venue, plan: plan, profile: profile, theme: theme, into: dressing)
+            buildRower(
+                venue,
+                plan: plan,
+                profile: profile,
+                theme: theme,
+                materials: materials,
+                into: dressing
+            )
         case .skierg:
             guard let venue = plan.skierg else { return nil }
-            buildSki(venue, plan: plan, profile: profile, theme: theme, into: dressing)
+            buildSki(
+                venue,
+                plan: plan,
+                profile: profile,
+                theme: theme,
+                materials: materials,
+                into: dressing
+            )
         case .bike:
             guard let venue = plan.bike else { return nil }
-            buildBike(venue, plan: plan, profile: profile, theme: theme, into: dressing)
+            buildBike(
+                venue,
+                plan: plan,
+                profile: profile,
+                theme: theme,
+                materials: materials,
+                into: dressing
+            )
         }
         return root
     }
@@ -64,11 +85,23 @@ enum ReplayEnvironmentInstaller {
         plan: ReplayEnvironmentPlan,
         profile: ReplayQualitySceneProfile,
         theme: ReplayEnvironmentTheme,
+        materials: ReplayEnvironmentMaterialLibrary,
         into root: Entity
     ) {
-        let water = simple(plan.courseStyle.surface, theme: theme, roughness: 0.18)
+        let water = materials.material(
+            family: nil,
+            baseColor: color(plan.courseStyle.surface, theme: theme),
+            roughness: 0.18,
+            tier: profile.environmentDetail
+        )
         addDisk(name: "regatta-basin", radius: 38, height: 0.025, y: 0, material: water, to: root)
-        let island = simple(plan.lighting.infield, theme: theme, roughness: 0.9)
+        let island = materials.material(
+            family: .aerialGrassRock,
+            baseColor: color(plan.lighting.infield, theme: theme),
+            roughness: 0.9,
+            tier: profile.environmentDetail,
+            textureRepeat: SIMD2(8, 8)
+        )
         addDisk(name: "island-park", radius: Float(venue.islandRadius), height: 0.18, y: 0.08, material: island, to: root)
         let structure = simple(plan.lighting.venueStructure, theme: theme)
         for (index, placement) in venue.landmarks.prefix(venue.landmarkCounts[profile.environmentDetail]).enumerated() {
@@ -91,9 +124,16 @@ enum ReplayEnvironmentInstaller {
         plan: ReplayEnvironmentPlan,
         profile: ReplayQualitySceneProfile,
         theme: ReplayEnvironmentTheme,
+        materials: ReplayEnvironmentMaterialLibrary,
         into root: Entity
     ) {
-        let snow = simple(plan.courseStyle.surface, theme: theme, roughness: 0.92)
+        let snow = materials.material(
+            family: .snow02,
+            baseColor: color(plan.courseStyle.surface, theme: theme),
+            roughness: 0.92,
+            tier: profile.environmentDetail,
+            textureRepeat: SIMD2(12, 12)
+        )
         addDisk(name: "nordic-stadium-field", radius: Float(venue.stadiumFieldRadius), height: 0.04, y: 0, material: snow, to: root)
         let structure = simple(plan.lighting.venueStructure, theme: theme)
         for (index, placement) in venue.landmarks.prefix(venue.landmarkCounts[profile.environmentDetail]).enumerated() {
@@ -115,11 +155,24 @@ enum ReplayEnvironmentInstaller {
         plan: ReplayEnvironmentPlan,
         profile: ReplayQualitySceneProfile,
         theme: ReplayEnvironmentTheme,
+        materials: ReplayEnvironmentMaterialLibrary,
         into root: Entity
     ) {
-        let timber = simple(plan.courseStyle.surface, theme: theme, roughness: 0.48)
+        let timber = materials.material(
+            family: .woodFloor,
+            baseColor: color(plan.courseStyle.surface, theme: theme),
+            roughness: 0.48,
+            tier: profile.environmentDetail,
+            textureRepeat: SIMD2(18, 3)
+        )
         addDisk(name: "velodrome-track", radius: Float(plan.course.outerRadius), height: 0.06, y: 0, material: timber, to: root)
-        let infield = simple(plan.lighting.infield, theme: theme, roughness: 0.8)
+        let infield = materials.material(
+            family: .brushedConcrete2,
+            baseColor: color(plan.lighting.infield, theme: theme),
+            roughness: 0.8,
+            tier: profile.environmentDetail,
+            textureRepeat: SIMD2(10, 10)
+        )
         addDisk(name: "velodrome-infield", radius: Float(venue.infieldFloorRadius), height: 0.08, y: 0.04, material: infield, to: root)
         let wall = simple(plan.lighting.venueStructure, theme: theme, roughness: 0.72)
         addRingMarkers(count: 16 + profile.environmentDetail * 8, radius: Float(venue.arenaWallRadius),
@@ -186,7 +239,7 @@ enum ReplayEnvironmentInstaller {
         radius: Float,
         height: Float,
         y: Float,
-        material: SimpleMaterial,
+        material: PhysicallyBasedMaterial,
         to root: Entity
     ) {
         let disk = ModelEntity(mesh: .generateCylinder(height: height, radius: radius), materials: [material])
