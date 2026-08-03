@@ -49,6 +49,17 @@ def main() -> None:
         fail("contract hash mismatch")
     if sha256(usdz_path) != athlete.get("usdzSha256"):
         fail("athlete USDZ hash mismatch")
+    artifacts = source.get("artifacts", {})
+    if artifacts.get("athleteContract", {}).get("sha256") != athlete.get("contractSha256"):
+        fail("source and athlete manifests disagree on contract hash")
+    if artifacts.get("athleteUsdz", {}).get("sha256") != athlete.get("usdzSha256"):
+        fail("source and athlete manifests disagree on USDZ hash")
+    if artifacts.get("athleteGlb", {}).get("sha256") != athlete.get("glbSha256"):
+        fail("source and athlete manifests disagree on GLB hash")
+    if contract_path.stat().st_size != artifacts.get("athleteContract", {}).get("byteCount"):
+        fail("athlete contract byte count mismatch")
+    if usdz_path.stat().st_size != artifacts.get("athleteUsdz", {}).get("byteCount"):
+        fail("athlete USDZ byte count mismatch")
     contract = json.loads(contract_path.read_text())
     bones = contract.get("bones", {})
     if bones.get("semanticCount") != athlete.get("semanticBoneCount"):
@@ -59,6 +70,10 @@ def main() -> None:
     motion = load(REFERENCE_ROOT / "motion" / "rowplay-motion-manifest.json")
     if motion.get("sourceCommit") != pinned:
         fail("motion manifest pinned to a different commit")
+    if motion.get("sourceGlbSha256") != artifacts.get("athleteGlb", {}).get("sha256"):
+        fail("motion and source manifests disagree on athlete GLB hash")
+    if set(motion.get("sports", [])) != {"rower", "skierg", "bike"}:
+        fail("motion manifest must contain exactly the three supported sports")
     motion_bin = REFERENCE_ROOT / "motion" / "rowplay-motion.bin"
     if not motion_bin.exists():
         fail("missing rowplay-motion.bin")
@@ -78,7 +93,13 @@ def main() -> None:
     equipment = load(REFERENCE_ROOT / "equipment" / "rowplay-equipment-manifest.json")
     if equipment.get("sourceCommit") != pinned:
         fail("equipment manifest pinned to a different commit")
-    for entry in equipment.get("packages", []):
+    if equipment.get("sourceGlbSha256") != artifacts.get("equipmentSourceGlb", {}).get("sha256"):
+        fail("equipment and source manifests disagree on equipment GLB hash")
+    packages = equipment.get("packages", [])
+    package_sports = [entry.get("sport") for entry in packages]
+    if len(packages) != 3 or set(package_sports) != {"row", "ski", "bike"}:
+        fail("equipment manifest must contain one package for each supported sport")
+    for entry in packages:
         package = REFERENCE_ROOT / "equipment" / entry["file"]
         if not package.exists():
             fail(f"missing equipment package {entry['file']}")
@@ -92,11 +113,24 @@ def main() -> None:
         sidecar_json = json.loads(sidecar.read_text())
         if sidecar_json.get("sourceCommit") != pinned:
             fail(f"{entry['contractFile']} pinned to a different commit")
+        if sidecar_json.get("sport") != entry.get("sport"):
+            fail(f"{entry['contractFile']} sport does not match manifest")
 
     environment = load(REFERENCE_ROOT / "environment" / "environment-manifest.json")
     if environment.get("sourceCommit") != pinned:
         fail("environment manifest pinned to a different commit")
-    for texture in environment.get("textures", []):
+    textures = environment.get("textures", [])
+    families = {texture.get("family") for texture in textures}
+    if len(textures) != 39 or len(families) != 13:
+        fail("environment manifest must contain 13 complete texture triplets")
+    for family in families:
+        family_files = [texture.get("file", "") for texture in textures if texture.get("family") == family]
+        if len(family_files) != 3 or not all(
+            any(role in filename for filename in family_files)
+            for role in ("diffuse-512.jpg", "normal-gl-512.jpg", "roughness-512.jpg")
+        ):
+            fail(f"environment texture family is incomplete: {family}")
+    for texture in textures:
         path = REFERENCE_ROOT / "environment" / texture["file"]
         if not path.exists():
             fail(f"missing texture {texture['file']}")

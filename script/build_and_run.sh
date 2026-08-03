@@ -11,6 +11,7 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 
@@ -42,11 +43,19 @@ done
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 swift build --package-path "$ROOT_DIR"
-BUILD_BINARY="$(swift build --package-path "$ROOT_DIR" --show-bin-path)/$APP_NAME"
+BUILD_DIR="$(swift build --package-path "$ROOT_DIR" --show-bin-path)"
+BUILD_BINARY="$BUILD_DIR/$APP_NAME"
+BUILD_RESOURCE_BUNDLE="$BUILD_DIR/${APP_NAME}_${APP_NAME}.bundle"
+
+if [[ ! -d "$BUILD_RESOURCE_BUNDLE" ]]; then
+  echo "missing SwiftPM resource bundle: $BUILD_RESOURCE_BUNDLE" >&2
+  exit 1
+fi
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
+cp -R "$BUILD_RESOURCE_BUNDLE" "$APP_RESOURCES/"
 chmod +x "$APP_BINARY"
 
 # Generate Info.plist with stable technical identity.
