@@ -104,15 +104,21 @@ struct LiveModePanelView: View {
             Text("Polling Interval")
                 .font(AppDesign.Typography.compactLabel)
                 .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
 
             HStack(spacing: AppDesign.Spacing.xSmall) {
                 ForEach(liveIntervals, id: \.self) { sec in
+                    let isSelected = library.liveState.intervalSec == sec
                     Button(intervalLabel(sec)) {
                         library.setLiveInterval(sec)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .tint(library.liveState.intervalSec == sec ? .accentColor : .secondary)
+                    .tint(isSelected ? .accentColor : .secondary)
+                    .accessibilityLabel(intervalAccessibilityLabel(sec))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityHint("Changes how often live telemetry is polled")
+                    .help("Set polling interval to \(intervalAccessibilityLabel(sec))")
                 }
             }
         }
@@ -175,6 +181,15 @@ struct LiveModePanelView: View {
     private func intervalLabel(_ sec: Int) -> String {
         if sec < 60 { return "\(sec)s" }
         return "\(sec / 60)m"
+    }
+
+    /// Spoken form for VoiceOver / tooltips ("30 seconds", "1 minute").
+    private func intervalAccessibilityLabel(_ sec: Int) -> String {
+        if sec < 60 {
+            return sec == 1 ? "1 second" : "\(sec) seconds"
+        }
+        let minutes = sec / 60
+        return minutes == 1 ? "1 minute" : "\(minutes) minutes"
     }
 
     private func sampleMetric(_ label: LocalizedStringKey, _ value: String, color: Color = .primary) -> some View {
