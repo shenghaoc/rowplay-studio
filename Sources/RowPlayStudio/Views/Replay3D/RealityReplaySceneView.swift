@@ -60,17 +60,27 @@ struct RealityReplaySceneView: View {
     var body: some View {
         let configuration = performanceController.effectiveQuality.configuration
         let interval = 1.0 / Double(configuration.targetFrameRate)
-        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
-            Replay3DQualityRebuildBoundary(
-                effectiveQuality: performanceController.effectiveQuality,
-                sceneIdentity: Replay3DSceneIdentity(
-                    workoutID: detail.id,
-                    rivalID: rival?.id,
-                    sportRawValue: sport.rawValue
-                ),
-                assetGeneration: assetLoadGeneration
-            ) {
-                realityContent(timeline: timeline, configuration: configuration)
+        GeometryReader { geometry in
+            let viewportAspect = ReplayCameraSolver.viewportAspect(
+                width: Double(geometry.size.width),
+                height: Double(geometry.size.height)
+            )
+            TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
+                Replay3DQualityRebuildBoundary(
+                    effectiveQuality: performanceController.effectiveQuality,
+                    sceneIdentity: Replay3DSceneIdentity(
+                        workoutID: detail.id,
+                        rivalID: rival?.id,
+                        sportRawValue: sport.rawValue
+                    ),
+                    assetGeneration: assetLoadGeneration
+                ) {
+                    realityContent(
+                        timeline: timeline,
+                        configuration: configuration,
+                        viewportAspect: viewportAspect
+                    )
+                }
             }
         }
         .frame(minHeight: 300)
@@ -129,7 +139,8 @@ struct RealityReplaySceneView: View {
     @ViewBuilder
     private func realityContent(
         timeline: TimelineViewDefaultContext,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        viewportAspect: Double
     ) -> some View {
         RealityView { make in
             // Precompute immutable aggregates once per live workout, and per
@@ -173,6 +184,7 @@ struct RealityReplaySceneView: View {
                 ghostDistance: ghostSample.distance,
                 ghostVisible: rival != nil,
                 reduceMotion: reduceMotion,
+                viewportAspect: viewportAspect,
                 deltaTime: sceneState.lastFrameDelta,
                 playbackTickGeneration: sceneState.playbackTickGeneration,
                 isPlaying: state.playing,

@@ -94,21 +94,27 @@ final class ReplayCameraTests: XCTestCase {
         }
     }
 
-    func testReducedMotionFixesFieldOfViewAndDisablesSmoothing() {
-        let target = pose(for: .chase, speed: 100)
-        let current = ReplayCameraPose.fallback
-        let result = ReplayCameraSolver.smoothedPose(
-            current: current,
-            target: target,
-            dt: 1.0 / 60.0,
-            reduceMotion: true
-        )
+    func testReducedMotionPreservesSportFieldOfViewAndDisablesSmoothing() {
+        let expectedFieldOfViews: [Sport: Double] = [.rower: 40, .skierg: 42, .bike: 42]
+        for sport in Sport.allCases {
+            let target = ReplayCameraSolver.targetPose(
+                preset: .chase,
+                sport: sport,
+                participant: participant,
+                tangent: tangent,
+                speed: 100,
+                reduceMotion: true
+            )
+            let result = ReplayCameraSolver.smoothedPose(
+                current: ReplayCameraPose.fallback,
+                target: target,
+                dt: 1.0 / 60.0,
+                reduceMotion: true
+            )
 
-        XCTAssertEqual(result.positionX, target.positionX)
-        XCTAssertEqual(result.positionY, target.positionY)
-        XCTAssertEqual(result.positionZ, target.positionZ)
-        XCTAssertEqual(result.targetX, target.targetX)
-        XCTAssertEqual(result.fieldOfViewDegrees, 46)
+            XCTAssertEqual(result, target)
+            XCTAssertEqual(result.fieldOfViewDegrees, expectedFieldOfViews[sport])
+        }
     }
 
     func testChaseRigUsesSportSpecificFraming() {
@@ -126,7 +132,7 @@ final class ReplayCameraTests: XCTestCase {
         XCTAssertEqual(Set(poses.map(\.positionZ)).count, 3)
     }
 
-    func testRivalFramingTargetsMidpointAndPullsBackForSeparation() {
+    func testRivalFramingTargetsMidpointAndPullsBackMonotonicallyForSeparation() {
         let solo = ReplayCameraSolver.targetPose(
             preset: .chase,
             sport: .rower,
@@ -134,19 +140,93 @@ final class ReplayCameraTests: XCTestCase {
             tangent: tangent,
             speed: 6
         )
-        let rival = ReplayCameraSolver.targetPose(
+        let nearRival = ReplayCameraSolver.targetPose(
             preset: .chase,
             sport: .rower,
             participant: participant,
             tangent: tangent,
             speed: 6,
-            rival: (x: 12, y: 0, z: 42)
+            rival: (x: 12, y: 0, z: 32)
         )
-        XCTAssertEqual(rival.targetZ, 36, accuracy: 0.0001)
-        XCTAssertLessThan(rival.positionX, solo.positionX)
+        let farRival = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: (x: 12, y: 0, z: 50)
+        )
+        XCTAssertEqual(farRival.targetZ, 40, accuracy: 0.0001)
+        XCTAssertGreaterThan(cameraDistance(nearRival), cameraDistance(solo))
+        XCTAssertGreaterThan(cameraDistance(farRival), cameraDistance(nearRival))
+    }
+
+    func testPortraitViewportPullsBackMoreThanUltrawideForSameRival() {
+        let rival: ReplayPosition = (x: 12, y: 0, z: 50)
+        let portrait = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: rival,
+            aspect: 0.65
+        )
+        let ultrawide = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: rival,
+            aspect: 2.4
+        )
+
+        XCTAssertGreaterThan(cameraDistance(portrait), cameraDistance(ultrawide))
+    }
+
+    func testViewportAspectSanitizerHandlesLayoutAndDirectInputEdges() {
+        XCTAssertEqual(ReplayCameraSolver.viewportAspect(width: 1600, height: 1000), 1.6)
+        XCTAssertEqual(ReplayCameraSolver.viewportAspect(width: 900, height: 1200), 0.75)
+        for dimensions in [
+            (Double.nan, 600.0),
+            (600.0, Double.infinity),
+            (0.0, 600.0),
+            (600.0, -1.0),
+            (0.5, 600.0),
+            (600.0, 0.5),
+        ] {
+            XCTAssertEqual(
+                ReplayCameraSolver.viewportAspect(width: dimensions.0, height: dimensions.1),
+                ReplayCameraSolver.defaultViewportAspect
+            )
+        }
+        for aspect in [Double.nan, .infinity, 0, -1, 0.2] {
+            XCTAssertEqual(
+                ReplayCameraSolver.sanitizedViewportAspect(aspect),
+                ReplayCameraSolver.defaultViewportAspect
+            )
+        }
+        let defaultPose = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: (x: 12, y: 0, z: 50)
+        )
+        let invalidAspectPose = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: (x: 12, y: 0, z: 50),
+            aspect: .nan
+        )
+        XCTAssertEqual(invalidAspectPose, defaultPose)
     }
 
     func testReducedMotionUsesStaticSportFieldOfView() {
+        let expectedFieldOfViews: [Sport: Double] = [.rower: 40, .skierg: 42, .bike: 42]
         for sport in Sport.allCases {
             let slow = ReplayCameraSolver.targetPose(
                 preset: .chase, sport: sport, participant: participant,
@@ -157,6 +237,7 @@ final class ReplayCameraTests: XCTestCase {
                 tangent: tangent, speed: 100, reduceMotion: true
             )
             XCTAssertEqual(slow.fieldOfViewDegrees, fast.fieldOfViewDegrees)
+            XCTAssertEqual(slow.fieldOfViewDegrees, expectedFieldOfViews[sport])
             XCTAssertEqual(slow.positionX, fast.positionX)
             XCTAssertEqual(slow.positionZ, fast.positionZ)
         }
@@ -301,6 +382,10 @@ final class ReplayCameraTests: XCTestCase {
             tangent: tangent,
             speed: speed
         )
+    }
+
+    private func cameraDistance(_ pose: ReplayCameraPose) -> Double {
+        hypot(pose.positionX - pose.targetX, pose.positionZ - pose.targetZ)
     }
 
     private func integrate(

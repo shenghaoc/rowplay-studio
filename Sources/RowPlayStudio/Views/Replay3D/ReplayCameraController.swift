@@ -10,7 +10,9 @@ import RowPlayCore
 final class ReplayCameraController {
     var orbit = ReplayCameraOrbit()
 
-    @ObservationIgnored private var currentPose: ReplayCameraPose?
+    /// Last portable pose applied to RealityKit. Kept readable for scene-level
+    /// acceptance tests so camera wiring is verified without matrix decoding.
+    @ObservationIgnored private(set) var resolvedPose: ReplayCameraPose?
     @ObservationIgnored private var smoothedSpeed: Double = 0
     @ObservationIgnored private var previousDistance: Double?
     @ObservationIgnored private var previousPreset: ReplayCameraPreset?
@@ -31,6 +33,7 @@ final class ReplayCameraController {
         sport: Sport = .rower,
         distance: Double,
         rivalDistance: Double? = nil,
+        viewportAspect: Double = ReplayCameraSolver.defaultViewportAspect,
         deltaTime: TimeInterval,
         playbackTickGeneration: UInt64,
         preset: ReplayCameraPreset,
@@ -91,6 +94,7 @@ final class ReplayCameraController {
             tangent: courseTangent,
             speed: smoothedSpeed,
             rival: rivalPosition,
+            aspect: viewportAspect,
             orbit: orbit,
             reduceMotion: reduceMotion
         )
@@ -105,14 +109,14 @@ final class ReplayCameraController {
         let solvedPose = shouldSnap
             ? targetPose
             : ReplayCameraSolver.smoothedPose(
-                current: currentPose ?? targetPose,
+                current: resolvedPose ?? targetPose,
                 target: targetPose,
                 dt: safeDeltaTime,
                 reduceMotion: reduceMotion
             )
 
         apply(solvedPose.isFinite ? solvedPose : targetPose, to: camera)
-        currentPose = solvedPose.isFinite ? solvedPose : targetPose
+        resolvedPose = solvedPose.isFinite ? solvedPose : targetPose
         previousDistance = safeDistance
         previousPreset = preset
         appliedResetGeneration = resetGeneration
@@ -161,7 +165,7 @@ final class ReplayCameraController {
     }
 
     func resetSceneState() {
-        currentPose = nil
+        resolvedPose = nil
         smoothedSpeed = 0
         previousDistance = nil
         previousPreset = nil

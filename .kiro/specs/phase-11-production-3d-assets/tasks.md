@@ -33,8 +33,10 @@ claim that the complete phase or visual QA matrix is finished.
       Environment geometry is non-failable; individual texture slots retain
       scalar PBR when a bundled map is unavailable.
 - [x] **8/8 Camera, rival, effects, and final QA** — finish scene wiring and
-      run the staged-app matrix across renderers, sports, tiers, themes, rival
-      modes, and Reduced Motion before claiming Phase 11 acceptance.
+      add the reproducible 96-case scene matrix across sports, tiers, cameras,
+      themes, rival modes, bundled-path eligibility, and Reduced Motion. A
+      staged-bundle launch and the separate human renderer walkthrough remain
+      explicit pre-acceptance gates rather than claims made by this checkbox.
 
 Each layer must pass `git diff --check`, its focused tests, the full
 warnings-as-errors build and test suite, and exact-head CI before merge.

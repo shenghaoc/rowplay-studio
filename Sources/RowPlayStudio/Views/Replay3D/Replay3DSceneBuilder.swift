@@ -282,6 +282,7 @@ enum Replay3DSceneBuilder {
         ghostDistance: Double,
         ghostVisible: Bool,
         reduceMotion: Bool,
+        viewportAspect: Double = ReplayCameraSolver.defaultViewportAspect,
         deltaTime: TimeInterval,
         playbackTickGeneration: UInt64,
         isPlaying: Bool,
@@ -318,8 +319,10 @@ enum Replay3DSceneBuilder {
             return false
         }
 
-        // Ghost
-        if ghostVisible, let ghostPose {
+        // A rival renders only when both visibility intent and a sampled pose
+        // exist. Camera/effects must share this exact predicate with the rig.
+        let rendersGhost = ghostVisible && ghostPose != nil
+        if rendersGhost, let ghostPose {
             container.ghostGroup.isEnabled = true
             let ghostPos = layout.ghostPosition(at: ghostDistance)
             let ghostHeading = layout.headingAngle(at: ghostDistance)
@@ -348,7 +351,8 @@ enum Replay3DSceneBuilder {
             layout: layout,
             sport: sport,
             distance: liveDistance,
-            rivalDistance: ghostVisible ? ghostDistance : nil,
+            rivalDistance: rendersGhost ? ghostDistance : nil,
+            viewportAspect: viewportAspect,
             deltaTime: deltaTime,
             playbackTickGeneration: playbackTickGeneration,
             preset: cameraPreset,
@@ -364,7 +368,7 @@ enum Replay3DSceneBuilder {
             livePhase: livePose.phase,
             liveCatchOrdinal: livePose.index,
             ghostDistance: ghostDistance,
-            ghostVisible: ghostVisible,
+            ghostVisible: rendersGhost,
             deltaTime: deltaTime,
             playbackTickGeneration: playbackTickGeneration,
             isPlaying: isPlaying,

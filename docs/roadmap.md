@@ -399,7 +399,9 @@ Scope:
 - Add the regatta basin, Nordic stadium, and velodrome venues with verified
   textures and distinct Low through Ultra construction budgets.
 - Finish sport-specific camera and live/rival framing, exact seeking,
-  reduced-motion behavior, effects, and the reproducible final scene matrix.
+  live-viewport aspect handling, sport-static reduced-motion FOV, effects, and
+  two reproducible 48-case scene matrices. The staged human renderer
+  walkthrough remains a separate acceptance gate.
 - Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
 
 ## Review Strategy

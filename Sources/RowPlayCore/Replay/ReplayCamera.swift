@@ -148,18 +148,6 @@ public struct ReplayCameraPose: Equatable, Sendable {
         fieldOfViewDegrees: 46
     )
 
-    fileprivate func withFixedFieldOfView() -> ReplayCameraPose {
-        ReplayCameraPose(
-            positionX: positionX,
-            positionY: positionY,
-            positionZ: positionZ,
-            targetX: targetX,
-            targetY: targetY,
-            targetZ: targetZ,
-            fieldOfViewDegrees: 46
-        )
-    }
-
     fileprivate func validated(fallback: ReplayCameraPose = .fallback) -> ReplayCameraPose {
         wasSanitized || !isFinite ? fallback : self
     }
@@ -200,10 +188,32 @@ public struct ReplayCameraChaseRig: Equatable, Sendable {
 public enum ReplayCameraSolver: Sendable {
     public static let positionDampingRate = 7.5
     public static let fieldOfViewDampingRate = 2.5
+    public static let defaultViewportAspect = 1.6
+    public static let minimumViewportDimension = 1.0
     /// FOV breathing gain above the walking-speed threshold.
     public static let speedFieldOfViewGain = 2.0
     /// Flat pullback added whenever a rival is on course.
     public static let rivalPullback = 1.05
+
+    /// Converts live viewport dimensions into a stable camera aspect. SwiftUI
+    /// can transiently report zero/sub-point geometry while laying out or
+    /// rebuilding the RealityView, so those values use the authored default.
+    public static func viewportAspect(width: Double, height: Double) -> Double {
+        guard width.isFinite,
+              height.isFinite,
+              width >= minimumViewportDimension,
+              height >= minimumViewportDimension else {
+            return defaultViewportAspect
+        }
+        return sanitizedViewportAspect(width / height)
+    }
+
+    /// Repairs direct solver inputs as well as values produced by the live
+    /// viewport seam. Extremely narrow/non-positive frusta cannot provide a
+    /// useful rival-fit calculation and fall back deterministically.
+    public static func sanitizedViewportAspect(_ aspect: Double) -> Double {
+        aspect.isFinite && aspect > 0.2 ? aspect : defaultViewportAspect
+    }
 
     public static func targetPose(
         preset: ReplayCameraPreset,
@@ -258,7 +268,7 @@ public enum ReplayCameraSolver: Sendable {
                 let comparisonSpan = (spanX * spanX + spanZ * spanZ).squareRoot()
                 let margin = sport == .rower ? 1.6 : 1.1
                 let verticalHalf = fieldOfView * .pi / 360
-                let safeAspect = aspect.isFinite && aspect > 0.2 ? aspect : 1.6
+                let safeAspect = sanitizedViewportAspect(aspect)
                 let horizontalHalf = atan(tan(verticalHalf) * safeAspect)
                 let requiredBack = (comparisonSpan / 2 + margin)
                     / max(0.05, tan(horizontalHalf) * 0.9)
@@ -308,8 +318,7 @@ public enum ReplayCameraSolver: Sendable {
             )
         }
 
-        let safePose = pose.validated()
-        return reduceMotion ? safePose.withFixedFieldOfView() : safePose
+        return pose.validated()
     }
 
     public static func smoothedPose(
@@ -322,10 +331,10 @@ public enum ReplayCameraSolver: Sendable {
     ) -> ReplayCameraPose {
         let safeTarget = target.validated()
         if current.wasSanitized || !current.isFinite {
-            return reduceMotion ? safeTarget.withFixedFieldOfView() : safeTarget
+            return safeTarget
         }
         if reduceMotion {
-            return safeTarget.withFixedFieldOfView()
+            return safeTarget
         }
 
         let safeDt = dt.isFinite ? max(0, dt) : 0
