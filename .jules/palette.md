@@ -26,6 +26,6 @@
 **Learning:** In SwiftUI, splitting a single `Text` view into an `HStack` of multiple `Text` views to individually hide decorative characters (like '·') from VoiceOver using `.accessibilityHidden(true)` is an anti-pattern. This breaks SwiftUI's built-in text wrapping, potentially causing truncation or layout issues on narrow screens, and combined `accessibilityElement(children: .combine)` still fails to insert necessary natural reading pauses, creating run-on sentences.
 **Action:** Keep visual text layout within a single interpolated `Text` view (which wraps perfectly) and handle the auditory experience by providing an explicit `.accessibilityLabel` where the decorative separators are replaced with semantic punctuation like commas for natural VoiceOver pauses.
 
-## 2026-08-01 - Selection States on Custom Button Controls
-**Learning:** In SwiftUI, when building custom selection controls (like interval pickers) using `Button` with tinting for visual selection, VoiceOver users receive no indication of which option is currently active unless explicit traits are provided.
-**Action:** Dynamically apply `.accessibilityAddTraits(.isSelected)` to the active element in custom selection controls so screen readers can correctly announce its state.
+## 2026-08-03 - Selection States on Custom Button Controls
+**Learning:** In SwiftUI, when building custom selection controls (like interval pickers) using `Button` with tinting for visual selection, VoiceOver users receive no indication of which option is currently active unless explicit traits are provided. Compact visual labels ("30s", "1m") are also poor spoken names.
+**Action:** Dynamically apply `.accessibilityAddTraits(.isSelected)` to the active element, pair it with a full spoken `.accessibilityLabel` (and matching `.help` tooltip), and mark the section title with `.isHeader` so the control group is navigable.
