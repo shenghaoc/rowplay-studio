@@ -1,6 +1,5 @@
 import RealityKit
 import RowPlayCore
-import SwiftUI
 import XCTest
 @testable import RowPlayStudio
 
@@ -118,4 +117,77 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         XCTAssertTrue(differs, "live and rival skeleton state must be independent")
     }
 
+    func testMissingResourceReportsTypedFailureOnceAndStaysFailed() async throws {
+        var urls = try bundledResourceURLs()
+        urls[.motionBin] = nil
+        let source = TestAthleteResourceSource(urls: urls)
+        var reports: [ReplayAthleteValidationFailure] = []
+        let library = ReplayAthleteLibrary(source: source) { reports.append($0) }
+
+        let first = await library.athleteTemplate()
+        let second = await library.athleteTemplate()
+
+        XCTAssertNil(first)
+        XCTAssertNil(second)
+        XCTAssertEqual(source.requests[.motionBin], 1)
+        XCTAssertEqual(reports, [.missingResource(ReplayAthleteResource.motionBin.rawValue)])
+        XCTAssertEqual(library.lastFailure, reports.first)
+    }
+
+    func testCorruptMotionPayloadRejectsBeforeRealityKitLoadAndReportsOnce() async throws {
+        var urls = try bundledResourceURLs()
+        var binData = try Data(contentsOf: try XCTUnwrap(urls[.motionBin]))
+        binData[binData.startIndex] ^= 0xff
+        let corruptURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-corrupt-motion-\(UUID().uuidString).bin")
+        try binData.write(to: corruptURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: corruptURL) }
+        urls[.motionBin] = corruptURL
+
+        let source = TestAthleteResourceSource(urls: urls)
+        var reports: [ReplayAthleteValidationFailure] = []
+        let library = ReplayAthleteLibrary(source: source) { reports.append($0) }
+
+        async let first = library.athleteTemplate()
+        async let second = library.athleteTemplate()
+        let results = await (first, second)
+
+        XCTAssertNil(results.0)
+        XCTAssertNil(results.1)
+        XCTAssertEqual(source.requests[.motionBin], 1)
+        XCTAssertEqual(reports.count, 1)
+        let failure = try XCTUnwrap(library.lastFailure)
+        guard case .hashMismatch(let resource, _, _) = failure else {
+            return XCTFail("Expected the motion payload hash rejection")
+        }
+        XCTAssertEqual(resource, "motion.bin")
+    }
+
+    private func bundledResourceURLs() throws -> [ReplayAthleteResource: URL] {
+        var urls: [ReplayAthleteResource: URL] = [:]
+        for resource in ReplayAthleteResource.allCases {
+            urls[resource] = try XCTUnwrap(ReplayAthleteLibrary.bundledURL(
+                name: resource.name,
+                extension: resource.fileExtension,
+                subdirectory: resource.subdirectory
+            ))
+        }
+        return urls
+    }
+
+}
+
+@MainActor
+private final class TestAthleteResourceSource: ReplayAthleteResourceSource {
+    let urls: [ReplayAthleteResource: URL]
+    private(set) var requests: [ReplayAthleteResource: Int] = [:]
+
+    init(urls: [ReplayAthleteResource: URL]) {
+        self.urls = urls
+    }
+
+    func url(for resource: ReplayAthleteResource) -> URL? {
+        requests[resource, default: 0] += 1
+        return urls[resource]
+    }
 }

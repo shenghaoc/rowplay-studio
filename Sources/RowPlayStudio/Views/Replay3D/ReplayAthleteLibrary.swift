@@ -2,6 +2,59 @@ import Foundation
 import RealityKit
 import RowPlayCore
 
+enum ReplayAthleteResource: String, CaseIterable, Sendable {
+    case contract
+    case sourceManifest
+    case usdz
+    case motionManifest
+    case motionBin
+
+    var name: String {
+        switch self {
+        case .contract: ReplayAthleteCatalog.contractResourceName
+        case .sourceManifest: ReplayAthleteCatalog.sourceManifestResourceName
+        case .usdz: ReplayAthleteCatalog.usdzResourceName
+        case .motionManifest: ReplayAthleteCatalog.motionManifestResourceName
+        case .motionBin: ReplayAthleteCatalog.motionBinResourceName
+        }
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .contract: ReplayAthleteCatalog.contractExtension
+        case .sourceManifest: ReplayAthleteCatalog.sourceManifestExtension
+        case .usdz: ReplayAthleteCatalog.usdzExtension
+        case .motionManifest: ReplayAthleteCatalog.motionManifestExtension
+        case .motionBin: ReplayAthleteCatalog.motionBinExtension
+        }
+    }
+
+    var subdirectory: String {
+        switch self {
+        case .contract, .sourceManifest, .usdz:
+            ReplayAthleteCatalog.athleteSubdirectory
+        case .motionManifest, .motionBin:
+            ReplayAthleteCatalog.motionSubdirectory
+        }
+    }
+}
+
+@MainActor
+protocol ReplayAthleteResourceSource: AnyObject {
+    func url(for resource: ReplayAthleteResource) -> URL?
+}
+
+@MainActor
+private final class ReplayModuleAthleteResourceSource: ReplayAthleteResourceSource {
+    func url(for resource: ReplayAthleteResource) -> URL? {
+        ReplayAthleteLibrary.bundledURL(
+            name: resource.name,
+            extension: resource.fileExtension,
+            subdirectory: resource.subdirectory
+        )
+    }
+}
+
 /// Loads and validates the bundled production athlete from the
 /// `ReplayReference` bundle: contract, source manifest, native USDZ, and the
 /// sampled motion table.
@@ -11,11 +64,28 @@ import RowPlayCore
 /// retry a broken package on every SwiftUI update.
 @MainActor
 final class ReplayAthleteLibrary {
-    static let shared = ReplayAthleteLibrary()
+    static let shared = ReplayAthleteLibrary(source: ReplayModuleAthleteResourceSource())
+    private static let logger = PrivacySafeLogger(category: "replay-athlete")
 
+    private let source: any ReplayAthleteResourceSource
+    private let failureReporter: (ReplayAthleteValidationFailure) -> Void
     private var template: ReplayAthleteTemplate?
     private var loadFailed = false
     private var inFlight: Task<ReplayAthleteTemplate?, Never>?
+    private(set) var lastFailure: ReplayAthleteValidationFailure?
+
+    init(
+        source: any ReplayAthleteResourceSource,
+        failureReporter: ((ReplayAthleteValidationFailure) -> Void)? = nil
+    ) {
+        self.source = source
+        self.failureReporter = failureReporter ?? { failure in
+            ReplayAthleteLibrary.logger.warn(
+                "Replay athlete package rejected",
+                failure.diagnosticCode
+            )
+        }
+    }
 
     func athleteTemplate() async -> ReplayAthleteTemplate? {
         if let template {
@@ -38,6 +108,7 @@ final class ReplayAthleteLibrary {
     func resetCacheForTesting() {
         template = nil
         loadFailed = false
+        lastFailure = nil
         inFlight?.cancel()
         inFlight = nil
     }
@@ -48,59 +119,72 @@ final class ReplayAthleteLibrary {
         }
         guard !loadFailed else { return nil }
 
-        guard let contractURL = bundledURL(
-            name: ReplayAthleteCatalog.contractResourceName,
-            extension: ReplayAthleteCatalog.contractExtension,
-            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
-        ),
-        let sourceURL = bundledURL(
-            name: ReplayAthleteCatalog.sourceManifestResourceName,
-            extension: ReplayAthleteCatalog.sourceManifestExtension,
-            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
-        ),
-        let usdzURL = bundledURL(
-            name: ReplayAthleteCatalog.usdzResourceName,
-            extension: ReplayAthleteCatalog.usdzExtension,
-            subdirectory: ReplayAthleteCatalog.athleteSubdirectory
-        ),
-        let motionManifestURL = bundledURL(
-            name: ReplayAthleteCatalog.motionManifestResourceName,
-            extension: ReplayAthleteCatalog.motionManifestExtension,
-            subdirectory: ReplayAthleteCatalog.motionSubdirectory
-        ),
-        let motionBinURL = bundledURL(
-            name: ReplayAthleteCatalog.motionBinResourceName,
-            extension: ReplayAthleteCatalog.motionBinExtension,
-            subdirectory: ReplayAthleteCatalog.motionSubdirectory
-        ) else {
-            loadFailed = true
-            return nil
+        var urls: [ReplayAthleteResource: URL] = [:]
+        for resource in ReplayAthleteResource.allCases {
+            guard let url = source.url(for: resource) else {
+                return reject(.missingResource(resource.rawValue))
+            }
+            urls[resource] = url
+        }
+        var payloads: [ReplayAthleteResource: Data] = [:]
+        for resource in ReplayAthleteResource.allCases {
+            guard let url = urls[resource], let data = try? Data(contentsOf: url) else {
+                return reject(.unreadableResource(resource.rawValue))
+            }
+            payloads[resource] = data
+        }
+        guard let usdzURL = urls[.usdz],
+              let contractData = payloads[.contract],
+              let sourceData = payloads[.sourceManifest],
+              let usdzData = payloads[.usdz],
+              let motionManifestData = payloads[.motionManifest],
+              let motionBinData = payloads[.motionBin] else {
+            return reject(.invalidRuntimeAsset)
         }
 
-        guard let contractData = try? Data(contentsOf: contractURL),
-              let sourceData = try? Data(contentsOf: sourceURL),
-              let usdzData = try? Data(contentsOf: usdzURL),
-              let motionManifestData = try? Data(contentsOf: motionManifestURL),
-              let motionBinData = try? Data(contentsOf: motionBinURL) else {
-            loadFailed = true
-            return nil
+        let parsedSource = ReplayAthleteCatalog.parseSourceManifest(data: sourceData)
+        guard case .success(let manifest) = parsedSource else {
+            if case .failure(let failure) = parsedSource { return reject(failure) }
+            return reject(.invalidContract("source manifest"))
         }
-
-        guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData),
-              ReplayAthleteCatalog.validateSourceManifest(manifest).isValid else {
-            loadFailed = true
-            return nil
-        }
+        let sourceValidation = ReplayAthleteCatalog.validateSourceManifest(manifest)
+        if let failure = sourceValidation.failures.first { return reject(failure) }
 
         let contractHash = ReplayAthleteCatalog.sha256Hex(of: contractData)
         let usdzHash = ReplayAthleteCatalog.sha256Hex(of: usdzData)
-        guard contractHash == manifest.contractSha256,
-              usdzHash == manifest.usdzSha256,
-              case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData),
-              ReplayAthleteCatalog.validateContract(contract, manifest: manifest).isValid else {
-            loadFailed = true
-            return nil
+        guard contractHash == manifest.contractSha256 else {
+            return reject(.hashMismatch(
+                resource: "athlete.contract",
+                expected: manifest.contractSha256,
+                actual: contractHash
+            ))
         }
+        guard usdzHash == manifest.usdzSha256 else {
+            return reject(.hashMismatch(
+                resource: "athlete.usdz",
+                expected: manifest.usdzSha256,
+                actual: usdzHash
+            ))
+        }
+        let parsedContract = ReplayAthleteCatalog.parseContract(data: contractData)
+        guard case .success(let contract) = parsedContract else {
+            if case .failure(let failure) = parsedContract { return reject(failure) }
+            return reject(.invalidContract("contract"))
+        }
+        let contractValidation = ReplayAthleteCatalog.validateContract(contract, manifest: manifest)
+        if let failure = contractValidation.failures.first { return reject(failure) }
+
+        let parsedMotion = ReplayAthleteCatalog.parseMotionManifest(data: motionManifestData)
+        guard case .success(let motionManifest) = parsedMotion else {
+            if case .failure(let failure) = parsedMotion { return reject(failure) }
+            return reject(.invalidMotionManifest("manifest"))
+        }
+        let motionValidation = ReplayAthleteCatalog.validateMotionManifest(
+            motionManifest,
+            source: manifest,
+            binData: motionBinData
+        )
+        if let failure = motionValidation.failures.first { return reject(failure) }
 
         // The motion table must come from the same pinned tree and match the
         // contract's semantic hierarchy exactly.
@@ -111,16 +195,14 @@ final class ReplayAthleteLibrary {
         motionTable.boneNames == contract.semanticBoneNames,
         motionTable.sourceCommit == manifest.pinnedCommit,
         motionTable.clips.count == 3 else {
-            loadFailed = true
-            return nil
+            return reject(.invalidMotionManifest("motion table"))
         }
         for sport in [Sport.rower, .skierg, .bike] {
             guard let tableClip = motionTable.clips[sport],
                   let contractClip = contract.clip(for: sport),
                   tableClip.clipName == contractClip.name,
                   abs(tableClip.driveEnd - contractClip.driveEnd) < 1e-9 else {
-                loadFailed = true
-                return nil
+                return reject(.invalidMotionManifest("\(sport.rawValue) clip"))
             }
         }
 
@@ -131,17 +213,50 @@ final class ReplayAthleteLibrary {
                 sourceManifest: manifest,
                 motionTable: motionTable
               ) else {
-            loadFailed = true
-            return nil
+            return reject(.invalidRuntimeAsset)
         }
 
         self.template = template
         return template
     }
 
-    private func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {
+    private func reject(
+        _ failure: ReplayAthleteValidationFailure
+    ) -> ReplayAthleteTemplate? {
+        guard !loadFailed else { return nil }
+        loadFailed = true
+        lastFailure = failure
+        failureReporter(failure)
+        return nil
+    }
+
+    static func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {
         let bundle = Bundle.module
         return bundle.url(forResource: name, withExtension: ext, subdirectory: subdirectory)
             ?? bundle.url(forResource: name, withExtension: ext)
+    }
+}
+
+private extension ReplayAthleteValidationFailure {
+    var diagnosticCode: String {
+        switch self {
+        case .missingResource: "missing-resource"
+        case .unreadableResource: "unreadable-resource"
+        case .hashMismatch: "hash-mismatch"
+        case .invalidContract: "invalid-contract"
+        case .invalidMotionManifest: "invalid-motion-manifest"
+        case .byteCountMismatch: "byte-count-mismatch"
+        case .missingBone: "missing-bone"
+        case .boneCountMismatch: "bone-count-mismatch"
+        case .missingClip: "missing-clip"
+        case .invalidClipTiming: "invalid-clip-timing"
+        case .missingContact: "missing-contact"
+        case .nonFiniteRestTransform: "nonfinite-rest-transform"
+        case .missingSkinnedAthlete: "missing-skinned-athlete"
+        case .multipleSkinnedAthletes: "multiple-skinned-athletes"
+        case .missingAnimation: "missing-animation"
+        case .invalidRuntimeAsset: "invalid-runtime-asset"
+        case .pinMismatch: "pin-mismatch"
+        }
     }
 }

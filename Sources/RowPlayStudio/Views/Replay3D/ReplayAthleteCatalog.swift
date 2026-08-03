@@ -135,11 +135,22 @@ struct ReplayAthleteSourceManifest: Equatable, Sendable {
     let totalBoneCount: Int
 }
 
+/// Cross-seals the sampled motion payload to the same upstream athlete tree.
+struct ReplayAthleteMotionManifest: Equatable, Sendable {
+    let sourceCommit: String
+    let sourceGlbSha256: String
+    let motionBinSha256: String
+    let motionBinByteCount: Int
+}
+
 /// Reasons the canonical athlete package cannot be used.
 enum ReplayAthleteValidationFailure: Error, Equatable, Sendable {
     case missingResource(String)
+    case unreadableResource(String)
     case hashMismatch(resource: String, expected: String, actual: String)
     case invalidContract(String)
+    case invalidMotionManifest(String)
+    case byteCountMismatch(resource: String, expected: Int, actual: Int)
     case missingBone(String)
     case boneCountMismatch(actual: Int, expected: Int)
     case missingClip(Sport)
@@ -149,6 +160,7 @@ enum ReplayAthleteValidationFailure: Error, Equatable, Sendable {
     case missingSkinnedAthlete
     case multipleSkinnedAthletes
     case missingAnimation
+    case invalidRuntimeAsset
     case pinMismatch(String)
 }
 
@@ -548,6 +560,9 @@ enum ReplayAthleteCatalog {
         manifest: ReplayAthleteSourceManifest
     ) -> ReplayAthleteValidationResult {
         var failures: [ReplayAthleteValidationFailure] = []
+        if contract.meshName != skinnedMeshName {
+            failures.append(.invalidContract("mesh.meshName"))
+        }
         if contract.glbSha256 != manifest.glbSha256 {
             failures.append(.hashMismatch(
                 resource: "contract.glb",
@@ -572,6 +587,60 @@ enum ReplayAthleteCatalog {
             failures.append(.boneCountMismatch(
                 actual: contract.helpers.count,
                 expected: manifest.helperCount
+            ))
+        }
+        return ReplayAthleteValidationResult(failures: failures)
+    }
+
+    // MARK: - Motion manifest
+
+    static func parseMotionManifest(
+        data: Data
+    ) -> Result<ReplayAthleteMotionManifest, ReplayAthleteValidationFailure> {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sourceCommit = root["sourceCommit"] as? String,
+              let sourceGlbSha256 = root["sourceGlbSha256"] as? String,
+              let motionBinSha256 = root["motionBinSha256"] as? String,
+              let motionBinByteCount = root["motionBinByteCount"] as? Int,
+              !sourceCommit.isEmpty,
+              !sourceGlbSha256.isEmpty,
+              !motionBinSha256.isEmpty,
+              motionBinByteCount > 0 else {
+            return .failure(.invalidMotionManifest("required fields"))
+        }
+        return .success(ReplayAthleteMotionManifest(
+            sourceCommit: sourceCommit,
+            sourceGlbSha256: sourceGlbSha256,
+            motionBinSha256: motionBinSha256,
+            motionBinByteCount: motionBinByteCount
+        ))
+    }
+
+    static func validateMotionManifest(
+        _ motion: ReplayAthleteMotionManifest,
+        source: ReplayAthleteSourceManifest,
+        binData: Data
+    ) -> ReplayAthleteValidationResult {
+        var failures: [ReplayAthleteValidationFailure] = []
+        if motion.sourceCommit != source.pinnedCommit {
+            failures.append(.pinMismatch("motion.sourceCommit"))
+        }
+        if motion.sourceGlbSha256 != source.glbSha256 {
+            failures.append(.pinMismatch("motion.sourceGlbSha256"))
+        }
+        if motion.motionBinByteCount != binData.count {
+            failures.append(.byteCountMismatch(
+                resource: "motion.bin",
+                expected: motion.motionBinByteCount,
+                actual: binData.count
+            ))
+        }
+        let actualHash = sha256Hex(of: binData)
+        if motion.motionBinSha256 != actualHash {
+            failures.append(.hashMismatch(
+                resource: "motion.bin",
+                expected: motion.motionBinSha256,
+                actual: actualHash
             ))
         }
         return ReplayAthleteValidationResult(failures: failures)

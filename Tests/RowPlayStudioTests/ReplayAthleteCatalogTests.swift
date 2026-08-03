@@ -56,6 +56,7 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         XCTAssertEqual(contract.clip(for: .skierg)?.name, "rowplay-v4-ski-cycle")
         XCTAssertEqual(contract.clip(for: .bike)?.name, "rowplay-v4-bike-cycle")
         XCTAssertEqual(contract.surfaces.count, 8)
+        XCTAssertEqual(contract.meshName, ReplayAthleteCatalog.skinnedMeshName)
         for role in ReplayAthleteCatalog.requiredSurfaceRoles {
             XCTAssertTrue(
                 contract.surfaces.contains { $0.role == role },
@@ -63,6 +64,33 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             )
         }
         XCTAssertTrue(ReplayAthleteCatalog.validateContract(contract, manifest: manifest).isValid)
+    }
+
+    func testContractRejectsUnexpectedRuntimeMeshName() throws {
+        let original = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
+        )
+        var root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: original) as? [String: Any]
+        )
+        var mesh = try XCTUnwrap(root["mesh"] as? [String: Any])
+        mesh["meshName"] = "unexpected-athlete"
+        root["mesh"] = mesh
+        let mutated = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        guard case .success(let contract) = ReplayAthleteCatalog.parseContract(data: mutated) else {
+            return XCTFail("The mutation should remain structurally parseable")
+        }
+        let sourceData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-source.json")
+        )
+        guard case .success(let manifest) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData) else {
+            return XCTFail("source manifest parse failed")
+        }
+
+        XCTAssertEqual(
+            ReplayAthleteCatalog.validateContract(contract, manifest: manifest).failures,
+            [.invalidContract("mesh.meshName")]
+        )
     }
 
     func testHelperHierarchyDescribesTenDigitChains() throws {
@@ -111,6 +139,23 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             contentsOf: try referenceURL("motion/rowplay-motion-manifest.json")
         )
         let binData = try Data(contentsOf: try referenceURL("motion/rowplay-motion.bin"))
+        let sourceData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-source.json")
+        )
+        guard case .success(let source) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData),
+              case .success(let motion) = ReplayAthleteCatalog.parseMotionManifest(data: manifestData) else {
+            return XCTFail("reference manifests must parse")
+        }
+        XCTAssertTrue(
+            ReplayAthleteCatalog.validateMotionManifest(
+                motion,
+                source: source,
+                binData: binData
+            ).isValid
+        )
+        XCTAssertEqual(motion.sourceCommit, source.pinnedCommit)
+        XCTAssertEqual(motion.sourceGlbSha256, source.glbSha256)
+        XCTAssertEqual(motion.motionBinByteCount, binData.count)
         let table = try ReplayAthleteMotionTable(manifestData: manifestData, binData: binData)
         XCTAssertEqual(table.boneNames, contract.semanticBoneNames)
         XCTAssertEqual(table.sourceCommit, Self.pinnedRowPlayMain)

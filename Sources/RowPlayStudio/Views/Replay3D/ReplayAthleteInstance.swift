@@ -34,8 +34,8 @@ final class ReplayAthleteTemplate {
         sourceManifest: ReplayAthleteSourceManifest,
         motionTable: ReplayAthleteMotionTable
     ) {
-        guard let athlete = root.findEntity(named: ReplayAthleteCatalog.skinnedMeshName)
-                ?? root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName) else {
+        guard let athlete = root.findEntity(named: contract.meshName)
+                ?? root.replayDescendant(named: contract.meshName) else {
             return nil
         }
         guard athlete.components[ModelComponent.self] != nil else {
@@ -126,8 +126,8 @@ final class ReplayAthleteTemplate {
         if let light = clone.findEntity(named: "env_light") {
             light.removeFromParent()
         }
-        guard let athlete = clone.findEntity(named: ReplayAthleteCatalog.skinnedMeshName)
-                ?? clone.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName) else {
+        guard let athlete = clone.findEntity(named: contract.meshName)
+                ?? clone.replayDescendant(named: contract.meshName) else {
             return nil
         }
         let instance = ReplayAthleteInstance(
@@ -187,14 +187,14 @@ final class ReplayAthleteInstance {
         // stack layer composes its install-time closure onto these transforms.
         self.workingTransforms = template.restTransforms
 
-        self.leftHandContact = root.findEntity(named: "v4LeftHandContact")
-            ?? root.replayDescendant(named: "v4LeftHandContact")
-        self.rightHandContact = root.findEntity(named: "v4RightHandContact")
-            ?? root.replayDescendant(named: "v4RightHandContact")
-        self.leftFootContact = root.findEntity(named: "v4LeftFootContact")
-            ?? root.replayDescendant(named: "v4LeftFootContact")
-        self.rightFootContact = root.findEntity(named: "v4RightFootContact")
-            ?? root.replayDescendant(named: "v4RightFootContact")
+        func contactEntity(for role: String) -> Entity? {
+            guard let name = ReplayAthleteCatalog.contactEntityNames[role] else { return nil }
+            return root.findEntity(named: name) ?? root.replayDescendant(named: name)
+        }
+        self.leftHandContact = contactEntity(for: "left-hand")
+        self.rightHandContact = contactEntity(for: "right-hand")
+        self.leftFootContact = contactEntity(for: "left-foot")
+        self.rightFootContact = contactEntity(for: "right-foot")
 
         // Stable names used by contact tests and equipment solvers.
         leftHandContact?.name = "hand-L"
