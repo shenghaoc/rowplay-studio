@@ -125,6 +125,16 @@ final class PersonalBestsTests: XCTestCase {
         XCTAssertEqual(ids, [1])
     }
 
+    func testPbWorkoutIdsKeepsFirstOnEqualTime() {
+        // Matches prior `.min { a.time < b.time }` behavior: strict less-than keeps first-seen.
+        let workouts = [
+            makeWorkout(id: 1, sport: .rower, distance: 2000, time: 420),
+            makeWorkout(id: 2, sport: .rower, distance: 2000, time: 420),
+        ]
+        let ids = PersonalBests.pbWorkoutIds(for: workouts)
+        XCTAssertEqual(ids, [1])
+    }
+
     func testStandardDistanceMatchesWithinTolerance() {
         XCTAssertEqual(PersonalBests.standardDistance(matching: 2_003), 2_000)
         XCTAssertNil(PersonalBests.standardDistance(matching: 1_700))
