@@ -50,26 +50,28 @@ public enum PersonalBests: Sendable {
         }
     }
 
+    /// Single O(N) pass: map each workout to at most one standard distance via
+    /// `standardDistance(matching:)`, keep the fastest time per bucket (O(K) space).
+    /// Ties keep the first-seen workout, matching the prior `.min(by:)` behavior.
     private static func bestWorkoutsPerStandardDistance(
         for workouts: [Workout],
         sport: Sport?
     ) -> [(distance: Double, workout: Workout)] {
-        let filtered = sport.map { s in workouts.filter { $0.sport == s } } ?? workouts
-        var bests: [(distance: Double, workout: Workout)] = []
+        var bestsByDistance: [Double: Workout] = [:]
 
-        for target in standardDistances {
-            guard let best = bestWorkout(in: filtered, for: target) else { continue }
-            bests.append((distance: target, workout: best))
+        for workout in workouts {
+            guard workout.time > 0 else { continue }
+            if let sport = sport, workout.sport != sport { continue }
+            guard let target = standardDistance(matching: workout.distance) else { continue }
+
+            if let existingBest = bestsByDistance[target], workout.time >= existingBest.time {
+                continue
+            }
+            bestsByDistance[target] = workout
         }
 
-        return bests
-    }
-
-    private static func bestWorkout(in workouts: [Workout], for target: Double) -> Workout? {
-        workouts
-            .filter { workout in
-                abs(workout.distance - target) <= target * distanceTolerance && workout.time > 0
-            }
-            .min { a, b in a.time < b.time }
+        return standardDistances.compactMap { target in
+            bestsByDistance[target].map { (target, $0) }
+        }
     }
 }

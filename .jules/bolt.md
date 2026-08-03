@@ -27,3 +27,7 @@
 ## 2026-07-30 - Intermediate Array Allocations from Higher-Order Functions
 **Learning:** In Swift, chaining higher-order functional array methods like `.reduce`, `.map`, and `.filter` creates intermediate array allocations. When executed on large arrays (like hundreds of parsed workouts during aggregation), this unnecessarily consumes memory and CPU.
 **Action:** Optimize data aggregations by replacing chained functional array methods with a single `for` loop to accumulate all required values in O(1) extra space.
+
+## 2026-08-03 - Intermediate Array Allocations from Multiple Filter and Min Calls
+**Learning:** In Swift, calling `.filter { ... }.min { ... }` inside a loop for each standard distance when trying to find the best workouts creates unnecessary intermediate array allocations for large arrays of workouts and results in an O(K * N) time complexity (where K is the number of standard distances).
+**Action:** Optimize with a single O(N) pass: resolve each workout to at most one standard distance via the existing tolerance helper, and keep the fastest time per bucket in a dictionary (O(K) space). Do not re-scan the full collection per distance.
