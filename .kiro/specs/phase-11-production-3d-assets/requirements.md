@@ -118,8 +118,10 @@ dense cycles.
 
 ## R9 — Privacy and accessibility
 
-9.1 Synthetic demo data only; no workout IDs, filenames, paths, tokens or
-user metrics in generated manifests; `PrivacySafeLogger` categories only.
+9.1 Synthetic demo data only; no workout IDs, user-derived filenames,
+absolute filesystem paths, tokens or user metrics in generated manifests.
+Pinned repo-relative provenance paths required by R1.2 are allowed;
+`PrivacySafeLogger` categories only.
 9.2 2D and 3D each expose one meaningful semantic replay element (sport,
 time, progress, pace, rival, gap); decorative drawing stays hidden from
 VoiceOver; controls remain keyboard operable in every quality/fallback state.

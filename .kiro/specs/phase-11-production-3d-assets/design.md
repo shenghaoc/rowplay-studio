@@ -30,7 +30,8 @@ CI-safe committed-bundle gate.
 - `ReplayAthleteGripController` collects the ten digit chains from contract
   rest transforms, runs `ReplayHandClosure.solve` per hand with the sport
   contract, and caches the resulting helper rotations (rest × oppose ×
-  flex, plus the palm-cup roll on `v4*Fingers`).
+  flex, plus palm-cup roll resolved through the contract-derived hand helper
+  mapping rather than a hard-coded joint name).
 - Rival styling is an opaque cool tint (white → ghost teal 34 %); live gets
   the 14 % violet identity tint.  No alpha on the deforming body.
 
@@ -51,14 +52,20 @@ tables (`ReplayRowGripContract`, `ReplaySkiGripContract`,
 `Replay3DSceneBuilder` composes: native venue (`ReplayEnvironment*` from the
 ported plan + CC0 maps, per-tier), sport rig (procedural from Core contracts
 at Low/Medium, authored packages at High/Ultra via
-`ReplayBundledRigVisualProvider`), production athletes (live + rival), the
-effect renderer, and the per-sport chase camera
+`ReplayBundledRigVisualProvider`), and production athletes (live + rival) at
+every tier.  Athlete surface detail follows the 0/128/256/512 px
+Low/Medium/High/Ultra ladder independently of the equipment-source split.
+The builder also owns the effect renderer and per-sport chase camera
 (`ReplayCameraSolver`/`ReplayCameraChaseRig` in Core).  2D scenes live in
 `Views/Replay2D/` and consume the same motion graph.
 
 ## Failure model
 
-Athlete, equipment and venue loads validate atomically and cache failures;
-any gate failure yields the complete procedural scene with all replay state
-(time, play/pause, speed, camera, quality, rival) preserved.  No per-frame
-retries, no mixed scenes.
+The athlete package validates atomically and caches failures.  A missing or
+invalid production athlete yields the complete procedural scene at any tier.
+At Low/Medium, a valid production athlete intentionally composes with
+contract-built procedural equipment; at High/Ultra, athlete and authored
+equipment must both validate or the graph falls back atomically.  Runtime
+athlete/contact failure likewise yields the complete procedural scene with all
+replay state (time, play/pause, speed, camera, quality, rival) preserved.  No
+per-frame retries or partial authored failure scenes.
