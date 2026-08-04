@@ -4,10 +4,10 @@ import XCTest
 final class ReplayRenderQualityTests: XCTestCase {
     func testAllTierConfigurationsMatchRequiredBudgets() {
         let expected: [(ReplayRenderQuality, [Int])] = [
-            (.low, [48, 24, 0, 0, 0, 30]),
-            (.medium, [72, 48, 16, 40, 4, 60]),
-            (.high, [96, 64, 28, 48, 4, 60]),
-            (.ultra, [144, 96, 44, 72, 6, 60]),
+            (.low, [48, 24, 0, 0, 0, 12, 30]),
+            (.medium, [72, 48, 16, 40, 4, 18, 60]),
+            (.high, [96, 64, 28, 48, 4, 22, 60]),
+            (.ultra, [144, 96, 44, 72, 6, 28, 60]),
         ]
 
         for (quality, values) in expected {
@@ -25,8 +25,41 @@ final class ReplayRenderQualityTests: XCTestCase {
                 values[4],
                 "\(quality)"
             )
-            XCTAssertEqual(configuration.targetFrameRate, values[5], "\(quality)")
+            XCTAssertEqual(configuration.buoysPerRing, values[5], "\(quality)")
+            XCTAssertEqual(configuration.targetFrameRate, values[6], "\(quality)")
         }
+    }
+
+    func testConfigurationClampsEveryGeometryAndEffectBudget() {
+        let configuration = ReplayRenderConfiguration(
+            courseRingSegmentCount: .max,
+            laneMarkerCount: -1,
+            wakeEntryCapacityPerParticipant: .max,
+            sprayParticleCapacity: -1,
+            sprayDropletsPerSidePerCatch: .max,
+            buoysPerRing: .max,
+            targetFrameRate: 1
+        )
+
+        XCTAssertEqual(
+            configuration.courseRingSegmentCount,
+            ReplayRenderConfiguration.maximumCourseRingSegmentCount
+        )
+        XCTAssertEqual(configuration.laneMarkerCount, 0)
+        XCTAssertEqual(
+            configuration.wakeEntryCapacityPerParticipant,
+            ReplayRenderConfiguration.maximumWakeEntryCapacityPerParticipant
+        )
+        XCTAssertEqual(configuration.sprayParticleCapacity, 0)
+        XCTAssertEqual(
+            configuration.sprayDropletsPerSidePerCatch,
+            ReplayRenderConfiguration.maximumSprayDropletsPerSidePerCatch
+        )
+        XCTAssertEqual(
+            configuration.buoysPerRing,
+            ReplayRenderConfiguration.maximumBuoysPerRing
+        )
+        XCTAssertEqual(configuration.targetFrameRate, 60)
     }
 
     func testMediumIsDefaultQuality() {

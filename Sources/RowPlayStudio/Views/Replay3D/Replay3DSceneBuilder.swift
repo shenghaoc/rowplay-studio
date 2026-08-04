@@ -24,7 +24,7 @@ final class Replay3DSceneContainer {
     /// of this choice because it remains active at every tier once validated.
     let visualSource: ReplayAssetVisualSource
     let usesCanonicalAthlete: Bool
-    let bundledEnvironment: Entity?
+    let bundledEnvironment: Entity
 
     init(
         root: Entity,
@@ -42,8 +42,8 @@ final class Replay3DSceneContainer {
         layout: ReplayCourseLayout,
         configuration: ReplayRenderConfiguration,
         visualSource: ReplayAssetVisualSource,
-        usesCanonicalAthlete: Bool
-        bundledEnvironment: Entity?
+        usesCanonicalAthlete: Bool,
+        bundledEnvironment: Entity
     ) {
         self.root = root
         self.camera = camera
@@ -141,6 +141,8 @@ enum Replay3DSceneBuilder {
         root.name = "scene-root"
 
         let layout = ReplayCourseLayout.standard
+        let environmentPlan = ReplayEnvironmentPlan.plan(for: sport)
+        let environmentTheme: ReplayEnvironmentTheme = colorScheme == .dark ? .dark : .light
 
         // Camera
         let camera = PerspectiveCamera()
@@ -149,19 +151,27 @@ enum Replay3DSceneBuilder {
         camera.position = SIMD3(0, 6, -12)
         root.addChild(camera)
 
-        // Lighting — directional sun + warm fill
+        // Venue-owned directional sun and opposing fill.
         let sun = DirectionalLight()
         sun.name = "sun"
-        sun.light.color = .white
-        sun.light.intensity = 12_000
-        sun.look(at: SIMD3(0, 0, 0), from: SIMD3(14, 26, 10), relativeTo: nil)
+        sun.light.color = environmentPlan.lighting.sunColor.resolvedColor(for: environmentTheme)
+        sun.light.intensity = environmentPlan.lighting.sunIntensity
+        sun.look(
+            at: SIMD3(0, 0, 0),
+            from: environmentPlan.lighting.sunOffset,
+            relativeTo: nil
+        )
         root.addChild(sun)
 
         let fill = DirectionalLight()
         fill.name = "fill-light"
-        fill.light.color = NSColor(calibratedRed: 1.0, green: 0.93, blue: 0.82, alpha: 1)
-        fill.light.intensity = 3_000
-        fill.look(at: SIMD3(0, 0, 0), from: SIMD3(-10, 8, -6), relativeTo: nil)
+        fill.light.color = environmentPlan.lighting.fillColor.resolvedColor(for: environmentTheme)
+        fill.light.intensity = environmentPlan.lighting.fillIntensity
+        fill.look(
+            at: SIMD3(0, 0, 0),
+            from: environmentPlan.lighting.fillOffset,
+            relativeTo: nil
+        )
         root.addChild(fill)
 
         // Ground
@@ -175,7 +185,8 @@ enum Replay3DSceneBuilder {
 
         // At High/Ultra the athlete and requested authored equipment are one
         // atomic source. Low/Medium intentionally pair the same validated V4
-        // athlete with their tier-specific procedural equipment.
+        // athlete with their tier-specific procedural equipment. The native
+        // procedural venue is deterministic and independent of that package.
         let resolvedVisualSource: ReplayAssetVisualSource =
             requestedEquipmentSource == .bundled && usesCanonicalAthlete
                 ? .bundled
@@ -183,15 +194,11 @@ enum Replay3DSceneBuilder {
         let bundledEnvironment = ReplayEnvironmentInstaller.install(
             sport: sport,
             quality: effectiveQuality,
-            colorScheme: colorScheme
+            colorScheme: colorScheme,
+            layout: layout
         )
-        if let bundledEnvironment {
-            let authoredLoopRadius = ReplayEnvironmentPlan.plan(for: sport).course.loopRadius
-            let venueScale = Float(layout.loopRadius / authoredLoopRadius)
-            bundledEnvironment.scale = SIMD3(repeating: venueScale)
-            ground.isEnabled = false
-            root.addChild(bundledEnvironment)
-        }
+        ground.isEnabled = false
+        root.addChild(bundledEnvironment)
 
         // Course ring
         let courseEntity = Entity()
@@ -256,7 +263,7 @@ enum Replay3DSceneBuilder {
             layout: layout,
             configuration: configuration,
             visualSource: resolvedVisualSource,
-            usesCanonicalAthlete: usesCanonicalAthlete
+            usesCanonicalAthlete: usesCanonicalAthlete,
             bundledEnvironment: bundledEnvironment
         )
     }

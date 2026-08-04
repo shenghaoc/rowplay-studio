@@ -78,10 +78,6 @@ enum ReplayEnvironmentTextureFailure: String, Equatable, Sendable {
 final class ReplayEnvironmentMaterialLibrary {
     static let shared = ReplayEnvironmentMaterialLibrary()
     private static let logger = PrivacySafeLogger(category: "replay-environment-texture")
-    /// Environment detail threshold at which surface maps switch on (High).
-    static let texturedDetailThreshold = 2
-    /// Environment detail threshold at which normal maps join (Ultra).
-    static let normalMappedDetailThreshold = 3
 
     private let resourceResolver: (ReplayEnvironmentTextureFamily, ReplayEnvironmentTextureSlot) -> URL?
     private let textureLoader: (URL, TextureResource.Semantic) throws -> TextureResource
@@ -119,7 +115,7 @@ final class ReplayEnvironmentMaterialLibrary {
 
     // MARK: - Materials
 
-    /// A physically based venue material for the given tier.
+    /// A physically based primary-receiver material for the given quality.
     ///
     /// - Parameters:
     ///   - family: CC0 family to bind at High/Ultra, or nil for an always
@@ -128,7 +124,8 @@ final class ReplayEnvironmentMaterialLibrary {
     ///     it, matching the web's map-times-color behavior.
     ///   - roughness: Scalar roughness; multiplied by the roughness map when
     ///     one is bound.
-    ///   - tier: Environment detail level 0...3.
+    ///   - quality: Low/Medium use scalar values, High adds diffuse and
+    ///     roughness maps, and Ultra also adds the normal map.
     ///   - textureRepeat: UV tiling applied through the material's texture
     ///     coordinate transform (the web per-texture `repeat`).
     ///   - metallic: Scalar metallic response.
@@ -136,7 +133,7 @@ final class ReplayEnvironmentMaterialLibrary {
         family: ReplayEnvironmentTextureFamily?,
         baseColor: NSColor,
         roughness: Float,
-        tier: Int,
+        quality: ReplayRenderQuality,
         textureRepeat: SIMD2<Float> = SIMD2(1, 1),
         metallic: Float = 0
     ) -> PhysicallyBasedMaterial {
@@ -145,28 +142,42 @@ final class ReplayEnvironmentMaterialLibrary {
         material.roughness = .init(floatLiteral: roughness)
         material.metallic = .init(floatLiteral: metallic)
 
-        guard let family, tier >= Self.texturedDetailThreshold else {
+        guard let family, Self.usesSurfaceMaps(at: quality) else {
             return material
         }
 
+        var boundMap = false
         if let diffuse = texture(family: family, slot: .diffuse) {
             material.baseColor = .init(tint: baseColor, texture: .init(diffuse))
+            boundMap = true
         }
         if let roughnessMap = texture(family: family, slot: .roughness) {
             material.roughness = .init(scale: roughness, texture: .init(roughnessMap))
+            boundMap = true
         }
-        if tier >= Self.normalMappedDetailThreshold,
+        if Self.usesNormalMap(at: quality),
             let normalMap = texture(family: family, slot: .normal) {
             // RealityKit has no per-material normal scale; the web's
             // `normalScale` tuning is dropped rather than approximated.
             material.normal = .init(texture: .init(normalMap))
+            boundMap = true
         }
-        material.textureCoordinateTransform = .init(
-            offset: SIMD2(0, 0),
-            scale: textureRepeat,
-            rotation: 0
-        )
+        if boundMap {
+            material.textureCoordinateTransform = .init(
+                offset: SIMD2(0, 0),
+                scale: textureRepeat,
+                rotation: 0
+            )
+        }
         return material
+    }
+
+    static func usesSurfaceMaps(at quality: ReplayRenderQuality) -> Bool {
+        quality == .high || quality == .ultra
+    }
+
+    static func usesNormalMap(at quality: ReplayRenderQuality) -> Bool {
+        quality == .ultra
     }
 
     // MARK: - Textures

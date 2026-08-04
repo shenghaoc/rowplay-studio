@@ -28,8 +28,10 @@ claim that the complete phase or visual QA matrix is finished.
 - [x] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.
 - [x] **7/8 Environments and quality** — add the three venue stories,
-      materials, lighting profiles, quality-tier differentiation, and atomic
-      environment fallback.
+      BikeErg line grammar, per-sport/theme lighting, primary-receiver
+      materials, planar native-course mapping, and quality-tier differentiation.
+      Environment geometry is non-failable; individual texture slots retain
+      scalar PBR when a bundled map is unavailable.
 - [ ] **8/8 Camera, rival, effects, and final QA** — finish scene wiring and
       run the staged-app matrix across renderers, sports, tiers, themes, rival
       modes, and Reduced Motion before claiming Phase 11 acceptance.
