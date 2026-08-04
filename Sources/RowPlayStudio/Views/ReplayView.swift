@@ -189,6 +189,7 @@ struct ReplayView: View {
                 #if os(macOS)
                 .help("Replay camera")
                 #endif
+                .accessibilityHint("Opens a menu to select the 3D replay camera angle")
 
                 if cameraPreset == .orbit {
                     orbitAdjustmentMenu
@@ -206,6 +207,7 @@ struct ReplayView: View {
                 #if os(macOS)
                 .help("Reset replay camera")
                 #endif
+                .accessibilityHint("Resets the 3D replay camera to its default position")
             }
             Spacer()
         }
@@ -619,6 +621,7 @@ struct ReplayView: View {
             #if os(macOS)
             .help(Self.qualityPickerHelp)
             #endif
+            .accessibilityHint("Opens a menu to select the maximum 3D replay quality")
 
             if Self.isAdaptiveReduction(
                 selected: preferences.replayRenderQuality,
