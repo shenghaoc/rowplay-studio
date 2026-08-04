@@ -82,7 +82,8 @@ public enum RowPlayFormatting: Sendable {
             return 0
         }
         let perMetre = pacePer500m / 500
-        return 2.8 / pow(perMetre, 3)
+        // Concept2 formula: watts = 2.8 / (pace/500)³ — multiply cube (avoid pow(x, 3))
+        return 2.8 / (perMetre * perMetre * perMetre)
     }
 
     public static func paceToWatts(for sport: Sport, pacePer500m: TimeInterval) -> Double {
