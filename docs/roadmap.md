@@ -382,11 +382,27 @@ Non-goals:
 
 ### Phase 11 - Production-Quality Bundled 3D Assets
 
-Status: planned follow-up.
+Status: implemented as the eight-layer replacement stack rooted at PR #90;
+each higher layer remains a draft until its immediate base merges. Full Phase
+11 completion is claimed only after all eight layers merge and exact-head CI
+and review gates are repeated bottom-up.
 
 Scope:
 
-- Bundle production-quality 3D athlete/equipment assets while retaining the procedural renderer as fallback.
+- Pin the current RowPlay reference bundle with reproducible provenance,
+  conversion, hashes, and validation.
+- Port renderer-neutral motion, quaternion, grip, contact, and hand-closure
+  contracts into `RowPlayCore` with Linux-compatible fixture parity.
+- Bundle validated RowErg, SkiErg, and BikeErg equipment plus the production
+  athlete and retain complete procedural fallbacks.
+- Replace the 2D placeholder with three purpose-built sport renderers.
+- Add the regatta basin, Nordic stadium, and velodrome venues with verified
+  textures and distinct Low through Ultra construction budgets.
+- Finish sport-specific camera and live/rival framing, exact seeking,
+  chase-rival live-viewport aspect handling, sport-static reduced-motion FOV,
+  effects, a 48-case procedural wiring matrix, and a 48-case deterministic
+  Reduced-Motion/seek/framing matrix. The staged human renderer walkthrough
+  remains a separate acceptance gate.
 - Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
 
 ## Review Strategy

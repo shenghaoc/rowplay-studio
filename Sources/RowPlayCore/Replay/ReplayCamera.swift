@@ -90,6 +90,10 @@ public struct ReplayCameraOrbit: Equatable, Sendable {
 
 /// A portable camera transform. RealityKit conversion happens in RowPlayStudio.
 public struct ReplayCameraPose: Equatable, Sendable {
+    public static let minimumFieldOfViewDegrees = 36.0
+    public static let maximumFieldOfViewDegrees = 52.0
+    public static let defaultFieldOfViewDegrees = 46.0
+
     public let positionX: Double
     public let positionY: Double
     public let positionZ: Double
@@ -118,8 +122,8 @@ public struct ReplayCameraPose: Equatable, Sendable {
             || !targetY.isFinite
             || !targetZ.isFinite
             || !fieldOfViewDegrees.isFinite
-            || fieldOfViewDegrees < 46
-            || fieldOfViewDegrees > 51
+            || fieldOfViewDegrees < Self.minimumFieldOfViewDegrees
+            || fieldOfViewDegrees > Self.maximumFieldOfViewDegrees
         self.positionX = positionX.isFinite ? positionX : 0
         self.positionY = positionY.isFinite ? positionY : 3.6
         self.positionZ = positionZ.isFinite ? positionZ : -5.8
@@ -127,8 +131,13 @@ public struct ReplayCameraPose: Equatable, Sendable {
         self.targetY = targetY.isFinite ? targetY : 0.85
         self.targetZ = targetZ.isFinite ? targetZ : 0
         self.fieldOfViewDegrees = min(
-            51,
-            max(46, fieldOfViewDegrees.isFinite ? fieldOfViewDegrees : 46)
+            Self.maximumFieldOfViewDegrees,
+            max(
+                Self.minimumFieldOfViewDegrees,
+                fieldOfViewDegrees.isFinite
+                    ? fieldOfViewDegrees
+                    : Self.defaultFieldOfViewDegrees
+            )
         )
     }
 
@@ -145,23 +154,42 @@ public struct ReplayCameraPose: Equatable, Sendable {
         targetX: 4.4,
         targetY: 0.85,
         targetZ: 0,
-        fieldOfViewDegrees: 46
+        fieldOfViewDegrees: defaultFieldOfViewDegrees
     )
-
-    fileprivate func withFixedFieldOfView() -> ReplayCameraPose {
-        ReplayCameraPose(
-            positionX: positionX,
-            positionY: positionY,
-            positionZ: positionZ,
-            targetX: targetX,
-            targetY: targetY,
-            targetZ: targetZ,
-            fieldOfViewDegrees: 46
-        )
-    }
 
     fileprivate func validated(fallback: ReplayCameraPose = .fallback) -> ReplayCameraPose {
         wasSanitized || !isFinite ? fallback : self
+    }
+}
+
+/// Per-sport rear three-quarter chase rig ported from the merged RowPlay
+/// `CAMERA_RIGS` and `BASE_CAMERA_FOV` tables.
+public struct ReplayCameraChaseRig: Equatable, Sendable {
+    public let back: Double
+    public let height: Double
+    public let ahead: Double
+    public let lateral: Double
+    public let aimY: Double
+    public let baseFieldOfView: Double
+
+    public static func rig(for sport: Sport) -> ReplayCameraChaseRig {
+        switch sport {
+        case .rower:
+            ReplayCameraChaseRig(
+                back: 4.05, height: 1.78, ahead: 0.88, lateral: 2.16, aimY: 0.84,
+                baseFieldOfView: 40
+            )
+        case .skierg:
+            ReplayCameraChaseRig(
+                back: 3.15, height: 2.3, ahead: 0.9, lateral: 1.86, aimY: 1.14,
+                baseFieldOfView: 42
+            )
+        case .bike:
+            ReplayCameraChaseRig(
+                back: 3.12, height: 1.96, ahead: 0.58, lateral: 1.92, aimY: 0.92,
+                baseFieldOfView: 42
+            )
+        }
     }
 }
 
@@ -169,12 +197,48 @@ public struct ReplayCameraPose: Equatable, Sendable {
 public enum ReplayCameraSolver: Sendable {
     public static let positionDampingRate = 7.5
     public static let fieldOfViewDampingRate = 2.5
+    public static let defaultViewportAspect = 1.6
+    public static let minimumViewportDimension = 1.0
+    /// FOV breathing gain above the walking-speed threshold.
+    public static let speedFieldOfViewGain = 2.0
+    /// Flat pullback added whenever a rival is on course.
+    public static let rivalPullback = 1.05
+    /// Fraction of the horizontal half-frustum reserved for participants.
+    /// The remaining edge space keeps equipment and limbs away from clipping.
+    static let rivalFrustumFillFraction = 0.9
+    static let minimumRivalFrustumDepth = 0.001
 
+    /// Converts live viewport dimensions into a stable camera aspect. SwiftUI
+    /// can transiently report zero/sub-point geometry while laying out or
+    /// rebuilding the RealityView, so those values use the authored default.
+    public static func viewportAspect(width: Double, height: Double) -> Double {
+        guard width.isFinite,
+              height.isFinite,
+              width >= minimumViewportDimension,
+              height >= minimumViewportDimension else {
+            return defaultViewportAspect
+        }
+        return sanitizedViewportAspect(width / height)
+    }
+
+    /// Repairs direct solver inputs as well as values produced by the live
+    /// viewport seam. Extremely narrow/non-positive frusta cannot provide a
+    /// useful rival-fit calculation and fall back deterministically.
+    public static func sanitizedViewportAspect(_ aspect: Double) -> Double {
+        aspect.isFinite && aspect > 0.2 ? aspect : defaultViewportAspect
+    }
+
+    /// - Parameter aspect: Viewport width divided by height. Used only for
+    ///   horizontal rival fitting in the chase preset; solo and non-chase
+    ///   poses intentionally retain their authored framing.
     public static func targetPose(
         preset: ReplayCameraPreset,
+        sport: Sport = .rower,
         participant: ReplayPosition,
         tangent: ReplayPosition,
         speed: Double,
+        rival: ReplayPosition? = nil,
+        aspect: Double = ReplayCameraSolver.defaultViewportAspect,
         orbit: ReplayCameraOrbit = ReplayCameraOrbit(),
         reduceMotion: Bool = false
     ) -> ReplayCameraPose {
@@ -184,26 +248,53 @@ public enum ReplayCameraSolver: Sendable {
         let direction = normalizedHorizontal(x: tangent.x, z: tangent.z, fallbackX: 1, fallbackZ: 0)
         let rightX = -direction.z
         let rightZ = direction.x
-        let radial = normalizedHorizontal(
-            x: px,
-            z: pz,
-            fallbackX: rightX,
-            fallbackZ: rightZ
-        )
 
         let pose: ReplayCameraPose
         switch preset {
         case .chase:
-            let replaySpeed = speed.isFinite ? max(0, speed) : 0
-            let speedFraction = min(1, max(0, (replaySpeed - 3) / 6))
+            let rig = ReplayCameraChaseRig.rig(for: sport)
+            // Rival comparison: focus the lane midpoint and pull back so the
+            // pair's padded camera-space angles fit the horizontal frustum.
+            var focusX = px
+            var focusZ = pz
+            var back = rig.back
+            var height = rig.height
+            if reduceMotion {
+                // Reduced Motion widens the static frame instead of animating
+                // FOV or lagging the camera.
+                back += 0.8
+                height += 0.7
+            }
+            let fieldOfView = chaseFieldOfView(
+                rig: rig,
+                speed: speed,
+                reduceMotion: reduceMotion
+            )
+            if let rival {
+                let rx = finite(rival.x, fallback: px)
+                let rz = finite(rival.z, fallback: pz)
+                let fit = rivalChaseFit(
+                    participant: (x: px, z: pz),
+                    rival: (x: rx, z: rz),
+                    direction: direction,
+                    rig: rig,
+                    minimumBack: back + rivalPullback,
+                    fieldOfViewDegrees: fieldOfView,
+                    aspect: aspect,
+                    horizontalPadding: rivalHorizontalPadding(for: sport)
+                )
+                focusX = fit.focusX
+                focusZ = fit.focusZ
+                back = fit.back
+            }
             pose = ReplayCameraPose(
-                positionX: px - direction.x * 5.8 + radial.x * 1.1,
-                positionY: py + 3.6,
-                positionZ: pz - direction.z * 5.8 + radial.z * 1.1,
-                targetX: px + direction.x * 4.4,
-                targetY: py + 0.85,
-                targetZ: pz + direction.z * 4.4,
-                fieldOfViewDegrees: 46 + speedFraction * 5
+                positionX: focusX - direction.x * back + rightX * rig.lateral,
+                positionY: py + height,
+                positionZ: focusZ - direction.z * back + rightZ * rig.lateral,
+                targetX: focusX + direction.x * rig.ahead,
+                targetY: py + rig.aimY,
+                targetZ: focusZ + direction.z * rig.ahead,
+                fieldOfViewDegrees: fieldOfView
             )
         case .side:
             pose = ReplayCameraPose(
@@ -213,7 +304,7 @@ public enum ReplayCameraSolver: Sendable {
                 targetX: px,
                 targetY: py + 0.9,
                 targetZ: pz,
-                fieldOfViewDegrees: 46
+                fieldOfViewDegrees: ReplayCameraPose.defaultFieldOfViewDegrees
             )
         case .overhead:
             pose = ReplayCameraPose(
@@ -223,7 +314,7 @@ public enum ReplayCameraSolver: Sendable {
                 targetX: px,
                 targetY: py + 0.5,
                 targetZ: pz,
-                fieldOfViewDegrees: 46
+                fieldOfViewDegrees: ReplayCameraPose.defaultFieldOfViewDegrees
             )
         case .orbit:
             let horizontalDistance = orbit.distance * cos(orbit.pitch)
@@ -236,12 +327,115 @@ public enum ReplayCameraSolver: Sendable {
                 targetX: px,
                 targetY: py + 0.9,
                 targetZ: pz,
-                fieldOfViewDegrees: 46
+                fieldOfViewDegrees: ReplayCameraPose.defaultFieldOfViewDegrees
             )
         }
 
-        let safePose = pose.validated()
-        return reduceMotion ? safePose.withFixedFieldOfView() : safePose
+        return pose.validated()
+    }
+
+    static func rivalHorizontalPadding(for sport: Sport) -> Double {
+        sport == .rower ? 1.6 : 1.1
+    }
+
+    private struct RivalChaseFit {
+        let focusX: Double
+        let focusZ: Double
+        let back: Double
+    }
+
+    private static func chaseFieldOfView(
+        rig: ReplayCameraChaseRig,
+        speed: Double,
+        reduceMotion: Bool
+    ) -> Double {
+        guard !reduceMotion else { return rig.baseFieldOfView }
+        let replaySpeed = speed.isFinite ? max(0, speed) : 0
+        let speedFraction = min(1, max(0, (replaySpeed - 3) / 6))
+        return rig.baseFieldOfView + speedFraction * speedFieldOfViewGain
+    }
+
+    /// Fits both participant origins in the actual laterally-offset chase
+    /// camera. A lateral-only world-space projection is insufficient here:
+    /// course gaps also change camera-space depth and angle as the camera aims
+    /// ahead of the pair midpoint.
+    private static func rivalChaseFit(
+        participant: (x: Double, z: Double),
+        rival: (x: Double, z: Double),
+        direction: (x: Double, z: Double),
+        rig: ReplayCameraChaseRig,
+        minimumBack: Double,
+        fieldOfViewDegrees: Double,
+        aspect: Double,
+        horizontalPadding: Double
+    ) -> RivalChaseFit {
+        // Dividing before addition avoids overflowing a finite midpoint.
+        let focusX = participant.x / 2 + rival.x / 2
+        let focusZ = participant.z / 2 + rival.z / 2
+        let right = (x: -direction.z, z: direction.x)
+        let verticalHalfAngle = fieldOfViewDegrees * .pi / 360
+        let horizontalHalfAngle = atan(
+            tan(verticalHalfAngle) * sanitizedViewportAspect(aspect)
+        ) * rivalFrustumFillFraction
+
+        func fits(back: Double) -> Bool {
+            let cameraX = focusX - direction.x * back + right.x * rig.lateral
+            let cameraZ = focusZ - direction.z * back + right.z * rig.lateral
+            let targetX = focusX + direction.x * rig.ahead
+            let targetZ = focusZ + direction.z * rig.ahead
+            let viewX = targetX - cameraX
+            let viewZ = targetZ - cameraZ
+            let viewLength = hypot(viewX, viewZ)
+            guard viewLength.isFinite, viewLength > minimumRivalFrustumDepth else {
+                return false
+            }
+            let forwardX = viewX / viewLength
+            let forwardZ = viewZ / viewLength
+            let cameraRightX = -forwardZ
+            let cameraRightZ = forwardX
+
+            func contains(pointX: Double, pointZ: Double) -> Bool {
+                let offsetX = pointX - cameraX
+                let offsetZ = pointZ - cameraZ
+                let depth = offsetX * forwardX + offsetZ * forwardZ
+                guard depth.isFinite, depth > minimumRivalFrustumDepth else {
+                    return false
+                }
+                let lateral = abs(offsetX * cameraRightX + offsetZ * cameraRightZ)
+                let paddedAngle = atan2(lateral + horizontalPadding, depth)
+                return paddedAngle.isFinite && paddedAngle <= horizontalHalfAngle
+            }
+
+            return contains(pointX: participant.x, pointZ: participant.z)
+                && contains(pointX: rival.x, pointZ: rival.z)
+        }
+
+        var upperBack = max(0, finite(minimumBack, fallback: rig.back))
+        if !fits(back: upperBack) {
+            for _ in 0..<64 {
+                let expanded = max(upperBack + 1, upperBack * 2)
+                guard expanded.isFinite else { break }
+                upperBack = expanded
+                if fits(back: upperBack) { break }
+            }
+        }
+
+        // Keep the authored flat pullback as the lower bound and converge on
+        // the smallest fitted distance. `upperBack` is already fitted for all
+        // finite ReplayCourseLayout positions used by the renderer.
+        var lowerBack = max(0, finite(minimumBack, fallback: rig.back))
+        if fits(back: upperBack) {
+            for _ in 0..<64 {
+                let candidate = lowerBack + (upperBack - lowerBack) / 2
+                if fits(back: candidate) {
+                    upperBack = candidate
+                } else {
+                    lowerBack = candidate
+                }
+            }
+        }
+
+        return RivalChaseFit(focusX: focusX, focusZ: focusZ, back: upperBack)
     }
 
     public static func smoothedPose(
@@ -254,10 +448,10 @@ public enum ReplayCameraSolver: Sendable {
     ) -> ReplayCameraPose {
         let safeTarget = target.validated()
         if current.wasSanitized || !current.isFinite {
-            return reduceMotion ? safeTarget.withFixedFieldOfView() : safeTarget
+            return safeTarget
         }
         if reduceMotion {
-            return safeTarget.withFixedFieldOfView()
+            return safeTarget
         }
 
         let safeDt = dt.isFinite ? max(0, dt) : 0

@@ -3,6 +3,15 @@ import Observation
 import RealityKit
 import RowPlayCore
 
+enum ReplayOrbitAdjustment: Equatable, Sendable {
+    case rotateLeft
+    case rotateRight
+    case rotateUp
+    case rotateDown
+    case zoomIn
+    case zoomOut
+}
+
 /// Owns scene-local camera interaction and RealityKit transform application.
 /// Playback time remains owned by `ReplayState` and its existing timeline.
 @MainActor
@@ -10,7 +19,9 @@ import RowPlayCore
 final class ReplayCameraController {
     var orbit = ReplayCameraOrbit()
 
-    @ObservationIgnored private var currentPose: ReplayCameraPose?
+    /// Last portable pose applied to RealityKit. Kept readable for scene-level
+    /// acceptance tests so camera wiring is verified without matrix decoding.
+    @ObservationIgnored private(set) var resolvedPose: ReplayCameraPose?
     @ObservationIgnored private var smoothedSpeed: Double = 0
     @ObservationIgnored private var previousDistance: Double?
     @ObservationIgnored private var previousPreset: ReplayCameraPreset?
@@ -22,13 +33,18 @@ final class ReplayCameraController {
     @ObservationIgnored private var forceSnap = true
 
     private static let dragRadiansPerPoint = 0.006
+    private static let keyboardRotationStep = 10.0 * Double.pi / 180.0
+    private static let keyboardZoomFactor = 1.2
     private static let speedDampingRate = 3.0
     private static let maximumContinuousDistanceDelta = 30.0
 
     func update(
         camera: PerspectiveCamera,
         layout: ReplayCourseLayout,
+        sport: Sport,
         distance: Double,
+        rivalDistance: Double? = nil,
+        viewportAspect: Double = ReplayCameraSolver.defaultViewportAspect,
         deltaTime: TimeInterval,
         playbackTickGeneration: UInt64,
         preset: ReplayCameraPreset,
@@ -81,11 +97,15 @@ final class ReplayCameraController {
 
         let participantPosition = layout.position(at: safeDistance)
         let courseTangent = layout.tangent(at: safeDistance)
+        let rivalPosition = rivalDistance.map { layout.ghostPosition(at: $0) }
         let targetPose = ReplayCameraSolver.targetPose(
             preset: preset,
+            sport: sport,
             participant: participantPosition,
             tangent: courseTangent,
             speed: smoothedSpeed,
+            rival: rivalPosition,
+            aspect: viewportAspect,
             orbit: orbit,
             reduceMotion: reduceMotion
         )
@@ -100,14 +120,14 @@ final class ReplayCameraController {
         let solvedPose = shouldSnap
             ? targetPose
             : ReplayCameraSolver.smoothedPose(
-                current: currentPose ?? targetPose,
+                current: resolvedPose ?? targetPose,
                 target: targetPose,
                 dt: safeDeltaTime,
                 reduceMotion: reduceMotion
             )
 
         apply(solvedPose.isFinite ? solvedPose : targetPose, to: camera)
-        currentPose = solvedPose.isFinite ? solvedPose : targetPose
+        resolvedPose = solvedPose.isFinite ? solvedPose : targetPose
         previousDistance = safeDistance
         previousPreset = preset
         appliedResetGeneration = resetGeneration
@@ -155,8 +175,29 @@ final class ReplayCameraController {
         forceSnap = true
     }
 
+    func applyOrbitAdjustment(_ adjustment: ReplayOrbitAdjustment) {
+        var updated = orbit
+        switch adjustment {
+        case .rotateLeft:
+            updated.rotate(yawDelta: Self.keyboardRotationStep, pitchDelta: 0)
+        case .rotateRight:
+            updated.rotate(yawDelta: -Self.keyboardRotationStep, pitchDelta: 0)
+        case .rotateUp:
+            updated.rotate(yawDelta: 0, pitchDelta: Self.keyboardRotationStep)
+        case .rotateDown:
+            updated.rotate(yawDelta: 0, pitchDelta: -Self.keyboardRotationStep)
+        case .zoomIn:
+            updated.zoom(magnification: Self.keyboardZoomFactor)
+        case .zoomOut:
+            updated.zoom(magnification: 1 / Self.keyboardZoomFactor)
+        }
+        orbit = updated
+        endInteractions()
+        forceSnap = true
+    }
+
     func resetSceneState() {
-        currentPose = nil
+        resolvedPose = nil
         smoothedSpeed = 0
         previousDistance = nil
         previousPreset = nil
@@ -183,9 +224,12 @@ final class ReplayCameraController {
             finiteFloat(pose.targetY),
             finiteFloat(pose.targetZ)
         )
-        let fieldOfView = finiteFloat(pose.fieldOfViewDegrees, fallback: 46)
+        let fieldOfView = finiteFloat(
+            pose.fieldOfViewDegrees,
+            fallback: Float(ReplayCameraPose.defaultFieldOfViewDegrees)
+        )
 
-        camera.camera.fieldOfViewInDegrees = min(51, max(46, fieldOfView))
+        camera.camera.fieldOfViewInDegrees = fieldOfView
         camera.look(at: target, from: position, relativeTo: nil)
     }
 

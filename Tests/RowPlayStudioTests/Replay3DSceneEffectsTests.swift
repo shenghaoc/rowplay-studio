@@ -73,6 +73,60 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         )
     }
 
+    func testMissingGhostPoseDisablesRigCameraAndEffects() {
+        let configuration = ReplayRenderQuality.medium.configuration
+        let missingPoseScene = Replay3DSceneBuilder.buildScene(
+            sport: .rower,
+            colorScheme: .dark,
+            configuration: configuration
+        )
+        let soloScene = Replay3DSceneBuilder.buildScene(
+            sport: .rower,
+            colorScheme: .dark,
+            configuration: configuration
+        )
+        let missingPoseController = ReplayCameraController()
+        let soloController = ReplayCameraController()
+
+        func drive(
+            scene: Replay3DSceneContainer,
+            controller: ReplayCameraController,
+            ghostVisible: Bool
+        ) {
+            for (index, distance) in [0.0, 5.0].enumerated() {
+                XCTAssertTrue(Replay3DSceneBuilder.updateScene(
+                    container: scene,
+                    livePose: ReplayStrokePose.fallback(
+                        sport: .rower,
+                        phase: Double(index) * 0.4,
+                        rate: 28
+                    ),
+                    liveDistance: distance,
+                    sport: .rower,
+                    ghostPose: nil,
+                    ghostDistance: 80,
+                    ghostVisible: ghostVisible,
+                    reduceMotion: false,
+                    viewportAspect: 0.75,
+                    deltaTime: 1.0 / 60.0,
+                    playbackTickGeneration: UInt64(index + 1),
+                    isPlaying: true,
+                    cameraController: controller,
+                    cameraPreset: .chase,
+                    cameraResetGeneration: 0,
+                    replayDiscontinuityGeneration: 0
+                ))
+            }
+        }
+
+        drive(scene: missingPoseScene, controller: missingPoseController, ghostVisible: true)
+        drive(scene: soloScene, controller: soloController, ghostVisible: false)
+
+        XCTAssertFalse(missingPoseScene.ghostGroup.isEnabled)
+        XCTAssertEqual(missingPoseScene.effectRenderer.ghostWakeCount, 0)
+        XCTAssertEqual(missingPoseController.resolvedPose, soloController.resolvedPose)
+    }
+
     func testLiveAndGhostWakeHistoriesAdvanceIndependently() {
         let renderer = makeRenderer(sport: .skierg)
 
@@ -290,6 +344,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 0,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 1,
@@ -302,6 +357,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 6,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 2,
@@ -316,6 +372,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 6,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 2,

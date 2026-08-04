@@ -16,10 +16,13 @@ struct RealityReplaySceneView: View {
     let reduceMotion: Bool
     /// Generic rival (past session, constant pace, or imported). Nil = no rival.
     let rival: ReplayRival?
+    let distanceUnit: DistanceUnit
     let selectedQuality: ReplayRenderQuality
     @Binding var effectiveQuality: ReplayRenderQuality
     let cameraPreset: ReplayCameraPreset
     let cameraResetGeneration: Int
+    let orbitAdjustment: ReplayOrbitAdjustment?
+    let orbitAdjustmentGeneration: Int
     let replayDiscontinuityGeneration: Int
 
     @Environment(\.colorScheme) private var colorScheme
@@ -37,20 +40,26 @@ struct RealityReplaySceneView: View {
         state: Binding<ReplayState>,
         reduceMotion: Bool,
         rival: ReplayRival?,
+        distanceUnit: DistanceUnit,
         selectedQuality: ReplayRenderQuality,
         effectiveQuality: Binding<ReplayRenderQuality>,
         cameraPreset: ReplayCameraPreset,
         cameraResetGeneration: Int,
+        orbitAdjustment: ReplayOrbitAdjustment?,
+        orbitAdjustmentGeneration: Int,
         replayDiscontinuityGeneration: Int
     ) {
         self.detail = detail
         _state = state
         self.reduceMotion = reduceMotion
         self.rival = rival
+        self.distanceUnit = distanceUnit
         self.selectedQuality = selectedQuality
         _effectiveQuality = effectiveQuality
         self.cameraPreset = cameraPreset
         self.cameraResetGeneration = cameraResetGeneration
+        self.orbitAdjustment = orbitAdjustment
+        self.orbitAdjustmentGeneration = orbitAdjustmentGeneration
         self.replayDiscontinuityGeneration = replayDiscontinuityGeneration
         _performanceController = State(
             initialValue: ReplayPerformanceController(selectedQuality: selectedQuality)
@@ -60,17 +69,28 @@ struct RealityReplaySceneView: View {
     var body: some View {
         let configuration = performanceController.effectiveQuality.configuration
         let interval = 1.0 / Double(configuration.targetFrameRate)
-        TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
-            Replay3DQualityRebuildBoundary(
-                effectiveQuality: performanceController.effectiveQuality,
-                sceneIdentity: Replay3DSceneIdentity(
-                    workoutID: detail.id,
-                    rivalID: rival?.id,
-                    sportRawValue: sport.rawValue
-                ),
-                assetGeneration: assetLoadGeneration
-            ) {
-                realityContent(timeline: timeline, configuration: configuration)
+        GeometryReader { geometry in
+            let viewportAspect = ReplayCameraSolver.viewportAspect(
+                width: Double(geometry.size.width),
+                height: Double(geometry.size.height)
+            )
+            TimelineView(.animation(minimumInterval: interval, paused: !state.playing)) { timeline in
+                Replay3DQualityRebuildBoundary(
+                    effectiveQuality: performanceController.effectiveQuality,
+                    sceneIdentity: Replay3DSceneIdentity(
+                        workoutID: detail.id,
+                        rivalID: rival?.id,
+                        sportRawValue: sport.rawValue
+                    ),
+                    colorScheme: colorScheme,
+                    assetGeneration: assetLoadGeneration
+                ) {
+                    realityContent(
+                        timeline: timeline,
+                        configuration: configuration,
+                        viewportAspect: viewportAspect
+                    )
+                }
             }
         }
         .frame(minHeight: 300)
@@ -115,12 +135,19 @@ struct RealityReplaySceneView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("3D workout replay")
         .accessibilityValue(accessibilityDescription)
+        .accessibilityHint(cameraPreset == .orbit
+            ? "Use the Adjust Orbit Camera menu to rotate or zoom with the keyboard"
+            : "Choose a camera from the Replay Camera menu")
         .simultaneousGesture(orbitDragGesture)
         .simultaneousGesture(orbitMagnificationGesture)
         .simultaneousGesture(orbitResetGesture)
         .onChange(of: cameraPreset) { _, _ in
             cameraController.endOrbitDrag()
             cameraController.endOrbitMagnification()
+        }
+        .onChange(of: orbitAdjustmentGeneration) { _, _ in
+            guard cameraPreset == .orbit, let orbitAdjustment else { return }
+            cameraController.applyOrbitAdjustment(orbitAdjustment)
         }
     }
 
@@ -129,7 +156,8 @@ struct RealityReplaySceneView: View {
     @ViewBuilder
     private func realityContent(
         timeline: TimelineViewDefaultContext,
-        configuration: ReplayRenderConfiguration
+        configuration: ReplayRenderConfiguration,
+        viewportAspect: Double
     ) -> some View {
         RealityView { make in
             // Precompute immutable aggregates once per live workout, and per
@@ -173,6 +201,7 @@ struct RealityReplaySceneView: View {
                 ghostDistance: ghostSample.distance,
                 ghostVisible: rival != nil,
                 reduceMotion: reduceMotion,
+                viewportAspect: viewportAspect,
                 deltaTime: sceneState.lastFrameDelta,
                 playbackTickGeneration: sceneState.playbackTickGeneration,
                 isPlaying: state.playing,
@@ -411,16 +440,53 @@ struct RealityReplaySceneView: View {
     // MARK: - Accessibility
 
     private var accessibilityDescription: String {
-        let sportName = sport.displayName
+        Self.accessibilityDescription(
+            sport: sport,
+            cameraPreset: cameraPreset,
+            frame: state.currentFrame,
+            duration: state.duration,
+            distanceUnit: distanceUnit,
+            rival: rival,
+            reduceMotion: reduceMotion
+        )
+    }
+
+    static func accessibilityDescription(
+        sport: Sport,
+        cameraPreset: ReplayCameraPreset,
+        frame: ReplayFrame,
+        duration: TimeInterval,
+        distanceUnit: DistanceUnit,
+        rival: ReplayRival?,
+        reduceMotion: Bool
+    ) -> String {
         let progress = ReplayTelemetryFormatting.roundedInteger(
-            state.currentFrame.progress * 100,
+            frame.progress * 100,
             fallback: "0"
         )
-        let pace = RowPlayFormatting.pace(state.currentFrame.pace)
-        let cadence = ReplayTelemetryFormatting.roundedInteger(state.currentFrame.cadence)
-        let unit = sport.cadenceUnit
-        let ghost = rival != nil ? "ghost present" : "no ghost"
-        return "\(sportName), \(cameraPreset.displayName) camera, \(progress)%, \(pace), \(cadence) \(unit), \(ghost)"
+        var parts = [
+            sport.displayName,
+            "\(cameraPreset.displayName) camera",
+            "Time \(RowPlayFormatting.time(frame.t, tenths: true)) of \(RowPlayFormatting.time(duration, tenths: true))",
+            "Progress \(progress)%",
+            "Pace \(RowPlayFormatting.pace(frame.pace))",
+            reduceMotion ? "Reduced motion" : "Animated athlete",
+        ]
+        if let rival {
+            let rivalDistance = ReplayRaceGap.ghostDistance(
+                elapsed: frame.t,
+                strokes: rival.strokes
+            )
+            let gap = ReplayRaceGap.raceGapMeters(
+                playerDistance: frame.d,
+                ghostDistance: rivalDistance
+            )
+            parts.append("Rival \(rival.displayLabel)")
+            parts.append(ReplayRivalGapFormatting.metersLabel(gap, unit: distanceUnit))
+        } else {
+            parts.append("No rival")
+        }
+        return parts.joined(separator: ", ")
     }
 
 }
@@ -430,15 +496,18 @@ struct RealityReplaySceneView: View {
 struct Replay3DQualityGraphIdentity: Hashable {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let colorScheme: ColorScheme
     let assetGeneration: Int
 
     init(
         effectiveQuality: ReplayRenderQuality,
         sceneIdentity: Replay3DSceneIdentity,
+        colorScheme: ColorScheme = .light,
         assetGeneration: Int = 0
     ) {
         self.effectiveQuality = effectiveQuality
         self.sceneIdentity = sceneIdentity
+        self.colorScheme = colorScheme
         self.assetGeneration = assetGeneration
     }
 }
@@ -449,17 +518,20 @@ struct Replay3DQualityGraphIdentity: Hashable {
 struct Replay3DQualityRebuildBoundary<Content: View>: View {
     let effectiveQuality: ReplayRenderQuality
     let sceneIdentity: Replay3DSceneIdentity
+    let colorScheme: ColorScheme
     let assetGeneration: Int
     private let content: Content
 
     init(
         effectiveQuality: ReplayRenderQuality,
         sceneIdentity: Replay3DSceneIdentity,
+        colorScheme: ColorScheme = .light,
         assetGeneration: Int = 0,
         @ViewBuilder content: () -> Content
     ) {
         self.effectiveQuality = effectiveQuality
         self.sceneIdentity = sceneIdentity
+        self.colorScheme = colorScheme
         self.assetGeneration = assetGeneration
         self.content = content()
     }
@@ -468,6 +540,7 @@ struct Replay3DQualityRebuildBoundary<Content: View>: View {
         content.id(Replay3DQualityGraphIdentity(
             effectiveQuality: effectiveQuality,
             sceneIdentity: sceneIdentity,
+            colorScheme: colorScheme,
             assetGeneration: assetGeneration
         ))
     }

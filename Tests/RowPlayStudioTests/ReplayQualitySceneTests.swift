@@ -493,6 +493,35 @@ final class ReplayQualitySceneTests: XCTestCase {
         XCTAssertEqual(performanceController.effectiveQuality, effectiveQualityBefore)
     }
 
+    func testThemeTransitionRebuildsOnlyInnerGraphState() {
+        let sceneIdentity = Replay3DSceneIdentity(
+            workoutID: 1,
+            rivalID: "session-2",
+            sportRawValue: Sport.rower.rawValue
+        )
+        let lightGraph = Replay3DQualityGraphIdentity(
+            effectiveQuality: .high,
+            sceneIdentity: sceneIdentity,
+            colorScheme: .light
+        )
+        let darkGraph = Replay3DQualityGraphIdentity(
+            effectiveQuality: .high,
+            sceneIdentity: sceneIdentity,
+            colorScheme: .dark
+        )
+        let stableOwnerBefore = Replay3DViewIdentity(
+            workoutID: sceneIdentity.workoutID,
+            sportRawValue: sceneIdentity.sportRawValue
+        )
+        let stableOwnerAfter = Replay3DViewIdentity(
+            workoutID: sceneIdentity.workoutID,
+            sportRawValue: sceneIdentity.sportRawValue
+        )
+
+        XCTAssertNotEqual(lightGraph, darkGraph)
+        XCTAssertEqual(stableOwnerBefore, stableOwnerAfter)
+    }
+
     func testWorkoutTransitionReplacesOuterSceneStateOwner() {
         let firstWorkout = Replay3DViewIdentity(
             workoutID: 1,
@@ -531,6 +560,102 @@ final class ReplayQualitySceneTests: XCTestCase {
             ReplayView.adaptiveQualityHelp,
             "Quality was reduced to maintain replay performance"
         )
+    }
+
+    func testReducedMotionHonorsEverySupportedSource() {
+        XCTAssertFalse(ReplayView.shouldReduceMotion(
+            appPreference: false,
+            systemPreference: false,
+            automationMode: false
+        ))
+        XCTAssertTrue(ReplayView.shouldReduceMotion(
+            appPreference: true,
+            systemPreference: false,
+            automationMode: false
+        ))
+        XCTAssertTrue(ReplayView.shouldReduceMotion(
+            appPreference: false,
+            systemPreference: true,
+            automationMode: false
+        ))
+        XCTAssertTrue(ReplayView.shouldReduceMotion(
+            appPreference: false,
+            systemPreference: false,
+            automationMode: true
+        ))
+    }
+
+    func testKeyboardOrbitAdjustmentsRotateAndZoomReversibly() {
+        let cameraController = ReplayCameraController()
+        let initial = cameraController.orbit
+
+        cameraController.applyOrbitAdjustment(.rotateLeft)
+        XCTAssertGreaterThan(cameraController.orbit.yaw, initial.yaw)
+        cameraController.applyOrbitAdjustment(.rotateRight)
+        XCTAssertEqual(cameraController.orbit.yaw, initial.yaw, accuracy: 1e-12)
+
+        cameraController.applyOrbitAdjustment(.rotateUp)
+        XCTAssertGreaterThan(cameraController.orbit.pitch, initial.pitch)
+        cameraController.applyOrbitAdjustment(.rotateDown)
+        XCTAssertEqual(cameraController.orbit.pitch, initial.pitch, accuracy: 1e-12)
+
+        cameraController.applyOrbitAdjustment(.zoomIn)
+        XCTAssertLessThan(cameraController.orbit.distance, initial.distance)
+        cameraController.applyOrbitAdjustment(.zoomOut)
+        XCTAssertEqual(cameraController.orbit.distance, initial.distance, accuracy: 1e-12)
+    }
+
+    func test3DAccessibilitySemanticsIncludeTelemetryRivalIdentityAndGap() {
+        let frame = ReplayFrame(
+            t: 5,
+            d: 60,
+            pace: 120,
+            cadence: 28,
+            watts: 220,
+            progress: 0.5
+        )
+        let rival = ReplayRival(
+            id: "pace-boat",
+            kind: .constantPace,
+            displayLabel: "2:00 pace boat",
+            strokes: [
+                Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 220),
+                Stroke(t: 10, d: 50, pace: 120, cadence: 28, watts: 220),
+            ],
+            hasGenuineStrokeData: false,
+            targetPace: 120
+        )
+
+        let value = RealityReplaySceneView.accessibilityDescription(
+            sport: .rower,
+            cameraPreset: .side,
+            frame: frame,
+            duration: 10,
+            distanceUnit: .metric,
+            rival: rival,
+            reduceMotion: true
+        )
+
+        XCTAssertTrue(value.contains("RowErg"))
+        XCTAssertTrue(value.contains("Side camera"))
+        XCTAssertTrue(value.contains("Time 0:05.0 of 0:10.0"))
+        XCTAssertTrue(value.contains("Progress 50%"))
+        XCTAssertTrue(value.contains("Pace 2:00.0/500m"))
+        XCTAssertTrue(value.contains("Reduced motion"))
+        XCTAssertTrue(value.contains("Rival 2:00 pace boat"))
+        XCTAssertTrue(value.contains("Ahead 35 m"))
+
+        let noRival = RealityReplaySceneView.accessibilityDescription(
+            sport: .rower,
+            cameraPreset: .side,
+            frame: frame,
+            duration: 10,
+            distanceUnit: .metric,
+            rival: nil,
+            reduceMotion: false
+        )
+        XCTAssertTrue(noRival.contains("Animated athlete"))
+        XCTAssertTrue(noRival.contains("No rival"))
     }
 
     func testQualityStatusStartsAtPersistedCeilingAndOnlyReportsLowerTiers() {
