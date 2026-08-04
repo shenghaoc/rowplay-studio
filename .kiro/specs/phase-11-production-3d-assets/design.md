@@ -52,6 +52,13 @@ CI-safe committed-bundle gate.
   detail map; Medium/High/Ultra generate exact 128/256/512 px maps off-main,
   then create and cache immutable RealityKit texture resources once per tier
   for reuse by live and rival instances. No network request is possible.
+- Each sport rig fixes a `ReplayRigSource` at build time. Bundled rigs require
+  a motion sample and use one shared sample/contact pipeline; they never fall
+  through to an unbuilt procedural athlete during pose application.
+- Contact roles and terminal bones come from the validated athlete contract.
+  One precomputed hierarchy/contact plan and one mutable matrix workspace are
+  reused per instance; joint edits update only dirty descendant matrices and
+  a failed residual restores the sampled pose atomically.
 
 ## Grip system (RowPlayCore)
 
@@ -87,7 +94,9 @@ with contract-built procedural equipment; at High/Ultra, athlete and authored
 equipment must both validate or the graph falls back atomically.  Runtime
 athlete/contact failure likewise yields the complete procedural scene with all
 replay state (time, play/pause, speed, camera, quality, rival) preserved.  No
-per-frame retries or partial authored failure scenes.
+per-frame retries or partial authored failure scenes.  Rig logical visual slots
+are mapped to authored equipment source names and every clone is preflighted
+before either athlete or equipment is attached.
 
 Equipment bundle URL resolution and RealityKit entity/provider work stay on
 the main actor; immutable manifest/package reads, streaming hashes, JSON

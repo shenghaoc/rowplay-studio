@@ -18,7 +18,11 @@ protocol ReplaySportRig: AnyObject {
     ///   - motion: Optional phase sample for V4 animation seeking. When the
     ///     rig uses the canonical athlete, the adapter samples the authored
     ///     clip from this value; the native clock remains authoritative.
-    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?)
+    @discardableResult
+    func applyPose(
+        _ pose: ReplaySportRigPose,
+        motion: ReplayAthleteMotionSample?
+    ) -> ReplaySportRigPoseResult
     /// Apply ghost translucency to all materials.
     func applyGhostTranslucency()
     /// Returns and clears a V4 runtime failure that requires rebuilding the
@@ -28,7 +32,8 @@ protocol ReplaySportRig: AnyObject {
 
 @MainActor
 extension ReplaySportRig {
-    func applyPose(_ pose: ReplaySportRigPose) {
+    @discardableResult
+    func applyPose(_ pose: ReplaySportRigPose) -> ReplaySportRigPoseResult {
         applyPose(pose, motion: nil)
     }
 }
@@ -42,7 +47,7 @@ extension ReplaySportRig {
 @MainActor
 extension ReplaySportRig {
     func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
+        ReplayRigAppearancePolicy.applyRivalEquipment(to: root, excludingAthlete: nil)
     }
 }
 
@@ -69,13 +74,27 @@ enum ReplaySportRigFactory {
         visualProvider: (any ReplayRigVisualProvider)? = nil,
         canonicalAthlete: ReplayAthleteInstance? = nil
     ) -> ReplaySportRig {
+        let preflightProvider: ReplayPreflightRigVisualProvider?
+        if let alreadyPreflighted = visualProvider as? ReplayPreflightRigVisualProvider {
+            preflightProvider = alreadyPreflighted.isComplete(for: sport)
+                ? alreadyPreflighted
+                : nil
+        } else if let visualProvider {
+            preflightProvider = ReplayPreflightRigVisualProvider(base: visualProvider, sport: sport)
+        } else {
+            preflightProvider = nil
+        }
+
+        // Athlete and equipment are one build-time source decision. A missing
+        // athlete or any visual clone discards both authored inputs.
+        let usesBundledSource = preflightProvider != nil && canonicalAthlete != nil
         let resolvedVisualProvider: (any ReplayRigVisualProvider)?
-        if let visualProvider {
+        if usesBundledSource, let preflightProvider {
             // Bundled accent slots are recoloured on an independent clone. The
             // procedural provider remains unchanged because it already creates
             // its materials using this same `accent` value.
             resolvedVisualProvider = ReplayAccentRigVisualProvider(
-                base: visualProvider,
+                base: preflightProvider,
                 accent: NSColor(accent)
             )
         } else {
@@ -90,7 +109,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: canonicalAthlete
+                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
             )
             return rig
         case .skierg:
@@ -100,7 +119,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: canonicalAthlete
+                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
             )
             return rig
         case .bike:
@@ -110,7 +129,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: canonicalAthlete
+                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
             )
             return rig
         }
@@ -134,14 +153,23 @@ enum ReplaySportRigFiniteGuard {
     }
 }
 
-/// Shared ghost translucency application for all sport rigs.
+/// One explicit appearance policy for the mixed RealityKit rig hierarchy.
+/// Bundled deforming bodies remain opaque/depth-writing; only equipment uses
+/// alpha in a rival rig. Procedural athletes have no excluded body and retain
+/// the historical whole-rig translucency.
 @MainActor
-enum ReplaySportRigTranslucency {
+enum ReplayRigAppearancePolicy {
+    static let rivalEquipmentOpacity: Float = 0.45
+
+    static func applyRivalEquipment(to root: Entity, excludingAthlete: Entity?) {
+        apply(to: root, opacity: rivalEquipmentOpacity, excluding: excludingAthlete)
+    }
+
     /// Recursively apply opacity to every built-in material type used by the
     /// procedural rig, generated USDA assets, and the V4 athlete. Each
     /// live/ghost clone has independent materials, so this never mutates a
     /// cached template.
-    static func apply(to entity: Entity, opacity: Float, excluding excluded: Entity? = nil) {
+    private static func apply(to entity: Entity, opacity: Float, excluding excluded: Entity?) {
         if entity === excluded {
             return
         }

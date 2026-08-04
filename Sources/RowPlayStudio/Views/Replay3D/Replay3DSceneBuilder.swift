@@ -90,7 +90,19 @@ enum Replay3DSceneBuilder {
         case .bundled:
             // Atomic package: equipment provider plus independent V4 clones.
             let assetSet = matchingAssetSet!
-            visualProvider = assetSet.rigVisualProvider
+            guard let preflightProvider = ReplayPreflightRigVisualProvider(
+                base: assetSet.rigVisualProvider,
+                sport: sport
+            ) else {
+                return buildScene(
+                    sport: sport,
+                    colorScheme: colorScheme,
+                    configuration: configuration,
+                    effectiveQuality: effectiveQuality,
+                    bundledAssetSet: nil
+                )
+            }
+            visualProvider = preflightProvider
             liveAthlete = assetSet.makeAthleteInstance(
                 sport: sport,
                 name: "live-v4-athlete",

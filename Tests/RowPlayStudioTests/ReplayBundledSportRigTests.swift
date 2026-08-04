@@ -89,7 +89,7 @@ final class ReplayBundledSportRigTests: XCTestCase {
             sport: .rower,
             rigVisualProvider: rowerSet.rigVisualProvider,
             athleteTemplate: rowerSet.athleteTemplate,
-            athleteInstanceFactory: { _, _, _ in nil }
+            athleteInstanceFactory: { _, _, _, _ in nil }
         )
         let failedClone = Replay3DSceneBuilder.buildScene(
             sport: .rower,
@@ -101,12 +101,128 @@ final class ReplayBundledSportRigTests: XCTestCase {
         assertCompleteProceduralScene(failedClone)
     }
 
-    func testGripControllersInstallCompleteClosuresAndSportChannelOffsets() async throws {
+    func testEquipmentPreflightFailureSelectsOneProceduralRig() async throws {
+        let loaded = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower)
+        let assetSet = try XCTUnwrap(loaded)
+        let athlete = try XCTUnwrap(assetSet.makeAthleteInstance(
+            sport: .rower,
+            name: "preflight-athlete",
+            isRival: false,
+            quality: .ultra
+        ))
+        let missingSource = try XCTUnwrap(
+            ReplayRigVisualCatalog.slots(for: .rower).first?.sourceName
+        )
+        let rig = ReplaySportRigFactory.build(
+            sport: .rower,
+            into: ModelEntity(),
+            accent: .green,
+            opacity: 1,
+            visualProvider: FailingRigVisualProvider(missingSource: missingSource),
+            canonicalAthlete: athlete
+        )
+
+        XCTAssertNotNil(rig.root.replayDescendant(named: "pelvis"))
+        XCTAssertNotNil(rig.root.replayDescendant(named: "hull-model"))
+        XCTAssertNil(rig.root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName))
+        XCTAssertNil(rig.root.replayDescendant(named: "bundled-test-visual"))
+    }
+
+    func testWrongSportPreflightSelectsOneCompleteProceduralRig() async throws {
+        let loaded = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower)
+        let rowerSet = try XCTUnwrap(loaded)
+        let rowerPreflight = try XCTUnwrap(ReplayPreflightRigVisualProvider(
+            base: rowerSet.rigVisualProvider,
+            sport: .rower
+        ))
+        let bikeAthlete = try XCTUnwrap(await rowerSet.athleteTemplate.makeInstance(
+            sport: .bike,
+            name: "wrong-preflight-athlete",
+            isRival: false,
+            quality: .ultra
+        ))
+
+        XCTAssertTrue(rowerPreflight.isComplete(for: .rower))
+        XCTAssertFalse(rowerPreflight.isComplete(for: .bike))
+        XCTAssertEqual(
+            rowerPreflight.logicalNames,
+            Set(ReplayRigVisualCatalog.slots(for: .rower).map(\.logicalName))
+        )
+        XCTAssertFalse(rowerPreflight.logicalNames.contains("visual-programming-error"))
+
+        let rig = ReplaySportRigFactory.build(
+            sport: .bike,
+            into: ModelEntity(),
+            accent: .green,
+            opacity: 1,
+            visualProvider: rowerPreflight,
+            canonicalAthlete: bikeAthlete
+        )
+
+        XCTAssertNotNil(rig.root.replayDescendant(named: "pelvis"))
+        XCTAssertNotNil(rig.root.replayDescendant(named: "chainStay-L"))
+        XCTAssertNil(rig.root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName))
+    }
+
+    func testVisualCatalogMapsEveryLogicalSlotToAuthoredEquipment() {
+        let expectedCounts: [Sport: Int] = [.rower: 8, .skierg: 9, .bike: 11]
+        for sport in ReplayAssetCatalog.supportedSports {
+            let slots = ReplayRigVisualCatalog.slots(for: sport)
+            XCTAssertEqual(slots.count, expectedCounts[sport])
+            XCTAssertEqual(Set(slots.map(\.logicalName)).count, slots.count)
+            XCTAssertTrue(slots.allSatisfy { $0.logicalName.hasPrefix("visual-") })
+            XCTAssertTrue(slots.allSatisfy { $0.sourceName.hasPrefix("equipment:") })
+        }
+    }
+
+    func testPreflightExhaustsTheExactCatalogForEverySport() async throws {
+        for sport in ReplayAssetCatalog.supportedSports {
+            let loaded = await ReplayAssetLibrary.shared.bundledAssetSet(for: sport)
+            let assetSet = try XCTUnwrap(loaded)
+            let preflight = try XCTUnwrap(ReplayPreflightRigVisualProvider(
+                base: assetSet.rigVisualProvider,
+                sport: sport
+            ))
+            let expected = Set(ReplayRigVisualCatalog.slots(for: sport).map(\.logicalName))
+            XCTAssertEqual(preflight.sport, sport)
+            XCTAssertEqual(preflight.logicalNames, expected)
+            XCTAssertTrue(preflight.isComplete(for: sport))
+            for logicalName in expected {
+                XCTAssertNotNil(preflight.cloneVisual(named: logicalName))
+            }
+        }
+    }
+
+    func testGripControllerSourceContainsNoPinnedHandOrCupBoneLiterals() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repositoryRoot.appendingPathComponent(
+            "Sources/RowPlayStudio/Views/Replay3D/ReplayAthleteGripController.swift"
+        )
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        for forbidden in [
+            "v4LeftHand",
+            "v4RightHand",
+            "v4LeftFingers",
+            "v4RightFingers",
+        ] {
+            XCTAssertFalse(source.contains(forbidden), "Found pinned controller literal: \(forbidden)")
+        }
+    }
+
+    func testGripControllersInstallCompleteClosuresAndResolveChannelNativeContacts() async throws {
         let loaded = await ReplayAthleteLibrary.shared.athleteTemplate()
         let template = try XCTUnwrap(loaded)
         for sport in ReplayAssetCatalog.supportedSports {
             let instance = try XCTUnwrap(
-                template.makeInstance(sport: sport, name: "grip-probe", isRival: false)
+                await template.makeInstance(
+                    sport: sport,
+                    name: "grip-probe",
+                    isRival: false,
+                    quality: .ultra
+                )
             )
             for side in ReplayHandSide.allCases {
                 let closure = instance.gripController.closure(forSide: side)
@@ -116,14 +232,53 @@ final class ReplayBundledSportRigTests: XCTestCase {
                     XCTAssertNotNil(instance.gripController.solvedRotation(forHelper: pose.helper))
                 }
                 let role: ReplayAthleteContactRole = side == .left ? .leftHand : .rightHand
-                let actual = try XCTUnwrap(instance.effectiveContactOffset(role: role))
-                let expected = ReplayAthleteGripController.effectorOffset(
-                    for: sport,
-                    side: side
+                let authored = try XCTUnwrap(instance.authoredContactSpec(role: role))
+                let resolved = try XCTUnwrap(instance.resolvedContactSpec(role: role))
+                var authoredPalm = ReplayGripGeometry.handPalmContact
+                authoredPalm.x *= side.rawValue
+                XCTAssertEqual(authored.localOffset.x, authoredPalm.x, accuracy: 1e-9)
+                XCTAssertEqual(authored.localOffset.y, authoredPalm.y, accuracy: 1e-9)
+                XCTAssertEqual(authored.localOffset.z, authoredPalm.z, accuracy: 1e-9)
+                XCTAssertEqual(resolved.bone, authored.bone)
+                XCTAssertEqual(resolved.role, role)
+                XCTAssertEqual(resolved.model, .sportGripChannel)
+                XCTAssertEqual(
+                    instance.gripController.terminalHandBone(forSide: side),
+                    authored.bone
                 )
-                XCTAssertEqual(actual.x, Float(expected.x), accuracy: 1e-6)
-                XCTAssertEqual(actual.y, Float(expected.y), accuracy: 1e-6)
-                XCTAssertEqual(actual.z, Float(expected.z), accuracy: 1e-6)
+                let cupHelper = instance.gripController.cupHelper(forSide: side)
+                XCTAssertEqual(instance.contract.parentName(of: cupHelper), authored.bone)
+                XCTAssertTrue(instance.contract.helpers.contains { $0.name == cupHelper })
+
+                let expected: SIMD3<Double>
+                switch sport {
+                case .rower:
+                    expected = ReplayGripGeometry.handChannelCentre(
+                        radius: ReplayRowGripContract.scullGrip.radius,
+                        side: side
+                    )
+                case .skierg:
+                    var centre = ReplayGripGeometry.handFistCentre
+                    centre.x *= side.rawValue
+                    expected = centre
+                case .bike:
+                    expected = ReplayGripGeometry.handChannelCentre(
+                        radius: ReplayBikeGripContract.hoodRadius,
+                        side: side
+                    )
+                }
+                XCTAssertEqual(resolved.localOffset.x, expected.x, accuracy: 1e-9)
+                XCTAssertEqual(resolved.localOffset.y, expected.y, accuracy: 1e-9)
+                XCTAssertEqual(resolved.localOffset.z, expected.z, accuracy: 1e-9)
+            }
+
+            for role in [ReplayAthleteContactRole.leftFoot, .rightFoot] {
+                let authored = try XCTUnwrap(instance.authoredContactSpec(role: role))
+                let resolved = try XCTUnwrap(instance.resolvedContactSpec(role: role))
+                XCTAssertEqual(resolved.bone, authored.bone)
+                XCTAssertEqual(resolved.role, role)
+                XCTAssertEqual(resolved.model, .authoredSole)
+                XCTAssertEqual(resolved.localOffset, authored.localOffset)
             }
         }
     }
@@ -175,11 +330,113 @@ final class ReplayBundledSportRigTests: XCTestCase {
                     "Expected finite in-contract contacts for \(sport.rawValue) phase \(phase)"
                 )
                 if updated {
-                    assertCanonicalHandContacts(in: scene.liveRig, sport: sport)
-                    assertCanonicalHandContacts(in: scene.ghostRig, sport: sport)
+                    assertCanonicalContacts(in: scene.liveRig, sport: sport)
+                    assertCanonicalContacts(in: scene.ghostRig, sport: sport)
+                    let metrics = try XCTUnwrap(ReplayAthleteContactSolver.lastMetricsForTesting)
+                    XCTAssertEqual(metrics.topologyBuilds, 0)
+                    XCTAssertEqual(metrics.fullWorkspaceBuilds, 1)
+                    XCTAssertLessThanOrEqual(
+                        metrics.jointMatrixEvaluations,
+                        512,
+                        "Contact pass exceeded its deterministic matrix budget"
+                    )
+                    if sport == .bike,
+                       case .applied(let error, _) = ReplayAthleteContactSolver.lastResultForTesting {
+                        XCTAssertLessThanOrEqual(
+                            error.maximumGripChannelError,
+                            ReplayAthleteContactSolver.gripChannelContactBudgetMeters
+                        )
+                        XCTAssertLessThanOrEqual(
+                            error.maximumSoleError,
+                            ReplayAthleteContactSolver.reachContactBudgetMeters
+                        )
+                        XCTAssertLessThanOrEqual(
+                            error.pelvis,
+                            ReplayAthleteContactSolver.reachContactBudgetMeters
+                        )
+                    }
                 }
             }
         }
+    }
+
+    func testBundledRigWithoutMotionFailsClosedWithoutProceduralMutation() async throws {
+        let loadedSet = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower)
+        let assetSet = try XCTUnwrap(loadedSet)
+        let scene = Replay3DSceneBuilder.buildScene(
+            sport: .rower,
+            colorScheme: .dark,
+            configuration: ReplayRenderQuality.ultra.configuration,
+            effectiveQuality: .ultra,
+            bundledAssetSet: assetSet
+        )
+        let mesh = try XCTUnwrap(
+            scene.liveRig.root.replayDescendant(named: ReplayAthleteCatalog.skinnedMeshName)
+        )
+        let before = try XCTUnwrap(
+            mesh.components[SkeletalPosesComponent.self]?.poses.default
+        ).jointTransforms
+        let pose = ReplayRigPoseSolver.solve(
+            sport: .rower,
+            strokePose: .fallback(sport: .rower, phase: 1.2, rate: 28),
+            distance: 0,
+            reduceMotion: false
+        )
+
+        XCTAssertEqual(scene.liveRig.applyPose(pose, motion: nil), .failed(.missingMotionSample))
+        let after = try XCTUnwrap(
+            mesh.components[SkeletalPosesComponent.self]?.poses.default
+        ).jointTransforms
+        XCTAssertEqual(before.map(\.translation), after.map(\.translation))
+        XCTAssertEqual(before.map(\.rotation.vector), after.map(\.rotation.vector))
+        XCTAssertNil(scene.liveRig.root.replayDescendant(named: "pelvis"))
+        XCTAssertTrue(scene.liveRig.consumeCanonicalRuntimeFailure())
+    }
+
+    func testMalformedContactHierarchyFailsBeforeSolve() {
+        let failure = ReplayAthleteContactSolver.hierarchyFailureForTesting(
+            jointNames: ["v4Hips/v4Spine"]
+        )
+        guard case .malformedHierarchy = failure else {
+            return XCTFail("Expected missing-parent hierarchy failure, got \(String(describing: failure))")
+        }
+    }
+
+    func testUnreachableContactPassRestoresTheSampledPose() async throws {
+        let loaded = await ReplayAssetLibrary.shared.bundledAssetSet(for: .rower)
+        let assetSet = try XCTUnwrap(loaded)
+        let instance = try XCTUnwrap(assetSet.makeAthleteInstance(
+            sport: .rower,
+            name: "atomic-contact-probe",
+            isRival: false,
+            quality: .ultra
+        ))
+        let space = Entity()
+        instance.attach(to: space)
+        instance.captureBaseRootTransform()
+        let beforePose = try XCTUnwrap(instance.currentConstraintPose())
+        let beforeRoot = instance.root.transform
+
+        let result = ReplayAthleteContactSolver.solve(
+            instance: instance,
+            targets: ReplayAthleteContactTargets(
+                pelvis: .zero,
+                leftHand: SIMD3(-100, 100, 100),
+                rightHand: SIMD3(100, 100, 100),
+                leftFoot: SIMD3(-100, -100, 100),
+                rightFoot: SIMD3(100, -100, 100)
+            ),
+            relativeTo: space
+        )
+
+        guard case .failed(.residualExceeded, _) = result else {
+            return XCTFail("Expected typed residual failure, got \(result)")
+        }
+        let afterPose = try XCTUnwrap(instance.currentConstraintPose())
+        XCTAssertEqual(beforePose.jointTransforms.map(\.translation), afterPose.jointTransforms.map(\.translation))
+        XCTAssertEqual(beforePose.jointTransforms.map(\.rotation.vector), afterPose.jointTransforms.map(\.rotation.vector))
+        XCTAssertEqual(beforeRoot.translation, instance.root.transform.translation)
+        XCTAssertEqual(beforeRoot.rotation.vector, instance.root.transform.rotation.vector)
     }
 
     func testMissingSkeletalPoseTriggersOneShotRuntimeFailure() async throws {
@@ -340,7 +597,7 @@ final class ReplayBundledSportRigTests: XCTestCase {
         )
     }
 
-    private func assertCanonicalHandContacts(
+    private func assertCanonicalContacts(
         in rig: ReplaySportRig,
         sport: Sport,
         file: StaticString = #filePath,
@@ -364,6 +621,28 @@ final class ReplayBundledSportRigTests: XCTestCase {
                     anchor.position(relativeTo: rig.root)
                 ),
                 ReplayAthleteContactSolver.gripChannelContactBudgetMeters,
+                file: file,
+                line: line
+            )
+        }
+        let footAnchors = sport == .bike
+            ? [("foot-L", "pedal-L"), ("foot-R", "pedal-R")]
+            : [("foot-L", "foot-anchor-L"), ("foot-R", "foot-anchor-R")]
+        for (contactName, anchorName) in footAnchors {
+            guard let contact = rig.root.replayDescendant(named: contactName),
+                  let anchor = rig.root.replayDescendant(named: anchorName) else {
+                return XCTFail(
+                    "Missing \(contactName) or \(anchorName)",
+                    file: file,
+                    line: line
+                )
+            }
+            XCTAssertLessThanOrEqual(
+                simd_distance(
+                    contact.position(relativeTo: rig.root),
+                    anchor.position(relativeTo: rig.root)
+                ),
+                ReplayAthleteContactSolver.reachContactBudgetMeters,
                 file: file,
                 line: line
             )
@@ -416,5 +695,25 @@ final class ReplayBundledSportRigTests: XCTestCase {
             values.append(contentsOf: materialAlphas(in: child))
         }
         return values
+    }
+}
+
+@MainActor
+private final class FailingRigVisualProvider: ReplayRigVisualProvider {
+    let usesBundledAssets = true
+    private let missingSource: String
+
+    init(missingSource: String) {
+        self.missingSource = missingSource
+    }
+
+    func cloneVisual(named name: String) -> Entity? {
+        guard name != missingSource else { return nil }
+        let entity = ModelEntity(
+            mesh: .generateBox(size: 0.1),
+            materials: [SimpleMaterial(color: .white, isMetallic: false)]
+        )
+        entity.name = "bundled-test-visual"
+        return entity
     }
 }

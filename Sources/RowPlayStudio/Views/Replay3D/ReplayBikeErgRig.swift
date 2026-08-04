@@ -23,10 +23,8 @@ final class ReplayBikeErgRig: ReplaySportRig {
     // Rider group (contains athlete body)
     private let rider = Entity()
 
-    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
-    private let athlete = ReplayAthleteRig()
-    private var canonicalAthlete: ReplayAthleteInstance?
-    private var poseAdapter: ReplayAthletePoseAdapter?
+    // Fixed once during build; pose application never crosses source paths.
+    private var source: ReplayRigSource?
     private var canonicalRuntimeFailure = false
 
     // Pedal references for foot attachment
@@ -218,13 +216,15 @@ final class ReplayBikeErgRig: ReplaySportRig {
 
         // Athlete body (seated, aero tuck). Canonical V4 and procedural are exclusive.
         if let canonicalAthlete {
-            self.canonicalAthlete = canonicalAthlete
-            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
-            canonicalAthlete.attach(to: rider)
-            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
-            canonicalAthlete.root.position = .zero
-            canonicalAthlete.captureBaseRootTransform()
+            source = .bundled(ReplayBundledAthleteRuntime(
+                instance: canonicalAthlete,
+                sport: .bike,
+                parent: rider,
+                rootScale: 0.95,
+                rootPosition: .zero
+            ))
         } else {
+            let athlete = ReplayAthleteRig()
             athlete.build(
                 into: rider,
                 seated: true,
@@ -233,15 +233,20 @@ final class ReplayBikeErgRig: ReplaySportRig {
                 visualProvider: nil
             )
             athlete.pelvis.position = .zero
+            source = .procedural(athlete)
         }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
+    @discardableResult
+    func applyPose(
+        _ pose: ReplaySportRigPose,
+        motion: ReplayAthleteMotionSample?
+    ) -> ReplaySportRigPoseResult {
         guard case .bike(let bikePose) = pose else {
             assertionFailure("ReplayBikeErgRig.applyPose received non-bike pose")
-            return
+            return .failed(.unexpectedSport)
         }
 
         // Finite guard at Studio/RealityKit boundary
@@ -260,56 +265,40 @@ final class ReplayBikeErgRig: ReplaySportRig {
         // Rider sway
         rider.orientation = simd_quatf(angle: riderSway, axis: SIMD3(0, 0, 1))
 
-        let pelvisTarget = SIMD3<Float>.zero
+        let pelvisTarget = rider.position(relativeTo: root)
         let handL = handleGripL.position(relativeTo: root)
         let handR = handleGripR.position(relativeTo: root)
         let footL = pedalL.position(relativeTo: root)
         let footR = pedalR.position(relativeTo: root)
 
-        if let canonicalAthlete, let poseAdapter, let motion {
-            let sampled = poseAdapter.apply(sample: motion, sport: .bike, to: canonicalAthlete)
-            // Contact space is the rig root so pedals and grips stay authoritative.
-            let targets = ReplayAthleteContactTargets(
-                pelvis: rider.position(relativeTo: root),
-                leftHand: handL,
-                rightHand: handR,
-                leftFoot: footL,
-                rightFoot: footR
-            )
-            if sampled,
-               canonicalAthlete.hasFiniteJointTransforms(),
-               ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
-                ReplayAthleteContactSolver.orientHandsToTargets(
-                    instance: canonicalAthlete,
-                    targets: targets,
-                    relativeTo: root
-                )
-                let contactError = ReplayAthleteContactSolver.constrain(
-                    instance: canonicalAthlete,
-                    targets: targets,
-                    relativeTo: root
-                )
-                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
-                    || !canonicalAthlete.hasFiniteJointTransforms()
-            } else {
-                canonicalRuntimeFailure = true
-            }
-            // Keep a local zero under the swaying rider group after world placement.
-            _ = pelvisTarget
-        } else {
+        let targets = ReplayAthleteContactTargets(
+            pelvis: pelvisTarget,
+            leftHand: handL,
+            rightHand: handR,
+            leftFoot: footL,
+            rightFoot: footR
+        )
+        switch source {
+        case .bundled(let runtime):
+            let result = runtime.apply(motion: motion, targets: targets, relativeTo: root)
+            canonicalRuntimeFailure = result.failure != nil
+            return result
+        case .procedural(let athlete):
             athlete.applyPose(bikePose.joints)
             athlete.handL.setPosition(handL, relativeTo: root)
             athlete.handR.setPosition(handR, relativeTo: root)
             athlete.footL.setPosition(footL, relativeTo: root)
             athlete.footR.setPosition(footR, relativeTo: root)
+            return .applied
+        case nil:
+            return .failed(.motionSampleRejected)
         }
     }
 
     func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(
+        ReplayRigAppearancePolicy.applyRivalEquipment(
             to: root,
-            opacity: 0.45,
-            excluding: canonicalAthlete?.athleteEntity
+            excludingAthlete: source?.bundledAthlete?.athleteEntity
         )
     }
 

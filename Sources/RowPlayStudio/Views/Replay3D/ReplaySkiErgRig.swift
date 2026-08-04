@@ -21,10 +21,8 @@ final class ReplaySkiErgRig: ReplaySportRig {
     private let footAnchorR = Entity()
     private var poles: [Entity] = []
 
-    // Athlete — either the lightweight procedural body or the V4 USDZ instance.
-    private let athlete = ReplayAthleteRig()
-    private var canonicalAthlete: ReplayAthleteInstance?
-    private var poseAdapter: ReplayAthletePoseAdapter?
+    // Fixed once during build; pose application never crosses source paths.
+    private var source: ReplayRigSource?
     private var canonicalRuntimeFailure = false
 
     // MARK: - Build
@@ -172,13 +170,15 @@ final class ReplaySkiErgRig: ReplaySportRig {
 
         // Athlete body (standing). Canonical V4 and procedural paths are exclusive.
         if let canonicalAthlete {
-            self.canonicalAthlete = canonicalAthlete
-            self.poseAdapter = ReplayAthletePoseAdapter(contract: canonicalAthlete.contract)
-            canonicalAthlete.attach(to: root)
-            canonicalAthlete.root.scale = SIMD3(repeating: 0.95)
-            canonicalAthlete.root.position = SIMD3(0, 0.72, 0.02)
-            canonicalAthlete.captureBaseRootTransform()
+            source = .bundled(ReplayBundledAthleteRuntime(
+                instance: canonicalAthlete,
+                sport: .skierg,
+                parent: root,
+                rootScale: 0.95,
+                rootPosition: SIMD3(0, 0.72, 0.02)
+            ))
         } else {
+            let athlete = ReplayAthleteRig()
             athlete.build(
                 into: root,
                 seated: false,
@@ -187,15 +187,20 @@ final class ReplaySkiErgRig: ReplaySportRig {
                 visualProvider: nil
             )
             athlete.pelvis.position = SIMD3(0, 0.72, 0.02)
+            source = .procedural(athlete)
         }
     }
 
     // MARK: - Pose Application
 
-    func applyPose(_ pose: ReplaySportRigPose, motion: ReplayAthleteMotionSample?) {
+    @discardableResult
+    func applyPose(
+        _ pose: ReplaySportRigPose,
+        motion: ReplayAthleteMotionSample?
+    ) -> ReplaySportRigPoseResult {
         guard case .skierg(let skiPose) = pose else {
             assertionFailure("ReplaySkiErgRig.applyPose received non-skierg pose")
-            return
+            return .failed(.unexpectedSport)
         }
 
         // Finite guard at Studio/RealityKit boundary
@@ -233,48 +238,35 @@ final class ReplaySkiErgRig: ReplaySportRig {
         let footL = footAnchorL.position(relativeTo: root)
         let footR = footAnchorR.position(relativeTo: root)
 
-        if let canonicalAthlete, let poseAdapter, let motion {
-            let sampled = poseAdapter.apply(sample: motion, sport: .skierg, to: canonicalAthlete)
-            let targets = ReplayAthleteContactTargets(
-                pelvis: pelvisTarget,
-                leftHand: handL,
-                rightHand: handR,
-                leftFoot: footL,
-                rightFoot: footR
-            )
-            if sampled,
-               canonicalAthlete.hasFiniteJointTransforms(),
-               ReplayAthleteContactSolver.prepare(instance: canonicalAthlete) {
-                ReplayAthleteContactSolver.orientHandsToTargets(
-                    instance: canonicalAthlete,
-                    targets: targets,
-                    relativeTo: root
-                )
-                let contactError = ReplayAthleteContactSolver.constrain(
-                    instance: canonicalAthlete,
-                    targets: targets,
-                    relativeTo: root
-                )
-                canonicalRuntimeFailure = !ReplayAthleteContactSolver.isUsable(contactError)
-                    || !canonicalAthlete.hasFiniteJointTransforms()
-            } else {
-                canonicalRuntimeFailure = true
-            }
-        } else {
+        let targets = ReplayAthleteContactTargets(
+            pelvis: pelvisTarget,
+            leftHand: handL,
+            rightHand: handR,
+            leftFoot: footL,
+            rightFoot: footR
+        )
+        switch source {
+        case .bundled(let runtime):
+            let result = runtime.apply(motion: motion, targets: targets, relativeTo: root)
+            canonicalRuntimeFailure = result.failure != nil
+            return result
+        case .procedural(let athlete):
             athlete.pelvis.position = pelvisTarget
             athlete.applyPose(skiPose.joints)
             athlete.handL.setPosition(handL, relativeTo: root)
             athlete.handR.setPosition(handR, relativeTo: root)
             athlete.footL.setPosition(footL, relativeTo: root)
             athlete.footR.setPosition(footR, relativeTo: root)
+            return .applied
+        case nil:
+            return .failed(.motionSampleRejected)
         }
     }
 
     func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(
+        ReplayRigAppearancePolicy.applyRivalEquipment(
             to: root,
-            opacity: 0.45,
-            excluding: canonicalAthlete?.athleteEntity
+            excludingAthlete: source?.bundledAthlete?.athleteEntity
         )
     }
 

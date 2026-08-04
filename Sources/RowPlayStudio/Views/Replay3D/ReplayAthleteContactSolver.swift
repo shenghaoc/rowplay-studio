@@ -10,6 +10,15 @@ struct ReplayAthleteContactTargets {
     var rightHand: SIMD3<Float>
     var leftFoot: SIMD3<Float>
     var rightFoot: SIMD3<Float>
+
+    subscript(role: ReplayAthleteContactRole) -> SIMD3<Float> {
+        switch role {
+        case .leftHand: leftHand
+        case .rightHand: rightHand
+        case .leftFoot: leftFoot
+        case .rightFoot: rightFoot
+        }
+    }
 }
 
 /// Measured residual after a contact pass.
@@ -24,337 +33,522 @@ struct ReplayAthleteContactError: Equatable, Sendable {
     var maximumSoleError: Float { max(leftFoot, rightFoot) }
 }
 
+struct ReplayAthleteMatrixEvaluationMetrics: Equatable, Sendable {
+    var topologyBuilds: Int = 0
+    var fullWorkspaceBuilds: Int = 0
+    var jointMatrixEvaluations: Int = 0
+}
+
+enum ReplayAthleteContactSolveFailure: Error, Equatable, Sendable {
+    case missingConstraintPose
+    case malformedHierarchy(String)
+    case missingContact(ReplayAthleteContactRole)
+    case missingJoint(role: ReplayAthleteContactRole, bone: String)
+    case degenerateLimb(ReplayAthleteContactRole)
+    case nonfiniteTarget(ReplayAthleteContactRole)
+    case poseWriteRejected
+    case residualExceeded(ReplayAthleteContactError)
+}
+
+enum ReplayAthleteContactSolveResult: Equatable, Sendable {
+    case applied(error: ReplayAthleteContactError, metrics: ReplayAthleteMatrixEvaluationMetrics)
+    case failed(failure: ReplayAthleteContactSolveFailure, metrics: ReplayAthleteMatrixEvaluationMetrics)
+
+    var metrics: ReplayAthleteMatrixEvaluationMetrics {
+        switch self {
+        case .applied(_, let metrics), .failed(_, let metrics): metrics
+        }
+    }
+}
+
+/// Contact policy is centralized here instead of being duplicated by three
+/// sport rigs or embedded as role/name switches in the numerical solver.
+@MainActor
+fileprivate struct ReplayAthleteContactPolicy {
+    let role: ReplayAthleteContactRole
+    let bone: String
+    let offset: SIMD3<Float>
+    let bendHint: SIMD3<Float>
+    let terminalUp: SIMD3<Float>
+
+    init?(instance: ReplayAthleteInstance, role: ReplayAthleteContactRole) {
+        guard let spec = instance.resolvedContactSpec(role: role),
+              spec.localOffset.x.isFinite,
+              spec.localOffset.y.isFinite,
+              spec.localOffset.z.isFinite else {
+            return nil
+        }
+        self.role = role
+        self.bone = spec.bone
+        self.offset = SIMD3(
+            Float(spec.localOffset.x),
+            Float(spec.localOffset.y),
+            Float(spec.localOffset.z)
+        )
+
+        switch role {
+        case .leftHand:
+            bendHint = SIMD3(-0.65, -0.22, -0.70)
+            terminalUp = SIMD3(0, 1, 0)
+        case .rightHand:
+            bendHint = SIMD3(0.65, -0.22, -0.70)
+            terminalUp = SIMD3(0, 1, 0)
+        case .leftFoot:
+            bendHint = SIMD3(-0.24, 0.18, 0.82)
+            terminalUp = SIMD3(0, 0, 1)
+        case .rightFoot:
+            bendHint = SIMD3(0.24, 0.18, 0.82)
+            terminalUp = SIMD3(0, 0, 1)
+        }
+    }
+}
+
+fileprivate struct ReplayAthleteContactBinding {
+    let policy: ReplayAthleteContactPolicy
+    let upper: Int
+    let lower: Int
+    let terminal: Int
+}
+
+fileprivate struct ReplayAthleteJointTopology {
+    let parent: [Int?]
+    let children: [[Int]]
+    let evaluationOrder: [Int]
+
+    init(jointNames: [String]) throws {
+        guard !jointNames.isEmpty, Set(jointNames).count == jointNames.count else {
+            throw ReplayAthleteContactSolveFailure.malformedHierarchy("empty or duplicate joint path")
+        }
+        let indexByPath = Dictionary(uniqueKeysWithValues: jointNames.enumerated().map { ($0.element, $0.offset) })
+        var resolvedParents = Array<Int?>(repeating: nil, count: jointNames.count)
+        var resolvedChildren = Array(repeating: [Int](), count: jointNames.count)
+        for (index, path) in jointNames.enumerated() {
+            guard let slash = path.lastIndex(of: "/") else { continue }
+            let parentPath = String(path[..<slash])
+            guard let parentIndex = indexByPath[parentPath], parentIndex != index else {
+                throw ReplayAthleteContactSolveFailure.malformedHierarchy("missing parent for \(path)")
+            }
+            resolvedParents[index] = parentIndex
+            resolvedChildren[parentIndex].append(index)
+        }
+        var order: [Int] = []
+        var queue = resolvedParents.indices.filter { resolvedParents[$0] == nil }
+        var cursor = 0
+        while cursor < queue.count {
+            let index = queue[cursor]
+            cursor += 1
+            order.append(index)
+            queue.append(contentsOf: resolvedChildren[index])
+        }
+        guard order.count == jointNames.count else {
+            throw ReplayAthleteContactSolveFailure.malformedHierarchy("cyclic hierarchy")
+        }
+        parent = resolvedParents
+        children = resolvedChildren
+        evaluationOrder = order
+    }
+}
+
+/// One mutable world-matrix workspace per contact pass. Changing a local joint
+/// recomputes only that joint and its descendants; no limb step rebuilds the
+/// complete skeletal matrix array.
+@MainActor
+struct ReplayAthleteContactPlan {
+    fileprivate let jointNames: [String]
+    fileprivate let topology: ReplayAthleteJointTopology
+    fileprivate let bindings: [ReplayAthleteContactRole: ReplayAthleteContactBinding]
+    fileprivate let pelvisIndex: Int
+
+    init(instance: ReplayAthleteInstance) throws {
+        guard let pose = instance.currentConstraintPose() else {
+            throw ReplayAthleteContactSolveFailure.missingConstraintPose
+        }
+        let topology = try ReplayAthleteJointTopology(jointNames: pose.jointNames)
+        self.jointNames = pose.jointNames
+        self.topology = topology
+        self.bindings = try ReplayAthleteContactSolver.makeBindings(
+            instance: instance,
+            pose: pose,
+            topology: topology
+        )
+        guard let pelvisBone = instance.contract.semanticBones.first(where: { $0.parent == nil })?.name,
+              let pelvisIndex = instance.jointIndex(named: pelvisBone, in: pose) else {
+            throw ReplayAthleteContactSolveFailure.malformedHierarchy("missing contract root joint")
+        }
+        self.pelvisIndex = pelvisIndex
+    }
+}
+
+private struct ReplayAthleteMatrixWorkspace {
+    var pose: SkeletalPose
+    let topology: ReplayAthleteJointTopology
+    private(set) var matrices: [simd_float4x4]
+    private(set) var metrics = ReplayAthleteMatrixEvaluationMetrics()
+
+    init(
+        pose: SkeletalPose,
+        topology: ReplayAthleteJointTopology,
+        topologyWasPrecomputed: Bool
+    ) throws {
+        guard pose.jointNames.count == pose.jointTransforms.count,
+              topology.parent.count == pose.jointNames.count else {
+            throw ReplayAthleteContactSolveFailure.malformedHierarchy("joint/transform count mismatch")
+        }
+        self.pose = pose
+        self.topology = topology
+        self.matrices = Array(repeating: matrix_identity_float4x4, count: pose.jointNames.count)
+        metrics.topologyBuilds = topologyWasPrecomputed ? 0 : 1
+        metrics.fullWorkspaceBuilds = 1
+        for index in topology.evaluationOrder {
+            recompute(index)
+        }
+    }
+
+    mutating func setRotation(_ rotation: simd_quatf, at joint: Int) {
+        var transforms = pose.jointTransforms
+        var transform = transforms[joint]
+        transform.rotation = rotation
+        transforms[joint] = transform
+        pose.jointTransforms = transforms
+        recomputeSubtree(from: joint)
+    }
+
+    private mutating func recomputeSubtree(from root: Int) {
+        recompute(root)
+        for child in topology.children[root] {
+            recomputeSubtree(from: child)
+        }
+    }
+
+    private mutating func recompute(_ index: Int) {
+        let local = pose.jointTransforms[index].matrix
+        if let parent = topology.parent[index] {
+            matrices[index] = matrices[parent] * local
+        } else {
+            matrices[index] = local
+        }
+        metrics.jointMatrixEvaluations += 1
+    }
+}
+
 /// Corrects the sampled V4 skeleton toward equipment contacts.
-///
-/// This deliberately edits `SkeletalPosesComponent`, never the four contact
-/// marker entities.  Markers are updated only from the solved bone positions
-/// for diagnostics, which makes a residual visible instead of hiding it by
-/// snapping a helper entity to the machine.
 @MainActor
 enum ReplayAthleteContactSolver {
-    /// Grip channels must remain visually locked to their equipment axes.
     static let gripChannelContactBudgetMeters: Float = 0.01
-    /// Feet and pelvis retain a wider anatomical reach budget because sampled
-    /// asset proportions cannot match every procedural machine exactly.
     static let reachContactBudgetMeters: Float = 0.12
 
-    /// A finite but visibly detached skeleton is a failed canonical asset at
-    /// runtime too. Let the scene builder take its complete procedural path
-    /// rather than retain an implausible hybrid replay.
+    /// Deterministic instrumentation seam used by focused performance tests.
+    private(set) static var lastMetricsForTesting: ReplayAthleteMatrixEvaluationMetrics?
+    private(set) static var lastResultForTesting: ReplayAthleteContactSolveResult?
+
+    static func resetMetricsForTesting() {
+        lastMetricsForTesting = nil
+        lastResultForTesting = nil
+    }
+
+    static func hierarchyFailureForTesting(jointNames: [String]) -> ReplayAthleteContactSolveFailure? {
+        do {
+            _ = try ReplayAthleteJointTopology(jointNames: jointNames)
+            return nil
+        } catch let failure as ReplayAthleteContactSolveFailure {
+            return failure
+        } catch {
+            return .malformedHierarchy("unknown hierarchy failure")
+        }
+    }
+
     static func isUsable(_ error: ReplayAthleteContactError) -> Bool {
-        let values = [
-            error.leftHand,
-            error.rightHand,
-            error.leftFoot,
-            error.rightFoot,
-            error.pelvis,
-        ]
+        let values = [error.leftHand, error.rightHand, error.leftFoot, error.rightFoot, error.pelvis]
         return values.allSatisfy(\.isFinite)
             && error.maximumGripChannelError <= gripChannelContactBudgetMeters
             && error.maximumSoleError <= reachContactBudgetMeters
             && error.pelvis <= reachContactBudgetMeters
     }
 
-    /// Reset the instance to the authored clip sample and its configured root
-    /// placement. Must be called before `orientHandsToTargets` and `constrain`.
-    @discardableResult
-    static func prepare(instance: ReplayAthleteInstance) -> Bool {
-        instance.beginConstraintPass()
-    }
-
-    /// Pre-orient both arm chains before pelvis/leg closure. RowErg calls this
-    /// explicitly so hand-to-handle reach never cuts through the torso as the
-    /// seat moves; the final pass repeats the solve after pelvis placement.
-    static func orientHandsToTargets(
+    static func solve(
         instance: ReplayAthleteInstance,
         targets: ReplayAthleteContactTargets,
-        relativeTo space: Entity
-    ) {
-        guard var pose = instance.currentConstraintPose() else { return }
-        solveArm(
-            instance: instance,
-            pose: &pose,
-            role: .leftHand,
-            target: instance.athleteEntity.convert(position: targets.leftHand, from: space),
-            branchHint: SIMD3(-0.65, -0.22, -0.70)
-        )
-        solveArm(
-            instance: instance,
-            pose: &pose,
-            role: .rightHand,
-            target: instance.athleteEntity.convert(position: targets.rightHand, from: space),
-            branchHint: SIMD3(0.65, -0.22, -0.70)
-        )
-        instance.writeConstraintPose(pose)
-    }
-
-    /// Close pelvis, arm, and leg constraints using the prepared pose.
-    ///
-    /// All root and contact positions are calculated in the supplied rig space
-    /// so a rival instance, a BikeErg rider subgroup, and a live instance do
-    /// not leak transforms or pose state into one another.
-    static func constrain(
-        instance: ReplayAthleteInstance,
-        targets: ReplayAthleteContactTargets,
-        relativeTo space: Entity
-    ) -> ReplayAthleteContactError {
-        guard var pose = instance.currentConstraintPose() else {
-            return unavailableError()
+        relativeTo space: Entity,
+        plan: ReplayAthleteContactPlan? = nil
+    ) -> ReplayAthleteContactSolveResult {
+        guard ReplayAthleteContactRole.allCases.allSatisfy({ isFinite(targets[$0]) }) else {
+            let role = ReplayAthleteContactRole.allCases.first { !isFinite(targets[$0]) }!
+            return record(.failed(failure: .nonfiniteTarget(role), metrics: .init()))
+        }
+        guard instance.beginConstraintPass(), let pose = instance.currentConstraintPose() else {
+            return record(.failed(failure: .missingConstraintPose, metrics: .init()))
         }
 
-        alignPelvis(instance: instance, pose: pose, target: targets.pelvis, relativeTo: space)
+        let originalRootTransform = instance.root.transform
+        var failureMetrics = ReplayAthleteMatrixEvaluationMetrics()
+        do {
+            let resolvedPlan = try plan ?? ReplayAthleteContactPlan(instance: instance)
+            guard resolvedPlan.jointNames == pose.jointNames else {
+                throw ReplayAthleteContactSolveFailure.malformedHierarchy("joint paths changed after preflight")
+            }
+            var workspace = try ReplayAthleteMatrixWorkspace(
+                pose: pose,
+                topology: resolvedPlan.topology,
+                topologyWasPrecomputed: plan != nil
+            )
+            defer { failureMetrics = workspace.metrics }
+            let bindings = resolvedPlan.bindings
+            let pelvisIndex = resolvedPlan.pelvisIndex
 
-        // Root translation changes the equipment targets in athlete space.
-        solveArm(
-            instance: instance,
-            pose: &pose,
-            role: .leftHand,
-            target: instance.athleteEntity.convert(position: targets.leftHand, from: space),
-            branchHint: SIMD3(-0.65, -0.22, -0.70)
-        )
-        solveArm(
-            instance: instance,
-            pose: &pose,
-            role: .rightHand,
-            target: instance.athleteEntity.convert(position: targets.rightHand, from: space),
-            branchHint: SIMD3(0.65, -0.22, -0.70)
-        )
-        solveLeg(
-            instance: instance,
-            pose: &pose,
-            role: .leftFoot,
-            target: instance.athleteEntity.convert(position: targets.leftFoot, from: space),
-            branchHint: SIMD3(-0.24, 0.18, 0.82)
-        )
-        solveLeg(
-            instance: instance,
-            pose: &pose,
-            role: .rightFoot,
-            target: instance.athleteEntity.convert(position: targets.rightFoot, from: space),
-            branchHint: SIMD3(0.24, 0.18, 0.82)
-        )
-        instance.writeConstraintPose(pose)
-        updateDebugMarkers(instance: instance, relativeTo: space)
-        return measure(instance: instance, targets: targets, relativeTo: space)
+            // Row's long reach benefits from an initial arm clearance solve.
+            // The same workspace is retained through root closure and the
+            // final all-limb pass.
+            if instance.sport == .rower {
+                for role in [ReplayAthleteContactRole.leftHand, .rightHand] {
+                    try solveLimb(
+                        binding: bindings[role]!,
+                        target: instance.athleteEntity.convert(position: targets[role], from: space),
+                        workspace: &workspace
+                    )
+                }
+            }
+
+            alignPelvis(
+                instance: instance,
+                workspace: workspace,
+                pelvisIndex: pelvisIndex,
+                target: targets.pelvis,
+                relativeTo: space
+            )
+
+            for role in ReplayAthleteContactRole.allCases {
+                try solveLimb(
+                    binding: bindings[role]!,
+                    target: instance.athleteEntity.convert(position: targets[role], from: space),
+                    workspace: &workspace
+                )
+            }
+
+            guard instance.writeConstraintPose(workspace.pose),
+                  instance.hasFiniteJointTransforms() else {
+                _ = instance.writeConstraintPose(pose)
+                instance.root.transform = originalRootTransform
+                return record(.failed(
+                    failure: .poseWriteRejected,
+                    metrics: workspace.metrics
+                ))
+            }
+            let error = measure(
+                instance: instance,
+                bindings: bindings,
+                workspace: workspace,
+                pelvisIndex: pelvisIndex,
+                targets: targets,
+                relativeTo: space
+            )
+            guard isUsable(error) else {
+                _ = instance.writeConstraintPose(pose)
+                instance.root.transform = originalRootTransform
+                return record(.failed(
+                    failure: .residualExceeded(error),
+                    metrics: workspace.metrics
+                ))
+            }
+            updateDebugMarkers(
+                instance: instance,
+                bindings: bindings,
+                workspace: workspace,
+                relativeTo: space
+            )
+            return record(.applied(error: error, metrics: workspace.metrics))
+        } catch let failure as ReplayAthleteContactSolveFailure {
+            instance.root.transform = originalRootTransform
+            return record(.failed(failure: failure, metrics: failureMetrics))
+        } catch {
+            instance.root.transform = originalRootTransform
+            return record(.failed(
+                failure: .malformedHierarchy("unknown solve failure"),
+                metrics: failureMetrics
+            ))
+        }
     }
 
-    static func measure(
+    fileprivate static func makeBindings(
         instance: ReplayAthleteInstance,
-        targets: ReplayAthleteContactTargets,
-        relativeTo space: Entity
-    ) -> ReplayAthleteContactError {
-        ReplayAthleteContactError(
-            leftHand: distance(instance.skeletalContactPosition(role: .leftHand, relativeTo: space), targets.leftHand),
-            rightHand: distance(instance.skeletalContactPosition(role: .rightHand, relativeTo: space), targets.rightHand),
-            leftFoot: distance(instance.skeletalContactPosition(role: .leftFoot, relativeTo: space), targets.leftFoot),
-            rightFoot: distance(instance.skeletalContactPosition(role: .rightFoot, relativeTo: space), targets.rightFoot),
-            pelvis: distance(instance.skeletalJointPosition(named: "v4Hips", relativeTo: space), targets.pelvis)
-        )
+        pose: SkeletalPose,
+        topology: ReplayAthleteJointTopology
+    ) throws -> [ReplayAthleteContactRole: ReplayAthleteContactBinding] {
+        var bindings: [ReplayAthleteContactRole: ReplayAthleteContactBinding] = [:]
+        for role in ReplayAthleteContactRole.allCases {
+            guard let policy = ReplayAthleteContactPolicy(instance: instance, role: role) else {
+                throw ReplayAthleteContactSolveFailure.missingContact(role)
+            }
+            guard let terminal = instance.jointIndex(named: policy.bone, in: pose) else {
+                throw ReplayAthleteContactSolveFailure.missingJoint(role: role, bone: policy.bone)
+            }
+            guard let lower = topology.parent[terminal],
+                  let upper = topology.parent[lower] else {
+                throw ReplayAthleteContactSolveFailure.malformedHierarchy(
+                    "contact chain too short for \(role.rawValue)"
+                )
+            }
+            bindings[role] = .init(policy: policy, upper: upper, lower: lower, terminal: terminal)
+        }
+        return bindings
     }
 
     private static func alignPelvis(
         instance: ReplayAthleteInstance,
-        pose: SkeletalPose,
+        workspace: ReplayAthleteMatrixWorkspace,
+        pelvisIndex: Int,
         target: SIMD3<Float>,
         relativeTo space: Entity
     ) {
-        guard instance.jointIndex(named: "v4Hips", in: pose) != nil,
-              let current = instance.skeletalJointPosition(named: "v4Hips", relativeTo: space) else {
-            instance.root.setPosition(target, relativeTo: space)
-            return
-        }
+        let local = point(.zero, matrix: workspace.matrices[pelvisIndex])
+        let current = instance.athleteEntity.convert(position: local, to: space)
         let rootPosition = instance.root.position(relativeTo: space)
         instance.root.setPosition(rootPosition + (target - current), relativeTo: space)
     }
 
-    private static func solveArm(
-        instance: ReplayAthleteInstance,
-        pose: inout SkeletalPose,
-        role: ReplayAthleteContactRole,
-        target: SIMD3<Float>,
-        branchHint: SIMD3<Float>
-    ) {
-        let names: (upper: String, lower: String, terminal: String) = role == .leftHand
-            ? ("v4LeftUpperArm", "v4LeftForearm", "v4LeftHand")
-            : ("v4RightUpperArm", "v4RightForearm", "v4RightHand")
-        solveLimb(
-            instance: instance,
-            pose: &pose,
-            role: role,
-            names: names,
-            target: target,
-            branchHint: branchHint,
-            terminalUp: SIMD3(0, 1, 0)
-        )
-    }
-
-    private static func solveLeg(
-        instance: ReplayAthleteInstance,
-        pose: inout SkeletalPose,
-        role: ReplayAthleteContactRole,
-        target: SIMD3<Float>,
-        branchHint: SIMD3<Float>
-    ) {
-        let names: (upper: String, lower: String, terminal: String) = role == .leftFoot
-            ? ("v4LeftUpperLeg", "v4LeftLowerLeg", "v4LeftFoot")
-            : ("v4RightUpperLeg", "v4RightLowerLeg", "v4RightFoot")
-        solveLimb(
-            instance: instance,
-            pose: &pose,
-            role: role,
-            names: names,
-            target: target,
-            branchHint: branchHint,
-            terminalUp: SIMD3(0, 0, 1)
-        )
-    }
-
     private static func solveLimb(
-        instance: ReplayAthleteInstance,
-        pose: inout SkeletalPose,
-        role: ReplayAthleteContactRole,
-        names: (upper: String, lower: String, terminal: String),
+        binding: ReplayAthleteContactBinding,
         target: SIMD3<Float>,
-        branchHint: SIMD3<Float>,
-        terminalUp: SIMD3<Float>
-    ) {
-        guard let offset = instance.effectiveContactOffset(role: role),
-              let upper = instance.jointIndex(named: names.upper, in: pose),
-              let lower = instance.jointIndex(named: names.lower, in: pose),
-              let terminal = instance.jointIndex(named: names.terminal, in: pose) else {
-            return
+        workspace: inout ReplayAthleteMatrixWorkspace
+    ) throws {
+        let root = point(.zero, matrix: workspace.matrices[binding.upper])
+        let joint = point(.zero, matrix: workspace.matrices[binding.lower])
+        let contact = point(binding.policy.offset, matrix: workspace.matrices[binding.terminal])
+        let firstLength = length(joint - root)
+        let secondLength = length(contact - joint)
+        guard isFinite(root), isFinite(joint), isFinite(contact), isFinite(target),
+              firstLength > 1e-5, secondLength > 1e-5 else {
+            throw ReplayAthleteContactSolveFailure.degenerateLimb(binding.policy.role)
         }
-        var matrices = instance.skeletalJointMatrices(for: pose)
-        guard matrices.indices.contains(upper), matrices.indices.contains(lower), matrices.indices.contains(terminal) else {
-            return
-        }
-        let root = point(.zero, matrix: matrices[upper])
-        let elbow = point(.zero, matrix: matrices[lower])
-        let contactPoint = point(offset, matrix: matrices[terminal])
+
         let solution = ReplayTwoBoneSolver.solve3D(
             root: double(root),
             target: double(target),
-            firstLength: Double(length(elbow - root)),
-            secondLength: Double(length(contactPoint - elbow)),
-            bendHint: double(branchHint)
+            firstLength: Double(firstLength),
+            secondLength: Double(secondLength),
+            bendHint: double(binding.policy.bendHint)
         )
-        let targetJoint = float(solution.joint)
-        let targetEnd = float(solution.end)
+        let desiredJoint = float(solution.joint)
+        let desiredEnd = float(solution.end)
+        guard isFinite(desiredJoint), isFinite(desiredEnd) else {
+            throw ReplayAthleteContactSolveFailure.degenerateLimb(binding.policy.role)
+        }
 
-        aimJoint(
-            pose: &pose,
-            instance: instance,
-            joint: upper,
+        try aimJoint(
+            joint: binding.upper,
             sourceStart: root,
-            sourceEnd: elbow,
-            targetEnd: targetJoint
+            sourceEnd: joint,
+            targetEnd: desiredJoint,
+            role: binding.policy.role,
+            workspace: &workspace
         )
-        matrices = instance.skeletalJointMatrices(for: pose)
-        guard matrices.indices.contains(lower), matrices.indices.contains(terminal) else { return }
-        let newElbow = point(.zero, matrix: matrices[lower])
-        let currentContact = point(offset, matrix: matrices[terminal])
-        aimJoint(
-            pose: &pose,
-            instance: instance,
-            joint: lower,
-            sourceStart: newElbow,
+        let newJoint = point(.zero, matrix: workspace.matrices[binding.lower])
+        let currentContact = point(binding.policy.offset, matrix: workspace.matrices[binding.terminal])
+        try aimJoint(
+            joint: binding.lower,
+            sourceStart: newJoint,
             sourceEnd: currentContact,
-            targetEnd: targetEnd
+            targetEnd: desiredEnd,
+            role: binding.policy.role,
+            workspace: &workspace
         )
-        matrices = instance.skeletalJointMatrices(for: pose)
-        guard matrices.indices.contains(terminal) else { return }
-        orientTerminal(
-            pose: &pose,
-            instance: instance,
-            joint: terminal,
-            contactOffset: offset,
-            upHint: terminalUp,
-            matrices: matrices
-        )
+        orientTerminal(binding: binding, workspace: &workspace)
     }
 
     private static func aimJoint(
-        pose: inout SkeletalPose,
-        instance: ReplayAthleteInstance,
         joint: Int,
         sourceStart: SIMD3<Float>,
         sourceEnd: SIMD3<Float>,
-        targetEnd: SIMD3<Float>
-    ) {
+        targetEnd: SIMD3<Float>,
+        role: ReplayAthleteContactRole,
+        workspace: inout ReplayAthleteMatrixWorkspace
+    ) throws {
         let source = sourceEnd - sourceStart
         let destination = targetEnd - sourceStart
-        guard length(source) > 1e-5, length(destination) > 1e-5 else { return }
-        let matrices = instance.skeletalJointMatrices(for: pose)
-        guard matrices.indices.contains(joint) else { return }
-        let currentWorld = Transform(matrix: matrices[joint]).rotation
-        let desiredWorld = rotation(from: source, to: destination) * currentWorld
-        let parentWorld: simd_quatf
-        if let parent = parentIndex(of: joint, in: pose), matrices.indices.contains(parent) {
-            parentWorld = Transform(matrix: matrices[parent]).rotation
-        } else {
-            parentWorld = identityQuaternion()
+        guard length(source) > 1e-5, length(destination) > 1e-5 else {
+            throw ReplayAthleteContactSolveFailure.degenerateLimb(role)
         }
-        let local = normalized(inverse(parentWorld) * desiredWorld)
-        var transforms = pose.jointTransforms
-        var transform = transforms[joint]
-        transform.rotation = local
-        transforms[joint] = transform
-        pose.jointTransforms = transforms
+        let currentWorld = Transform(matrix: workspace.matrices[joint]).rotation
+        let desiredWorld = rotation(from: source, to: destination) * currentWorld
+        let parentWorld = workspace.topology.parent[joint].map {
+            Transform(matrix: workspace.matrices[$0]).rotation
+        } ?? identityQuaternion()
+        workspace.setRotation(normalized(inverse(parentWorld) * desiredWorld), at: joint)
     }
 
-    /// Apply only a twist around the terminal contact vector. This gives hands
-    /// and feet a stable orientation cue while preserving their solved contact
-    /// point exactly (a twist cannot move a point on its own rotation axis).
     private static func orientTerminal(
-        pose: inout SkeletalPose,
-        instance: ReplayAthleteInstance,
-        joint: Int,
-        contactOffset: SIMD3<Float>,
-        upHint: SIMD3<Float>,
-        matrices: [simd_float4x4]
+        binding: ReplayAthleteContactBinding,
+        workspace: inout ReplayAthleteMatrixWorkspace
     ) {
-        guard matrices.indices.contains(joint) else { return }
-        let matrix = matrices[joint]
+        let matrix = workspace.matrices[binding.terminal]
         let terminalPosition = point(.zero, matrix: matrix)
-        let contactPosition = point(contactOffset, matrix: matrix)
+        let contactPosition = point(binding.policy.offset, matrix: matrix)
         let axis = contactPosition - terminalPosition
         guard length(axis) > 1e-5 else { return }
         let normal = normalize(axis)
         let currentWorld = Transform(matrix: matrix).rotation
         let currentUp = project(simd_act(currentWorld, SIMD3(0, 1, 0)), off: normal)
-        let desiredUp = project(upHint, off: normal)
+        let desiredUp = project(binding.policy.terminalUp, off: normal)
         guard length(currentUp) > 1e-5, length(desiredUp) > 1e-5 else { return }
         let from = normalize(currentUp)
         let to = normalize(desiredUp)
         let angle = atan2(simd_dot(normal, simd_cross(from, to)), simd_dot(from, to))
         let desiredWorld = simd_quatf(angle: angle, axis: normal) * currentWorld
-        let parentWorld: simd_quatf
-        if let parent = parentIndex(of: joint, in: pose), matrices.indices.contains(parent) {
-            parentWorld = Transform(matrix: matrices[parent]).rotation
-        } else {
-            parentWorld = identityQuaternion()
-        }
-        var transforms = pose.jointTransforms
-        var transform = transforms[joint]
-        transform.rotation = normalized(inverse(parentWorld) * desiredWorld)
-        transforms[joint] = transform
-        pose.jointTransforms = transforms
+        let parentWorld = workspace.topology.parent[binding.terminal].map {
+            Transform(matrix: workspace.matrices[$0]).rotation
+        } ?? identityQuaternion()
+        workspace.setRotation(
+            normalized(inverse(parentWorld) * desiredWorld),
+            at: binding.terminal
+        )
     }
 
-    private static func updateDebugMarkers(instance: ReplayAthleteInstance, relativeTo space: Entity) {
+    private static func measure(
+        instance: ReplayAthleteInstance,
+        bindings: [ReplayAthleteContactRole: ReplayAthleteContactBinding],
+        workspace: ReplayAthleteMatrixWorkspace,
+        pelvisIndex: Int,
+        targets: ReplayAthleteContactTargets,
+        relativeTo space: Entity
+    ) -> ReplayAthleteContactError {
+        func residual(_ role: ReplayAthleteContactRole) -> Float {
+            let binding = bindings[role]!
+            let local = point(binding.policy.offset, matrix: workspace.matrices[binding.terminal])
+            let actual = instance.athleteEntity.convert(position: local, to: space)
+            return distance(actual, targets[role])
+        }
+        let pelvisLocal = point(.zero, matrix: workspace.matrices[pelvisIndex])
+        let pelvis = instance.athleteEntity.convert(position: pelvisLocal, to: space)
+        return ReplayAthleteContactError(
+            leftHand: residual(.leftHand),
+            rightHand: residual(.rightHand),
+            leftFoot: residual(.leftFoot),
+            rightFoot: residual(.rightFoot),
+            pelvis: distance(pelvis, targets.pelvis)
+        )
+    }
+
+    private static func updateDebugMarkers(
+        instance: ReplayAthleteInstance,
+        bindings: [ReplayAthleteContactRole: ReplayAthleteContactBinding],
+        workspace: ReplayAthleteMatrixWorkspace,
+        relativeTo space: Entity
+    ) {
         for role in ReplayAthleteContactRole.allCases {
-            if let position = instance.skeletalContactPosition(role: role, relativeTo: space) {
-                instance.setContactDebugMarker(role: role, position: position, relativeTo: space)
-            }
+            let binding = bindings[role]!
+            let local = point(binding.policy.offset, matrix: workspace.matrices[binding.terminal])
+            let position = instance.athleteEntity.convert(position: local, to: space)
+            instance.setContactDebugMarker(
+                role: role,
+                position: position,
+                relativeTo: space
+            )
         }
     }
 
-    private static func parentIndex(of index: Int, in pose: SkeletalPose) -> Int? {
-        guard pose.jointNames.indices.contains(index) else { return nil }
-        let path = pose.jointNames[index]
-        guard let slash = path.lastIndex(of: "/") else { return nil }
-        let parent = String(path[..<slash])
-        return pose.jointNames.firstIndex(of: parent)
+    private static func record(_ result: ReplayAthleteContactSolveResult) -> ReplayAthleteContactSolveResult {
+        lastMetricsForTesting = result.metrics
+        lastResultForTesting = result
+        return result
     }
 
     private static func rotation(from source: SIMD3<Float>, to target: SIMD3<Float>) -> simd_quatf {
@@ -399,20 +593,13 @@ enum ReplayAthleteContactSolver {
         return SIMD3(value.x, value.y, value.z) / value.w
     }
 
-    private static func distance(_ point: SIMD3<Float>?, _ target: SIMD3<Float>) -> Float {
-        guard let point else { return .infinity }
+    private static func distance(_ point: SIMD3<Float>, _ target: SIMD3<Float>) -> Float {
         let result = length(point - target)
         return result.isFinite ? result : .infinity
     }
 
-    private static func unavailableError() -> ReplayAthleteContactError {
-        ReplayAthleteContactError(
-            leftHand: .infinity,
-            rightHand: .infinity,
-            leftFoot: .infinity,
-            rightFoot: .infinity,
-            pelvis: .infinity
-        )
+    private static func isFinite(_ value: SIMD3<Float>) -> Bool {
+        value.x.isFinite && value.y.isFinite && value.z.isFinite
     }
 
     private static func double(_ value: SIMD3<Float>) -> SIMD3<Double> {

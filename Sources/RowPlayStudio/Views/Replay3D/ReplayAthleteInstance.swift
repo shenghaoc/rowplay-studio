@@ -491,8 +491,8 @@ final class ReplayAthleteInstance {
     }
 
     /// Begin one deterministic skeletal correction pass from the sampled base
-    /// pose. The per-frame order is `seek → beginConstraintPass →
-    /// solve/write`. Constraint transforms are intentionally ephemeral:
+    /// pose. The contact solver owns the complete pass and publishes only a
+    /// validated result. Constraint transforms are intentionally ephemeral:
     /// `seek` always rebuilds from the sampled table and bind helpers, so a
     /// shuffled seek cannot accumulate an earlier frame's correction.
     func beginConstraintPass() -> Bool {
@@ -547,33 +547,50 @@ final class ReplayAthleteInstance {
         return true
     }
 
-    func contactSpec(role: ReplayAthleteContactRole) -> ReplayAthleteContactSpec? {
+    func authoredContactSpec(role: ReplayAthleteContactRole) -> ReplayAthleteContactSpec? {
         contract.contacts.first { $0.role == role }
     }
 
-    /// The exact terminal-local point constrained and measured for a contact.
-    /// Hand roles retain the authored palm point and add the fitted sport
-    /// channel displacement; feet retain the authored sole offset unchanged.
-    func effectiveContactOffset(role: ReplayAthleteContactRole) -> SIMD3<Float>? {
-        guard let spec = contactSpec(role: role) else { return nil }
-        let value: SIMD3<Double>
+    /// Resolves one validated authored contact into the single runtime model
+    /// consumed by both solving and residual measurement.
+    ///
+    /// The contract supplies the terminal bone for every role. Hand offsets
+    /// come directly from the sport's grip-channel geometry; the raw pinned
+    /// palm offset remains available through `authoredContactSpec(role:)` only as
+    /// authored provenance. Feet use the authored sole offset unchanged.
+    func resolvedContactSpec(
+        role: ReplayAthleteContactRole
+    ) -> ReplayAthleteResolvedContactSpec? {
+        guard let authored = authoredContactSpec(role: role) else { return nil }
         switch role {
         case .leftHand:
-            var referencePalm = ReplayGripGeometry.handPalmContact
-            referencePalm.x *= -1
-            value = spec.localOffset + (
-                ReplayAthleteGripController.effectorOffset(for: sport, side: .left)
-                    - referencePalm
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: ReplayAthleteGripController.channelOffset(
+                    for: sport,
+                    side: .left
+                ),
+                model: .sportGripChannel
             )
         case .rightHand:
-            value = spec.localOffset + (
-                ReplayAthleteGripController.effectorOffset(for: sport, side: .right)
-                    - ReplayGripGeometry.handPalmContact
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: ReplayAthleteGripController.channelOffset(
+                    for: sport,
+                    side: .right
+                ),
+                model: .sportGripChannel
             )
         case .leftFoot, .rightFoot:
-            value = spec.localOffset
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: authored.localOffset,
+                model: .authoredSole
+            )
         }
-        return SIMD3(Float(value.x), Float(value.y), Float(value.z))
     }
 
     func jointIndex(named bone: String, in pose: SkeletalPose) -> Int? {
@@ -588,13 +605,20 @@ final class ReplayAthleteInstance {
         relativeTo space: Entity
     ) -> SIMD3<Float>? {
         guard let pose = currentConstraintPose(),
-              let spec = contactSpec(role: role),
+              let spec = resolvedContactSpec(role: role),
               let index = jointIndex(named: spec.bone, in: pose),
-              let offset = effectiveContactOffset(role: role) else {
+              spec.localOffset.x.isFinite,
+              spec.localOffset.y.isFinite,
+              spec.localOffset.z.isFinite else {
             return nil
         }
         let matrices = skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(index) else { return nil }
+        let offset = SIMD3(
+            Float(spec.localOffset.x),
+            Float(spec.localOffset.y),
+            Float(spec.localOffset.z)
+        )
         let local = ReplayAthleteInstance.point(offset, transformedBy: matrices[index])
         return athleteEntity.convert(position: local, to: space)
     }

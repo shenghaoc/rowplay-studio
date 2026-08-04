@@ -16,6 +16,24 @@ struct ReplayAthleteContactSpec: Equatable, Sendable {
     let localOffset: SIMD3<Double>
 }
 
+/// Runtime interpretation of one validated authored contact.
+///
+/// The pinned athlete contract keeps its sport-neutral palm points as source
+/// provenance. Runtime hand solving is channel-native because each equipment
+/// surface has a different grip radius; sole contacts continue to use the
+/// authored contract point directly.
+enum ReplayAthleteRuntimeContactModel: Equatable, Sendable {
+    case sportGripChannel
+    case authoredSole
+}
+
+struct ReplayAthleteResolvedContactSpec: Equatable, Sendable {
+    let bone: String
+    let role: ReplayAthleteContactRole
+    let localOffset: SIMD3<Double>
+    let model: ReplayAthleteRuntimeContactModel
+}
+
 /// Sport animation metadata from the versioned V4 contract.
 struct ReplayAthleteClipSpec: Equatable, Sendable {
     let sport: Sport
