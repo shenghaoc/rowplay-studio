@@ -148,7 +148,6 @@ struct ReplayRivalControlView: View {
                 #if os(macOS)
                 .help("Remove replay rival")
                 #endif
-                .accessibilityHint("Removes the currently selected rival from the replay")
             }
         }
         .padding(.vertical, 6)

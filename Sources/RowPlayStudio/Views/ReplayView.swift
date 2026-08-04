@@ -688,7 +688,6 @@ struct ReplayView: View {
                 #if os(macOS)
                 .help(playPauseLabel)
                 #endif
-                .accessibilityHint(state.playing ? "Pauses the replay playback" : "Starts the replay playback")
                 .keyboardShortcut(.space, modifiers: [])
 
             Slider(
