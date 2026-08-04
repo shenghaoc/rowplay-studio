@@ -147,7 +147,9 @@ enum Replay3DSceneBuilder {
         // Camera
         let camera = PerspectiveCamera()
         camera.name = "chase-camera"
-        camera.camera.fieldOfViewInDegrees = 46
+        camera.camera.fieldOfViewInDegrees = Float(
+            ReplayCameraPose.defaultFieldOfViewDegrees
+        )
         camera.position = SIMD3(0, 6, -12)
         root.addChild(camera)
 

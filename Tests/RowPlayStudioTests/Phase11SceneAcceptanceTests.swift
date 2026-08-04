@@ -9,7 +9,7 @@ final class Phase11SceneAcceptanceTests: XCTestCase {
     func testThreeSportQualityCameraRivalMatrixBuildsAndUpdates() {
         var cases = 0
         for sport in Sport.allCases {
-            for quality in ReplayRenderQuality.allCases {
+            for (qualityIndex, quality) in ReplayRenderQuality.allCases.enumerated() {
                 let scene = Replay3DSceneBuilder.buildScene(
                     sport: sport,
                     colorScheme: .dark,
@@ -21,20 +21,33 @@ final class Phase11SceneAcceptanceTests: XCTestCase {
                 XCTAssertFalse(scene.groundEntity.isEnabled)
                 XCTAssertFalse(scene.liveGroup === scene.ghostGroup)
 
-                let controller = ReplayCameraController()
                 for (presetIndex, preset) in ReplayCameraPreset.allCases.enumerated() {
+                    let controller = ReplayCameraController()
                     let phase = Double(presetIndex) * 0.7
+                    let liveDistance = 120 + Double(presetIndex) * 10
+                    let ghostDistance = 116 + Double(presetIndex) * 10
+                    let viewportAspects = [
+                        0.65,
+                        1.0,
+                        ReplayCameraSolver.defaultViewportAspect,
+                        2.4,
+                    ]
+                    let viewportAspect = viewportAspects[(qualityIndex + presetIndex) % 4]
+                    let ghostVisible = (qualityIndex + presetIndex).isMultiple(of: 2)
+                    let hasGhostPose = (qualityIndex + presetIndex).isMultiple(of: 3) == false
+                    let rendersGhost = ghostVisible && hasGhostPose
                     let live = ReplayStrokePose.fallback(sport: sport, phase: phase, rate: 28)
                     let rival = ReplayStrokePose.fallback(sport: sport, phase: phase + 0.35, rate: 27)
                     XCTAssertTrue(Replay3DSceneBuilder.updateScene(
                         container: scene,
                         livePose: live,
-                        liveDistance: 120 + Double(presetIndex) * 10,
+                        liveDistance: liveDistance,
                         sport: sport,
-                        ghostPose: rival,
-                        ghostDistance: 116 + Double(presetIndex) * 10,
-                        ghostVisible: true,
+                        ghostPose: hasGhostPose ? rival : nil,
+                        ghostDistance: ghostDistance,
+                        ghostVisible: ghostVisible,
                         reduceMotion: false,
+                        viewportAspect: viewportAspect,
                         deltaTime: 1.0 / 60.0,
                         playbackTickGeneration: UInt64(presetIndex + 1),
                         isPlaying: true,
@@ -43,7 +56,31 @@ final class Phase11SceneAcceptanceTests: XCTestCase {
                         cameraResetGeneration: 0,
                         replayDiscontinuityGeneration: 0
                     ))
-                    XCTAssertTrue(scene.ghostGroup.isEnabled)
+                    let participant = scene.layout.position(at: liveDistance)
+                    let tangent = scene.layout.tangent(at: liveDistance)
+                    let expected = ReplayCameraSolver.targetPose(
+                        preset: preset,
+                        sport: sport,
+                        participant: participant,
+                        tangent: tangent,
+                        speed: 0,
+                        rival: rendersGhost
+                            ? scene.layout.ghostPosition(at: ghostDistance)
+                            : nil,
+                        aspect: viewportAspect
+                    )
+                    let expectedFieldOfView = preset == .chase
+                        ? ReplayCameraChaseRig.rig(for: sport).baseFieldOfView
+                        : ReplayCameraPose.defaultFieldOfViewDegrees
+
+                    XCTAssertEqual(scene.ghostGroup.isEnabled, rendersGhost)
+                    XCTAssertEqual(controller.resolvedPose, expected)
+                    XCTAssertEqual(expected.fieldOfViewDegrees, expectedFieldOfView)
+                    XCTAssertEqual(
+                        scene.camera.camera.fieldOfViewInDegrees,
+                        Float(expectedFieldOfView),
+                        accuracy: 0.0001
+                    )
                     XCTAssertTrue(scene.camera.transform.matrix.columns.3.x.isFinite)
                     cases += 1
                 }

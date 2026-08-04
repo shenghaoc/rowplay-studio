@@ -72,15 +72,22 @@ final class ReplayCameraTests: XCTestCase {
     }
 
     func testChaseFieldOfViewStaysWithinRequiredBounds() {
-        for speed in [-100.0, 0, 3, 6, 9, 100, .infinity, .nan] {
-            let fov = ReplayCameraSolver.targetPose(
-                preset: .chase,
-                participant: participant,
-                tangent: tangent,
-                speed: speed
-            ).fieldOfViewDegrees
-            XCTAssertGreaterThanOrEqual(fov, 40)
-            XCTAssertLessThanOrEqual(fov, 42)
+        for sport in Sport.allCases {
+            let baseFieldOfView = ReplayCameraChaseRig.rig(for: sport).baseFieldOfView
+            for speed in [-100.0, 0, 3, 6, 9, 100, .infinity, .nan] {
+                let fov = ReplayCameraSolver.targetPose(
+                    preset: .chase,
+                    sport: sport,
+                    participant: participant,
+                    tangent: tangent,
+                    speed: speed
+                ).fieldOfViewDegrees
+                XCTAssertGreaterThanOrEqual(fov, baseFieldOfView)
+                XCTAssertLessThanOrEqual(
+                    fov,
+                    baseFieldOfView + ReplayCameraSolver.speedFieldOfViewGain
+                )
+            }
         }
 
         XCTAssertEqual(pose(for: .chase, speed: 3).fieldOfViewDegrees, 40)
@@ -156,9 +163,84 @@ final class ReplayCameraTests: XCTestCase {
             speed: 6,
             rival: (x: 12, y: 0, z: 50)
         )
+        let rig = ReplayCameraChaseRig.rig(for: .rower)
+        XCTAssertEqual(farRival.targetX, (12 + 12) / 2 + rig.ahead, accuracy: 0.0001)
         XCTAssertEqual(farRival.targetZ, 40, accuracy: 0.0001)
         XCTAssertGreaterThan(cameraDistance(nearRival), cameraDistance(solo))
         XCTAssertGreaterThan(cameraDistance(farRival), cameraDistance(nearRival))
+    }
+
+    func testEqualDistanceCourseRivalUsesMidpointAndWidensAgainstSolo() {
+        let layout = ReplayCourseLayout.standard
+        let distance = 100.0
+        let participant = layout.position(at: distance)
+        let rival = layout.ghostPosition(at: distance)
+        let tangent = layout.tangent(at: distance)
+        let rig = ReplayCameraChaseRig.rig(for: .rower)
+        let solo = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6
+        )
+        let paired = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: rival
+        )
+
+        XCTAssertTrue(paired.isFinite)
+        XCTAssertGreaterThan(cameraDistance(paired), cameraDistance(solo))
+        XCTAssertEqual(
+            paired.targetX,
+            participant.x / 2 + rival.x / 2 + tangent.x * rig.ahead,
+            accuracy: 1e-10
+        )
+        XCTAssertEqual(
+            paired.targetZ,
+            participant.z / 2 + rival.z / 2 + tangent.z * rig.ahead,
+            accuracy: 1e-10
+        )
+        assertPaddedHorizontalFrustumContains(
+            participant,
+            rival,
+            pose: paired,
+            sport: .rower,
+            aspect: ReplayCameraSolver.defaultViewportAspect
+        )
+    }
+
+    func testGappedCourseRivalHasPositiveDepthAndPaddedFrustumInclusion() {
+        assertCourseRivalFit(liveDistance: 246.5, rivalDistance: 211)
+    }
+
+    func testOppositeCourseRivalHasPositiveDepthAndPaddedFrustumInclusion() {
+        assertCourseRivalFit(liveDistance: 37, rivalDistance: 237)
+    }
+
+    func testLongitudinalGapWithZeroRightProjectionStillFitsBothParticipants() {
+        let longitudinalRival: ReplayPosition = (x: -28, y: 0, z: 30)
+        let pose = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            sport: .rower,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            rival: longitudinalRival
+        )
+
+        XCTAssertEqual(participant.z - longitudinalRival.z, 0)
+        assertPaddedHorizontalFrustumContains(
+            participant,
+            longitudinalRival,
+            pose: pose,
+            sport: .rower,
+            aspect: ReplayCameraSolver.defaultViewportAspect
+        )
     }
 
     func testPortraitViewportPullsBackMoreThanUltrawideForSameRival() {
@@ -182,7 +264,21 @@ final class ReplayCameraTests: XCTestCase {
             aspect: 2.4
         )
 
-        XCTAssertGreaterThan(cameraDistance(portrait), cameraDistance(ultrawide))
+        XCTAssertGreaterThanOrEqual(cameraDistance(portrait), cameraDistance(ultrawide))
+        assertPaddedHorizontalFrustumContains(
+            participant,
+            rival,
+            pose: portrait,
+            sport: .rower,
+            aspect: 0.65
+        )
+        assertPaddedHorizontalFrustumContains(
+            participant,
+            rival,
+            pose: ultrawide,
+            sport: .rower,
+            aspect: 2.4
+        )
     }
 
     func testViewportAspectSanitizerHandlesLayoutAndDirectInputEdges() {
@@ -223,6 +319,45 @@ final class ReplayCameraTests: XCTestCase {
             aspect: .nan
         )
         XCTAssertEqual(invalidAspectPose, defaultPose)
+    }
+
+    func testViewportAspectOnlyAffectsChaseWhenRivalIsPresent() {
+        let rival: ReplayPosition = (x: 12, y: 0, z: 50)
+        let portraitSolo = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            aspect: 0.65
+        )
+        let wideSolo = ReplayCameraSolver.targetPose(
+            preset: .chase,
+            participant: participant,
+            tangent: tangent,
+            speed: 6,
+            aspect: 2.4
+        )
+        XCTAssertEqual(portraitSolo, wideSolo)
+
+        for preset in [ReplayCameraPreset.side, .overhead, .orbit] {
+            let portrait = ReplayCameraSolver.targetPose(
+                preset: preset,
+                participant: participant,
+                tangent: tangent,
+                speed: 6,
+                rival: rival,
+                aspect: 0.65
+            )
+            let wide = ReplayCameraSolver.targetPose(
+                preset: preset,
+                participant: participant,
+                tangent: tangent,
+                speed: 6,
+                rival: rival,
+                aspect: 2.4
+            )
+            XCTAssertEqual(portrait, wide)
+        }
     }
 
     func testReducedMotionUsesStaticSportFieldOfView() {
@@ -386,6 +521,90 @@ final class ReplayCameraTests: XCTestCase {
 
     private func cameraDistance(_ pose: ReplayCameraPose) -> Double {
         hypot(pose.positionX - pose.targetX, pose.positionZ - pose.targetZ)
+    }
+
+    private func assertCourseRivalFit(
+        liveDistance: Double,
+        rivalDistance: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let layout = ReplayCourseLayout.standard
+        let participant = layout.position(at: liveDistance)
+        let rival = layout.ghostPosition(at: rivalDistance)
+        let tangent = layout.tangent(at: liveDistance)
+        var distances: [Double] = []
+
+        for aspect in [0.65, ReplayCameraSolver.defaultViewportAspect, 2.4] {
+            let pose = ReplayCameraSolver.targetPose(
+                preset: .chase,
+                sport: .rower,
+                participant: participant,
+                tangent: tangent,
+                speed: 6,
+                rival: rival,
+                aspect: aspect
+            )
+            XCTAssertTrue(pose.isFinite, file: file, line: line)
+            assertPaddedHorizontalFrustumContains(
+                participant,
+                rival,
+                pose: pose,
+                sport: .rower,
+                aspect: aspect,
+                file: file,
+                line: line
+            )
+            distances.append(cameraDistance(pose))
+        }
+
+        XCTAssertGreaterThanOrEqual(distances[0], distances[2], file: file, line: line)
+    }
+
+    private func assertPaddedHorizontalFrustumContains(
+        _ participant: ReplayPosition,
+        _ rival: ReplayPosition,
+        pose: ReplayCameraPose,
+        sport: Sport,
+        aspect: Double,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let viewX = pose.targetX - pose.positionX
+        let viewZ = pose.targetZ - pose.positionZ
+        let viewLength = hypot(viewX, viewZ)
+        XCTAssertGreaterThan(viewLength, 0, file: file, line: line)
+        let forwardX = viewX / viewLength
+        let forwardZ = viewZ / viewLength
+        let cameraRightX = -forwardZ
+        let cameraRightZ = forwardX
+        let horizontalHalfAngle = atan(
+            tan(pose.fieldOfViewDegrees * .pi / 360)
+                * ReplayCameraSolver.sanitizedViewportAspect(aspect)
+        ) * ReplayCameraSolver.rivalFrustumFillFraction
+
+        for point in [participant, rival] {
+            let offsetX = point.x - pose.positionX
+            let offsetZ = point.z - pose.positionZ
+            let depth = offsetX * forwardX + offsetZ * forwardZ
+            XCTAssertGreaterThan(
+                depth,
+                ReplayCameraSolver.minimumRivalFrustumDepth,
+                file: file,
+                line: line
+            )
+            let lateral = abs(offsetX * cameraRightX + offsetZ * cameraRightZ)
+            let paddedAngle = atan2(
+                lateral + ReplayCameraSolver.rivalHorizontalPadding(for: sport),
+                depth
+            )
+            XCTAssertLessThanOrEqual(
+                paddedAngle,
+                horizontalHalfAngle + 1e-12,
+                file: file,
+                line: line
+            )
+        }
     }
 
     private func integrate(

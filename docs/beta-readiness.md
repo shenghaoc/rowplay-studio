@@ -64,12 +64,13 @@ The items below describe the merged baseline, the validation completed for Phase
 - Phase 8D unavailable evidence is explicit: exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Automated scene/governor tests cover bounded entities, ghost separation, and deterministic degradation, but do not replace those unavailable UI/profiling checks.
 - Phase 10B validation on the final review-fix tree passes the focused rival factory (15), parser (51), race-result (7), report (8), card (9), ghost-workflow (30), 3D scene-effects (13), quality-scene (18), and workout-library ghost candidate (12) tests; `swift build --target RowPlayCore`; full `swift test` with 1,168 tests total (978 Core, 68 Platform, 122 Studio), two expected authenticated-smoke skips, and zero failures; full `swift build`; both architecture scans; and `git diff --check`.
 - Phase 10B staged-bundle gates pass on the final hardening tree with `./script/build_and_run.sh --verify`, `--automation`, and `--sign-verify`. The staged app was exercised through Best Match and removal; invalid and valid constant-pace entry; an actual CSV import through the native file panel; 2D and 3D rival rendering; finish verdict appearance and seek-back hiding; real privacy-minimized race-report JSON and 1080x1440 race-card PNG saves; and a first-click native share sheet that was opened and cancelled without transmitting the card. The exported JSON and card were inspected for content, dimensions, clipping, and prohibited identifiers. TCX/FIT behavior is covered by parser fixtures/tests rather than claimed as a separate native file-panel walkthrough; a spoken VoiceOver pass, exact 1440x900 inspection, and Instruments profiling were not available.
-- Phase 11's final stack layer defines 96 deterministic scene cases: a
-  48-case sport/tier/camera procedural matrix and a 48-case
-  sport/tier/theme/rival matrix that supplies validated assets, exercises the
-  bundled athlete/equipment path at High/Ultra, and verifies Reduced Motion,
-  exact seeks, the viewport-aspect camera seam, and rival pullback. This
-  automated proof
+- Phase 11's final stack layer defines two complementary 48-case scene
+  matrices. The procedural sport/tier/camera matrix verifies scene wiring,
+  varied viewport aspects, the shared rival-rendering predicate, full resolved
+  camera poses, and authored FOVs. The deterministic sport/tier/theme/rival
+  matrix supplies validated assets, exercises the bundled athlete/equipment
+  path at High/Ultra, and verifies Reduced Motion, repeated exact seeks,
+  chase-rival viewport framing, and rival pullback. This automated proof
   does not replace the still-unperformed human renderer/theme/window matrix or
   sustained GPU profiling.
 - Source-map: all sync, storage, and app-shell wiring files have corresponding source-map entries.

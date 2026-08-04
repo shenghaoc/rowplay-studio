@@ -30,7 +30,7 @@ final class ReplayCameraController {
     func update(
         camera: PerspectiveCamera,
         layout: ReplayCourseLayout,
-        sport: Sport = .rower,
+        sport: Sport,
         distance: Double,
         rivalDistance: Double? = nil,
         viewportAspect: Double = ReplayCameraSolver.defaultViewportAspect,
@@ -192,9 +192,12 @@ final class ReplayCameraController {
             finiteFloat(pose.targetY),
             finiteFloat(pose.targetZ)
         )
-        let fieldOfView = finiteFloat(pose.fieldOfViewDegrees, fallback: 46)
+        let fieldOfView = finiteFloat(
+            pose.fieldOfViewDegrees,
+            fallback: Float(ReplayCameraPose.defaultFieldOfViewDegrees)
+        )
 
-        camera.camera.fieldOfViewInDegrees = min(52, max(36, fieldOfView))
+        camera.camera.fieldOfViewInDegrees = fieldOfView
         camera.look(at: target, from: position, relativeTo: nil)
     }
 

@@ -6,21 +6,24 @@ validation from human screenshot review.
 
 ## Reproducible matrix
 
-`Phase11SceneAcceptanceTests` constructs and updates 96 combinations in two
-independent matrices:
+`Phase11SceneAcceptanceTests` constructs and updates two complementary 48-case
+matrices:
 
 - 48 procedural-path cases cover three sports, four quality tiers, and four
-  camera presets with an independent live/rival pair.
+  camera presets. They vary viewport aspect and rival visibility/pose inputs,
+  then verify the shared render predicate, full resolved camera pose, and
+  authored FOV for each wiring case.
 - 48 asset-supplied cases cover three sports, four tiers, light/dark themes,
   and rival absent/present under Reduced Motion. Low/Medium assert the intended
   procedural policy; High/Ultra assert the production bundled athlete and
   equipment path. Repeated exact seeks require identical live, rival, and
-  camera transforms, sport-static Reduced Motion FOV, and rival pullback.
+  camera transforms, sport-static Reduced Motion FOV, and chase-rival framing.
 
 The scene-effects suite separately proves that a requested rival with no
 sampled pose cannot enable the ghost rig, influence the camera, or emit ghost
-effects. Portable camera tests cover viewport sanitization plus portrait
-and ultrawide rival framing.
+effects. Portable camera tests cover viewport sanitization plus padded
+camera-space frustum inclusion for equal-distance, gapped, and opposite-course
+rivals in portrait, default, and ultrawide viewports.
 
 The surrounding focused suites prove current motion fixtures, equipment
 contracts, atomic athlete/equipment/environment fallback, hand/grip contact,

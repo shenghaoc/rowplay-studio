@@ -344,6 +344,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 0,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 1,
@@ -356,6 +357,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 6,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 2,
@@ -370,6 +372,7 @@ final class Replay3DSceneEffectsTests: XCTestCase {
         controller.update(
             camera: camera,
             layout: layout,
+            sport: .rower,
             distance: 6,
             deltaTime: 1.0 / 60.0,
             playbackTickGeneration: 2,
