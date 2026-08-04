@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import RowPlayCore
 import XCTest
@@ -123,6 +124,88 @@ final class ReplayAssetLibraryTests: XCTestCase {
         XCTAssertEqual(source.contractRequests, 1)
     }
 
+    func testConcurrentDifferentSportsShareOneManifestPreflight() async throws {
+        let sports: [Sport] = [.rower, .bike]
+        var packages: [Sport: URL] = [:]
+        var contracts: [Sport: URL] = [:]
+        for sport in sports {
+            let resource = ReplayEquipmentPackageResource(sport: sport)
+            packages[sport] = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.packageName,
+                extension: resource.packageExtension,
+                subdirectory: resource.subdirectory
+            ))
+            contracts[sport] = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.contractName,
+                extension: resource.contractExtension,
+                subdirectory: resource.subdirectory
+            ))
+        }
+        let source = TestEquipmentResourceSource(
+            manifest: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: ReplayAssetCatalog.equipmentManifestName,
+                extension: ReplayAssetCatalog.equipmentManifestExtension,
+                subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+            )),
+            packages: packages,
+            contracts: contracts
+        )
+        let library = ReplayAssetLibrary(source: source)
+
+        async let rower = library.bundledEquipmentSet(for: .rower)
+        async let bike = library.bundledEquipmentSet(for: .bike)
+        let results = await (rower, bike)
+
+        XCTAssertNotNil(results.0)
+        XCTAssertNotNil(results.1)
+        XCTAssertEqual(source.manifestRequests, 1)
+        XCTAssertEqual(source.packageRequests, 2)
+        XCTAssertEqual(source.contractRequests, 2)
+    }
+
+    func testPortablePreflightValidatesCommittedPackageOffMainThread() async throws {
+        let sport = Sport.rower
+        let resource = ReplayEquipmentPackageResource(sport: sport)
+        let manifestURL = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+            name: ReplayAssetCatalog.equipmentManifestName,
+            extension: ReplayAssetCatalog.equipmentManifestExtension,
+            subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+        ))
+        let packageURL = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+            name: resource.packageName,
+            extension: resource.packageExtension,
+            subdirectory: resource.subdirectory
+        ))
+        let contractURL = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+            name: resource.contractName,
+            extension: resource.contractExtension,
+            subdirectory: resource.subdirectory
+        ))
+
+        let outcome = await Task.detached(priority: .userInitiated) {
+            let manifestResult = ReplayEquipmentPortablePreflight.loadManifest(
+                contentsOf: manifestURL
+            )
+            guard case .success(let manifest) = manifestResult,
+                  let expected = manifest[sport] else {
+                return (pthread_main_np() != 0, false)
+            }
+            let packageResult = ReplayEquipmentPortablePreflight.validatePackage(
+                packageURL: packageURL,
+                contractURL: contractURL,
+                expected: expected,
+                sport: sport
+            )
+            guard case .success(let contract) = packageResult else {
+                return (pthread_main_np() != 0, false)
+            }
+            return (pthread_main_np() != 0, contract.sport == sport)
+        }.value
+
+        XCTAssertFalse(outcome.0, "Portable I/O and validation must not occupy the main thread")
+        XCTAssertTrue(outcome.1)
+    }
+
     func testStreamingPackageHashMatchesInMemoryHash() throws {
         let resource = ReplayEquipmentPackageResource(sport: .rower)
         let url = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
@@ -168,6 +251,7 @@ private final class TestEquipmentResourceSource: ReplayAssetResourceSource {
     let contracts: [Sport: URL]
     private(set) var packageRequests = 0
     private(set) var contractRequests = 0
+    private(set) var manifestRequests = 0
 
     init(
         manifest: URL,
@@ -189,5 +273,8 @@ private final class TestEquipmentResourceSource: ReplayAssetResourceSource {
         return contracts[resource.sport]
     }
 
-    func manifestURL() -> URL? { manifest }
+    func manifestURL() -> URL? {
+        manifestRequests += 1
+        return manifest
+    }
 }

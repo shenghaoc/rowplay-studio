@@ -67,7 +67,7 @@ enum ReplayAssetGeometry {
     }
 }
 
-enum ReplayAssetLoadFailure: Equatable, Sendable {
+enum ReplayAssetLoadFailure: Error, Equatable, Sendable {
     case manifestInvalid
     case packageMissing
     case contractMissing
@@ -95,6 +95,97 @@ enum ReplayAssetLoadFailure: Equatable, Sendable {
     }
 }
 
+/// Immutable manifest entry used by the portable equipment preflight.
+///
+/// Keeping this value `Sendable` lets the library resolve bundle URLs on the
+/// main actor, then move all file reads, hashing, JSON parsing, and contract
+/// validation to a detached task before RealityKit touches the package.
+struct ReplayEquipmentManifestEntry: Equatable, Sendable {
+    let sha256: String
+    let contractSha256: String
+}
+
+/// Portable, RealityKit-free validation for bundled equipment resources.
+///
+/// These synchronous functions intentionally have no actor annotation. The
+/// main-actor library invokes them only from detached tasks so cold package
+/// verification cannot stall SwiftUI while it reads and hashes bundle files.
+enum ReplayEquipmentPortablePreflight {
+    static func loadManifest(
+        contentsOf url: URL
+    ) -> Result<[Sport: ReplayEquipmentManifestEntry], ReplayAssetLoadFailure> {
+        guard let data = try? Data(contentsOf: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let packages = root["packages"] as? [[String: Any]] else {
+            return .failure(.manifestInvalid)
+        }
+
+        var bySport: [Sport: ReplayEquipmentManifestEntry] = [:]
+        for entry in packages {
+            guard let slug = entry["sport"] as? String,
+                  let sha256 = entry["sha256"] as? String,
+                  let contractSha256 = entry["contractSha256"] as? String,
+                  let sport = sport(slug: slug),
+                  bySport[sport] == nil else {
+                return .failure(.manifestInvalid)
+            }
+            bySport[sport] = ReplayEquipmentManifestEntry(
+                sha256: sha256,
+                contractSha256: contractSha256
+            )
+        }
+        guard Set(bySport.keys) == Set(ReplayAssetCatalog.supportedSports) else {
+            return .failure(.manifestInvalid)
+        }
+        return .success(bySport)
+    }
+
+    static func validatePackage(
+        packageURL: URL,
+        contractURL: URL,
+        expected: ReplayEquipmentManifestEntry,
+        sport: Sport
+    ) -> Result<ReplayEquipmentPackageContract, ReplayAssetLoadFailure> {
+        let packageHash: String
+        do {
+            packageHash = try ReplayBundledResourceSupport.sha256Hex(contentsOf: packageURL)
+        } catch {
+            return .failure(.packageUnreadable)
+        }
+        guard let contractData = try? Data(contentsOf: contractURL) else {
+            return .failure(.contractUnreadable)
+        }
+        guard packageHash == expected.sha256 else {
+            return .failure(.packageHashMismatch)
+        }
+        guard ReplayBundledResourceSupport.sha256Hex(of: contractData)
+            == expected.contractSha256 else {
+            return .failure(.contractHashMismatch)
+        }
+
+        let contract: ReplayEquipmentPackageContract
+        switch ReplayAssetCatalog.parsePackageContract(data: contractData, sport: sport) {
+        case .success(let parsed):
+            contract = parsed
+        case .failure(let failure):
+            return .failure(.contractInvalid(failure))
+        }
+        if case .failure(let failure) = ReplayAssetCatalog.validatePackageContract(contract) {
+            return .failure(.contractInvalid(failure))
+        }
+        return .success(contract)
+    }
+
+    private static func sport(slug: String) -> Sport? {
+        switch slug {
+        case "row": .rower
+        case "ski": .skierg
+        case "bike": .bike
+        default: nil
+        }
+    }
+}
+
 /// Loads, hash-checks, contract-checks, and caches per-sport equipment.
 /// Failures are cached so a broken package selects one coherent procedural
 /// fallback instead of being retried during render updates.
@@ -108,7 +199,11 @@ final class ReplayAssetLibrary {
     private var loadedSets: [Sport: ReplayBundledEquipmentSet] = [:]
     private var failedSports = Set<Sport>()
     private var inFlightLoads: [Sport: Task<ReplayBundledEquipmentSet?, Never>] = [:]
-    private var manifestPackages: [Sport: (sha256: String, contractSha256: String)]?
+    private var manifestPackages: [Sport: ReplayEquipmentManifestEntry]?
+    private var manifestLoadTask: Task<
+        Result<[Sport: ReplayEquipmentManifestEntry], ReplayAssetLoadFailure>,
+        Never
+    >?
     private var manifestLoadFailed = false
     private(set) var lastFailures: [Sport: ReplayAssetLoadFailure] = [:]
 
@@ -146,7 +241,7 @@ final class ReplayAssetLibrary {
     private func loadEquipmentSet(for sport: Sport) async -> ReplayBundledEquipmentSet? {
         if let cached = loadedSets[sport] { return cached }
         guard !failedSports.contains(sport) else { return nil }
-        guard let expected = loadManifest()?[sport] else {
+        guard let expected = await loadManifest()?[sport] else {
             return reject(sport, because: .manifestInvalid)
         }
 
@@ -157,30 +252,20 @@ final class ReplayAssetLibrary {
         guard let contractURL = source.contractURL(for: resource) else {
             return reject(sport, because: .contractMissing)
         }
-        guard let packageHash = try? ReplayBundledResourceSupport.sha256Hex(
-            contentsOf: packageURL
-        ) else {
-            return reject(sport, because: .packageUnreadable)
-        }
-        guard let contractData = try? Data(contentsOf: contractURL) else {
-            return reject(sport, because: .contractUnreadable)
-        }
-        guard packageHash == expected.sha256 else {
-            return reject(sport, because: .packageHashMismatch)
-        }
-        guard ReplayBundledResourceSupport.sha256Hex(of: contractData)
-            == expected.contractSha256 else {
-            return reject(sport, because: .contractHashMismatch)
+        let preflightTask = Task.detached(priority: .userInitiated) {
+            ReplayEquipmentPortablePreflight.validatePackage(
+                packageURL: packageURL,
+                contractURL: contractURL,
+                expected: expected,
+                sport: sport
+            )
         }
         let contract: ReplayEquipmentPackageContract
-        switch ReplayAssetCatalog.parsePackageContract(data: contractData, sport: sport) {
+        switch await preflightTask.value {
         case .success(let parsed):
             contract = parsed
         case .failure(let failure):
-            return reject(sport, because: .contractInvalid(failure))
-        }
-        if case .failure(let failure) = ReplayAssetCatalog.validatePackageContract(contract) {
-            return reject(sport, because: .contractInvalid(failure))
+            return reject(sport, because: failure)
         }
         guard let root = try? await Entity(contentsOf: packageURL) else {
             return reject(sport, because: .packageLoadFailed)
@@ -210,35 +295,39 @@ final class ReplayAssetLibrary {
         return nil
     }
 
-    private func loadManifest() -> [Sport: (sha256: String, contractSha256: String)]? {
+    private func loadManifest() async -> [Sport: ReplayEquipmentManifestEntry]? {
         if let manifestPackages { return manifestPackages }
-        guard !manifestLoadFailed,
-              let url = source.manifestURL(),
-              let data = try? Data(contentsOf: url),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let packages = root["packages"] as? [[String: Any]] else {
+        guard !manifestLoadFailed else { return nil }
+        if let manifestLoadTask {
+            return manifestPackages(from: await manifestLoadTask.value)
+        }
+        guard let url = source.manifestURL() else {
             manifestLoadFailed = true
             return nil
         }
+        let task = Task.detached(priority: .userInitiated) {
+            ReplayEquipmentPortablePreflight.loadManifest(contentsOf: url)
+        }
+        manifestLoadTask = task
+        let result = await task.value
+        manifestLoadTask = nil
+        return manifestPackages(from: result)
+    }
 
-        var bySport: [Sport: (String, String)] = [:]
-        for entry in packages {
-            guard let slug = entry["sport"] as? String,
-                  let sha256 = entry["sha256"] as? String,
-                  let contractSha256 = entry["contractSha256"] as? String,
-                  let sport = Self.sport(slug: slug),
-                  bySport[sport] == nil else {
-                manifestLoadFailed = true
-                return nil
-            }
-            bySport[sport] = (sha256, contractSha256)
-        }
-        guard Set(bySport.keys) == Set(ReplayAssetCatalog.supportedSports) else {
+    private func manifestPackages(
+        from result: Result<
+            [Sport: ReplayEquipmentManifestEntry],
+            ReplayAssetLoadFailure
+        >
+    ) -> [Sport: ReplayEquipmentManifestEntry]? {
+        switch result {
+        case .success(let packages):
+            manifestPackages = packages
+            return packages
+        case .failure:
             manifestLoadFailed = true
             return nil
         }
-        manifestPackages = bySport
-        return bySport
     }
 
     func resetCacheForTesting() {
@@ -248,17 +337,10 @@ final class ReplayAssetLibrary {
             task.cancel()
         }
         inFlightLoads.removeAll()
+        manifestLoadTask?.cancel()
+        manifestLoadTask = nil
         manifestPackages = nil
         manifestLoadFailed = false
         lastFailures.removeAll()
-    }
-
-    private static func sport(slug: String) -> Sport? {
-        switch slug {
-        case "row": .rower
-        case "ski": .skierg
-        case "bike": .bike
-        default: nil
-        }
     }
 }
