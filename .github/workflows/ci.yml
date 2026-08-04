@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - 'codex/phase-11-*'
 
 jobs:
   # RowPlayCore: Pure Swift domain logic — test on Linux for cross-platform validation
@@ -36,6 +38,8 @@ jobs:
         run: |
           swift --version
           swift --version | grep -F 'Swift version 6.3.3'
+      - name: Validate replay reference bundle
+        run: python3 script/validate_rowplay_reference.py
       - name: Test
         run: swift test -Xswiftc -warnings-as-errors
       - name: Build

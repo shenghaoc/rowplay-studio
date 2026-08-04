@@ -1,0 +1,247 @@
+{
+  "nodes": [
+    {
+      "bounds": {
+        "max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "min": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "exportedName": "equipment_ski_ski_assembly",
+      "kind": "composite",
+      "parts": [
+        {
+          "bounds": {
+            "max": [
+              0.0347733311355114,
+              0.949999988079071,
+              0.0758296325802803
+            ],
+            "min": [
+              -0.0347733311355114,
+              -0.949999988079071,
+              0.0053748153150081635
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_base",
+          "materialRole": "equipment-dark",
+          "part": "base",
+          "sourceName": "equipment:ski:ski-assembly:base"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.01885119080543518,
+              -0.0717083215713501,
+              0.04600000008940697
+            ],
+            "min": [
+              -0.020923243835568428,
+              -0.11275769025087357,
+              0.03399999812245369
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_binding_heel",
+          "materialRole": "equipment-trim",
+          "part": "binding-heel",
+          "sourceName": "equipment:ski:ski-assembly:binding-heel"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.02956414595246315,
+              0.0737864077091217,
+              0.07858885079622269
+            ],
+            "min": [
+              -0.02956414595246315,
+              -0.11067961901426315,
+              0.023685084655880928
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_binding_plate",
+          "materialRole": "equipment-dark",
+          "part": "binding-plate",
+          "sourceName": "equipment:ski:ski-assembly:binding-plate"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.02800000086426735,
+              0.09545356780290604,
+              0.06749175488948822
+            ],
+            "min": [
+              -0.02800000086426735,
+              0.053495142608881,
+              0.03799999877810478
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_binding_toe",
+          "materialRole": "equipment-metal",
+          "part": "binding-toe",
+          "sourceName": "equipment:ski:ski-assembly:binding-toe"
+        },
+        {
+          "bounds": {
+            "max": [
+              -0.02000071108341217,
+              0.8116759061813354,
+              0.03799954429268837
+            ],
+            "min": [
+              -0.03840209171175957,
+              -0.7194870710372925,
+              0.01984824799001217
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_edge_left",
+          "materialRole": "equipment-metal",
+          "part": "edge-left",
+          "sourceName": "equipment:ski:ski-assembly:edge-left"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.03840209171175957,
+              0.8116759061813354,
+              0.03799954429268837
+            ],
+            "min": [
+              0.02000071108341217,
+              -0.7194870710372925,
+              0.01984824799001217
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_edge_right",
+          "materialRole": "equipment-metal",
+          "part": "edge-right",
+          "sourceName": "equipment:ski:ski-assembly:edge-right"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.004999999888241291,
+              -0.6636845469474792,
+              0.07658769935369492
+            ],
+            "min": [
+              -0.004045085050165653,
+              -0.9511541128158569,
+              0.01926385425031185
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_tip_ridge",
+          "materialRole": "equipment-light",
+          "part": "tip-ridge",
+          "sourceName": "equipment:ski:ski-assembly:tip-ridge"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.026629582047462463,
+              0.8116504549980164,
+              0.04600000008940697
+            ],
+            "min": [
+              -0.026629582047462463,
+              -0.8116504549980164,
+              0.02500000037252903
+            ]
+          },
+          "exportedName": "equipment_ski_ski_assembly_top_deck",
+          "materialRole": "equipment-painted",
+          "part": "top-deck",
+          "sourceName": "equipment:ski:ski-assembly:top-deck"
+        }
+      ],
+      "sourceName": "equipment:ski:ski-assembly",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "bounds": {
+        "max": [
+          0.7206260561943054,
+          0.5,
+          0.7206260561943054
+        ],
+        "min": [
+          -0.7206260561943054,
+          -0.5,
+          -0.7206260561943054
+        ]
+      },
+      "exportedName": "equipment_ski_pole_shaft",
+      "kind": "leaf",
+      "sourceName": "equipment:ski:pole-shaft"
+    },
+    {
+      "bounds": {
+        "max": [
+          0.8130139708518982,
+          0.5,
+          0.8284467458724976
+        ],
+        "min": [
+          -0.8130139708518982,
+          -0.8199999928474426,
+          -0.9084467887878418
+        ]
+      },
+      "exportedName": "equipment_ski_pole_grip",
+      "kind": "leaf",
+      "sourceName": "equipment:ski:pole-grip"
+    },
+    {
+      "bounds": {
+        "max": [
+          0.6200000047683716,
+          0.6200000047683716,
+          0.125
+        ],
+        "min": [
+          -0.6200000047683716,
+          -0.6200000047683716,
+          -0.46000000834465027
+        ]
+      },
+      "exportedName": "equipment_ski_pole_basket",
+      "kind": "leaf",
+      "sourceName": "equipment:ski:pole-basket"
+    }
+  ],
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "sourceGlbSha256": "31418f4808b30fa786830129b0b637fc025b6e5ddbb539d848fc8cab74806925",
+  "sport": "ski"
+}

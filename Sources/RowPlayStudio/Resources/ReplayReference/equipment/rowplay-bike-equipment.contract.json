@@ -1,0 +1,538 @@
+{
+  "nodes": [
+    {
+      "bounds": {
+        "max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "min": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "exportedName": "equipment_bike_wheel_assembly",
+      "kind": "composite",
+      "parts": [
+        {
+          "bounds": {
+            "max": [
+              0.011900000274181366,
+              0.3099899888038635,
+              0.3099899888038635
+            ],
+            "min": [
+              -0.012240000069141388,
+              -0.3099899888038635,
+              -0.3099899888038635
+            ]
+          },
+          "exportedName": "equipment_bike_wheel_assembly_aero_rim",
+          "materialRole": "equipment-metal",
+          "part": "aero-rim",
+          "sourceName": "equipment:bike:wheel-assembly:aero-rim"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.05950000137090683,
+              0.07500000298023224,
+              0.07458914071321487
+            ],
+            "min": [
+              0.045125361531972885,
+              -0.07500000298023224,
+              -0.07458914071321487
+            ]
+          },
+          "exportedName": "equipment_bike_wheel_assembly_brake_rotor",
+          "materialRole": "equipment-metal",
+          "part": "brake-rotor",
+          "sourceName": "equipment:bike:wheel-assembly:brake-rotor"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.05000000074505806,
+              0.024000000208616257,
+              0.023635385558009148
+            ],
+            "min": [
+              -0.05000000074505806,
+              -0.024000000208616257,
+              -0.023635385558009148
+            ]
+          },
+          "exportedName": "equipment_bike_wheel_assembly_hub",
+          "materialRole": "equipment-dark",
+          "part": "hub",
+          "sourceName": "equipment:bike:wheel-assembly:hub"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.0019052558345720172,
+              0.2965061664581299,
+              0.2965061664581299
+            ],
+            "min": [
+              -0.0019052558345720172,
+              -0.2965061664581299,
+              -0.2965061664581299
+            ]
+          },
+          "exportedName": "equipment_bike_wheel_assembly_spokes",
+          "materialRole": "equipment-metal",
+          "part": "spokes",
+          "sourceName": "equipment:bike:wheel-assembly:spokes"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.017500000074505806,
+              0.3217499852180481,
+              0.3217499852180481
+            ],
+            "min": [
+              -0.017999999225139618,
+              -0.3217499852180481,
+              -0.3217499852180481
+            ]
+          },
+          "exportedName": "equipment_bike_wheel_assembly_tyre",
+          "materialRole": "equipment-rubber",
+          "part": "tyre",
+          "sourceName": "equipment:bike:wheel-assembly:tyre"
+        }
+      ],
+      "sourceName": "equipment:bike:wheel-assembly",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "bounds": {
+        "max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "min": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "exportedName": "equipment_bike_frame_assembly",
+      "kind": "composite",
+      "parts": [
+        {
+          "bounds": {
+            "max": [
+              0.03179642930626869,
+              0.4548473358154297,
+              0.3405439853668213
+            ],
+            "min": [
+              -0.007796429097652435,
+              -0.5432311296463013,
+              0.2680000066757202
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_brake_calipers",
+          "materialRole": "equipment-dark",
+          "part": "brake-calipers",
+          "sourceName": "equipment:bike:frame-assembly:brake-calipers"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.21899999678134918,
+              -0.42282769083976746,
+              0.8740000128746033
+            ],
+            "min": [
+              -0.21899999678134918,
+              -0.5675491690635681,
+              0.7196687459945679
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_brake_hoods",
+          "materialRole": "equipment-dark",
+          "part": "brake-hoods",
+          "sourceName": "equipment:bike:frame-assembly:brake-hoods"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.20499999821186066,
+              -0.5167620182037354,
+              0.847809910774231
+            ],
+            "min": [
+              -0.20499999821186066,
+              -0.5675559639930725,
+              0.7796677947044373
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_brake_levers",
+          "materialRole": "equipment-metal",
+          "part": "brake-levers",
+          "sourceName": "equipment:bike:frame-assembly:brake-levers"
+        },
+        {
+          "bounds": {
+            "max": [
+              -0.040800001472234726,
+              0.5066266059875488,
+              0.3817325532436371
+            ],
+            "min": [
+              -0.0660310909152031,
+              -0.05157032981514931,
+              0.16340690851211548
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_chain_and_cassette",
+          "materialRole": "equipment-metal",
+          "part": "chain-and-cassette",
+          "sourceName": "equipment:bike:frame-assembly:chain-and-cassette"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.21250000596046448,
+              -0.3329450190067291,
+              0.8675000071525574
+            ],
+            "min": [
+              -0.21250000596046448,
+              -0.5121723413467407,
+              0.8276700973510742
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_cockpit",
+          "materialRole": "equipment-metal",
+          "part": "cockpit",
+          "sourceName": "equipment:bike:frame-assembly:cockpit"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.029999999329447746,
+              -0.36438825726509094,
+              0.6990000009536743
+            ],
+            "min": [
+              -0.029999999329447746,
+              -0.40838825702667236,
+              0.6470000147819519
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_fork_crown",
+          "materialRole": "equipment-painted",
+          "part": "fork-crown",
+          "sourceName": "equipment:bike:frame-assembly:fork-crown"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.059088464826345444,
+              -0.5057899355888367,
+              0.3700000047683716
+            ],
+            "min": [
+              -0.059088464826345444,
+              -0.572998046875,
+              0.30000001192092896
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_front_axle",
+          "materialRole": "equipment-metal",
+          "part": "front-axle",
+          "sourceName": "equipment:bike:frame-assembly:front-axle"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.020999999716877937,
+              0.23129884898662567,
+              0.8534519076347351
+            ],
+            "min": [
+              -0.020999999716877937,
+              -0.4024706482887268,
+              0.251729816198349
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_main_triangle",
+          "materialRole": "equipment-painted",
+          "part": "main-triangle",
+          "sourceName": "equipment:bike:frame-assembly:main-triangle"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.059088464826345444,
+              0.49360406398773193,
+              0.3700000047683716
+            ],
+            "min": [
+              -0.059088464826345444,
+              0.4263959228992462,
+              0.30000001192092896
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_rear_axle",
+          "materialRole": "equipment-metal",
+          "part": "rear-axle",
+          "sourceName": "equipment:bike:frame-assembly:rear-axle"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.07500000298023224,
+              0.33500000834465027,
+              0.8946135640144348
+            ],
+            "min": [
+              -0.07500000298023224,
+              0.11499999463558197,
+              0.8166135549545288
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_saddle",
+          "materialRole": "equipment-dark",
+          "part": "saddle",
+          "sourceName": "equipment:bike:frame-assembly:saddle"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.013500000350177288,
+              0.24791011214256287,
+              0.8545606136322021
+            ],
+            "min": [
+              -0.013500000350177288,
+              0.20454758405685425,
+              0.7892882823944092
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_seat_post",
+          "materialRole": "equipment-metal",
+          "part": "seat-post",
+          "sourceName": "equipment:bike:frame-assembly:seat-post"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.06647121161222458,
+              0.4683990180492401,
+              0.7968738079071045
+            ],
+            "min": [
+              -0.06647121161222458,
+              -0.5479497909545898,
+              0.2536758482456207
+            ]
+          },
+          "exportedName": "equipment_bike_frame_assembly_stays_and_fork",
+          "materialRole": "equipment-painted",
+          "part": "stays-and-fork",
+          "sourceName": "equipment:bike:frame-assembly:stays-and-fork"
+        }
+      ],
+      "sourceName": "equipment:bike:frame-assembly",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "bounds": {
+        "max": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "min": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "exportedName": "equipment_bike_drivetrain_assembly",
+      "kind": "composite",
+      "parts": [
+        {
+          "bounds": {
+            "max": [
+              0.07249999791383743,
+              0.01899999938905239,
+              0.01899999938905239
+            ],
+            "min": [
+              -0.07249999791383743,
+              -0.01899999938905239,
+              -0.01899999938905239
+            ]
+          },
+          "exportedName": "equipment_bike_drivetrain_assembly_bottom_bracket",
+          "materialRole": "equipment-metal",
+          "part": "bottom-bracket",
+          "sourceName": "equipment:bike:drivetrain-assembly:bottom-bracket"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.006000000052154064,
+              0.10400000214576721,
+              0.10400000214576721
+            ],
+            "min": [
+              -0.006000000052154064,
+              -0.10400000214576721,
+              -0.10400000214576721
+            ]
+          },
+          "exportedName": "equipment_bike_drivetrain_assembly_chainring",
+          "materialRole": "equipment-metal",
+          "part": "chainring",
+          "sourceName": "equipment:bike:drivetrain-assembly:chainring"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.13250000774860382,
+              0.03380740433931351,
+              0.24250000715255737
+            ],
+            "min": [
+              -0.13250000774860382,
+              -0.06000000238418579,
+              -0.18505702912807465
+            ]
+          },
+          "exportedName": "equipment_bike_drivetrain_assembly_clipless_pedals",
+          "materialRole": "equipment-dark",
+          "part": "clipless-pedals",
+          "sourceName": "equipment:bike:drivetrain-assembly:clipless-pedals"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.008999999612569809,
+              0.008999999612569809,
+              0.17249999940395355
+            ],
+            "min": [
+              -0.008999999612569809,
+              -0.008999999612569809,
+              -0.17249999940395355
+            ]
+          },
+          "exportedName": "equipment_bike_drivetrain_assembly_crank_arms",
+          "materialRole": "equipment-metal",
+          "part": "crank-arms",
+          "sourceName": "equipment:bike:drivetrain-assembly:crank-arms"
+        },
+        {
+          "bounds": {
+            "max": [
+              0.006657395511865616,
+              0.08500000089406967,
+              0.08500000089406967
+            ],
+            "min": [
+              -0.006657395511865616,
+              -0.08500000089406967,
+              -0.08500000089406967
+            ]
+          },
+          "exportedName": "equipment_bike_drivetrain_assembly_spider",
+          "materialRole": "equipment-dark",
+          "part": "spider",
+          "sourceName": "equipment:bike:drivetrain-assembly:spider"
+        }
+      ],
+      "sourceName": "equipment:bike:drivetrain-assembly",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ],
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "sourceGlbSha256": "31418f4808b30fa786830129b0b637fc025b6e5ddbb539d848fc8cab74806925",
+  "sport": "bike"
+}

@@ -1,0 +1,280 @@
+{
+  "licence": "CC0 (see provenance)",
+  "provenanceReadmeSha256": "8eb751e36de73fe12be1a823b73b40aa488e150feba8b69b8763f5a0ded3b5fc",
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "textures": [
+    {
+      "byteCount": 99466,
+      "family": "aerial-grass-rock",
+      "file": "textures/aerial-grass-rock/aerial-grass-rock-diffuse-512.jpg",
+      "sha256": "0ba2f50ac5472ea90f9a7110ae8805402592997e0f0c6e5f0ac33c8f3a3e2e34",
+      "sourcePath": "static/replay-assets/environments/aerial-grass-rock/aerial-grass-rock-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 105694,
+      "family": "aerial-grass-rock",
+      "file": "textures/aerial-grass-rock/aerial-grass-rock-normal-gl-512.jpg",
+      "sha256": "7186ea4554c8a657869af2e5441503126b1060d4008798c2526bf229d58af653",
+      "sourcePath": "static/replay-assets/environments/aerial-grass-rock/aerial-grass-rock-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 76118,
+      "family": "aerial-grass-rock",
+      "file": "textures/aerial-grass-rock/aerial-grass-rock-roughness-512.jpg",
+      "sha256": "dc7c447546f9b9439b57d1a1ee730f6785c1d6189891ae2d9211949982f4e8fb",
+      "sourcePath": "static/replay-assets/environments/aerial-grass-rock/aerial-grass-rock-roughness-512.jpg"
+    },
+    {
+      "byteCount": 123431,
+      "family": "bark-brown-01",
+      "file": "textures/bark-brown-01/bark-brown-01-diffuse-512.jpg",
+      "sha256": "3a5c636bf35244e6bf436b5a5da999f29efffa04882c24d42387f80ec9e21049",
+      "sourcePath": "static/replay-assets/environments/bark-brown-01/bark-brown-01-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 140928,
+      "family": "bark-brown-01",
+      "file": "textures/bark-brown-01/bark-brown-01-normal-gl-512.jpg",
+      "sha256": "572f31a0c68bd0ecd3b1680ae939cb669db901419850525edf0261caf5143170",
+      "sourcePath": "static/replay-assets/environments/bark-brown-01/bark-brown-01-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 44822,
+      "family": "bark-brown-01",
+      "file": "textures/bark-brown-01/bark-brown-01-roughness-512.jpg",
+      "sha256": "c8392e995cb7040fc022fba4099dcbced67662a3a52ba99c4b7452c627e4b7c0",
+      "sourcePath": "static/replay-assets/environments/bark-brown-01/bark-brown-01-roughness-512.jpg"
+    },
+    {
+      "byteCount": 98228,
+      "family": "brown-planks-03",
+      "file": "textures/brown-planks-03/brown-planks-03-diffuse-512.jpg",
+      "sha256": "3b53a63afb2a1ce6ee1fa45e6c7bab5b0241cb5f03f267e8c223b3e7694b66c2",
+      "sourcePath": "static/replay-assets/environments/brown-planks-03/brown-planks-03-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 40437,
+      "family": "brown-planks-03",
+      "file": "textures/brown-planks-03/brown-planks-03-normal-gl-512.jpg",
+      "sha256": "6ef4b139a08ef9f0bf75e84c0182176d5866fa2e4364c0ba5685b45e16834f37",
+      "sourcePath": "static/replay-assets/environments/brown-planks-03/brown-planks-03-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 46319,
+      "family": "brown-planks-03",
+      "file": "textures/brown-planks-03/brown-planks-03-roughness-512.jpg",
+      "sha256": "edc3f1996678a5d3ba5a306180ff6b4a0d0364b9cbdcf4e2ef0362cafbf0e3ee",
+      "sourcePath": "static/replay-assets/environments/brown-planks-03/brown-planks-03-roughness-512.jpg"
+    },
+    {
+      "byteCount": 61922,
+      "family": "brushed-concrete-2",
+      "file": "textures/brushed-concrete-2/brushed-concrete-2-diffuse-512.jpg",
+      "sha256": "e0552acd803f63c2e055aac8c096f5a1dddc4668cd3008017bcdc0f46a2e173f",
+      "sourcePath": "static/replay-assets/environments/brushed-concrete-2/brushed-concrete-2-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 68254,
+      "family": "brushed-concrete-2",
+      "file": "textures/brushed-concrete-2/brushed-concrete-2-normal-gl-512.jpg",
+      "sha256": "18a8e69e29c18478b07ac00cdb4ceada80f3be3a5fdfd4a0b3b05824ba2fd7b4",
+      "sourcePath": "static/replay-assets/environments/brushed-concrete-2/brushed-concrete-2-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 41777,
+      "family": "brushed-concrete-2",
+      "file": "textures/brushed-concrete-2/brushed-concrete-2-roughness-512.jpg",
+      "sha256": "500e543fa6bf4a14a43233352ff6273b326ab63f0e49b5d0af14edb729e43f55",
+      "sourcePath": "static/replay-assets/environments/brushed-concrete-2/brushed-concrete-2-roughness-512.jpg"
+    },
+    {
+      "byteCount": 100997,
+      "family": "cobblestone-floor-03",
+      "file": "textures/cobblestone-floor-03/cobblestone-floor-03-diffuse-512.jpg",
+      "sha256": "999a8745fbf6996860e9c64995728c97185032389201931b29ff6f80691ff0e9",
+      "sourcePath": "static/replay-assets/environments/cobblestone-floor-03/cobblestone-floor-03-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 83551,
+      "family": "cobblestone-floor-03",
+      "file": "textures/cobblestone-floor-03/cobblestone-floor-03-normal-gl-512.jpg",
+      "sha256": "947b46c737dbfe5890e264636ec437be09665a8a227a11c8b8228eec4089c335",
+      "sourcePath": "static/replay-assets/environments/cobblestone-floor-03/cobblestone-floor-03-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 49569,
+      "family": "cobblestone-floor-03",
+      "file": "textures/cobblestone-floor-03/cobblestone-floor-03-roughness-512.jpg",
+      "sha256": "daeab61257a199ae69efd7ecd278f7555ed5a68ef0ba4f43fa9f7e8c492e7281",
+      "sourcePath": "static/replay-assets/environments/cobblestone-floor-03/cobblestone-floor-03-roughness-512.jpg"
+    },
+    {
+      "byteCount": 113161,
+      "family": "concrete-floor-painted",
+      "file": "textures/concrete-floor-painted/concrete-floor-painted-diffuse-512.jpg",
+      "sha256": "19c89793bd4a07d5f233799a0a372da2faa58b9ecf50d47220e762ba9101dd1e",
+      "sourcePath": "static/replay-assets/environments/concrete-floor-painted/concrete-floor-painted-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 73925,
+      "family": "concrete-floor-painted",
+      "file": "textures/concrete-floor-painted/concrete-floor-painted-normal-gl-512.jpg",
+      "sha256": "20253d5ec67097b4ee522afd787e926396add5c55a2565bc40fe3917ccecb66a",
+      "sourcePath": "static/replay-assets/environments/concrete-floor-painted/concrete-floor-painted-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 114214,
+      "family": "concrete-floor-painted",
+      "file": "textures/concrete-floor-painted/concrete-floor-painted-roughness-512.jpg",
+      "sha256": "0ba04433f0a61569d4e1d19eef1e947364ad43280b92ebb0e4c7bf5cd98cc613",
+      "sourcePath": "static/replay-assets/environments/concrete-floor-painted/concrete-floor-painted-roughness-512.jpg"
+    },
+    {
+      "byteCount": 116529,
+      "family": "dry-river-pebbles",
+      "file": "textures/dry-river-pebbles/dry-river-pebbles-diffuse-512.jpg",
+      "sha256": "717c0d224a024e72909504dbbe9e26f85914894067b29c909a5241df0b526662",
+      "sourcePath": "static/replay-assets/environments/dry-river-pebbles/dry-river-pebbles-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 146796,
+      "family": "dry-river-pebbles",
+      "file": "textures/dry-river-pebbles/dry-river-pebbles-normal-gl-512.jpg",
+      "sha256": "a35aeba24d6e3744771053a5e9074d29a89afbee185bfc6917dc87245085db6d",
+      "sourcePath": "static/replay-assets/environments/dry-river-pebbles/dry-river-pebbles-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 69869,
+      "family": "dry-river-pebbles",
+      "file": "textures/dry-river-pebbles/dry-river-pebbles-roughness-512.jpg",
+      "sha256": "cebf7ff77629c6ea308bfc46358314a515aeb59d076153a58712a87159cd1470",
+      "sourcePath": "static/replay-assets/environments/dry-river-pebbles/dry-river-pebbles-roughness-512.jpg"
+    },
+    {
+      "byteCount": 146693,
+      "family": "forest-leaves-04",
+      "file": "textures/forest-leaves-04/forest-leaves-04-diffuse-512.jpg",
+      "sha256": "0c4a19d3e4f81ac2bd28475d1c0c15e0b951cf68e6b35a72ec48bdd790331b47",
+      "sourcePath": "static/replay-assets/environments/forest-leaves-04/forest-leaves-04-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 173272,
+      "family": "forest-leaves-04",
+      "file": "textures/forest-leaves-04/forest-leaves-04-normal-gl-512.jpg",
+      "sha256": "d3b4bed87b801470ec1567bb582a618883ce06e6051298db38731a28362c4644",
+      "sourcePath": "static/replay-assets/environments/forest-leaves-04/forest-leaves-04-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 121895,
+      "family": "forest-leaves-04",
+      "file": "textures/forest-leaves-04/forest-leaves-04-roughness-512.jpg",
+      "sha256": "001bfa94e88d2debe0b3f91c8aa72577a6d4db4e79392ba9d0354b1c86d5b925",
+      "sourcePath": "static/replay-assets/environments/forest-leaves-04/forest-leaves-04-roughness-512.jpg"
+    },
+    {
+      "byteCount": 130009,
+      "family": "forrest-ground-01",
+      "file": "textures/forrest-ground-01/forrest-ground-01-diffuse-512.jpg",
+      "sha256": "655b2425d9b18d150c4a7854002e9c71ed1c321f72a8b2f929436ea557af0acb",
+      "sourcePath": "static/replay-assets/environments/forrest-ground-01/forrest-ground-01-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 152007,
+      "family": "forrest-ground-01",
+      "file": "textures/forrest-ground-01/forrest-ground-01-normal-gl-512.jpg",
+      "sha256": "07b8bb3fa23ceb43b6f5ebdccdb49786f78222ab16a33941597c577b87e25938",
+      "sourcePath": "static/replay-assets/environments/forrest-ground-01/forrest-ground-01-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 63945,
+      "family": "forrest-ground-01",
+      "file": "textures/forrest-ground-01/forrest-ground-01-roughness-512.jpg",
+      "sha256": "632e6bc9faf39d25afae2af708524e7a30e4daf05eba6eee7f6b66923e79958d",
+      "sourcePath": "static/replay-assets/environments/forrest-ground-01/forrest-ground-01-roughness-512.jpg"
+    },
+    {
+      "byteCount": 130499,
+      "family": "leafy-grass",
+      "file": "textures/leafy-grass/leafy-grass-diffuse-512.jpg",
+      "sha256": "92cd6d767e9502ab4d8b1aed49b6f40e16d4b9c761020e833681fabe371506d4",
+      "sourcePath": "static/replay-assets/environments/leafy-grass/leafy-grass-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 150504,
+      "family": "leafy-grass",
+      "file": "textures/leafy-grass/leafy-grass-normal-gl-512.jpg",
+      "sha256": "946fc165aa732befa8bbfe55073c66d1662c2463998bc24cfeb37afd32f8afaa",
+      "sourcePath": "static/replay-assets/environments/leafy-grass/leafy-grass-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 40551,
+      "family": "leafy-grass",
+      "file": "textures/leafy-grass/leafy-grass-roughness-512.jpg",
+      "sha256": "6cca720bf619d284bedd2dac4be5a6126a3abfa566fc410312efdb9f0392391d",
+      "sourcePath": "static/replay-assets/environments/leafy-grass/leafy-grass-roughness-512.jpg"
+    },
+    {
+      "byteCount": 120693,
+      "family": "rock-01",
+      "file": "textures/rock-01/rock-01-diffuse-512.jpg",
+      "sha256": "1ee06fb1752c9eab2b21d7e89e7912efd5981b923e72a6e30f5ce4c3e3bc5898",
+      "sourcePath": "static/replay-assets/environments/rock-01/rock-01-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 110358,
+      "family": "rock-01",
+      "file": "textures/rock-01/rock-01-normal-gl-512.jpg",
+      "sha256": "6025fd703dd261b8edcbb39b21223a850f291b1b8e7564f80d7037b48160b087",
+      "sourcePath": "static/replay-assets/environments/rock-01/rock-01-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 99142,
+      "family": "rock-01",
+      "file": "textures/rock-01/rock-01-roughness-512.jpg",
+      "sha256": "511ba59e965cdc61ee16d30cfc5b5e19cec2e99986945cc48cad0e14767766d0",
+      "sourcePath": "static/replay-assets/environments/rock-01/rock-01-roughness-512.jpg"
+    },
+    {
+      "byteCount": 62514,
+      "family": "snow-02",
+      "file": "textures/snow-02/snow-diffuse-512.jpg",
+      "sha256": "0ae627f87a222d82dfe2f311ef1ba427432fdc58268d4cbcfbbff7764f4f6492",
+      "sourcePath": "static/replay-assets/environments/snow-02/snow-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 156254,
+      "family": "snow-02",
+      "file": "textures/snow-02/snow-normal-gl-512.jpg",
+      "sha256": "5bc9092efa6c2d73cd6b0f04c9ed790b4c3beeed4400938911eb405918a5cc0e",
+      "sourcePath": "static/replay-assets/environments/snow-02/snow-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 42246,
+      "family": "snow-02",
+      "file": "textures/snow-02/snow-roughness-512.jpg",
+      "sha256": "507717de6130d18c2c057ffbc4ae1575a32a5ea26e338deff6827032c4d5399f",
+      "sourcePath": "static/replay-assets/environments/snow-02/snow-roughness-512.jpg"
+    },
+    {
+      "byteCount": 74574,
+      "family": "wood-floor",
+      "file": "textures/wood-floor/wood-floor-diffuse-512.jpg",
+      "sha256": "763103fd5fb60cc18b1f3764bff98fbb666ab0c74512ec90f8f12626f59cb50e",
+      "sourcePath": "static/replay-assets/environments/wood-floor/wood-floor-diffuse-512.jpg"
+    },
+    {
+      "byteCount": 26004,
+      "family": "wood-floor",
+      "file": "textures/wood-floor/wood-floor-normal-gl-512.jpg",
+      "sha256": "0096fb6be668196d968459efd93cd482e16a6f62fd8b86807346930fb6a58613",
+      "sourcePath": "static/replay-assets/environments/wood-floor/wood-floor-normal-gl-512.jpg"
+    },
+    {
+      "byteCount": 66641,
+      "family": "wood-floor",
+      "file": "textures/wood-floor/wood-floor-roughness-512.jpg",
+      "sha256": "6a639e0d23c6133df3a7906a8aa0ebdadfe9dba0472221dc21d7dc16fe2bcdc4",
+      "sourcePath": "static/replay-assets/environments/wood-floor/wood-floor-roughness-512.jpg"
+    }
+  ]
+}

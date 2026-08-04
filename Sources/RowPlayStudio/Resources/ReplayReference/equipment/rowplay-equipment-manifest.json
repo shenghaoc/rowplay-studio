@@ -1,0 +1,33 @@
+{
+  "converter": "Blender 5.2.0 LTS",
+  "geometryPolicy": "converted from the pinned RowPlay V3 GLB with names, transforms and bounds preserved; no geometry redesign",
+  "packages": [
+    {
+      "byteCount": 341171,
+      "contractFile": "rowplay-row-equipment.contract.json",
+      "contractSha256": "76c44237277c2750326e595ab2f53b14c916bd1b8e9120ebfe8b6463e9fedf41",
+      "file": "rowplay-row-equipment.usdz",
+      "sha256": "39f5edf0d36167fd4fd63db8ce2c0d113336085ee9f2f6da7ae02b02c5ec7ec5",
+      "sport": "row"
+    },
+    {
+      "byteCount": 73702,
+      "contractFile": "rowplay-ski-equipment.contract.json",
+      "contractSha256": "d58f44b04ba6881cb3325f7c7f57e568eed2a1d46d564c80e1a190d43c11fa60",
+      "file": "rowplay-ski-equipment.usdz",
+      "sha256": "331f5c28511e269ce5a6cbb02f6b192436183f2ee1dbed087349417504e4e13e",
+      "sport": "ski"
+    },
+    {
+      "byteCount": 607987,
+      "contractFile": "rowplay-bike-equipment.contract.json",
+      "contractSha256": "2a90c46ca8f8decc0a6c02a615c60985ea6873dce977e9dcb2abb579fa55bdb9",
+      "file": "rowplay-bike-equipment.usdz",
+      "sha256": "d0c6b9355749bb75a2276f8a2007419de994da1471db32de0c46df700754cf0e",
+      "sport": "bike"
+    }
+  ],
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "sourceGlbPath": "static/replay-assets/rowplay-rigs-v3.glb",
+  "sourceGlbSha256": "31418f4808b30fa786830129b0b637fc025b6e5ddbb539d848fc8cab74806925"
+}
