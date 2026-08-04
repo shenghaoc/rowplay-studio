@@ -28,7 +28,17 @@ import sys
 import tempfile
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
 import bpy
+
+from replay_reference_contract import (
+    DOMAIN_TO_EQUIPMENT_SPORT,
+    EQUIPMENT_SPORTS,
+    validate_equipment_manifest,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EQUIPMENT_ROOT = (
@@ -61,13 +71,13 @@ TEMPLATE_PARTS = {
 }
 
 SPORT_TEMPLATES = {
-    "row": [
+    DOMAIN_TO_EQUIPMENT_SPORT["rower"]: [
         "equipment:row:boat-assembly",
         "equipment:row:seat-carriage",
         "equipment:row:oar-rig",
     ],
-    "ski": ["equipment:ski:ski-assembly"],
-    "bike": [
+    DOMAIN_TO_EQUIPMENT_SPORT["skierg"]: ["equipment:ski:ski-assembly"],
+    DOMAIN_TO_EQUIPMENT_SPORT["bike"]: [
         "equipment:bike:wheel-assembly",
         "equipment:bike:frame-assembly",
         "equipment:bike:drivetrain-assembly",
@@ -78,19 +88,19 @@ SPORT_TEMPLATES = {
 # no composite — the leaf shaft/grip/basket meshes are the authored pole
 # geometry; the row blade leaf backs the oar spoon).
 SPORT_LEAVES = {
-    "row": ["equipment:row:blade"],
-    "ski": [
+    DOMAIN_TO_EQUIPMENT_SPORT["rower"]: ["equipment:row:blade"],
+    DOMAIN_TO_EQUIPMENT_SPORT["skierg"]: [
         "equipment:ski:pole-shaft",
         "equipment:ski:pole-grip",
         "equipment:ski:pole-basket",
     ],
-    "bike": [],
+    DOMAIN_TO_EQUIPMENT_SPORT["bike"]: [],
 }
 
 OUTPUT_FILES = {
-    "row": "rowplay-row-equipment.usdz",
-    "ski": "rowplay-ski-equipment.usdz",
-    "bike": "rowplay-bike-equipment.usdz",
+    DOMAIN_TO_EQUIPMENT_SPORT["rower"]: "rowplay-row-equipment.usdz",
+    DOMAIN_TO_EQUIPMENT_SPORT["skierg"]: "rowplay-ski-equipment.usdz",
+    DOMAIN_TO_EQUIPMENT_SPORT["bike"]: "rowplay-bike-equipment.usdz",
 }
 
 
@@ -173,21 +183,20 @@ def main() -> None:
             if not manifest_path.exists():
                 fail("equipment manifest missing — run without --check first")
             manifest = json.loads(manifest_path.read_text())
-            if manifest.get("sourceCommit") != resolved:
-                fail("equipment manifest pinned to a different commit")
-            if manifest.get("sourceGlbSha256") != source_hash:
-                fail("pinned GLB hash changed — regenerate the equipment packages")
-            for entry in manifest.get("packages", []):
-                package = EQUIPMENT_ROOT / entry["file"]
-                if not package.exists():
-                    fail(f"missing package {entry['file']}")
-                if sha256(package) != entry["sha256"]:
-                    fail(f"stale package {entry['file']}")
+            errors = validate_equipment_manifest(
+                manifest,
+                EQUIPMENT_ROOT,
+                expected_commit=resolved,
+                expected_source_glb_sha256=source_hash,
+            )
+            if errors:
+                fail("; ".join(errors))
             print(f"equipment packages match RowPlay {resolved}")
             return
 
         packages = []
-        for sport, templates in SPORT_TEMPLATES.items():
+        for sport in EQUIPMENT_SPORTS:
+            templates = SPORT_TEMPLATES[sport]
             reset_scene()
             bpy.ops.import_scene.gltf(filepath=str(glb_path))
             all_objects = {obj.name: obj for obj in bpy.data.objects}

@@ -42,6 +42,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_reference_contract import (
+    DOMAIN_SPORTS,
+    validate_equipment_manifest,
+    validate_motion_manifest,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_ROOT = REPO_ROOT / "Sources" / "RowPlayStudio" / "Resources" / "ReplayReference"
 
@@ -52,29 +62,6 @@ SEMANTIC_BONES = [
     "v4LeftUpperLeg", "v4LeftLowerLeg", "v4LeftFoot",
     "v4RightUpperLeg", "v4RightLowerLeg", "v4RightFoot",
 ]
-
-CLIPS = [
-    ("rower", "rowplay-v4-row-cycle"),
-    ("skierg", "rowplay-v4-ski-cycle"),
-    ("bike", "rowplay-v4-bike-cycle"),
-]
-
-DRIVE_END = {"rower": 0.38, "skierg": 0.34, "bike": 0.5}
-
-PHASE_LANDMARKS = {
-    "rower": {
-        "catch": 0.0, "legDrive": 0.08, "bodyOpen": 0.3, "finish": 0.38,
-        "handsAway": 0.54, "bodyOver": 0.72, "slide": 0.88, "loop": 1.0,
-    },
-    "skierg": {
-        "reach": 0.0, "plant": 0.12, "loadedPull": 0.24, "driveEnd": 0.34,
-        "release": 0.58, "recover": 0.78, "loop": 1.0,
-    },
-    "bike": {
-        "leftTop": 0.0, "leftPower": 0.25, "opposed": 0.5, "rightPower": 0.75,
-        "loop": 1.0,
-    },
-}
 
 SAMPLES_PER_SPORT = 257
 MOTION_FORMAT_VERSION = 2
@@ -225,7 +212,71 @@ class SampledChannel:
         return lerp_vec(self.values[low], self.values[high], t)
 
 
-def sample_motion_table(glb: bytes) -> tuple[bytes, dict[str, Any]]:
+def motion_clips_from_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    animation = contract.get("animation")
+    if not isinstance(animation, dict):
+        fail("athlete contract animation must be an object")
+    raw_clips = animation.get("clips")
+    if not isinstance(raw_clips, list):
+        fail("athlete contract animation.clips must be an array")
+
+    clips_by_sport: dict[str, dict[str, Any]] = {}
+    for index, raw_clip in enumerate(raw_clips):
+        if not isinstance(raw_clip, dict):
+            fail(f"athlete contract clip {index} must be an object")
+        sport = raw_clip.get("sport")
+        if sport not in DOMAIN_SPORTS:
+            fail(f"athlete contract clip {index} has unsupported sport {sport!r}")
+        if sport in clips_by_sport:
+            fail(f"athlete contract duplicates the {sport} clip")
+        name = raw_clip.get("name")
+        if not isinstance(name, str) or not name:
+            fail(f"athlete contract {sport} clip name missing")
+        duration = _finite_number(raw_clip.get("durationSeconds"), f"{sport} durationSeconds")
+        if duration <= 0:
+            fail(f"athlete contract {sport} durationSeconds must be positive")
+        drive_end = _normalized_number(raw_clip.get("driveEnd"), f"{sport} driveEnd")
+        raw_landmarks = raw_clip.get("phaseLandmarks")
+        if not isinstance(raw_landmarks, dict) or not raw_landmarks:
+            fail(f"athlete contract {sport} phaseLandmarks must be a non-empty object")
+        landmarks: dict[str, float] = {}
+        for label, value in raw_landmarks.items():
+            if not isinstance(label, str) or not label:
+                fail(f"athlete contract {sport} phase landmark name missing")
+            landmarks[label] = _normalized_number(value, f"{sport} phaseLandmarks.{label}")
+        clips_by_sport[sport] = {
+            "sport": sport,
+            "name": name,
+            "durationSeconds": duration,
+            "driveEnd": drive_end,
+            "phaseLandmarks": landmarks,
+        }
+
+    if set(clips_by_sport) != set(DOMAIN_SPORTS):
+        fail("athlete contract must contain one clip for each supported sport")
+    return [clips_by_sport[sport] for sport in DOMAIN_SPORTS]
+
+
+def _finite_number(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        fail(f"athlete contract {label} must be numeric")
+    number = float(value)
+    if not math.isfinite(number):
+        fail(f"athlete contract {label} must be finite")
+    return number
+
+
+def _normalized_number(value: Any, label: str) -> float:
+    number = _finite_number(value, label)
+    if not 0.0 <= number <= 1.0:
+        fail(f"athlete contract {label} must be between zero and one")
+    return number
+
+
+def sample_motion_table(
+    glb: bytes,
+    clip_contracts: list[dict[str, Any]],
+) -> tuple[bytes, dict[str, Any]]:
     gltf, binary = parse_glb(glb)
     node_names = {index: node.get("name", "") for index, node in enumerate(gltf.get("nodes", []))}
     node_rest: dict[int, dict[str, tuple[float, ...]]] = {}
@@ -241,7 +292,9 @@ def sample_motion_table(glb: bytes) -> tuple[bytes, dict[str, Any]]:
 
     payload = bytearray()
     clip_manifests: list[dict[str, Any]] = []
-    for sport, clip_name in CLIPS:
+    for clip_contract in clip_contracts:
+        sport = clip_contract["sport"]
+        clip_name = clip_contract["name"]
         animation = animations.get(clip_name)
         if animation is None:
             fail(f"clip {clip_name!r} missing from athlete GLB")
@@ -262,6 +315,12 @@ def sample_motion_table(glb: bytes) -> tuple[bytes, dict[str, Any]]:
             duration = max(duration, times[-1])
         if duration <= 0:
             fail(f"clip {clip_name!r} has zero duration")
+        authored_duration = clip_contract["durationSeconds"]
+        if not math.isclose(duration, authored_duration, rel_tol=1e-6, abs_tol=1e-6):
+            fail(
+                f"clip {clip_name!r} duration {duration} does not match "
+                f"athlete contract duration {authored_duration}"
+            )
         rest_by_name = {
             node_names[index]: rest for index, rest in node_rest.items()
             if node_names[index] in SEMANTIC_BONES
@@ -296,9 +355,9 @@ def sample_motion_table(glb: bytes) -> tuple[bytes, dict[str, Any]]:
             {
                 "sport": sport,
                 "clipName": clip_name,
-                "durationSeconds": duration,
-                "driveEnd": DRIVE_END[sport],
-                "phaseLandmarks": PHASE_LANDMARKS[sport],
+                "durationSeconds": authored_duration,
+                "driveEnd": clip_contract["driveEnd"],
+                "phaseLandmarks": clip_contract["phaseLandmarks"],
                 "animatedTrackCount": len(channels),
             }
         )
@@ -307,7 +366,7 @@ def sample_motion_table(glb: bytes) -> tuple[bytes, dict[str, Any]]:
         "formatVersion": MOTION_FORMAT_VERSION,
         "layout": "float32-little-endian [sport][phase][bone][tx ty tz rx ry rz rw sx sy sz]",
         "samplesPerSport": SAMPLES_PER_SPORT,
-        "sports": [sport for sport, _ in CLIPS],
+        "sports": [clip["sport"] for clip in clip_contracts],
         "boneNames": SEMANTIC_BONES,
         "floatsPerBone": 10,
         "clips": clip_manifests,
@@ -380,6 +439,7 @@ def main() -> None:
     bones = contract.get("bones", {})
     if bones.get("semanticOrderedNames") != SEMANTIC_BONES:
         fail("contract semantic bone list drifted from the sync script's table")
+    motion_clips = motion_clips_from_contract(contract)
 
     write_or_check(
         REFERENCE_ROOT / "athlete" / "rowplay-athlete-v4.usdz", usdz_blob, check, mismatches
@@ -422,7 +482,10 @@ def main() -> None:
     )
 
     # Motion table sampled from the pinned GLB clips.
-    motion_bin, motion_manifest = sample_motion_table(glb_blob)
+    motion_bin, motion_manifest = sample_motion_table(glb_blob, motion_clips)
+    motion_errors = validate_motion_manifest(motion_manifest, contract)
+    if motion_errors:
+        fail(motion_errors[0])
     motion_manifest["sourceCommit"] = resolved
     motion_manifest["sourceGlbSha256"] = sha256(glb_blob)
     motion_manifest["motionBinSha256"] = sha256(motion_bin)
@@ -481,32 +544,19 @@ def main() -> None:
         if not equipment_manifest_path.exists():
             mismatches.append("missing: equipment/rowplay-equipment-manifest.json (run convert_rowplay_equipment.py)")
         else:
-            manifest = json.loads(equipment_manifest_path.read_text())
-            if manifest.get("sourceCommit") != resolved:
-                mismatches.append("equipment manifest pinned to a different commit")
-            if manifest.get("sourceGlbSha256") != sha256(rigs_blob):
-                mismatches.append("equipment manifest source GLB hash drifted")
-            for entry in manifest.get("packages", []):
-                package_path = equipment_dir / entry["file"]
-                if not package_path.exists():
-                    mismatches.append(f"missing: equipment/{entry['file']}")
-                elif sha256(package_path.read_bytes()) != entry.get("sha256"):
-                    mismatches.append(f"stale: equipment/{entry['file']}")
-                contract_path = equipment_dir / entry["contractFile"]
-                if not contract_path.exists():
-                    mismatches.append(f"missing: equipment/{entry['contractFile']}")
-                elif sha256(contract_path.read_bytes()) != entry.get("contractSha256"):
-                    mismatches.append(f"stale: equipment/{entry['contractFile']}")
-                else:
-                    sidecar = json.loads(contract_path.read_text())
-                    if sidecar.get("sourceCommit") != resolved:
-                        mismatches.append(
-                            f"equipment/{entry['contractFile']} pinned to a different commit"
-                        )
-                    if sidecar.get("sport") != entry.get("sport"):
-                        mismatches.append(
-                            f"equipment/{entry['contractFile']} sport does not match manifest"
-                        )
+            try:
+                manifest = json.loads(equipment_manifest_path.read_text())
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                mismatches.append(f"invalid equipment manifest: {error}")
+            else:
+                mismatches.extend(
+                    validate_equipment_manifest(
+                        manifest,
+                        equipment_dir,
+                        expected_commit=resolved,
+                        expected_source_glb_sha256=sha256(rigs_blob),
+                    )
+                )
 
     # Parity fixtures are generated into the Core test target by
     # export_rowplay_native_parity.mjs. Layers add those files independently,

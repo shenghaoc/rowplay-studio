@@ -14,6 +14,12 @@ import json
 import sys
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_reference_contract import validate_equipment_manifest, validate_motion_manifest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_ROOT = REPO_ROOT / "Sources" / "RowPlayStudio" / "Resources" / "ReplayReference"
 
@@ -72,8 +78,9 @@ def main() -> None:
         fail("motion manifest pinned to a different commit")
     if motion.get("sourceGlbSha256") != artifacts.get("athleteGlb", {}).get("sha256"):
         fail("motion and source manifests disagree on athlete GLB hash")
-    if set(motion.get("sports", [])) != {"rower", "skierg", "bike"}:
-        fail("motion manifest must contain exactly the three supported sports")
+    motion_errors = validate_motion_manifest(motion, contract)
+    if motion_errors:
+        fail(motion_errors[0])
     motion_bin = REFERENCE_ROOT / "motion" / "rowplay-motion.bin"
     if not motion_bin.exists():
         fail("missing rowplay-motion.bin")
@@ -91,30 +98,14 @@ def main() -> None:
         fail("motion.bin layout does not match its manifest")
 
     equipment = load(REFERENCE_ROOT / "equipment" / "rowplay-equipment-manifest.json")
-    if equipment.get("sourceCommit") != pinned:
-        fail("equipment manifest pinned to a different commit")
-    if equipment.get("sourceGlbSha256") != artifacts.get("equipmentSourceGlb", {}).get("sha256"):
-        fail("equipment and source manifests disagree on equipment GLB hash")
-    packages = equipment.get("packages", [])
-    package_sports = [entry.get("sport") for entry in packages]
-    if len(packages) != 3 or set(package_sports) != {"row", "ski", "bike"}:
-        fail("equipment manifest must contain one package for each supported sport")
-    for entry in packages:
-        package = REFERENCE_ROOT / "equipment" / entry["file"]
-        if not package.exists():
-            fail(f"missing equipment package {entry['file']}")
-        if sha256(package) != entry.get("sha256"):
-            fail(f"equipment package hash mismatch: {entry['file']}")
-        sidecar = REFERENCE_ROOT / "equipment" / entry["contractFile"]
-        if not sidecar.exists():
-            fail(f"missing equipment contract {entry['contractFile']}")
-        if sha256(sidecar) != entry.get("contractSha256"):
-            fail(f"equipment contract hash mismatch: {entry['contractFile']}")
-        sidecar_json = json.loads(sidecar.read_text())
-        if sidecar_json.get("sourceCommit") != pinned:
-            fail(f"{entry['contractFile']} pinned to a different commit")
-        if sidecar_json.get("sport") != entry.get("sport"):
-            fail(f"{entry['contractFile']} sport does not match manifest")
+    equipment_errors = validate_equipment_manifest(
+        equipment,
+        REFERENCE_ROOT / "equipment",
+        expected_commit=pinned,
+        expected_source_glb_sha256=artifacts.get("equipmentSourceGlb", {}).get("sha256"),
+    )
+    if equipment_errors:
+        fail(equipment_errors[0])
 
     environment = load(REFERENCE_ROOT / "environment" / "environment-manifest.json")
     if environment.get("sourceCommit") != pinned:
