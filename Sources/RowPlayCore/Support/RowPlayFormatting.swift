@@ -82,7 +82,9 @@ public enum RowPlayFormatting: Sendable {
             return 0
         }
         let perMetre = pacePer500m / 500
-        return 2.8 / pow(perMetre, 3)
+        // Use direct multiplication instead of pow(x, 3) to avoid generalized power function overhead
+        // in hot paths (e.g., when processing strokes or calculating totals).
+        return 2.8 / (perMetre * perMetre * perMetre)
     }
 
     public static func paceToWatts(for sport: Sport, pacePer500m: TimeInterval) -> Double {
