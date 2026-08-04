@@ -11,7 +11,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
         library.resetCacheForTesting()
 
         for sport in ReplayAssetCatalog.supportedSports {
-            guard let set = await library.bundledEquipmentSet(for: sport) else {
+            guard let set = await library.bundledAssetSet(for: sport) else {
                 return XCTFail("Expected validated equipment for \(sport.rawValue)")
             }
             XCTAssertEqual(set.sport, sport)
@@ -51,12 +51,12 @@ final class ReplayAssetLibraryTests: XCTestCase {
             ))
         )
         var reports: [(Sport, ReplayAssetLoadFailure)] = []
-        let library = ReplayAssetLibrary(source: source) { sport, failure in
+        let library = ReplayAssetLibrary(source: source, failureReporter: { sport, failure in
             reports.append((sport, failure))
-        }
+        })
 
-        let first = await library.bundledEquipmentSet(for: .rower)
-        let second = await library.bundledEquipmentSet(for: .rower)
+        let first = await library.bundledAssetSet(for: .rower)
+        let second = await library.bundledAssetSet(for: .rower)
         XCTAssertNil(first)
         XCTAssertNil(second)
         XCTAssertEqual(source.packageRequests, 1)
@@ -87,7 +87,7 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        let set = await library.bundledEquipmentSet(for: sport)
+        let set = await library.bundledAssetSet(for: sport)
         XCTAssertNil(set)
         XCTAssertEqual(library.lastFailures[sport], .contractHashMismatch)
     }
@@ -114,8 +114,8 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        async let first = library.bundledEquipmentSet(for: sport)
-        async let second = library.bundledEquipmentSet(for: sport)
+        async let first = library.bundledAssetSet(for: sport)
+        async let second = library.bundledAssetSet(for: sport)
         let results = await (first, second)
 
         XCTAssertNotNil(results.0)
@@ -152,8 +152,8 @@ final class ReplayAssetLibraryTests: XCTestCase {
         )
         let library = ReplayAssetLibrary(source: source)
 
-        async let rower = library.bundledEquipmentSet(for: .rower)
-        async let bike = library.bundledEquipmentSet(for: .bike)
+        async let rower = library.bundledAssetSet(for: .rower)
+        async let bike = library.bundledAssetSet(for: .bike)
         let results = await (rower, bike)
 
         XCTAssertNotNil(results.0)
@@ -218,6 +218,67 @@ final class ReplayAssetLibraryTests: XCTestCase {
             try ReplayBundledResourceSupport.sha256Hex(contentsOf: url),
             ReplayBundledResourceSupport.sha256Hex(of: data)
         )
+    }
+
+    func testMissingAthleteRejectsTheWholeBundledSet() async throws {
+        let sport = Sport.rower
+        let resource = ReplayEquipmentPackageResource(sport: sport)
+        let source = TestEquipmentResourceSource(
+            manifest: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: ReplayAssetCatalog.equipmentManifestName,
+                extension: ReplayAssetCatalog.equipmentManifestExtension,
+                subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+            )),
+            packages: [sport: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.packageName,
+                extension: resource.packageExtension,
+                subdirectory: resource.subdirectory
+            ))],
+            contracts: [sport: try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+                name: resource.contractName,
+                extension: resource.contractExtension,
+                subdirectory: resource.subdirectory
+            ))]
+        )
+        let library = ReplayAssetLibrary(
+            source: source,
+            athleteTemplateProvider: { nil }
+        )
+
+        let set = await library.bundledAssetSet(for: sport)
+
+        XCTAssertNil(set)
+        XCTAssertEqual(library.lastFailures[sport], .athleteUnavailable)
+    }
+
+    func testManifestRequiresExactlyOnePackageForEverySupportedSport() async throws {
+        let bundled = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
+            name: ReplayAssetCatalog.equipmentManifestName,
+            extension: ReplayAssetCatalog.equipmentManifestExtension,
+            subdirectory: ReplayAssetCatalog.equipmentSubdirectory
+        ))
+        let data = try Data(contentsOf: bundled)
+        let root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let packages = try XCTUnwrap(root["packages"] as? [[String: Any]])
+
+        for invalidPackages in [Array(packages.dropLast()), packages + [packages[0]]] {
+            var invalidRoot = root
+            invalidRoot["packages"] = invalidPackages
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("rowplay-equipment-manifest-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: invalidRoot, options: [.sortedKeys])
+                .write(to: url, options: .atomic)
+            defer { try? FileManager.default.removeItem(at: url) }
+
+            let library = ReplayAssetLibrary(
+                source: TestEquipmentResourceSource(manifest: url)
+            )
+            let set = await library.bundledAssetSet(for: .rower)
+            XCTAssertNil(set)
+            XCTAssertEqual(library.lastFailures[.rower], .manifestInvalid)
+        }
     }
 
     private func parsedContract(

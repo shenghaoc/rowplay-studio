@@ -189,13 +189,17 @@ final class ReplayAthleteTemplate {
         sport: Sport,
         name: String,
         isRival: Bool,
-        quality: ReplayRenderQuality
-    ) async -> ReplayAthleteInstance? {
+        quality: ReplayRenderQuality,
+        detailMaps: [ReplayAthleteSurfaceRole: TextureResource]
+    ) -> ReplayAthleteInstance? {
         guard motionTable.clips[sport] != nil,
-              let selectedClipName = contract.clip(for: sport)?.name else { return nil }
-        guard let detailMaps = await ReplayAthleteMaterialLibrary.shared.detailMaps(
-            for: quality
-        ) else { return nil }
+              let selectedClipName = contract.clip(for: sport)?.name,
+              let gripController = ReplayAthleteGripController(
+                  contract: contract,
+                  sport: sport
+              ) else {
+            return nil
+        }
         let clone = rootTemplate.clone(recursive: true)
         clone.name = name
         clone.isEnabled = true
@@ -212,12 +216,34 @@ final class ReplayAthleteTemplate {
             template: self,
             sport: sport,
             selectedClipName: selectedClipName,
-            quality: quality
+            quality: quality,
+            gripController: gripController
         )
         guard instance.applyBodyStyle(isRival: isRival, detailMaps: detailMaps) else {
             return nil
         }
         return instance
+    }
+
+    /// Convenience for callers that are already async and have not resolved the
+    /// tier's detail maps. The synchronous scene build uses the prewarmed cache
+    /// instead, so this never runs inside RealityView's `make` closure.
+    func makeInstance(
+        sport: Sport,
+        name: String,
+        isRival: Bool,
+        quality: ReplayRenderQuality
+    ) async -> ReplayAthleteInstance? {
+        guard let detailMaps = await ReplayAthleteMaterialLibrary.shared.detailMaps(
+            for: quality
+        ) else { return nil }
+        return makeInstance(
+            sport: sport,
+            name: name,
+            isRival: isRival,
+            quality: quality,
+            detailMaps: detailMaps
+        )
     }
 }
 
@@ -233,6 +259,7 @@ final class ReplayAthleteInstance {
     let selectedClipName: String
     let quality: ReplayRenderQuality
     let surfaceRoles: [ReplayAthleteSurfaceRole]
+    let gripController: ReplayAthleteGripController
 
     private let template: ReplayAthleteTemplate
     private var baseRootTransform: Transform?
@@ -253,7 +280,8 @@ final class ReplayAthleteInstance {
         template: ReplayAthleteTemplate,
         sport: Sport,
         selectedClipName: String,
-        quality: ReplayRenderQuality
+        quality: ReplayRenderQuality,
+        gripController: ReplayAthleteGripController
     ) {
         self.root = root
         self.athleteEntity = athleteEntity
@@ -264,14 +292,25 @@ final class ReplayAthleteInstance {
         self.selectedClipName = selectedClipName
         self.quality = quality
         self.surfaceRoles = template.nativeManifest.surfaceRoles
+        self.gripController = gripController
         self.sampleBuffer = Array(
             repeating: ReplayAthleteBoneTransform(),
             count: template.motionTable.boneNames.count
         )
 
-        // Grip helpers remain at bind in this layer. The following grip/contact
-        // stack layer composes its install-time closure onto these transforms.
-        self.workingTransforms = template.restTransforms
+        // Working pose starts at bind; helper joints are pre-composed with
+        // the install-time grip closure once — per frame only the semantic
+        // bones are rewritten from the motion table.
+        var transforms = template.restTransforms
+        for (offset, helper) in template.contract.helpers.enumerated() {
+            let jointIndex = template.helperJointIndices[offset]
+            if let solved = gripController.solvedRotation(forHelper: helper.name) {
+                var transform = transforms[jointIndex]
+                transform.rotation = solved
+                transforms[jointIndex] = transform
+            }
+        }
+        self.workingTransforms = transforms
 
         func contactEntity(for role: ReplayAthleteContactRole) -> Entity? {
             guard let name = ReplayAthleteCatalog.contactEntityNames[role] else { return nil }
@@ -313,7 +352,10 @@ final class ReplayAthleteInstance {
             sport: sport,
             fraction: fraction,
             into: &sampleBuffer
-        ) else { return false }
+        ) else {
+            constraintPose = nil
+            return false
+        }
         for (tableIndex, jointIndex) in template.semanticJointIndices.enumerated() {
             let sampled = sampleBuffer[tableIndex]
             let scale = SIMD3<Float>(
@@ -449,8 +491,8 @@ final class ReplayAthleteInstance {
     }
 
     /// Begin one deterministic skeletal correction pass from the sampled base
-    /// pose. The per-frame order is `seek → beginConstraintPass →
-    /// solve/write`. Constraint transforms are intentionally ephemeral:
+    /// pose. The contact solver owns the complete pass and publishes only a
+    /// validated result. Constraint transforms are intentionally ephemeral:
     /// `seek` always rebuilds from the sampled table and bind helpers, so a
     /// shuffled seek cannot accumulate an earlier frame's correction.
     func beginConstraintPass() -> Bool {
@@ -505,8 +547,50 @@ final class ReplayAthleteInstance {
         return true
     }
 
-    func contactSpec(role: ReplayAthleteContactRole) -> ReplayAthleteContactSpec? {
+    func authoredContactSpec(role: ReplayAthleteContactRole) -> ReplayAthleteContactSpec? {
         contract.contacts.first { $0.role == role }
+    }
+
+    /// Resolves one validated authored contact into the single runtime model
+    /// consumed by both solving and residual measurement.
+    ///
+    /// The contract supplies the terminal bone for every role. Hand offsets
+    /// come directly from the sport's grip-channel geometry; the raw pinned
+    /// palm offset remains available through `authoredContactSpec(role:)` only as
+    /// authored provenance. Feet use the authored sole offset unchanged.
+    func resolvedContactSpec(
+        role: ReplayAthleteContactRole
+    ) -> ReplayAthleteResolvedContactSpec? {
+        guard let authored = authoredContactSpec(role: role) else { return nil }
+        switch role {
+        case .leftHand:
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: ReplayAthleteGripController.channelOffset(
+                    for: sport,
+                    side: .left
+                ),
+                model: .sportGripChannel
+            )
+        case .rightHand:
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: ReplayAthleteGripController.channelOffset(
+                    for: sport,
+                    side: .right
+                ),
+                model: .sportGripChannel
+            )
+        case .leftFoot, .rightFoot:
+            return ReplayAthleteResolvedContactSpec(
+                bone: authored.bone,
+                role: role,
+                localOffset: authored.localOffset,
+                model: .authoredSole
+            )
+        }
     }
 
     func jointIndex(named bone: String, in pose: SkeletalPose) -> Int? {
@@ -521,14 +605,15 @@ final class ReplayAthleteInstance {
         relativeTo space: Entity
     ) -> SIMD3<Float>? {
         guard let pose = currentConstraintPose(),
-              let spec = contactSpec(role: role),
-              let index = jointIndex(named: spec.bone, in: pose) else {
+              let spec = resolvedContactSpec(role: role),
+              let index = jointIndex(named: spec.bone, in: pose),
+              spec.localOffset.x.isFinite,
+              spec.localOffset.y.isFinite,
+              spec.localOffset.z.isFinite else {
             return nil
         }
         let matrices = skeletalJointMatrices(for: pose)
         guard matrices.indices.contains(index) else { return nil }
-        // Hand-channel contact refinement belongs to the next stack layer.
-        // This layer exposes the authored skeletal contact consistently.
         let offset = SIMD3(
             Float(spec.localOffset.x),
             Float(spec.localOffset.y),

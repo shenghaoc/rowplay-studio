@@ -12,16 +12,42 @@ protocol ReplaySportRig: AnyObject {
     /// The root entity of the rig hierarchy.
     var root: Entity { get }
     /// Apply a sport-specific rig pose.
-    func applyPose(_ pose: ReplaySportRigPose)
+    ///
+    /// - Parameters:
+    ///   - pose: Equipment and (procedural) joint targets from the pure solver.
+    ///   - motion: Optional phase sample for V4 animation seeking. When the
+    ///     rig uses the canonical athlete, the adapter samples the authored
+    ///     clip from this value; the native clock remains authoritative.
+    @discardableResult
+    func applyPose(
+        _ pose: ReplaySportRigPose,
+        motion: ReplayAthleteMotionSample?
+    ) -> ReplaySportRigPoseResult
     /// Apply ghost translucency to all materials.
     func applyGhostTranslucency()
+    /// Returns and clears a V4 runtime failure that requires rebuilding the
+    /// complete scene through the procedural fallback path.
+    func consumeCanonicalRuntimeFailure() -> Bool
+}
+
+@MainActor
+extension ReplaySportRig {
+    @discardableResult
+    func applyPose(_ pose: ReplaySportRigPose) -> ReplaySportRigPoseResult {
+        applyPose(pose, motion: nil)
+    }
+}
+
+@MainActor
+extension ReplaySportRig {
+    func consumeCanonicalRuntimeFailure() -> Bool { false }
 }
 
 /// Default ghost translucency: recursively applies 0.45 opacity to all materials.
 @MainActor
 extension ReplaySportRig {
     func applyGhostTranslucency() {
-        ReplaySportRigTranslucency.apply(to: root, opacity: 0.45)
+        ReplayRigAppearancePolicy.applyRivalEquipment(to: root, excludingAthlete: nil)
     }
 }
 
@@ -35,25 +61,84 @@ enum ReplaySportRigFactory {
     ///   - parent: The entity to attach the rig to.
     ///   - accent: Accent color for sport-specific elements.
     ///   - opacity: Material opacity (1.0 for live, <1 for ghost).
+    ///   - visualProvider: A complete bundled visual provider, or `nil` for the
+    ///     existing procedural mesh path.
+    ///   - canonicalAthlete: Independent validated V4 athlete instance for any
+    ///     quality tier. When present the procedural body is not built.
     /// - Returns: A `ReplaySportRig` that can apply poses.
     static func build(
         sport: Sport,
         into parent: ModelEntity,
         accent: Color,
-        opacity: Float = 1.0
+        opacity: Float = 1.0,
+        visualProvider: (any ReplayRigVisualProvider)? = nil,
+        canonicalAthlete: ReplayAthleteInstance? = nil
     ) -> ReplaySportRig {
+        let requestsBundledEquipment = visualProvider?.usesBundledAssets == true
+        let preflightProvider: ReplayPreflightRigVisualProvider?
+        if requestsBundledEquipment,
+           let alreadyPreflighted = visualProvider as? ReplayPreflightRigVisualProvider {
+            preflightProvider = alreadyPreflighted.isComplete(for: sport)
+                ? alreadyPreflighted
+                : nil
+        } else if requestsBundledEquipment, let visualProvider {
+            preflightProvider = ReplayPreflightRigVisualProvider(base: visualProvider, sport: sport)
+        } else {
+            preflightProvider = nil
+        }
+
+        // Authored equipment is atomic with the athlete when requested. At
+        // Low/Medium no authored equipment is requested, so a validated V4
+        // athlete intentionally rides the tier's procedural equipment.
+        let usesBundledEquipment = requestsBundledEquipment
+            && preflightProvider != nil
+            && canonicalAthlete != nil
+        let usesCanonicalAthlete = requestsBundledEquipment
+            ? usesBundledEquipment
+            : canonicalAthlete != nil
+        let resolvedVisualProvider: (any ReplayRigVisualProvider)?
+        if usesBundledEquipment, let preflightProvider {
+            // Bundled accent slots are recoloured on an independent clone. The
+            // procedural provider remains unchanged because it already creates
+            // its materials using this same `accent` value.
+            resolvedVisualProvider = ReplayAccentRigVisualProvider(
+                base: preflightProvider,
+                accent: NSColor(accent)
+            )
+        } else {
+            resolvedVisualProvider = nil
+        }
+
         switch sport {
         case .rower:
             let rig = ReplayRowerRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
+            )
             return rig
         case .skierg:
             let rig = ReplaySkiErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
+            )
             return rig
         case .bike:
             let rig = ReplayBikeErgRig()
-            rig.build(into: parent, accent: accent, opacity: opacity)
+            rig.build(
+                into: parent,
+                accent: accent,
+                opacity: opacity,
+                visualProvider: resolvedVisualProvider,
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
+            )
             return rig
         }
     }
@@ -76,22 +161,54 @@ enum ReplaySportRigFiniteGuard {
     }
 }
 
-/// Shared ghost translucency application for all sport rigs.
+/// One explicit appearance policy for the mixed RealityKit rig hierarchy.
+/// Bundled deforming bodies remain opaque/depth-writing; only equipment uses
+/// alpha in a rival rig. Procedural athletes have no excluded body and retain
+/// the historical whole-rig translucency.
 @MainActor
-enum ReplaySportRigTranslucency {
-    /// Recursively apply opacity to all `SimpleMaterial` instances in the hierarchy.
-    static func apply(to entity: Entity, opacity: Float) {
-        if let model = entity as? ModelEntity {
-            model.model?.materials = model.model?.materials.map { mat in
+enum ReplayRigAppearancePolicy {
+    static let rivalEquipmentOpacity: Float = 0.45
+
+    static func applyRivalEquipment(to root: Entity, excludingAthlete: Entity?) {
+        apply(to: root, opacity: rivalEquipmentOpacity, excluding: excludingAthlete)
+    }
+
+    /// Recursively apply opacity to every built-in material type used by the
+    /// procedural rig, generated USDA assets, and the V4 athlete. Each
+    /// live/ghost clone has independent materials, so this never mutates a
+    /// cached template.
+    private static func apply(to entity: Entity, opacity: Float, excluding excluded: Entity?) {
+        if entity === excluded {
+            return
+        }
+        // USDA loading produces generic `Entity` values with a ModelComponent,
+        // whereas the procedural path usually produces `ModelEntity`. Replacing
+        // the component works for both representations.
+        if var model = entity.components[ModelComponent.self] {
+            model.materials = model.materials.map { mat in
                 if var sm = mat as? SimpleMaterial {
                     sm.color.tint = sm.color.tint.withAlphaComponent(CGFloat(opacity))
                     return sm
                 }
+                if var pbr = mat as? PhysicallyBasedMaterial {
+                    // UsdPreviewSurface loads as PBR. Tint alpha alone stays
+                    // opaque; transparent blending is required for ghosts.
+                    pbr.baseColor.tint = pbr.baseColor.tint.withAlphaComponent(CGFloat(opacity))
+                    pbr.blending = .transparent(
+                        opacity: PhysicallyBasedMaterial.Opacity(scale: opacity)
+                    )
+                    return pbr
+                }
+                if var unlit = mat as? UnlitMaterial {
+                    unlit.color.tint = unlit.color.tint.withAlphaComponent(CGFloat(opacity))
+                    return unlit
+                }
                 return mat
-            } ?? []
+            }
+            entity.components.set(model)
         }
         for child in entity.children {
-            apply(to: child, opacity: opacity)
+            apply(to: child, opacity: opacity, excluding: excluded)
         }
     }
 }

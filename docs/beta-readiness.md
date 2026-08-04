@@ -84,7 +84,7 @@ The items below describe the merged baseline, the validation completed for Phase
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
 2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
-3. **3D assets remain procedural**: No imported USD/USDZ athlete or equipment assets exist. Phase 8C does not claim final production asset fidelity.
+3. **Phase 11 production 3D QA is not complete**: The V4 athlete and authored High/Ultra equipment are now bundled, while Low/Medium equipment intentionally remains contract-driven procedural. Final staged visual and performance evidence remains part of stack layer 8 before Phase 11 acceptance.
 
 ## Must Not Ship Yet
 

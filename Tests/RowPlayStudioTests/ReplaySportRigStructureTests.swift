@@ -12,8 +12,10 @@ final class ReplaySportRigStructureTests: XCTestCase {
         let rig = buildRig(sport: .rower)
         let names = allEntityNames(in: rig.root)
         let required = [
-            "hull", "seat", "handle", "footplate", "rail",
+            "boat", "hull", "seat", "footplate", "rail",
             "oar-port", "oar-starboard",
+            "scull-grip-L", "scull-grip-R",
+            "scull-grip-anchor-L", "scull-grip-anchor-R",
             "pelvis", "torso", "head",
             "upperArm-L", "upperArm-R",
             "forearm-L", "forearm-R",
@@ -25,15 +27,18 @@ final class ReplaySportRigStructureTests: XCTestCase {
         for name in required {
             XCTAssert(names.contains(name), "Missing required entity: \(name)")
         }
+        XCTAssertFalse(names.contains("handle"), "A sculling shell must not render a centre handle")
     }
 
     func testSkiErgRigHasRequiredNamedEntities() {
         let rig = buildRig(sport: .skierg)
         let names = allEntityNames(in: rig.root)
         let required = [
-            "post-L", "post-R", "topBar", "cable",
-            "handle-L", "handle-R", "platform",
-            "pole-L", "pole-R",
+            "ski-L", "ski-R", "binding-plate", "binding-toe", "binding-heel",
+            "pole-L", "pole-R", "pole-grip-L", "pole-grip-R",
+            "pole-basket-L", "pole-basket-R",
+            "pole-grip-anchor-L", "pole-grip-anchor-R",
+            "pole-basket-anchor-L", "pole-basket-anchor-R",
             "pelvis", "torso", "head",
             "upperArm-L", "upperArm-R",
             "thigh-L", "thigh-R",
@@ -42,6 +47,9 @@ final class ReplaySportRigStructureTests: XCTestCase {
         ]
         for name in required {
             XCTAssert(names.contains(name), "Missing required entity: \(name)")
+        }
+        for forbidden in ["post-L", "post-R", "topBar", "cable", "handle-L", "handle-R", "platform"] {
+            XCTAssertFalse(names.contains(forbidden), "Legacy indoor SkiErg part remains: \(forbidden)")
         }
     }
 
@@ -170,7 +178,8 @@ final class ReplaySportRigStructureTests: XCTestCase {
             poleRotation: -1.0
         ))
         rig.applyPose(tallPose)
-        let tallHandleY = findEntity(named: "handle-L", in: rig.root)?.position.y
+        let tallHandleY = findEntity(named: "pole-grip-anchor-L", in: rig.root)?
+            .position(relativeTo: rig.root).y
         let tallPoleOrientation = findEntity(named: "pole-L", in: rig.root)?.orientation
 
         let compressedPose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
@@ -181,7 +190,8 @@ final class ReplaySportRigStructureTests: XCTestCase {
             poleRotation: 0.8
         ))
         rig.applyPose(compressedPose)
-        let compressedHandleY = findEntity(named: "handle-L", in: rig.root)?.position.y
+        let compressedHandleY = findEntity(named: "pole-grip-anchor-L", in: rig.root)?
+            .position(relativeTo: rig.root).y
         let compressedPoleOrientation = findEntity(named: "pole-L", in: rig.root)?.orientation
 
         XCTAssertNotEqual(tallHandleY, compressedHandleY,
@@ -251,16 +261,19 @@ final class ReplaySportRigStructureTests: XCTestCase {
             handleRotX: 0.12
         )))
 
-        try assertContact(named: "hand-L", with: "handle-grip-anchor-L", in: rig)
-        try assertContact(named: "hand-R", with: "handle-grip-anchor-R", in: rig)
+        try assertContact(named: "hand-L", with: "scull-grip-anchor-L", in: rig)
+        try assertContact(named: "hand-R", with: "scull-grip-anchor-R", in: rig)
         try assertContact(named: "foot-L", with: "foot-anchor-L", in: rig)
         try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
+        let left = try XCTUnwrap(findEntity(named: "scull-grip-anchor-L", in: rig.root))
+        let right = try XCTUnwrap(findEntity(named: "scull-grip-anchor-R", in: rig.root))
+        XCTAssertNotEqual(left.position(relativeTo: rig.root), right.position(relativeTo: rig.root))
     }
 
     func testRowerOarCollarsRemainAtGateDuringSweep() throws {
         let rig = buildRig(sport: .rower)
         let portOar = try XCTUnwrap(findEntity(named: "oar-port", in: rig.root))
-        let collar = try XCTUnwrap(portOar.children.first(where: { $0.name == "collar" }))
+        let collar = try XCTUnwrap(findEntity(named: "collar", in: portOar))
 
         rig.applyPose(.rower(ReplayRowerRigPose(oarSweep: -0.5, oarFeather: -0.06)))
         let catchPosition = collar.position(relativeTo: rig.root)
@@ -268,28 +281,35 @@ final class ReplaySportRigStructureTests: XCTestCase {
         assertPositionsEqual(catchPosition, collar.position(relativeTo: rig.root))
     }
 
-    func testSkiErgHandsFeetAndCableFollowEquipment() throws {
+    func testSkiErgHandsFeetAndRigidPolesFollowEquipment() throws {
         let rig = buildRig(sport: .skierg)
         rig.applyPose(.skierg(ReplaySkiErgRigPose(
             hipCompression: 0.7,
-            handleY: 0.28,
-            handleZ: -0.06,
-            poleRotation: 0.7
+            handleY: 1.25,
+            handleZ: 0.36,
+            poleRotation: -0.7,
+            poleContact: 1,
+            plantBasketZ: 0.24
         )))
 
-        try assertContact(named: "hand-L", with: "handle-L", in: rig)
-        try assertContact(named: "hand-R", with: "handle-R", in: rig)
+        try assertContact(named: "hand-L", with: "pole-grip-anchor-L", in: rig)
+        try assertContact(named: "hand-R", with: "pole-grip-anchor-R", in: rig)
         try assertContact(named: "foot-L", with: "foot-anchor-L", in: rig)
         try assertContact(named: "foot-R", with: "foot-anchor-R", in: rig)
-        let cable = try XCTUnwrap(findEntity(named: "cable", in: rig.root))
-        let poleL = try XCTUnwrap(findEntity(named: "pole-L", in: rig.root))
-        let poleR = try XCTUnwrap(findEntity(named: "pole-R", in: rig.root))
-        let handleL = try XCTUnwrap(findEntity(named: "handle-L", in: rig.root))
-        let handleR = try XCTUnwrap(findEntity(named: "handle-R", in: rig.root))
-        XCTAssertEqual(poleL.position.x, handleL.position.x, accuracy: 0.0001)
-        XCTAssertEqual(poleR.position.x, handleR.position.x, accuracy: 0.0001)
-        XCTAssertNotEqual(cable.orientation, simd_quatf(angle: 0, axis: SIMD3(1, 0, 0)))
-        XCTAssertGreaterThan(cable.scale.y, 0)
+        for suffix in ["L", "R"] {
+            let grip = try XCTUnwrap(findEntity(named: "pole-grip-anchor-\(suffix)", in: rig.root))
+            let basket = try XCTUnwrap(findEntity(named: "pole-basket-anchor-\(suffix)", in: rig.root))
+            XCTAssertEqual(
+                simd_distance(
+                    grip.position(relativeTo: rig.root),
+                    basket.position(relativeTo: rig.root)
+                ),
+                Float(ReplaySkiGripContract.athleteProportions.poleLength),
+                accuracy: 0.0001
+            )
+            XCTAssertEqual(basket.position(relativeTo: rig.root).y, 0.055, accuracy: 0.0001)
+            XCTAssertEqual(basket.position(relativeTo: rig.root).z, 0.24, accuracy: 0.0001)
+        }
     }
 
     func testBikeErgHandsRemainOnHandlebar() throws {
@@ -320,14 +340,20 @@ final class ReplaySportRigStructureTests: XCTestCase {
 
         let pedalL = try XCTUnwrap(findEntity(named: "pedal-L", in: rig.root))
         let pedalR = try XCTUnwrap(findEntity(named: "pedal-R", in: rig.root))
-        let pelvis = try XCTUnwrap(findEntity(named: "pelvis", in: rig.root))
         let saddle = try XCTUnwrap(findEntity(named: "saddle", in: rig.root))
+        let rider = try XCTUnwrap(findEntity(named: "rider", in: rig.root))
         XCTAssertGreaterThan(pedalL.position(relativeTo: rig.root).y,
             pedalR.position(relativeTo: rig.root).y)
-        assertPositionsEqual(
-            pelvis.position(relativeTo: rig.root),
-            saddle.position(relativeTo: rig.root)
-        )
+        assertPositionsEqual(rider.position(relativeTo: rig.root), SIMD3(
+            Float(ReplayBikeGripContract.riderRoot.x),
+            Float(ReplayBikeGripContract.riderRoot.y),
+            Float(ReplayBikeGripContract.riderRoot.z)
+        ))
+        assertPositionsEqual(saddle.position(relativeTo: rig.root), SIMD3(
+            0,
+            Float(ReplayBikeGripContract.saddleY),
+            Float(ReplayBikeGripContract.saddleZ)
+        ))
     }
 
     func testFootMeshOriginMatchesAnkleJoint() throws {
@@ -377,7 +403,13 @@ final class ReplaySportRigStructureTests: XCTestCase {
             joints: .neutral, hipCompression: 0, handleY: 0.42, handleZ: 0.16,
             poleRotation: -0.1
         ))
-        assertNoDrift(rig: rig, pose: pose, entityName: "handle-L", property: \.position.y, sport: "skierg")
+        assertNoDrift(
+            rig: rig,
+            pose: pose,
+            entityName: "pole-L",
+            property: \.position.y,
+            sport: "skierg"
+        )
     }
 
     func testRepeatedPoseApplicationDoesNotDriftBike() {
@@ -404,12 +436,62 @@ final class ReplaySportRigStructureTests: XCTestCase {
         }
     }
 
+    // MARK: - Procedural Fallback Remains Available
+
+    func testProceduralFallbackAvailableAtEveryPivot() {
+        // The low-quality provider intentionally supplies no authored nodes,
+        // leaving ReplayMeshFactory as the complete visual source.
+        for sport: Sport in [.rower, .skierg, .bike] {
+            let rig = buildRig(
+                sport: sport,
+                visualProvider: ReplayProceduralRigVisualProvider.shared
+            )
+            let names = allEntityNames(in: rig.root)
+            let hasProceduralTorso = names.contains("torso-model")
+            XCTAssertTrue(hasProceduralTorso,
+                          "\(sport) rig should use procedural torso at low quality")
+        }
+    }
+
+    func testMissingAssetsProduceCompleteFunctionalRig() {
+        // A missing provider represents a failed asset set. It must retain all
+        // pivots and pose behavior through the complete procedural fallback.
+        for sport: Sport in [.rower, .skierg, .bike] {
+            let rig = buildRig(sport: sport)
+            let pose = makeTestPose(sport: sport)
+            rig.applyPose(pose)
+            // After applying pose, all transforms must be finite
+            XCTAssertTrue(allTransformsFinite(in: rig.root),
+                          "\(sport) rig should have finite transforms without catalog")
+            // Every required pivot entity must exist
+            let names = allEntityNames(in: rig.root)
+            let requiredPivots = ["pelvis", "torso", "head",
+                                   "upperArm-L", "upperArm-R",
+                                   "forearm-L", "forearm-R",
+                                   "hand-L", "hand-R",
+                                   "thigh-L", "thigh-R",
+                                   "shin-L", "shin-R",
+                                   "foot-L", "foot-R"]
+            for pivot in requiredPivots {
+                XCTAssert(names.contains(pivot),
+                          "\(sport) rig missing pivot entity: \(pivot)")
+            }
+        }
+    }
+
     // MARK: - Helpers
 
-    private func buildRig(sport: Sport) -> ReplaySportRig {
+    private func buildRig(
+        sport: Sport,
+        visualProvider: (any ReplayRigVisualProvider)? = nil
+    ) -> ReplaySportRig {
         let parent = ModelEntity()
         return ReplaySportRigFactory.build(
-            sport: sport, into: parent, accent: .green, opacity: 1.0
+            sport: sport,
+            into: parent,
+            accent: .green,
+            opacity: 1.0,
+            visualProvider: visualProvider
         )
     }
 

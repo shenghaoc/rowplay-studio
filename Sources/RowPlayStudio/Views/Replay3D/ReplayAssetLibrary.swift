@@ -37,22 +37,65 @@ private final class ReplayModuleAssetResourceSource: ReplayAssetResourceSource {
     }
 }
 
-/// A complete validated equipment package for one sport.
-///
-/// This layer deliberately does not load or require the athlete. The later
-/// athlete layer combines independently validated equipment and athlete
-/// components at scene construction, preserving all-or-nothing selection.
+/// A complete validated sport-specific set. Equipment and athlete must both
+/// validate so scenes never mix authored and procedural sources.
 @MainActor
-final class ReplayBundledEquipmentSet {
+final class ReplayBundledAssetSet {
     let sport: Sport
     let rigVisualProvider: ReplayBundledRigVisualProvider
+    let athleteTemplate: ReplayAthleteTemplate
+
+    private let athleteInstanceFactory:
+        (Sport, String, Bool, ReplayRenderQuality) -> ReplayAthleteInstance?
 
     init(
         sport: Sport,
-        rigVisualProvider: ReplayBundledRigVisualProvider
+        rigVisualProvider: ReplayBundledRigVisualProvider,
+        athleteTemplate: ReplayAthleteTemplate
     ) {
         self.sport = sport
         self.rigVisualProvider = rigVisualProvider
+        self.athleteTemplate = athleteTemplate
+        self.athleteInstanceFactory = { requestedSport, name, isRival, quality in
+            // The tier's detail maps are prewarmed by the async asset load, so
+            // a miss here is a real failure and must not yield a half-bound
+            // athlete.
+            guard let detailMaps = ReplayAthleteMaterialLibrary.shared
+                .cachedDetailMaps(for: quality) else { return nil }
+            return athleteTemplate.makeInstance(
+                sport: requestedSport,
+                name: name,
+                isRival: isRival,
+                quality: quality,
+                detailMaps: detailMaps
+            )
+        }
+    }
+
+    /// Internal seam used to prove that an instance-clone failure selects one
+    /// complete procedural scene rather than a mixed-source hybrid.
+    init(
+        sport: Sport,
+        rigVisualProvider: ReplayBundledRigVisualProvider,
+        athleteTemplate: ReplayAthleteTemplate,
+        athleteInstanceFactory: @escaping (
+            Sport, String, Bool, ReplayRenderQuality
+        ) -> ReplayAthleteInstance?
+    ) {
+        self.sport = sport
+        self.rigVisualProvider = rigVisualProvider
+        self.athleteTemplate = athleteTemplate
+        self.athleteInstanceFactory = athleteInstanceFactory
+    }
+
+    func makeAthleteInstance(
+        sport requestedSport: Sport,
+        name: String,
+        isRival: Bool,
+        quality: ReplayRenderQuality
+    ) -> ReplayAthleteInstance? {
+        guard requestedSport == sport else { return nil }
+        return athleteInstanceFactory(requestedSport, name, isRival, quality)
     }
 }
 
@@ -76,6 +119,7 @@ enum ReplayAssetLoadFailure: Error, Equatable, Sendable {
     case packageHashMismatch
     case contractHashMismatch
     case contractInvalid(ReplayEquipmentContractFailure)
+    case athleteUnavailable
     case packageLoadFailed
     case providerInvalid(ReplayBundledRigVisualProviderFailure)
 
@@ -89,6 +133,7 @@ enum ReplayAssetLoadFailure: Error, Equatable, Sendable {
         case .packageHashMismatch: "package-hash-mismatch"
         case .contractHashMismatch: "contract-hash-mismatch"
         case .contractInvalid(let failure): "contract-\(failure.diagnosticCode)"
+        case .athleteUnavailable: "athlete-unavailable"
         case .packageLoadFailed: "package-load-failed"
         case .providerInvalid(let failure): "provider-\(failure.diagnosticCode)"
         }
@@ -186,19 +231,20 @@ enum ReplayEquipmentPortablePreflight {
     }
 }
 
-/// Loads, hash-checks, contract-checks, and caches per-sport equipment.
-/// Failures are cached so a broken package selects one coherent procedural
-/// fallback instead of being retried during render updates.
+/// Loads, hash-checks, contract-checks, and caches complete per-sport sets.
+/// Failures are sticky and reported once so render updates cannot repeatedly
+/// retry a broken package or silently select a hybrid scene.
 @MainActor
 final class ReplayAssetLibrary {
     static let shared = ReplayAssetLibrary(source: ReplayModuleAssetResourceSource())
     private static let logger = PrivacySafeLogger(category: "replay-assets")
 
     private let source: any ReplayAssetResourceSource
+    private let athleteTemplateProvider: () async -> ReplayAthleteTemplate?
     private let failureReporter: (Sport, ReplayAssetLoadFailure) -> Void
-    private var loadedSets: [Sport: ReplayBundledEquipmentSet] = [:]
+    private var loadedSets: [Sport: ReplayBundledAssetSet] = [:]
     private var failedSports = Set<Sport>()
-    private var inFlightLoads: [Sport: Task<ReplayBundledEquipmentSet?, Never>] = [:]
+    private var inFlightLoads: [Sport: Task<ReplayBundledAssetSet?, Never>] = [:]
     private var manifestPackages: [Sport: ReplayEquipmentManifestEntry]?
     private var manifestLoadTask: Task<
         Result<[Sport: ReplayEquipmentManifestEntry], ReplayAssetLoadFailure>,
@@ -209,28 +255,32 @@ final class ReplayAssetLibrary {
 
     init(
         source: any ReplayAssetResourceSource,
+        athleteTemplateProvider: @escaping () async -> ReplayAthleteTemplate? = {
+            await ReplayAthleteLibrary.shared.athleteTemplate()
+        },
         failureReporter: ((Sport, ReplayAssetLoadFailure) -> Void)? = nil
     ) {
         self.source = source
+        self.athleteTemplateProvider = athleteTemplateProvider
         self.failureReporter = failureReporter ?? { sport, failure in
             ReplayAssetLibrary.logger.warn(
-                "Replay equipment package rejected",
+                "Replay asset set rejected",
                 sport.rawValue,
                 failure.diagnosticCode
             )
         }
     }
 
-    func bundledEquipmentSet(for sport: Sport) async -> ReplayBundledEquipmentSet? {
+    func bundledAssetSet(for sport: Sport) async -> ReplayBundledAssetSet? {
         if let cached = loadedSets[sport] { return cached }
         guard !failedSports.contains(sport) else { return nil }
         if let inFlight = inFlightLoads[sport] {
             return await inFlight.value
         }
-        let task: Task<ReplayBundledEquipmentSet?, Never> = Task {
-            @MainActor [weak self] () -> ReplayBundledEquipmentSet? in
+        let task: Task<ReplayBundledAssetSet?, Never> = Task {
+            @MainActor [weak self] () -> ReplayBundledAssetSet? in
             guard let self else { return nil }
-            return await self.loadEquipmentSet(for: sport)
+            return await self.loadAssetSet(for: sport)
         }
         inFlightLoads[sport] = task
         let result = await task.value
@@ -238,7 +288,7 @@ final class ReplayAssetLibrary {
         return result
     }
 
-    private func loadEquipmentSet(for sport: Sport) async -> ReplayBundledEquipmentSet? {
+    private func loadAssetSet(for sport: Sport) async -> ReplayBundledAssetSet? {
         if let cached = loadedSets[sport] { return cached }
         guard !failedSports.contains(sport) else { return nil }
         guard let expected = await loadManifest()?[sport] else {
@@ -267,18 +317,32 @@ final class ReplayAssetLibrary {
         case .failure(let failure):
             return reject(sport, because: failure)
         }
-        guard let root = try? await Entity(contentsOf: packageURL) else {
+        guard let athleteTemplate = await athleteTemplateProvider() else {
+            return reject(sport, because: .athleteUnavailable)
+        }
+        guard let equipmentRoot = try? await Entity(contentsOf: packageURL) else {
             return reject(sport, because: .packageLoadFailed)
         }
         let provider: ReplayBundledRigVisualProvider
         do {
-            provider = try ReplayBundledRigVisualProvider(root: root, contract: contract)
+            provider = try ReplayBundledRigVisualProvider(
+                root: equipmentRoot,
+                contract: contract
+            )
         } catch let failure as ReplayBundledRigVisualProviderFailure {
             return reject(sport, because: .providerInvalid(failure))
         } catch {
             return reject(sport, because: .packageLoadFailed)
         }
-        let set = ReplayBundledEquipmentSet(sport: sport, rigVisualProvider: provider)
+        // Every tier is generated here, while we are already async, so a later
+        // quality change can bind detail maps from the synchronous scene build.
+        await ReplayAthleteMaterialLibrary.shared.prewarm()
+
+        let set = ReplayBundledAssetSet(
+            sport: sport,
+            rigVisualProvider: provider,
+            athleteTemplate: athleteTemplate
+        )
 
         loadedSets[sport] = set
         return set
@@ -287,7 +351,7 @@ final class ReplayAssetLibrary {
     private func reject(
         _ sport: Sport,
         because failure: ReplayAssetLoadFailure
-    ) -> ReplayBundledEquipmentSet? {
+    ) -> ReplayBundledAssetSet? {
         if failedSports.insert(sport).inserted {
             lastFailures[sport] = failure
             failureReporter(sport, failure)

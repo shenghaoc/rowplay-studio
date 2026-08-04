@@ -9,6 +9,7 @@ final class ReplayAthleteLibraryTests: XCTestCase {
     override func setUp() async throws {
         ReplayAthleteLibrary.shared.resetCacheForTesting()
         ReplayAthleteMaterialLibrary.shared.resetCacheForTesting()
+        ReplayAssetLibrary.shared.resetCacheForTesting()
     }
 
     func testProductionAthleteTemplateLoadsFromReferenceBundle() async throws {
@@ -470,6 +471,17 @@ final class ReplayAthleteLibraryTests: XCTestCase {
             firstConstrained.jointTransforms[0].translation.x,
             accuracy: 1e-6
         )
+    }
+
+    func testProceduralFootRemainsAtAnklePivot() {
+        let athlete = ReplayAthleteRig()
+        let parent = Entity()
+        athlete.build(into: parent, seated: true, accent: .green, opacity: 1, visualProvider: nil)
+        // Foot is a child of shin at the ankle: local offset is shin length.
+        XCTAssertEqual(athlete.footL.position.y, -0.40, accuracy: 0.0001)
+        XCTAssertEqual(athlete.footR.position.y, -0.40, accuracy: 0.0001)
+        XCTAssertEqual(athlete.footL.position.x, 0, accuracy: 0.0001)
+        XCTAssertEqual(athlete.shinL.position.y, -0.42, accuracy: 0.0001)
     }
 
     private func bundledResourceURLs() throws -> [ReplayAthleteResource: URL] {
