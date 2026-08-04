@@ -3,6 +3,23 @@ import Foundation
 import RealityKit
 import RowPlayCore
 
+enum ReplayBundledRigVisualProviderFailure: Error, Equatable, Sendable {
+    case invalidContract(ReplayEquipmentContractFailure)
+    case missingEntity(sourceName: String, exportedName: String)
+    case missingModel(sourceName: String, exportedName: String)
+
+    var diagnosticCode: String {
+        switch self {
+        case .invalidContract(let failure):
+            "contract-\(failure.diagnosticCode)"
+        case .missingEntity:
+            "missing-entity"
+        case .missingModel:
+            "missing-model"
+        }
+    }
+}
+
 /// Bundled visual source backed by one converted equipment package.
 ///
 /// The provider holds the immutable loaded package root and resolves visuals
@@ -18,23 +35,33 @@ final class ReplayBundledRigVisualProvider: ReplayRigVisualProvider {
     private let contract: ReplayEquipmentPackageContract
     private var templateCache: [String: Entity] = [:]
 
-    init?(root: Entity, contract: ReplayEquipmentPackageContract) {
-        guard ReplayAssetCatalog.validatePackageContract(contract) else { return nil }
+    init(root: Entity, contract: ReplayEquipmentPackageContract) throws {
+        let requiredVisuals: [ReplayEquipmentRequiredVisualSpec]
+        switch ReplayAssetCatalog.requiredVisuals(in: contract) {
+        case .success(let visuals):
+            requiredVisuals = visuals
+        case .failure(let failure):
+            throw ReplayBundledRigVisualProviderFailure.invalidContract(failure)
+        }
         self.root = root
         self.contract = contract
 
-        // Every required node must resolve in the loaded package with real
-        // geometry beneath it; a partially converted package selects the
-        // complete procedural fallback instead.
-        let requiredNames = ReplayAssetCatalog.requiredCompositeSourceNames(for: contract.sport)
-            + ReplayAssetCatalog.requiredLeafSourceNames(for: contract.sport)
-        for sourceName in requiredNames {
-            guard let node = contract.node(sourceName: sourceName),
-                  let entity = root.replayDescendant(named: node.exportedName),
-                  ReplayAssetGeometry.hasModel(in: entity) else {
-                return nil
+        // Every composite root, required part, and required leaf must resolve
+        // with real geometry before bundled mode can activate.
+        for visual in requiredVisuals {
+            guard let entity = root.replayDescendant(named: visual.exportedName) else {
+                throw ReplayBundledRigVisualProviderFailure.missingEntity(
+                    sourceName: visual.sourceName,
+                    exportedName: visual.exportedName
+                )
             }
-            templateCache[sourceName] = entity
+            guard ReplayAssetGeometry.hasModel(in: entity) else {
+                throw ReplayBundledRigVisualProviderFailure.missingModel(
+                    sourceName: visual.sourceName,
+                    exportedName: visual.exportedName
+                )
+            }
+            templateCache[visual.sourceName] = entity
         }
         root.isEnabled = false
     }
@@ -43,32 +70,17 @@ final class ReplayBundledRigVisualProvider: ReplayRigVisualProvider {
 
     var sport: Sport { contract.sport }
 
+    var validatedSourceNames: Set<String> { Set(templateCache.keys) }
+
     func cloneVisual(named name: String) -> Entity? {
-        let template: Entity?
-        if let cached = templateCache[name] {
-            template = cached
-        } else if let node = contract.node(sourceName: name) {
-            template = root.replayDescendant(named: node.exportedName)
-        } else if let exported = exportedPartName(for: name) {
-            template = root.replayDescendant(named: exported)
-        } else {
-            template = nil
+        guard let template = templateCache[name] else {
+            preconditionFailure(
+                "Bundled equipment requested an unvalidated visual name: \(name)"
+            )
         }
-        guard let template else { return nil }
-        templateCache[name] = template
         let clone = template.clone(recursive: true)
         clone.isEnabled = true
         return clone
-    }
-
-    /// Resolve a `template:part` source path to its exported prim name.
-    private func exportedPartName(for sourceName: String) -> String? {
-        for node in contract.nodes {
-            if let part = node.parts.first(where: { $0.sourceName == sourceName }) {
-                return part.exportedName
-            }
-        }
-        return nil
     }
 
     /// Recolour a cloned bundled visual with the scene accent.  Bundled
@@ -94,29 +106,4 @@ final class ReplayBundledRigVisualProvider: ReplayRigVisualProvider {
         }
     }
 
-    /// Apply controlled rival translucency to a cloned bundled equipment
-    /// visual.  Unlike the deforming athlete body — which stays opaque with a
-    /// cool tint — equipment may use real alpha, matching the web's
-    /// `finalizeAvatar` ghost pass.
-    static func applyGhostTranslucency(_ opacity: Double, to entity: Entity) {
-        let alpha = Float(min(max(opacity, 0), 1))
-        if var model = entity.components[ModelComponent.self] {
-            model.materials = model.materials.map { material in
-                if var pbr = material as? PhysicallyBasedMaterial {
-                    pbr.blending = .transparent(opacity: .init(floatLiteral: alpha))
-                    return pbr
-                }
-                if var simple = material as? SimpleMaterial {
-                    let tint = simple.color.tint.usingColorSpace(.deviceRGB) ?? simple.color.tint
-                    simple.color.tint = tint.withAlphaComponent(CGFloat(alpha))
-                    return simple
-                }
-                return material
-            }
-            entity.components.set(model)
-        }
-        for child in entity.children {
-            applyGhostTranslucency(opacity, to: child)
-        }
-    }
 }

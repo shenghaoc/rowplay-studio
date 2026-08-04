@@ -57,6 +57,42 @@ struct ReplayEquipmentPackageContract: Equatable, Sendable {
     }
 }
 
+/// One contract entry that a bundled provider must resolve before it can be
+/// selected. Composite roots, required parts, and required leaves all share
+/// the same runtime geometry invariant.
+struct ReplayEquipmentRequiredVisualSpec: Equatable, Sendable {
+    let sourceName: String
+    let exportedName: String
+}
+
+enum ReplayEquipmentContractFailure: Error, Equatable, Sendable {
+    case invalidJSON
+    case missingField(String)
+    case sportMismatch(expected: Sport, actual: String)
+    case malformedNode(index: Int, field: String)
+    case malformedPart(node: String, index: Int, field: String)
+    case missingNode(sourceName: String, expectedKind: String)
+    case duplicateNode(sourceName: String)
+    case wrongNodeKind(sourceName: String, expected: String, actual: String)
+    case missingPart(node: String, part: String)
+    case duplicatePart(node: String, part: String)
+
+    var diagnosticCode: String {
+        switch self {
+        case .invalidJSON: "invalid-json"
+        case .missingField: "missing-field"
+        case .sportMismatch: "sport-mismatch"
+        case .malformedNode: "malformed-node"
+        case .malformedPart: "malformed-part"
+        case .missingNode: "missing-node"
+        case .duplicateNode: "duplicate-node"
+        case .wrongNodeKind: "wrong-node-kind"
+        case .missingPart: "missing-part"
+        case .duplicatePart: "duplicate-part"
+        }
+    }
+}
+
 /// Source of truth for equipment package names and validation.
 ///
 /// Environments are no longer bundled files: the premium venues are built
@@ -153,28 +189,60 @@ enum ReplayAssetCatalog {
     static func parsePackageContract(
         data: Data,
         sport: Sport
-    ) -> ReplayEquipmentPackageContract? {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              root["sport"] as? String == ReplayEquipmentPackageResource(sport: sport).slug,
-              let sourceCommit = root["sourceCommit"] as? String,
-              let sourceGlbSha256 = root["sourceGlbSha256"] as? String,
-              let rawNodes = root["nodes"] as? [[String: Any]] else {
-            return nil
+    ) -> Result<ReplayEquipmentPackageContract, ReplayEquipmentContractFailure> {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return .failure(.invalidJSON)
+        }
+        guard let rawSport = root["sport"] as? String else {
+            return .failure(.missingField("sport"))
+        }
+        let expectedSport = ReplayEquipmentPackageResource(sport: sport).slug
+        guard rawSport == expectedSport else {
+            return .failure(.sportMismatch(expected: sport, actual: rawSport))
+        }
+        guard let sourceCommit = root["sourceCommit"] as? String else {
+            return .failure(.missingField("sourceCommit"))
+        }
+        guard let sourceGlbSha256 = root["sourceGlbSha256"] as? String else {
+            return .failure(.missingField("sourceGlbSha256"))
+        }
+        guard let rawNodes = root["nodes"] as? [[String: Any]] else {
+            return .failure(.missingField("nodes"))
         }
         var nodes: [ReplayEquipmentNodeSpec] = []
-        for raw in rawNodes {
-            guard let kind = raw["kind"] as? String,
-                  let sourceName = raw["sourceName"] as? String,
-                  let exportedName = raw["exportedName"] as? String else {
-                return nil
+        for (nodeIndex, raw) in rawNodes.enumerated() {
+            guard let kind = raw["kind"] as? String else {
+                return .failure(.malformedNode(index: nodeIndex, field: "kind"))
+            }
+            guard let sourceName = raw["sourceName"] as? String else {
+                return .failure(.malformedNode(index: nodeIndex, field: "sourceName"))
+            }
+            guard let exportedName = raw["exportedName"] as? String else {
+                return .failure(.malformedNode(index: nodeIndex, field: "exportedName"))
             }
             var parts: [ReplayEquipmentPartSpec] = []
             if let rawParts = raw["parts"] as? [[String: Any]] {
-                for rawPart in rawParts {
-                    guard let part = rawPart["part"] as? String,
-                          let partSource = rawPart["sourceName"] as? String,
-                          let partExported = rawPart["exportedName"] as? String else {
-                        return nil
+                for (partIndex, rawPart) in rawParts.enumerated() {
+                    guard let part = rawPart["part"] as? String else {
+                        return .failure(.malformedPart(
+                            node: sourceName,
+                            index: partIndex,
+                            field: "part"
+                        ))
+                    }
+                    guard let partSource = rawPart["sourceName"] as? String else {
+                        return .failure(.malformedPart(
+                            node: sourceName,
+                            index: partIndex,
+                            field: "sourceName"
+                        ))
+                    }
+                    guard let partExported = rawPart["exportedName"] as? String else {
+                        return .failure(.malformedPart(
+                            node: sourceName,
+                            index: partIndex,
+                            field: "exportedName"
+                        ))
                     }
                     parts.append(
                         ReplayEquipmentPartSpec(
@@ -195,31 +263,83 @@ enum ReplayAssetCatalog {
                 )
             )
         }
-        return ReplayEquipmentPackageContract(
+        return .success(ReplayEquipmentPackageContract(
             sport: sport,
             sourceCommit: sourceCommit,
             sourceGlbSha256: sourceGlbSha256,
             nodes: nodes
-        )
+        ))
+    }
+
+    /// Validate one sport's sidecar and return the complete runtime visual set.
+    /// The provider resolves this exact list before bundled mode can activate.
+    static func requiredVisuals(
+        in contract: ReplayEquipmentPackageContract
+    ) -> Result<[ReplayEquipmentRequiredVisualSpec], ReplayEquipmentContractFailure> {
+        var visuals: [ReplayEquipmentRequiredVisualSpec] = []
+        let nodesByName = Dictionary(grouping: contract.nodes, by: \.sourceName)
+
+        for composite in requiredCompositeSourceNames(for: contract.sport) {
+            guard let matches = nodesByName[composite], !matches.isEmpty else {
+                return .failure(.missingNode(sourceName: composite, expectedKind: "composite"))
+            }
+            guard matches.count == 1, let node = matches.first else {
+                return .failure(.duplicateNode(sourceName: composite))
+            }
+            guard node.kind == "composite" else {
+                return .failure(.wrongNodeKind(
+                    sourceName: composite,
+                    expected: "composite",
+                    actual: node.kind
+                ))
+            }
+            guard let required = requiredParts[composite] else {
+                return .failure(.missingField("requiredParts.\(composite)"))
+            }
+            let partsByID = Dictionary(grouping: node.parts, by: \.part)
+            if let duplicate = partsByID.first(where: { $0.value.count > 1 })?.key {
+                return .failure(.duplicatePart(node: composite, part: duplicate))
+            }
+            visuals.append(ReplayEquipmentRequiredVisualSpec(
+                sourceName: node.sourceName,
+                exportedName: node.exportedName
+            ))
+            for partID in required.sorted() {
+                guard let part = partsByID[partID]?.first else {
+                    return .failure(.missingPart(node: composite, part: partID))
+                }
+                visuals.append(ReplayEquipmentRequiredVisualSpec(
+                    sourceName: part.sourceName,
+                    exportedName: part.exportedName
+                ))
+            }
+        }
+        for leaf in requiredLeafSourceNames(for: contract.sport) {
+            guard let matches = nodesByName[leaf], !matches.isEmpty else {
+                return .failure(.missingNode(sourceName: leaf, expectedKind: "leaf"))
+            }
+            guard matches.count == 1, let node = matches.first else {
+                return .failure(.duplicateNode(sourceName: leaf))
+            }
+            guard node.kind == "leaf" else {
+                return .failure(.wrongNodeKind(
+                    sourceName: leaf,
+                    expected: "leaf",
+                    actual: node.kind
+                ))
+            }
+            visuals.append(ReplayEquipmentRequiredVisualSpec(
+                sourceName: node.sourceName,
+                exportedName: node.exportedName
+            ))
+        }
+        return .success(visuals)
     }
 
     /// Validate one sport's sidecar against the required template tables.
-    static func validatePackageContract(_ contract: ReplayEquipmentPackageContract) -> Bool {
-        for composite in requiredCompositeSourceNames(for: contract.sport) {
-            guard let node = contract.node(sourceName: composite), node.kind == "composite" else {
-                return false
-            }
-            guard let required = requiredParts[composite] else { return false }
-            let present = Set(node.parts.map(\.part))
-            guard required.isSubset(of: present) else { return false }
-            // Duplicated parts are a conversion failure.
-            guard node.parts.count == present.count else { return false }
-        }
-        for leaf in requiredLeafSourceNames(for: contract.sport) {
-            guard let node = contract.node(sourceName: leaf), node.kind == "leaf" else {
-                return false
-            }
-        }
-        return true
+    static func validatePackageContract(
+        _ contract: ReplayEquipmentPackageContract
+    ) -> Result<Void, ReplayEquipmentContractFailure> {
+        requiredVisuals(in: contract).map { _ in () }
     }
 }

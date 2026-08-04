@@ -48,14 +48,10 @@ final class ReplayAssetCatalogTests: XCTestCase {
                 "equipment/\(resource.contractName).\(resource.contractExtension)"
             )
             let data = try Data(contentsOf: url)
-            let contract = try XCTUnwrap(
-                ReplayAssetCatalog.parsePackageContract(data: data, sport: sport),
-                "\(sport.rawValue) sidecar failed to parse"
-            )
-            XCTAssertTrue(
-                ReplayAssetCatalog.validatePackageContract(contract),
-                "\(sport.rawValue) sidecar failed validation"
-            )
+            let contract = try parsedContract(data: data, sport: sport)
+            guard case .success = ReplayAssetCatalog.validatePackageContract(contract) else {
+                return XCTFail("\(sport.rawValue) sidecar failed validation")
+            }
             XCTAssertEqual(contract.sourceCommit.count, 40)
             // Exported prim names must be USD-safe (no colons).
             for node in contract.nodes {
@@ -73,9 +69,7 @@ final class ReplayAssetCatalogTests: XCTestCase {
             "equipment/\(resource.contractName).\(resource.contractExtension)"
         )
         let data = try Data(contentsOf: url)
-        let contract = try XCTUnwrap(
-            ReplayAssetCatalog.parsePackageContract(data: data, sport: .rower)
-        )
+        let contract = try parsedContract(data: data, sport: .rower)
         let boat = try XCTUnwrap(contract.node(sourceName: "equipment:row:boat-assembly"))
         XCTAssertEqual(
             Set(boat.parts.map(\.part)),
@@ -119,7 +113,9 @@ final class ReplayAssetCatalogTests: XCTestCase {
             sourceGlbSha256: String(repeating: "b", count: 64),
             nodes: skiNodes()
         )
-        XCTAssertTrue(ReplayAssetCatalog.validatePackageContract(intact))
+        guard case .success = ReplayAssetCatalog.validatePackageContract(intact) else {
+            return XCTFail("Intact contract must validate")
+        }
 
         let missingPart = ReplayEquipmentPackageContract(
             sport: .skierg,
@@ -127,7 +123,10 @@ final class ReplayAssetCatalogTests: XCTestCase {
             sourceGlbSha256: intact.sourceGlbSha256,
             nodes: skiNodes(dropPart: "binding-toe")
         )
-        XCTAssertFalse(ReplayAssetCatalog.validatePackageContract(missingPart))
+        XCTAssertEqual(
+            failure(from: ReplayAssetCatalog.validatePackageContract(missingPart)),
+            .missingPart(node: "equipment:ski:ski-assembly", part: "binding-toe")
+        )
 
         let missingLeaf = ReplayEquipmentPackageContract(
             sport: .skierg,
@@ -135,7 +134,13 @@ final class ReplayAssetCatalogTests: XCTestCase {
             sourceGlbSha256: intact.sourceGlbSha256,
             nodes: skiNodes(dropLeaf: "equipment:ski:pole-basket")
         )
-        XCTAssertFalse(ReplayAssetCatalog.validatePackageContract(missingLeaf))
+        XCTAssertEqual(
+            failure(from: ReplayAssetCatalog.validatePackageContract(missingLeaf)),
+            .missingNode(
+                sourceName: "equipment:ski:pole-basket",
+                expectedKind: "leaf"
+            )
+        )
 
         let duplicatedPart = ReplayEquipmentPackageContract(
             sport: .skierg,
@@ -143,7 +148,14 @@ final class ReplayAssetCatalogTests: XCTestCase {
             sourceGlbSha256: intact.sourceGlbSha256,
             nodes: skiNodes(duplicatePart: true)
         )
-        XCTAssertFalse(ReplayAssetCatalog.validatePackageContract(duplicatedPart))
+        let duplicatedID = skiNodes().first?.parts.first?.part
+        XCTAssertEqual(
+            failure(from: ReplayAssetCatalog.validatePackageContract(duplicatedPart)),
+            .duplicatePart(
+                node: "equipment:ski:ski-assembly",
+                part: try XCTUnwrap(duplicatedID)
+            )
+        )
     }
 
     func testPackageParserRejectsSidecarForAnotherSport() throws {
@@ -156,7 +168,13 @@ final class ReplayAssetCatalogTests: XCTestCase {
         )
         root["sport"] = "bike"
         let mismatched = try JSONSerialization.data(withJSONObject: root)
-        XCTAssertNil(ReplayAssetCatalog.parsePackageContract(data: mismatched, sport: .rower))
+        XCTAssertEqual(
+            failure(from: ReplayAssetCatalog.parsePackageContract(
+                data: mismatched,
+                sport: .rower
+            )),
+            .sportMismatch(expected: .rower, actual: "bike")
+        )
     }
 
     private func skiNodes(
@@ -209,5 +227,24 @@ final class ReplayAssetCatalogTests: XCTestCase {
             .appendingPathComponent("Sources/RowPlayStudio/Resources/ReplayReference/\(relativePath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: path.path), "Missing \(relativePath)")
         return path
+    }
+
+    private func parsedContract(
+        data: Data,
+        sport: Sport
+    ) throws -> ReplayEquipmentPackageContract {
+        switch ReplayAssetCatalog.parsePackageContract(data: data, sport: sport) {
+        case .success(let contract):
+            contract
+        case .failure(let failure):
+            throw failure
+        }
+    }
+
+    private func failure<Success>(
+        from result: Result<Success, ReplayEquipmentContractFailure>
+    ) -> ReplayEquipmentContractFailure? {
+        guard case .failure(let failure) = result else { return nil }
+        return failure
     }
 }

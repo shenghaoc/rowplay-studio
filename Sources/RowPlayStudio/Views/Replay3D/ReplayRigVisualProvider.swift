@@ -16,7 +16,9 @@ protocol ReplayRigVisualProvider: AnyObject {
     var usesBundledAssets: Bool { get }
 
     /// Returns an independent clone of a named authored visual node. `nil`
-    /// selects the established procedural builder at that logical pivot.
+    /// selects the established procedural builder for a procedural provider.
+    /// A bundled provider accepts only its fully prevalidated source-name set;
+    /// requesting any other name is a programmer error, never a hybrid seam.
     func cloneVisual(named name: String) -> Entity?
 }
 
@@ -51,9 +53,10 @@ final class ReplayAccentRigVisualProvider: ReplayRigVisualProvider {
 extension ReplayRigVisualProvider {
     /// Attaches a bundled visual node to an existing logical pivot.
     ///
-    /// Returning `false` tells callers to construct their existing procedural
-    /// visual. A valid bundled provider contains every required name, so a
-    /// selected bundled sport set never produces a partial visual mix.
+    /// Returning `false` tells callers using the procedural provider to build
+    /// their existing procedural visual. A selected bundled provider contains
+    /// every accepted source name and traps programmer requests outside that
+    /// prevalidated set, so it cannot silently produce a partial visual mix.
     @discardableResult
     func attachVisual(named name: String, to parent: Entity) -> Bool {
         guard let visual = cloneVisual(named: name) else { return false }

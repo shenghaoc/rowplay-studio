@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import RealityKit
 import RowPlayCore
@@ -14,7 +13,7 @@ protocol ReplayAssetResourceSource: AnyObject {
 @MainActor
 private final class ReplayModuleAssetResourceSource: ReplayAssetResourceSource {
     func packageURL(for resource: ReplayEquipmentPackageResource) -> URL? {
-        ReplayAssetLibrary.bundledURL(
+        ReplayBundledResourceSupport.bundledURL(
             name: resource.packageName,
             extension: resource.packageExtension,
             subdirectory: resource.subdirectory
@@ -22,7 +21,7 @@ private final class ReplayModuleAssetResourceSource: ReplayAssetResourceSource {
     }
 
     func contractURL(for resource: ReplayEquipmentPackageResource) -> URL? {
-        ReplayAssetLibrary.bundledURL(
+        ReplayBundledResourceSupport.bundledURL(
             name: resource.contractName,
             extension: resource.contractExtension,
             subdirectory: resource.subdirectory
@@ -30,7 +29,7 @@ private final class ReplayModuleAssetResourceSource: ReplayAssetResourceSource {
     }
 
     func manifestURL() -> URL? {
-        ReplayAssetLibrary.bundledURL(
+        ReplayBundledResourceSupport.bundledURL(
             name: ReplayAssetCatalog.equipmentManifestName,
             extension: ReplayAssetCatalog.equipmentManifestExtension,
             subdirectory: ReplayAssetCatalog.equipmentSubdirectory
@@ -48,20 +47,12 @@ final class ReplayBundledEquipmentSet {
     let sport: Sport
     let rigVisualProvider: ReplayBundledRigVisualProvider
 
-    init?(
+    init(
         sport: Sport,
-        equipmentRoot: Entity,
-        equipmentContract: ReplayEquipmentPackageContract
+        rigVisualProvider: ReplayBundledRigVisualProvider
     ) {
-        guard equipmentContract.sport == sport,
-              let provider = ReplayBundledRigVisualProvider(
-                  root: equipmentRoot,
-                  contract: equipmentContract
-              ) else {
-            return nil
-        }
         self.sport = sport
-        self.rigVisualProvider = provider
+        self.rigVisualProvider = rigVisualProvider
     }
 }
 
@@ -76,7 +67,7 @@ enum ReplayAssetGeometry {
     }
 }
 
-enum ReplayAssetLoadFailure: String, Equatable, Sendable {
+enum ReplayAssetLoadFailure: Equatable, Sendable {
     case manifestInvalid
     case packageMissing
     case contractMissing
@@ -84,9 +75,24 @@ enum ReplayAssetLoadFailure: String, Equatable, Sendable {
     case contractUnreadable
     case packageHashMismatch
     case contractHashMismatch
-    case contractInvalid
+    case contractInvalid(ReplayEquipmentContractFailure)
     case packageLoadFailed
-    case providerInvalid
+    case providerInvalid(ReplayBundledRigVisualProviderFailure)
+
+    var diagnosticCode: String {
+        switch self {
+        case .manifestInvalid: "manifest-invalid"
+        case .packageMissing: "package-missing"
+        case .contractMissing: "contract-missing"
+        case .packageUnreadable: "package-unreadable"
+        case .contractUnreadable: "contract-unreadable"
+        case .packageHashMismatch: "package-hash-mismatch"
+        case .contractHashMismatch: "contract-hash-mismatch"
+        case .contractInvalid(let failure): "contract-\(failure.diagnosticCode)"
+        case .packageLoadFailed: "package-load-failed"
+        case .providerInvalid(let failure): "provider-\(failure.diagnosticCode)"
+        }
+    }
 }
 
 /// Loads, hash-checks, contract-checks, and caches per-sport equipment.
@@ -115,7 +121,7 @@ final class ReplayAssetLibrary {
             ReplayAssetLibrary.logger.warn(
                 "Replay equipment package rejected",
                 sport.rawValue,
-                failure.rawValue
+                failure.diagnosticCode
             )
         }
     }
@@ -151,34 +157,43 @@ final class ReplayAssetLibrary {
         guard let contractURL = source.contractURL(for: resource) else {
             return reject(sport, because: .contractMissing)
         }
-        guard let packageData = try? Data(contentsOf: packageURL) else {
+        guard let packageHash = try? ReplayBundledResourceSupport.sha256Hex(
+            contentsOf: packageURL
+        ) else {
             return reject(sport, because: .packageUnreadable)
         }
         guard let contractData = try? Data(contentsOf: contractURL) else {
             return reject(sport, because: .contractUnreadable)
         }
-        guard Self.sha256Hex(of: packageData) == expected.sha256 else {
+        guard packageHash == expected.sha256 else {
             return reject(sport, because: .packageHashMismatch)
         }
-        guard Self.sha256Hex(of: contractData) == expected.contractSha256 else {
+        guard ReplayBundledResourceSupport.sha256Hex(of: contractData)
+            == expected.contractSha256 else {
             return reject(sport, because: .contractHashMismatch)
         }
-        guard let contract = ReplayAssetCatalog.parsePackageContract(
-            data: contractData,
-            sport: sport
-        ), ReplayAssetCatalog.validatePackageContract(contract) else {
-            return reject(sport, because: .contractInvalid)
+        let contract: ReplayEquipmentPackageContract
+        switch ReplayAssetCatalog.parsePackageContract(data: contractData, sport: sport) {
+        case .success(let parsed):
+            contract = parsed
+        case .failure(let failure):
+            return reject(sport, because: .contractInvalid(failure))
+        }
+        if case .failure(let failure) = ReplayAssetCatalog.validatePackageContract(contract) {
+            return reject(sport, because: .contractInvalid(failure))
         }
         guard let root = try? await Entity(contentsOf: packageURL) else {
             return reject(sport, because: .packageLoadFailed)
         }
-        guard let set = ReplayBundledEquipmentSet(
-            sport: sport,
-            equipmentRoot: root,
-            equipmentContract: contract
-        ) else {
-            return reject(sport, because: .providerInvalid)
+        let provider: ReplayBundledRigVisualProvider
+        do {
+            provider = try ReplayBundledRigVisualProvider(root: root, contract: contract)
+        } catch let failure as ReplayBundledRigVisualProviderFailure {
+            return reject(sport, because: .providerInvalid(failure))
+        } catch {
+            return reject(sport, because: .packageLoadFailed)
         }
+        let set = ReplayBundledEquipmentSet(sport: sport, rigVisualProvider: provider)
 
         loadedSets[sport] = set
         return set
@@ -236,15 +251,6 @@ final class ReplayAssetLibrary {
         manifestPackages = nil
         manifestLoadFailed = false
         lastFailures.removeAll()
-    }
-
-    static func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {
-        Bundle.module.url(forResource: name, withExtension: ext, subdirectory: subdirectory)
-            ?? Bundle.module.url(forResource: name, withExtension: ext)
-    }
-
-    static func sha256Hex(of data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func sport(slug: String) -> Sport? {
