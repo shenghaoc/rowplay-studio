@@ -61,11 +61,17 @@ The builder also owns the effect renderer and per-sport chase camera
 
 ## Failure model
 
-The athlete package validates atomically and caches failures.  A missing or
-invalid production athlete yields the complete procedural scene at any tier.
-At Low/Medium, a valid production athlete intentionally composes with
-contract-built procedural equipment; at High/Ultra, athlete and authored
+Athlete, equipment and venue loads validate atomically and cache failures.  A
+missing or invalid production athlete yields the complete procedural scene at
+any tier.  At Low/Medium, a valid production athlete intentionally composes
+with contract-built procedural equipment; at High/Ultra, athlete and authored
 equipment must both validate or the graph falls back atomically.  Runtime
 athlete/contact failure likewise yields the complete procedural scene with all
 replay state (time, play/pause, speed, camera, quality, rival) preserved.  No
 per-frame retries or partial authored failure scenes.
+
+Equipment bundle URL resolution and RealityKit entity/provider work stay on
+the main actor; immutable manifest/package reads, streaming hashes, JSON
+parsing and contract validation run on detached work before the entity load.
+The process-shared library coalesces both manifest and per-sport requests so
+responsiveness does not create duplicate validation.
