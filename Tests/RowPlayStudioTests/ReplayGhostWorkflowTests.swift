@@ -493,33 +493,35 @@ final class ReplayGhostWorkflowTests: XCTestCase {
 
         XCTAssertEqual(
             state.updateGhostPoseAggregates(for: "session-a") {
-                (context: first, medianHR: 140)
+                ReplayStrokePoseAggregates(context: first, medianHeartRate: 140)
             },
             .recomputed
         )
         XCTAssertEqual(
             state.updateGhostPoseAggregates(for: "session-b") {
-                (context: replacement, medianHR: 155)
+                ReplayStrokePoseAggregates(context: replacement, medianHeartRate: 155)
             },
             .recomputed
         )
 
-        XCTAssertEqual(state.ghostPoseContext, replacement)
-        XCTAssertEqual(state.ghostMedianHR, 155)
+        XCTAssertEqual(state.ghostPoseAggregates?.context, replacement)
+        XCTAssertEqual(state.ghostPoseAggregates?.medianHeartRate, 155)
         XCTAssertEqual(state.ghostPoseRivalID, "session-b")
     }
 
     func testSceneStateGhostPoseAggregatesClearForFallbackRival() {
         let state = Replay3DSceneState()
         state.updateGhostPoseAggregates(for: "session-a") {
-            (context: makeGhostPoseContext(peakWatts: 200), medianHR: 140)
+            ReplayStrokePoseAggregates(
+                context: makeGhostPoseContext(peakWatts: 200),
+                medianHeartRate: 140
+            )
         }
 
         XCTAssertEqual(state.clearGhostPoseAggregates(), .cleared)
 
         XCTAssertNil(state.ghostPoseRivalID)
-        XCTAssertNil(state.ghostPoseContext)
-        XCTAssertEqual(state.ghostMedianHR, 0)
+        XCTAssertNil(state.ghostPoseAggregates)
         XCTAssertEqual(state.clearGhostPoseAggregates(), .unchanged)
     }
 
@@ -527,19 +529,22 @@ final class ReplayGhostWorkflowTests: XCTestCase {
         let state = Replay3DSceneState()
         let original = makeGhostPoseContext(peakWatts: 200)
         state.updateGhostPoseAggregates(for: "session-a") {
-            (context: original, medianHR: 140)
+            ReplayStrokePoseAggregates(context: original, medianHeartRate: 140)
         }
         var recomputeCount = 0
 
         let update = state.updateGhostPoseAggregates(for: "session-a") {
             recomputeCount += 1
-            return (context: makeGhostPoseContext(peakWatts: 999), medianHR: 199)
+            return ReplayStrokePoseAggregates(
+                context: makeGhostPoseContext(peakWatts: 999),
+                medianHeartRate: 199
+            )
         }
 
         XCTAssertEqual(update, .unchanged)
         XCTAssertEqual(recomputeCount, 0)
-        XCTAssertEqual(state.ghostPoseContext, original)
-        XCTAssertEqual(state.ghostMedianHR, 140)
+        XCTAssertEqual(state.ghostPoseAggregates?.context, original)
+        XCTAssertEqual(state.ghostPoseAggregates?.medianHeartRate, 140)
         XCTAssertEqual(state.ghostPoseRivalID, "session-a")
     }
 
