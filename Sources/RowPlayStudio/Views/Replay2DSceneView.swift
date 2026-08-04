@@ -121,9 +121,9 @@ struct Replay2DSceneView: View {
             drawSecondaryHUD(
                 context,
                 size: size,
-                colors: colors,
                 liveDistance: frame.d,
-                ghostDistance: ghost.pose == nil ? nil : ghost.distance
+                ghostDistance: ghost.pose == nil ? nil : ghost.distance,
+                progress: frame.progress
             )
         }
         .accessibilityElement(children: .ignore)
@@ -210,11 +210,24 @@ struct Replay2DSceneView: View {
         }
 
         let top = courseY - Replay2DStyle.athleteTopClearance(for: sport) * Replay2DStyle.athleteScale
-        var labelContext = context
-        labelContext.opacity = isRival ? Replay2DStyle.ghostLaneAlpha : 1
+        let labelContext = context
+        let labelCenterY = max(14, top - 9)
+        let labelWidth = isRival ? 48.0 : 38.0
+        labelContext.fill(
+            Replay2DFigure.roundedRectPath(
+                x - labelWidth / 2,
+                labelCenterY - 8,
+                labelWidth,
+                16,
+                6
+            ),
+            with: .color(Replay2DStyle.hudBackdrop)
+        )
         labelContext.draw(
-            Text(label).font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(colors.labelText),
-            at: CGPoint(x: x, y: max(14, top - 9)),
+            Text(label)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(isRival ? Replay2DStyle.hudRivalText : Replay2DStyle.hudText),
+            at: CGPoint(x: x, y: labelCenterY),
             anchor: .center
         )
     }
@@ -222,24 +235,87 @@ struct Replay2DSceneView: View {
     private func drawSecondaryHUD(
         _ context: GraphicsContext,
         size: CGSize,
-        colors: Replay2DCanvasColors,
         liveDistance: Double,
-        ghostDistance: Double?
+        ghostDistance: Double?,
+        progress: Double
     ) {
-        let baselineY = Double(size.height) - 18
-        context.stroke(
-            Replay2DFigure.linePath(18, baselineY - 10, Double(size.width) - 18, baselineY - 10),
-            with: .color(colors.laneLine.opacity(0.55)),
-            style: StrokeStyle(lineWidth: 1, dash: [4, 5])
+        let layout = Replay2DHUDRenderer.layout(size: size, progress: progress)
+        context.fill(
+            Replay2DFigure.roundedRectPath(
+                layout.backdrop.minX,
+                layout.backdrop.minY,
+                layout.backdrop.width,
+                layout.backdrop.height,
+                8
+            ),
+            with: .color(Replay2DStyle.hudBackdrop)
         )
+
+        context.draw(
+            Text(Replay2DHUDRenderer.progressLabel(progress))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Replay2DStyle.hudText),
+            at: CGPoint(x: size.width / 2, y: layout.summaryY),
+            anchor: .center
+        )
+
+        let cueFont = Font.system(size: 10, weight: .bold, design: .monospaced)
+        context.draw(
+            Text("START").font(cueFont).foregroundStyle(Replay2DStyle.hudText),
+            at: CGPoint(x: layout.backdrop.minX + 8, y: layout.trackY),
+            anchor: .leading
+        )
+        context.draw(
+            Text("FINISH").font(cueFont).foregroundStyle(Replay2DStyle.hudText),
+            at: CGPoint(x: layout.backdrop.maxX - 8, y: layout.trackY),
+            anchor: .trailing
+        )
+        context.stroke(
+            Replay2DFigure.linePath(
+                layout.trackStartX,
+                layout.trackY,
+                layout.trackEndX,
+                layout.trackY
+            ),
+            with: .color(Replay2DStyle.hudTrack),
+            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+        )
+        if layout.markerX > layout.trackStartX {
+            context.stroke(
+                Replay2DFigure.linePath(
+                    layout.trackStartX,
+                    layout.trackY,
+                    layout.markerX,
+                    layout.trackY
+                ),
+                with: .color(Replay2DStyle.hudProgress),
+                style: StrokeStyle(lineWidth: 4, lineCap: .round)
+            )
+        }
+        Replay2DFigure.disc(
+            context,
+            layout.markerX,
+            layout.trackY,
+            3.5,
+            color: Replay2DStyle.hudProgress
+        )
+
         let left = Text(RowPlayFormatting.time(state.time, tenths: true))
             .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(colors.tickText)
+            .foregroundStyle(Replay2DStyle.hudText)
         let right = Text(RowPlayFormatting.distance(liveDistance, unit: distanceUnit))
             .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(colors.tickText)
-        context.draw(left, at: CGPoint(x: 20, y: baselineY), anchor: .leading)
-        context.draw(right, at: CGPoint(x: size.width - 20, y: baselineY), anchor: .trailing)
+            .foregroundStyle(Replay2DStyle.hudText)
+        context.draw(
+            left,
+            at: CGPoint(x: layout.backdrop.minX + 8, y: layout.metricsY),
+            anchor: .leading
+        )
+        context.draw(
+            right,
+            at: CGPoint(x: layout.backdrop.maxX - 8, y: layout.metricsY),
+            anchor: .trailing
+        )
         if let ghostDistance {
             let gap = ReplayRaceGap.raceGapMeters(
                 playerDistance: liveDistance,
@@ -248,8 +324,8 @@ struct Replay2DSceneView: View {
             context.draw(
                 Text(ReplayRivalGapFormatting.metersLabel(gap, unit: distanceUnit))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(colors.ghost),
-                at: CGPoint(x: size.width / 2, y: baselineY),
+                    .foregroundStyle(Replay2DStyle.hudRivalText),
+                at: CGPoint(x: size.width / 2, y: layout.metricsY),
                 anchor: .center
             )
         }
@@ -370,6 +446,7 @@ struct Replay2DSceneView: View {
             frame: frame,
             distanceUnit: distanceUnit,
             reduceMotion: reduceMotion,
+            rival: rival,
             ghostDistance: ghostDistance
         )
     }
@@ -383,18 +460,46 @@ struct Replay2DSceneView: View {
         frame: ReplayFrame,
         distanceUnit: DistanceUnit,
         reduceMotion: Bool,
+        rival: ReplayRival?,
         ghostDistance: Double?
     ) -> String {
+        let progress = ReplayTelemetryFormatting.roundedInteger(
+            Replay2DHUDRenderer.clampedProgress(frame.progress) * 100,
+            fallback: "0"
+        )
         var parts = [
             "Time \(RowPlayFormatting.time(frame.t, tenths: true))",
+            "Progress \(progress)%",
+            "Pace \(RowPlayFormatting.pace(frame.pace))",
             "Distance \(RowPlayFormatting.distance(frame.d, unit: distanceUnit))",
             reduceMotion ? "Reduced motion" : "Animated \(sport.displayName) athlete",
         ]
-        if let ghostDistance {
-            let gap = ReplayRaceGap.raceGapMeters(playerDistance: frame.d, ghostDistance: ghostDistance)
-            parts.append(ReplayRivalGapFormatting.metersLabel(gap, unit: distanceUnit))
+        if let rival {
+            parts.append("Rival \(rivalAccessibilityIdentity(rival))")
+            if let ghostDistance {
+                let gap = ReplayRaceGap.raceGapMeters(
+                    playerDistance: frame.d,
+                    ghostDistance: ghostDistance
+                )
+                parts.append("Gap \(ReplayRivalGapFormatting.metersLabel(gap, unit: distanceUnit))")
+            } else {
+                parts.append("Gap unavailable")
+            }
+        } else {
+            parts.append("No rival")
         }
         return parts.joined(separator: ", ")
+    }
+
+    static func rivalAccessibilityIdentity(_ rival: ReplayRival) -> String {
+        switch rival.kind {
+        case .session:
+            "session \(rival.displayLabel)"
+        case .constantPace:
+            "pace boat \(rival.displayLabel)"
+        case .importedFile:
+            "imported file \(rival.localFileName ?? rival.displayLabel)"
+        }
     }
 
     /// Retained as a pure compatibility helper for replay-rival path tests and
@@ -408,6 +513,57 @@ struct Replay2DSceneView: View {
             ghostStrokes: ghostStrokes,
             playerStrokes: playerStrokes,
             size: size
+        )
+    }
+}
+
+struct Replay2DHUDLayout: Equatable {
+    let backdrop: CGRect
+    let summaryY: Double
+    let trackY: Double
+    let metricsY: Double
+    let trackStartX: Double
+    let trackEndX: Double
+    let markerX: Double
+}
+
+/// Pure layout and formatting boundary for the Canvas progress HUD. Exact
+/// marker geometry makes start, midpoint, finish, and seek states testable
+/// independently of font rasterization.
+enum Replay2DHUDRenderer {
+    static func clampedProgress(_ progress: Double) -> Double {
+        Replay2DStyle.clamp01(progress)
+    }
+
+    static func progressLabel(_ progress: Double) -> String {
+        let percent = ReplayTelemetryFormatting.roundedInteger(
+            clampedProgress(progress) * 100,
+            fallback: "0"
+        )
+        return "\(percent)% complete"
+    }
+
+    static func layout(size: CGSize, progress: Double) -> Replay2DHUDLayout {
+        let width = max(0, Double(size.width))
+        let height = max(0, Double(size.height))
+        let backdrop = CGRect(
+            x: 12,
+            y: max(0, height - 58),
+            width: max(0, width - 24),
+            height: min(52, height)
+        )
+        let trackStartX = min(backdrop.maxX, backdrop.minX + 68)
+        let trackEndX = max(trackStartX, backdrop.maxX - 72)
+        let markerX = trackStartX
+            + (trackEndX - trackStartX) * clampedProgress(progress)
+        return Replay2DHUDLayout(
+            backdrop: backdrop,
+            summaryY: max(0, height - 48),
+            trackY: max(0, height - 33),
+            metricsY: max(0, height - 15),
+            trackStartX: trackStartX,
+            trackEndX: trackEndX,
+            markerX: markerX
         )
     }
 }

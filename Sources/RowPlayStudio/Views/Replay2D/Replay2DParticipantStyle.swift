@@ -103,6 +103,13 @@ enum Replay2DStyle {
     static let ghostLaneAlpha: Double = 0.76
     /// Ghost avatar transparency.
     static let ghostAvatarAlpha: Double = 0.82
+    /// Neutral backing for small Canvas HUD text across every venue palette.
+    static let hudBackdropOpacity: Double = 0.86
+    static let hudBackdrop = Color.black.opacity(hudBackdropOpacity)
+    static let hudText = Color.white
+    static let hudRivalText = Color.requiredReplay2DHex("#c8f3ff")
+    static let hudTrack = Color.white.opacity(0.36)
+    static let hudProgress = Color.requiredReplay2DHex("#7fdef8")
 
     /// Forward/back hull surge per stroke (px), per sport. Bike pedals smoothly.
     static func surgePixels(for sport: Sport) -> Double {

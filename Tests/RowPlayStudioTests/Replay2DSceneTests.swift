@@ -15,6 +15,7 @@ final class Replay2DSceneTests: XCTestCase {
     private let minimumReducedMotionDifferencePixels = 60
     private let minimumIndependentRivalInkPixels = 160
     private let minimumVisibleColorDelta = 24.0
+    private let minimumHUDBackingInkPixels = 12_000
 
     func testEverySportPaintsParticipantPixelsBeyondVenue() throws {
         for sport in Sport.allCases {
@@ -149,11 +150,21 @@ final class Replay2DSceneTests: XCTestCase {
                 frame: frame,
                 distanceUnit: .metric,
                 reduceMotion: false,
+                rival: nil,
                 ghostDistance: nil
             ),
             "Time \(RowPlayFormatting.time(frame.t, tenths: true)), "
+                + "Progress 50%, Pace \(RowPlayFormatting.pace(frame.pace)), "
                 + "Distance \(RowPlayFormatting.distance(frame.d, unit: .metric)), "
-                + "Animated \(Sport.rower.displayName) athlete"
+                + "Animated \(Sport.rower.displayName) athlete, No rival"
+        )
+        let rival = ReplayRival(
+            id: "pace-112",
+            kind: .constantPace,
+            displayLabel: "1:52",
+            strokes: [],
+            hasGenuineStrokeData: false,
+            targetPace: 112
         )
         let ghostDistance = 1_250.0
         let gap = ReplayRaceGap.raceGapMeters(
@@ -166,12 +177,122 @@ final class Replay2DSceneTests: XCTestCase {
                 frame: frame,
                 distanceUnit: .metric,
                 reduceMotion: true,
+                rival: rival,
                 ghostDistance: ghostDistance
             ),
             "Time \(RowPlayFormatting.time(frame.t, tenths: true)), "
+                + "Progress 50%, Pace \(RowPlayFormatting.pace(frame.pace)), "
                 + "Distance \(RowPlayFormatting.distance(frame.d, unit: .metric)), "
-                + "Reduced motion, \(ReplayRivalGapFormatting.metersLabel(gap, unit: .metric))"
+                + "Reduced motion, Rival pace boat 1:52, "
+                + "Gap \(ReplayRivalGapFormatting.metersLabel(gap, unit: .metric))"
         )
+    }
+
+    func testCanvasAccessibilityNamesEveryRivalKind() {
+        let stroke = Stroke(t: 0, d: 0, pace: 120, cadence: 28, watts: 200)
+        let session = ReplayRival(
+            id: "session",
+            kind: .session,
+            displayLabel: "2026-05-24",
+            strokes: [stroke],
+            hasGenuineStrokeData: true,
+            sessionWorkoutID: 42
+        )
+        let imported = ReplayRival(
+            id: "file",
+            kind: .importedFile,
+            displayLabel: "Imported rival",
+            strokes: [stroke],
+            hasGenuineStrokeData: false,
+            localFileName: "race.csv"
+        )
+
+        XCTAssertEqual(
+            Replay2DSceneView.rivalAccessibilityIdentity(session),
+            "session 2026-05-24"
+        )
+        XCTAssertEqual(
+            Replay2DSceneView.rivalAccessibilityIdentity(imported),
+            "imported file race.csv"
+        )
+    }
+
+    func testHUDProgressCuePinsStartMidpointAndFinish() {
+        let size = CGSize(width: renderWidth, height: renderHeight)
+        let start = Replay2DHUDRenderer.layout(size: size, progress: -.infinity)
+        let midpoint = Replay2DHUDRenderer.layout(size: size, progress: 0.5)
+        let finish = Replay2DHUDRenderer.layout(size: size, progress: 2)
+
+        XCTAssertEqual(start.markerX, start.trackStartX, accuracy: 1e-10)
+        XCTAssertEqual(
+            midpoint.markerX,
+            (midpoint.trackStartX + midpoint.trackEndX) / 2,
+            accuracy: 1e-10
+        )
+        XCTAssertEqual(finish.markerX, finish.trackEndX, accuracy: 1e-10)
+        XCTAssertEqual(Replay2DHUDRenderer.progressLabel(.nan), "0% complete")
+        XCTAssertEqual(Replay2DHUDRenderer.progressLabel(0.5), "50% complete")
+        XCTAssertEqual(Replay2DHUDRenderer.progressLabel(2), "100% complete")
+    }
+
+    func testHUDTextContrastAcrossEverySportThemePaletteEndpoint() throws {
+        let foregrounds = try [Replay2DStyle.hudText, Replay2DStyle.hudRivalText]
+            .map(rgb)
+        for sport in Sport.allCases {
+            for darkTheme in [false, true] {
+                let palette = Replay2DVenueCatalog.palette(
+                    for: sport,
+                    darkTheme: darkTheme
+                )
+                for baseColor in venueColors(palette) {
+                    let base = try rgb(baseColor)
+                    let backed = RGB(
+                        red: base.red * (1 - Replay2DStyle.hudBackdropOpacity),
+                        green: base.green * (1 - Replay2DStyle.hudBackdropOpacity),
+                        blue: base.blue * (1 - Replay2DStyle.hudBackdropOpacity)
+                    )
+                    for foreground in foregrounds {
+                        XCTAssertGreaterThanOrEqual(
+                            contrastRatio(foreground, backed),
+                            4.5,
+                            "\(sport.rawValue) dark=\(darkTheme) HUD text is below 4.5:1"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    func testHUDBackingRendersAcrossEverySportAndTheme() throws {
+        let hudROI = CGRect(
+            x: 10,
+            y: renderHeight - 60,
+            width: renderWidth - 20,
+            height: 56
+        )
+        for sport in Sport.allCases {
+            let (detail, state) = try replayFixture(sport: sport)
+            for colorScheme in [ColorScheme.light, .dark] {
+                let scene = try renderScene(
+                    detail: detail,
+                    state: state,
+                    rival: nil,
+                    reduceMotion: false,
+                    colorScheme: colorScheme
+                )
+                let venue = try renderVenue(
+                    sport: sport,
+                    meters: state.currentFrame.d,
+                    reduceMotion: false,
+                    colorScheme: colorScheme
+                )
+                XCTAssertGreaterThan(
+                    differenceMask(scene, venue, canvasROI: hudROI).count,
+                    minimumHUDBackingInkPixels,
+                    "\(sport.rawValue) \(colorScheme) HUD backing did not render"
+                )
+            }
+        }
     }
 
     func testReplay2DHexParserRejectsMalformedPaletteValues() {
@@ -288,7 +409,8 @@ final class Replay2DSceneTests: XCTestCase {
         detail: WorkoutDetail,
         state: ReplayState,
         rival: ReplayRival?,
-        reduceMotion: Bool
+        reduceMotion: Bool,
+        colorScheme: ColorScheme = .dark
     ) throws -> NSBitmapImageRep {
         try renderBitmap(
             Replay2DSceneView(
@@ -300,14 +422,15 @@ final class Replay2DSceneTests: XCTestCase {
                 contentRevision: 0
             )
             .frame(width: renderWidth, height: renderHeight)
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, colorScheme)
         )
     }
 
     private func renderVenue(
         sport: Sport,
         meters: Double,
-        reduceMotion: Bool
+        reduceMotion: Bool,
+        colorScheme: ColorScheme = .dark
     ) throws -> NSBitmapImageRep {
         try renderBitmap(
             Canvas { context, size in
@@ -317,7 +440,7 @@ final class Replay2DSceneTests: XCTestCase {
                     height: Double(size.height),
                     sport: sport,
                     meters: meters,
-                    darkTheme: true,
+                    darkTheme: colorScheme == .dark,
                     reduceMotion: reduceMotion
                 )
             }
@@ -377,5 +500,63 @@ final class Replay2DSceneTests: XCTestCase {
             }
         }
         return mask
+    }
+
+    private struct RGB {
+        let red: Double
+        let green: Double
+        let blue: Double
+    }
+
+    private func rgb(_ color: Color) throws -> RGB {
+        let resolved = try XCTUnwrap(NSColor(color).usingColorSpace(.sRGB))
+        return RGB(
+            red: resolved.redComponent,
+            green: resolved.greenComponent,
+            blue: resolved.blueComponent
+        )
+    }
+
+    private func venueColors(_ palette: Replay2DVenuePalette) -> [Color] {
+        [
+            palette.skyTop,
+            palette.skyHorizon,
+            palette.haze,
+            palette.sun,
+            palette.ridgeFar,
+            palette.ridgeNear,
+            palette.foliageFar,
+            palette.foliageNear,
+            palette.structure,
+            palette.structureShade,
+            palette.structureLight,
+            palette.groundTop,
+            palette.groundMid,
+            palette.groundBottom,
+            palette.surfaceLine,
+            palette.surfaceHighlight,
+            palette.surfaceShadow,
+            palette.marker,
+            palette.safety,
+        ]
+    }
+
+    private func contrastRatio(_ first: RGB, _ second: RGB) -> Double {
+        let firstLuminance = relativeLuminance(first)
+        let secondLuminance = relativeLuminance(second)
+        let lighter = max(firstLuminance, secondLuminance)
+        let darker = min(firstLuminance, secondLuminance)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    private func relativeLuminance(_ color: RGB) -> Double {
+        func linear(_ component: Double) -> Double {
+            component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+        return linear(color.red) * 0.2126
+            + linear(color.green) * 0.7152
+            + linear(color.blue) * 0.0722
     }
 }
