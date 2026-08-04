@@ -29,3 +29,7 @@
 ## 2026-08-03 - Selection States on Custom Button Controls
 **Learning:** In SwiftUI, when building custom selection controls (like interval pickers) using `Button` with tinting for visual selection, VoiceOver users receive no indication of which option is currently active unless explicit traits are provided. Compact visual labels ("30s", "1m") are also poor spoken names.
 **Action:** Dynamically apply `.accessibilityAddTraits(.isSelected)` to the active element, pair it with a full spoken `.accessibilityLabel` (and matching `.help` tooltip), and mark the section title with `.isHeader` so the control group is navigable.
+
+## 2024-08-04 - Explicit Accessibility Hints for Icon-Only Pickers and Menus
+**Learning:** Icon-only pickers, menus, and buttons often have an `.accessibilityLabel` and a `.help` tooltip, but they can lack an `.accessibilityHint`. Without this hint, screen reader users might not understand the specific action or interaction (e.g., that it opens a menu to select an option or resets a state), especially if the component is heavily styled or uses non-standard patterns.
+**Action:** Always provide an explicit `.accessibilityHint` (e.g., "Opens a menu to select the camera angle" or "Resets the camera position") alongside `.accessibilityLabel` and `.help` for icon-only interactive elements to ensure complete and descriptive VoiceOver support.

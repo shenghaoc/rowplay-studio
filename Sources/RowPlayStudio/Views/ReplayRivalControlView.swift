@@ -129,6 +129,7 @@ struct ReplayRivalControlView: View {
             #if os(macOS)
             .help("Choose a past session, constant pace, or imported file rival")
             #endif
+            .accessibilityHint("Opens a menu to select a past session, constant pace, or imported file rival")
 
             if let activeRival {
                 rivalGapDisplay(for: activeRival)
@@ -147,6 +148,7 @@ struct ReplayRivalControlView: View {
                 #if os(macOS)
                 .help("Remove replay rival")
                 #endif
+                .accessibilityHint("Removes the currently selected rival from the replay")
             }
         }
         .padding(.vertical, 6)
