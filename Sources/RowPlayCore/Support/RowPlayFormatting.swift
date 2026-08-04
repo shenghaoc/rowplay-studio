@@ -82,8 +82,7 @@ public enum RowPlayFormatting: Sendable {
             return 0
         }
         let perMetre = pacePer500m / 500
-        // Use direct multiplication instead of pow(x, 3) to avoid generalized power function overhead
-        // in hot paths (e.g., when processing strokes or calculating totals).
+        // Concept2 formula: watts = 2.8 / (pace/500)³ — multiply cube (avoid pow(x, 3))
         return 2.8 / (perMetre * perMetre * perMetre)
     }
 
