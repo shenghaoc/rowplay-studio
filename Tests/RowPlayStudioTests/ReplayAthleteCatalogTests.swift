@@ -66,6 +66,51 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         XCTAssertTrue(ReplayAthleteCatalog.validateContract(contract, manifest: manifest).isValid)
     }
 
+    func testNativeDerivativeManifestSealsPinnedInputsEightRolesAndRuntimeBytes() throws {
+        let sourceData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-source.json")
+        )
+        let contractData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
+        )
+        let nativeData = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4-native.json")
+        )
+        let nativeUsdz = try referenceURL("athlete/rowplay-athlete-v4-native.usdz")
+        guard case .success(let source) = ReplayAthleteCatalog.parseSourceManifest(data: sourceData),
+              case .success(let contract) = ReplayAthleteCatalog.parseContract(data: contractData),
+              case .success(let native) = ReplayAthleteCatalog.parseNativeManifest(data: nativeData) else {
+            return XCTFail("native athlete manifests must parse")
+        }
+
+        XCTAssertTrue(
+            ReplayAthleteCatalog.validateNativeManifest(
+                native,
+                source: source,
+                contract: contract
+            ).isValid
+        )
+        XCTAssertEqual(native.sourceCommit, Self.pinnedRowPlayMain)
+        XCTAssertEqual(native.sourceGlbSha256, source.glbSha256)
+        XCTAssertEqual(native.sourceUsdzSha256, source.usdzSha256)
+        XCTAssertEqual(native.sourceContractSha256, source.contractSha256)
+        XCTAssertEqual(native.surfaceRoles, ReplayAthleteSurfaceRole.allCases)
+        XCTAssertEqual(
+            native.runtimeMaterialNames,
+            ReplayAthleteSurfaceRole.allCases.map(\.runtimeMaterialName)
+        )
+        XCTAssertEqual(native.materialSlotCount, 8)
+        XCTAssertEqual(native.skinnedMeshCount, 1)
+        XCTAssertEqual(
+            try ReplayBundledResourceSupport.sha256Hex(contentsOf: nativeUsdz),
+            native.runtimeUsdzSha256
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(nativeUsdz.resourceValues(forKeys: [.fileSizeKey]).fileSize),
+            native.runtimeUsdzByteCount
+        )
+    }
+
     func testContractRejectsUnexpectedRuntimeMeshName() throws {
         let original = try Data(
             contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")

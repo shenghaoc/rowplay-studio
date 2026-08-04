@@ -1,5 +1,6 @@
 import RealityKit
 import RowPlayCore
+import Synchronization
 import XCTest
 @testable import RowPlayStudio
 
@@ -7,6 +8,7 @@ import XCTest
 final class ReplayAthleteLibraryTests: XCTestCase {
     override func setUp() async throws {
         ReplayAthleteLibrary.shared.resetCacheForTesting()
+        ReplayAthleteMaterialLibrary.shared.resetCacheForTesting()
     }
 
     func testProductionAthleteTemplateLoadsFromReferenceBundle() async throws {
@@ -26,18 +28,30 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         XCTAssertTrue(
             Set(loaded.semanticJointIndices).isDisjoint(with: Set(loaded.helperJointIndices))
         )
-        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.leftHandContact)
-        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.rightHandContact)
-        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.leftFootContact)
-        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.rightFootContact)
+        let contacts = await loaded.makeInstance(
+            sport: .rower,
+            name: "contacts",
+            isRival: false,
+            quality: .medium
+        )
+        XCTAssertNotNil(contacts?.leftHandContact)
+        XCTAssertNotNil(contacts?.rightHandContact)
+        XCTAssertNotNil(contacts?.leftFootContact)
+        XCTAssertNotNil(contacts?.rightFootContact)
     }
 
     func testInstancesDriveDeterministicFinitePosesForAllSports() async throws {
         let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
         let template = try XCTUnwrap(loadedTemplate)
         for sport in ReplayAssetCatalog.supportedSports {
+            let built = await template.makeInstance(
+                sport: sport,
+                name: "live",
+                isRival: false,
+                quality: .medium
+            )
             let instance = try XCTUnwrap(
-                template.makeInstance(sport: sport, name: "live", isRival: false),
+                built,
                 "\(sport.rawValue) instance must build"
             )
             // Direct and shuffled seeks must be deterministic: the same
@@ -71,9 +85,13 @@ final class ReplayAthleteLibraryTests: XCTestCase {
     func testAuthoredMotionActuallyMovesTheSkeleton() async throws {
         let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
         let template = try XCTUnwrap(loadedTemplate)
-        let instance = try XCTUnwrap(
-            template.makeInstance(sport: .rower, name: "live", isRival: false)
+        let built = await template.makeInstance(
+            sport: .rower,
+            name: "live",
+            isRival: false,
+            quality: .medium
         )
+        let instance = try XCTUnwrap(built)
         instance.seek(toClipFraction: 0)
         let catchPose = try XCTUnwrap(instance.currentConstraintPose())
         instance.seek(toClipFraction: 0.38)
@@ -98,12 +116,20 @@ final class ReplayAthleteLibraryTests: XCTestCase {
     func testLiveAndRivalInstancesRemainIndependent() async throws {
         let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
         let template = try XCTUnwrap(loadedTemplate)
-        let live = try XCTUnwrap(
-            template.makeInstance(sport: .rower, name: "live", isRival: false)
+        let builtLive = await template.makeInstance(
+            sport: .rower,
+            name: "live",
+            isRival: false,
+            quality: .medium
         )
-        let rival = try XCTUnwrap(
-            template.makeInstance(sport: .rower, name: "rival", isRival: true)
+        let builtRival = await template.makeInstance(
+            sport: .rower,
+            name: "rival",
+            isRival: true,
+            quality: .medium
         )
+        let live = try XCTUnwrap(builtLive)
+        let rival = try XCTUnwrap(builtRival)
         live.seek(toClipFraction: 0.1)
         rival.seek(toClipFraction: 0.6)
         let livePose = try XCTUnwrap(live.currentConstraintPose())
@@ -119,6 +145,90 @@ final class ReplayAthleteLibraryTests: XCTestCase {
             }
         }
         XCTAssertTrue(differs, "live and rival skeleton state must be independent")
+
+        var liveModel = try XCTUnwrap(live.athleteEntity.components[ModelComponent.self])
+        let rivalModel = try XCTUnwrap(rival.athleteEntity.components[ModelComponent.self])
+        XCTAssertEqual(liveModel.materials.count, 8)
+        XCTAssertEqual(rivalModel.materials.count, 8)
+        var changed = try XCTUnwrap(liveModel.materials[0] as? PhysicallyBasedMaterial)
+        changed.roughness = 0.123
+        liveModel.materials[0] = changed
+        live.athleteEntity.components.set(liveModel)
+        let rivalFirst = try XCTUnwrap(
+            rival.athleteEntity.components[ModelComponent.self]?.materials[0]
+                as? PhysicallyBasedMaterial
+        )
+        XCTAssertNotEqual(rivalFirst.roughness.scale, changed.roughness.scale)
+    }
+
+    func testEveryQualityUsesEightSurfaceMaterialsAndExactDetailMapLadder() async throws {
+        let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
+        let template = try XCTUnwrap(loadedTemplate)
+        XCTAssertEqual(template.nativeManifest.surfaceRoles, ReplayAthleteSurfaceRole.allCases)
+
+        for quality in ReplayRenderQuality.allCases {
+            let built = await template.makeInstance(
+                sport: .rower,
+                name: "quality-\(quality.rawValue)",
+                isRival: false,
+                quality: quality
+            )
+            let instance = try XCTUnwrap(built)
+            let model = try XCTUnwrap(instance.athleteEntity.components[ModelComponent.self])
+            XCTAssertEqual(instance.surfaceRoles, ReplayAthleteSurfaceRole.allCases)
+            XCTAssertEqual(model.materials.count, 8)
+            let expectedSize = ReplayAthleteMaterialProfile.detailTextureSize(for: quality)
+            for (index, role) in instance.surfaceRoles.enumerated() {
+                let material = try XCTUnwrap(model.materials[index] as? PhysicallyBasedMaterial)
+                let expected = ReplayAthleteMaterialProfile.profile(for: role, quality: quality)
+                XCTAssertEqual(material.roughness.scale, expected.roughness, accuracy: 1e-6)
+                XCTAssertEqual(material.metallic.scale, expected.metallic, accuracy: 1e-6)
+                XCTAssertEqual(material.clearcoat.scale, expected.clearcoat, accuracy: 1e-6)
+                XCTAssertEqual(material.specular.scale, expected.specular, accuracy: 1e-6)
+                let detail = material.normal.texture?.resource
+                if expectedSize == 0 || role == .eye {
+                    XCTAssertNil(detail, "\(quality.rawValue) \(role.rawValue) must not allocate detail")
+                } else {
+                    XCTAssertEqual(detail?.width, expectedSize)
+                    XCTAssertEqual(detail?.height, expectedSize)
+                }
+            }
+        }
+    }
+
+    func testPortablePreflightRunsOutsideMainThreadBeforeRealityKitLoad() async throws {
+        let observations = Mutex<[Bool]>([])
+        let library = ReplayAthleteLibrary(
+            source: TestAthleteResourceSource(urls: try bundledResourceURLs()),
+            preflightObserver: { ranOnMainThread in
+                observations.withLock { $0.append(ranOnMainThread) }
+            }
+        )
+
+        let loaded = await library.athleteTemplate()
+        XCTAssertNotNil(loaded)
+        XCTAssertEqual(observations.withLock { $0 }, [false])
+    }
+
+    func testNativeDerivativeHashMismatchRejectsBeforeRealityKitLoad() async throws {
+        var urls = try bundledResourceURLs()
+        urls[.nativeUsdz] = urls[.usdz]
+        var entityLoads = 0
+        let library = ReplayAthleteLibrary(
+            source: TestAthleteResourceSource(urls: urls),
+            entityLoader: { url in
+                entityLoads += 1
+                return try await Entity(contentsOf: url)
+            }
+        )
+
+        let loaded = await library.athleteTemplate()
+        XCTAssertNil(loaded)
+        XCTAssertEqual(entityLoads, 0)
+        guard case .hashMismatch(let resource, _, _) = library.lastFailure else {
+            return XCTFail("expected typed native derivative hash rejection")
+        }
+        XCTAssertEqual(resource, "athlete.native-usdz")
     }
 
     func testMissingResourceReportsTypedFailureOnceAndStaysFailed() async throws {
@@ -210,7 +320,7 @@ final class ReplayAthleteLibraryTests: XCTestCase {
 
     func testMissingContactEntityReportsExactTemplateFailure() async throws {
         let urls = try bundledResourceURLs()
-        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.usdz]))
+        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.nativeUsdz]))
         let markerName = try XCTUnwrap(
             ReplayAthleteCatalog.contactEntityNames[.leftHand]
         )
@@ -230,7 +340,7 @@ final class ReplayAthleteLibraryTests: XCTestCase {
 
     func testDuplicateContactEntityReportsExactTemplateFailure() async throws {
         let urls = try bundledResourceURLs()
-        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.usdz]))
+        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.nativeUsdz]))
         let markerName = try XCTUnwrap(
             ReplayAthleteCatalog.contactEntityNames[.rightHand]
         )
@@ -328,9 +438,13 @@ final class ReplayAthleteLibraryTests: XCTestCase {
     func testSeekClearsConstraintAndReapplicationIsDeterministic() async throws {
         let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
         let template = try XCTUnwrap(loadedTemplate)
-        let instance = try XCTUnwrap(
-            template.makeInstance(sport: .rower, name: "constraint", isRival: false)
+        let built = await template.makeInstance(
+            sport: .rower,
+            name: "constraint",
+            isRival: false,
+            quality: .medium
         )
+        let instance = try XCTUnwrap(built)
         XCTAssertTrue(instance.seek(toClipFraction: 0.25))
         let sampled = try XCTUnwrap(instance.currentConstraintPose())
         XCTAssertTrue(instance.beginConstraintPass())

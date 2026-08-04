@@ -60,6 +60,50 @@ struct ReplayAthleteSurfaceSpec: Equatable, Sendable {
     let source: String
 }
 
+/// The eight reviewed vertex-colour regions carried by the canonical V4
+/// athlete. The native derivative preserves this exact order as material
+/// subsets while the source contract keeps its own declaration order.
+enum ReplayAthleteSurfaceRole: String, CaseIterable, Hashable, Sendable {
+    case skin = "athlete-skin"
+    case jersey = "athlete-fabric"
+    case lower = "athlete-shorts"
+    case footwear = "athlete-footwear"
+    case hair = "athlete-hair"
+    case trim = "athlete-trim"
+    case eye = "athlete-eye"
+    case faceDetail = "athlete-face-detail"
+
+    var runtimeMaterialName: String {
+        switch self {
+        case .skin: "rowplay-v4-skin"
+        case .jersey: "rowplay-v4-jersey"
+        case .lower: "rowplay-v4-lower"
+        case .footwear: "rowplay-v4-footwear"
+        case .hair: "rowplay-v4-hair"
+        case .trim: "rowplay-v4-trim"
+        case .eye: "rowplay-v4-eye"
+        case .faceDetail: "rowplay-v4-face-detail"
+        }
+    }
+}
+
+/// Reproducible manifest for the native material-subset derivative. Geometry,
+/// skinning, contacts, and animation stay in the pinned USDZ; only the pinned
+/// GLB's reviewed vertex colours become RealityKit-addressable material slots.
+struct ReplayAthleteNativeManifest: Equatable, Sendable {
+    let schema: String
+    let sourceCommit: String
+    let sourceGlbSha256: String
+    let sourceUsdzSha256: String
+    let sourceContractSha256: String
+    let runtimeUsdzSha256: String
+    let runtimeUsdzByteCount: Int
+    let skinnedMeshCount: Int
+    let materialSlotCount: Int
+    let surfaceRoles: [ReplayAthleteSurfaceRole]
+    let runtimeMaterialNames: [String]
+}
+
 /// Parsed, validated production contract used by the native loader, motion
 /// table, pose adapter, and grip controller.  The semantic and helper
 /// hierarchies are read from the live contract — not from a hard-coded name
@@ -141,6 +185,7 @@ enum ReplayAthleteValidationFailure: Error, Equatable, Sendable {
     case missingSkinnedAthlete
     case multipleSkinnedAthletes
     case missingModelComponent
+    case surfaceCountMismatch(actual: Int, expected: Int)
     case missingSkeletalPose
     case missingAnimation
     case invalidRuntimeAsset
@@ -167,6 +212,10 @@ enum ReplayAthleteCatalog {
     static let motionSubdirectory = "ReplayReference/motion"
     static let usdzResourceName = "rowplay-athlete-v4"
     static let usdzExtension = "usdz"
+    static let nativeUsdzResourceName = "rowplay-athlete-v4-native"
+    static let nativeUsdzExtension = "usdz"
+    static let nativeManifestResourceName = "rowplay-athlete-v4-native"
+    static let nativeManifestExtension = "json"
     static let contractResourceName = "rowplay-athlete-v4.contract"
     static let contractExtension = "json"
     static let sourceManifestResourceName = "rowplay-athlete-source"
@@ -180,16 +229,9 @@ enum ReplayAthleteCatalog {
     static let contractSchemaVersion = 1
     static let skinnedMeshName = "v4Athlete"
 
-    static let requiredSurfaceRoles: [String] = [
-        "athlete-fabric",
-        "athlete-skin",
-        "athlete-shorts",
-        "athlete-footwear",
-        "athlete-hair",
-        "athlete-trim",
-        "athlete-eye",
-        "athlete-face-detail",
-    ]
+    static let requiredSurfaceRoles = ReplayAthleteSurfaceRole.allCases.map(\.rawValue)
+
+    static let nativeManifestSchema = "rowplay.replay.athlete-native.v1"
 
     static let contactEntityNames: [ReplayAthleteContactRole: String] = [
         .leftHand: "v4LeftHandContact",
@@ -499,6 +541,107 @@ enum ReplayAthleteCatalog {
                     expected: manifest.totalBoneCount
                 )
             )
+        }
+        return ReplayAthleteValidationResult(failures: failures)
+    }
+
+    // MARK: - Native material derivative
+
+    static func parseNativeManifest(
+        data: Data
+    ) -> Result<ReplayAthleteNativeManifest, ReplayAthleteValidationFailure> {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let schema = root["schema"] as? String,
+              let sourceCommit = root["sourceCommit"] as? String,
+              let sourceGlbSha256 = root["sourceGlbSha256"] as? String,
+              let sourceUsdzSha256 = root["sourceUsdzSha256"] as? String,
+              let sourceContractSha256 = root["sourceContractSha256"] as? String,
+              let runtimeUsdzSha256 = root["runtimeUsdzSha256"] as? String,
+              let runtimeUsdzByteCount = root["runtimeUsdzByteCount"] as? Int,
+              let skinnedMeshCount = root["skinnedMeshCount"] as? Int,
+              let materialSlotCount = root["materialSlotCount"] as? Int,
+              let surfaceRoleNames = root["surfaceRoles"] as? [String],
+              let runtimeMaterialNames = root["runtimeMaterialNames"] as? [String] else {
+            return .failure(.invalidContract("native manifest"))
+        }
+        var roles: [ReplayAthleteSurfaceRole] = []
+        for raw in surfaceRoleNames {
+            guard let role = ReplayAthleteSurfaceRole(rawValue: raw) else {
+                return .failure(.invalidContract("native surface role \(raw)"))
+            }
+            guard !roles.contains(role) else {
+                return .failure(.invalidContract("duplicate native surface role \(raw)"))
+            }
+            roles.append(role)
+        }
+        return .success(ReplayAthleteNativeManifest(
+            schema: schema,
+            sourceCommit: sourceCommit,
+            sourceGlbSha256: sourceGlbSha256,
+            sourceUsdzSha256: sourceUsdzSha256,
+            sourceContractSha256: sourceContractSha256,
+            runtimeUsdzSha256: runtimeUsdzSha256,
+            runtimeUsdzByteCount: runtimeUsdzByteCount,
+            skinnedMeshCount: skinnedMeshCount,
+            materialSlotCount: materialSlotCount,
+            surfaceRoles: roles,
+            runtimeMaterialNames: runtimeMaterialNames
+        ))
+    }
+
+    static func validateNativeManifest(
+        _ native: ReplayAthleteNativeManifest,
+        source: ReplayAthleteSourceManifest,
+        contract: ReplayAthleteContract
+    ) -> ReplayAthleteValidationResult {
+        var failures: [ReplayAthleteValidationFailure] = []
+        if native.schema != nativeManifestSchema {
+            failures.append(.invalidContract("native schema"))
+        }
+        if native.sourceCommit != source.pinnedCommit {
+            failures.append(.pinMismatch("native.sourceCommit"))
+        }
+        if native.sourceGlbSha256 != source.glbSha256
+            || native.sourceGlbSha256 != contract.glbSha256 {
+            failures.append(.pinMismatch("native.sourceGlbSha256"))
+        }
+        if native.sourceUsdzSha256 != source.usdzSha256
+            || native.sourceUsdzSha256 != contract.usdzSha256 {
+            failures.append(.pinMismatch("native.sourceUsdzSha256"))
+        }
+        if native.sourceContractSha256 != source.contractSha256 {
+            failures.append(.pinMismatch("native.sourceContractSha256"))
+        }
+        if native.skinnedMeshCount != 1 {
+            failures.append(native.skinnedMeshCount == 0
+                ? .missingSkinnedAthlete
+                : .multipleSkinnedAthletes)
+        }
+        let expectedRoles = ReplayAthleteSurfaceRole.allCases
+        if native.surfaceRoles != expectedRoles {
+            failures.append(.invalidContract("native surface role order"))
+        }
+        if native.runtimeMaterialNames != expectedRoles.map(\.runtimeMaterialName) {
+            failures.append(.invalidContract("native material name order"))
+        }
+        if native.materialSlotCount != expectedRoles.count {
+            failures.append(.surfaceCountMismatch(
+                actual: native.materialSlotCount,
+                expected: expectedRoles.count
+            ))
+        }
+        if Set(contract.surfaces.map(\.role)) != Set(expectedRoles.map(\.rawValue)) {
+            failures.append(.invalidContract("contract surface roles"))
+        }
+        for (name, value) in [
+            ("native.sourceUsdzSha256", native.sourceUsdzSha256),
+            ("native.sourceContractSha256", native.sourceContractSha256),
+            ("native.runtimeUsdzSha256", native.runtimeUsdzSha256),
+        ] where value.count != 64 || !value.allSatisfy({ $0.isHexDigit }) {
+            failures.append(.invalidContract(name))
+        }
+        if native.runtimeUsdzByteCount <= 0 {
+            failures.append(.invalidContract("native runtimeUsdzByteCount"))
         }
         return ReplayAthleteValidationResult(failures: failures)
     }

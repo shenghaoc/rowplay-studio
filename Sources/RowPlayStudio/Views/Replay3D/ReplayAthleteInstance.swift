@@ -104,6 +104,7 @@ enum ReplayAthleteTemplateValidator {
 final class ReplayAthleteTemplate {
     let contract: ReplayAthleteContract
     let sourceManifest: ReplayAthleteSourceManifest
+    let nativeManifest: ReplayAthleteNativeManifest
     let motionTable: ReplayAthleteMotionTable
     let jointNames: [String]
 
@@ -120,14 +121,21 @@ final class ReplayAthleteTemplate {
         root: Entity,
         contract: ReplayAthleteContract,
         sourceManifest: ReplayAthleteSourceManifest,
+        nativeManifest: ReplayAthleteNativeManifest,
         motionTable: ReplayAthleteMotionTable
     ) throws {
         guard let athlete = root.findEntity(named: contract.meshName)
                 ?? root.replayDescendant(named: contract.meshName) else {
             throw ReplayAthleteValidationFailure.missingSkinnedAthlete
         }
-        guard athlete.components[ModelComponent.self] != nil else {
+        guard let model = athlete.components[ModelComponent.self] else {
             throw ReplayAthleteValidationFailure.missingModelComponent
+        }
+        guard model.materials.count == nativeManifest.materialSlotCount else {
+            throw ReplayAthleteValidationFailure.surfaceCountMismatch(
+                actual: model.materials.count,
+                expected: nativeManifest.materialSlotCount
+            )
         }
         guard let poses = athlete.components[SkeletalPosesComponent.self],
               let pose = poses.poses.default ?? poses.poses.first else {
@@ -160,6 +168,7 @@ final class ReplayAthleteTemplate {
 
         self.contract = contract
         self.sourceManifest = sourceManifest
+        self.nativeManifest = nativeManifest
         self.motionTable = motionTable
         self.jointNames = binding.jointNames
         self.semanticJointIndices = binding.semanticJointIndices
@@ -179,10 +188,14 @@ final class ReplayAthleteTemplate {
     func makeInstance(
         sport: Sport,
         name: String,
-        isRival: Bool
-    ) -> ReplayAthleteInstance? {
+        isRival: Bool,
+        quality: ReplayRenderQuality
+    ) async -> ReplayAthleteInstance? {
         guard motionTable.clips[sport] != nil,
               let selectedClipName = contract.clip(for: sport)?.name else { return nil }
+        guard let detailMaps = await ReplayAthleteMaterialLibrary.shared.detailMaps(
+            for: quality
+        ) else { return nil }
         let clone = rootTemplate.clone(recursive: true)
         clone.name = name
         clone.isEnabled = true
@@ -198,9 +211,12 @@ final class ReplayAthleteTemplate {
             athleteEntity: athlete,
             template: self,
             sport: sport,
-            selectedClipName: selectedClipName
+            selectedClipName: selectedClipName,
+            quality: quality
         )
-        instance.applyBodyStyle(isRival: isRival)
+        guard instance.applyBodyStyle(isRival: isRival, detailMaps: detailMaps) else {
+            return nil
+        }
         return instance
     }
 }
@@ -215,6 +231,8 @@ final class ReplayAthleteInstance {
     let jointNames: [String]
     let sport: Sport
     let selectedClipName: String
+    let quality: ReplayRenderQuality
+    let surfaceRoles: [ReplayAthleteSurfaceRole]
 
     private let template: ReplayAthleteTemplate
     private var baseRootTransform: Transform?
@@ -234,7 +252,8 @@ final class ReplayAthleteInstance {
         athleteEntity: Entity,
         template: ReplayAthleteTemplate,
         sport: Sport,
-        selectedClipName: String
+        selectedClipName: String,
+        quality: ReplayRenderQuality
     ) {
         self.root = root
         self.athleteEntity = athleteEntity
@@ -243,6 +262,8 @@ final class ReplayAthleteInstance {
         self.jointNames = template.jointNames
         self.sport = sport
         self.selectedClipName = selectedClipName
+        self.quality = quality
+        self.surfaceRoles = template.nativeManifest.surfaceRoles
         self.sampleBuffer = Array(
             repeating: ReplayAthleteBoneTransform(),
             count: template.motionTable.boneNames.count
@@ -331,14 +352,51 @@ final class ReplayAthleteInstance {
     /// is a restrained cool tint over the authored surface, never alpha: the
     /// rival blends 34% toward the ghost teal, the live athlete 14% toward
     /// the live violet — the merged RowPlay `styleInstance` constants.
-    func applyBodyStyle(isRival: Bool) {
+    @discardableResult
+    func applyBodyStyle(
+        isRival: Bool,
+        detailMaps: [ReplayAthleteSurfaceRole: TextureResource]
+    ) -> Bool {
         let tint: NSColor
         if isRival {
             tint = Self.blendTowardWhite(red: 0x17, green: 0x6b, blue: 0x8c, amount: 0.34)
         } else {
             tint = Self.blendTowardWhite(red: 0x52, green: 0x40, blue: 0xce, amount: 0.14)
         }
-        applyBodyTint(tint, to: athleteEntity)
+        guard var model = athleteEntity.components[ModelComponent.self],
+              model.materials.count == surfaceRoles.count else {
+            return false
+        }
+        var materials: [any Material] = []
+        materials.reserveCapacity(surfaceRoles.count)
+        for role in surfaceRoles {
+            let profile = ReplayAthleteMaterialProfile.profile(for: role, quality: quality)
+            var material = PhysicallyBasedMaterial()
+            material.baseColor.tint = Self.multipliedColor(
+                ReplayAthleteMaterialProfile.baseColor(for: role),
+                by: tint
+            )
+            material.roughness = .init(scale: profile.roughness)
+            material.metallic = .init(scale: profile.metallic)
+            material.clearcoat = .init(scale: profile.clearcoat)
+            material.clearcoatRoughness = .init(scale: profile.clearcoatRoughness)
+            material.specular = .init(scale: profile.specular)
+            material.anisotropyLevel = .init(scale: profile.anisotropy)
+            material.blending = .opaque
+            if let texture = detailMaps[role] {
+                material.normal = .init(texture: ReplayAthleteMaterialProfile.normalTexture(
+                    resource: texture,
+                    role: role
+                ))
+                material.textureCoordinateTransform = .init(
+                    scale: ReplayAthleteMaterialProfile.detailRepeat(for: role)
+                )
+            }
+            materials.append(material)
+        }
+        model.materials = materials
+        athleteEntity.components.set(model)
+        return true
     }
 
     private static func blendTowardWhite(red: Int, green: Int, blue: Int, amount: Double) -> NSColor {
@@ -346,6 +404,19 @@ final class ReplayAthleteInstance {
             calibratedRed: 1 - amount + amount * Double(red) / 255,
             green: 1 - amount + amount * Double(green) / 255,
             blue: 1 - amount + amount * Double(blue) / 255,
+            alpha: 1
+        )
+    }
+
+    private static func multipliedColor(_ base: NSColor, by tint: NSColor) -> NSColor {
+        guard let base = base.usingColorSpace(.deviceRGB),
+              let tint = tint.usingColorSpace(.deviceRGB) else {
+            return base
+        }
+        return NSColor(
+            calibratedRed: base.redComponent * tint.redComponent,
+            green: base.greenComponent * tint.greenComponent,
+            blue: base.blueComponent * tint.blueComponent,
             alpha: 1
         )
     }
@@ -519,28 +590,4 @@ final class ReplayAthleteInstance {
         return SIMD3(value.x, value.y, value.z) / value.w
     }
 
-    private func applyBodyTint(_ tint: NSColor, to entity: Entity) {
-        if var model = entity.components[ModelComponent.self] {
-            model.materials = model.materials.map { material in
-                if var pbr = material as? PhysicallyBasedMaterial {
-                    pbr.baseColor.tint = tint
-                    pbr.blending = .opaque
-                    return pbr
-                }
-                if var simple = material as? SimpleMaterial {
-                    simple.color.tint = tint
-                    return simple
-                }
-                if var unlit = material as? UnlitMaterial {
-                    unlit.color.tint = tint
-                    return unlit
-                }
-                return material
-            }
-            entity.components.set(model)
-        }
-        for child in entity.children {
-            applyBodyTint(tint, to: child)
-        }
-    }
 }

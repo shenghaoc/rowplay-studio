@@ -6,6 +6,8 @@ enum ReplayAthleteResource: String, CaseIterable, Sendable {
     case contract
     case sourceManifest
     case usdz
+    case nativeManifest
+    case nativeUsdz
     case motionManifest
     case motionBin
 
@@ -14,6 +16,8 @@ enum ReplayAthleteResource: String, CaseIterable, Sendable {
         case .contract: ReplayAthleteCatalog.contractResourceName
         case .sourceManifest: ReplayAthleteCatalog.sourceManifestResourceName
         case .usdz: ReplayAthleteCatalog.usdzResourceName
+        case .nativeManifest: ReplayAthleteCatalog.nativeManifestResourceName
+        case .nativeUsdz: ReplayAthleteCatalog.nativeUsdzResourceName
         case .motionManifest: ReplayAthleteCatalog.motionManifestResourceName
         case .motionBin: ReplayAthleteCatalog.motionBinResourceName
         }
@@ -24,6 +28,8 @@ enum ReplayAthleteResource: String, CaseIterable, Sendable {
         case .contract: ReplayAthleteCatalog.contractExtension
         case .sourceManifest: ReplayAthleteCatalog.sourceManifestExtension
         case .usdz: ReplayAthleteCatalog.usdzExtension
+        case .nativeManifest: ReplayAthleteCatalog.nativeManifestExtension
+        case .nativeUsdz: ReplayAthleteCatalog.nativeUsdzExtension
         case .motionManifest: ReplayAthleteCatalog.motionManifestExtension
         case .motionBin: ReplayAthleteCatalog.motionBinExtension
         }
@@ -31,7 +37,7 @@ enum ReplayAthleteResource: String, CaseIterable, Sendable {
 
     var subdirectory: String {
         switch self {
-        case .contract, .sourceManifest, .usdz:
+        case .contract, .sourceManifest, .usdz, .nativeManifest, .nativeUsdz:
             ReplayAthleteCatalog.athleteSubdirectory
         case .motionManifest, .motionBin:
             ReplayAthleteCatalog.motionSubdirectory
@@ -55,6 +61,178 @@ private final class ReplayModuleAthleteResourceSource: ReplayAthleteResourceSour
     }
 }
 
+struct ReplayAthletePreflight: Sendable {
+    let runtimeUsdzURL: URL
+    let contract: ReplayAthleteContract
+    let sourceManifest: ReplayAthleteSourceManifest
+    let nativeManifest: ReplayAthleteNativeManifest
+    let motionTable: ReplayAthleteMotionTable
+}
+
+/// Portable package I/O, hashing, JSON validation and motion-table parsing.
+/// This type has no RealityKit state and is deliberately nonisolated so the
+/// first 3D open never performs 22 MB of file/hash work on MainActor.
+enum ReplayAthletePreflightLoader {
+    nonisolated static func isMainThread() -> Bool {
+        Thread.isMainThread
+    }
+
+    nonisolated static func load(
+        urls: [ReplayAthleteResource: URL]
+    ) -> Result<ReplayAthletePreflight, ReplayAthleteValidationFailure> {
+        var payloads: [ReplayAthleteResource: Data] = [:]
+        for resource in ReplayAthleteResource.allCases
+        where resource != .usdz && resource != .nativeUsdz {
+            guard let url = urls[resource], let data = try? Data(contentsOf: url) else {
+                return .failure(.unreadableResource(resource.rawValue))
+            }
+            payloads[resource] = data
+        }
+        guard let sourceUsdzURL = urls[.usdz],
+              let runtimeUsdzURL = urls[.nativeUsdz],
+              let contractData = payloads[.contract],
+              let sourceData = payloads[.sourceManifest],
+              let nativeManifestData = payloads[.nativeManifest],
+              let motionManifestData = payloads[.motionManifest],
+              let motionBinData = payloads[.motionBin] else {
+            return .failure(.invalidRuntimeAsset)
+        }
+
+        let manifest: ReplayAthleteSourceManifest
+        switch ReplayAthleteCatalog.parseSourceManifest(data: sourceData) {
+        case .success(let parsed): manifest = parsed
+        case .failure(let failure): return .failure(failure)
+        }
+        if let failure = ReplayAthleteCatalog.validateSourceManifest(manifest).failures.first {
+            return .failure(failure)
+        }
+
+        let contractHash = ReplayBundledResourceSupport.sha256Hex(of: contractData)
+        guard contractHash == manifest.contractSha256 else {
+            return .failure(.hashMismatch(
+                resource: "athlete.contract",
+                expected: manifest.contractSha256,
+                actual: contractHash
+            ))
+        }
+        let sourceUsdzHash: String
+        do {
+            sourceUsdzHash = try ReplayBundledResourceSupport.sha256Hex(contentsOf: sourceUsdzURL)
+        } catch {
+            return .failure(.unreadableResource(ReplayAthleteResource.usdz.rawValue))
+        }
+        guard sourceUsdzHash == manifest.usdzSha256 else {
+            return .failure(.hashMismatch(
+                resource: "athlete.usdz",
+                expected: manifest.usdzSha256,
+                actual: sourceUsdzHash
+            ))
+        }
+
+        let contract: ReplayAthleteContract
+        switch ReplayAthleteCatalog.parseContract(data: contractData) {
+        case .success(let parsed): contract = parsed
+        case .failure(let failure): return .failure(failure)
+        }
+        if let failure = ReplayAthleteCatalog.validateContract(
+            contract,
+            manifest: manifest
+        ).failures.first {
+            return .failure(failure)
+        }
+
+        let nativeManifest: ReplayAthleteNativeManifest
+        switch ReplayAthleteCatalog.parseNativeManifest(data: nativeManifestData) {
+        case .success(let parsed): nativeManifest = parsed
+        case .failure(let failure): return .failure(failure)
+        }
+        if let failure = ReplayAthleteCatalog.validateNativeManifest(
+            nativeManifest,
+            source: manifest,
+            contract: contract
+        ).failures.first {
+            return .failure(failure)
+        }
+        let runtimeHash: String
+        do {
+            runtimeHash = try ReplayBundledResourceSupport.sha256Hex(contentsOf: runtimeUsdzURL)
+        } catch {
+            return .failure(.unreadableResource(ReplayAthleteResource.nativeUsdz.rawValue))
+        }
+        guard runtimeHash == nativeManifest.runtimeUsdzSha256 else {
+            return .failure(.hashMismatch(
+                resource: "athlete.native-usdz",
+                expected: nativeManifest.runtimeUsdzSha256,
+                actual: runtimeHash
+            ))
+        }
+        let runtimeByteCount: Int
+        do {
+            let values = try runtimeUsdzURL.resourceValues(forKeys: [.fileSizeKey])
+            guard let size = values.fileSize else {
+                return .failure(.unreadableResource(ReplayAthleteResource.nativeUsdz.rawValue))
+            }
+            runtimeByteCount = size
+        } catch {
+            return .failure(.unreadableResource(ReplayAthleteResource.nativeUsdz.rawValue))
+        }
+        guard runtimeByteCount == nativeManifest.runtimeUsdzByteCount else {
+            return .failure(.byteCountMismatch(
+                resource: "athlete.native-usdz",
+                expected: nativeManifest.runtimeUsdzByteCount,
+                actual: runtimeByteCount
+            ))
+        }
+
+        let motionManifest: ReplayAthleteMotionTable.Manifest
+        switch ReplayAthleteCatalog.parseMotionManifest(data: motionManifestData) {
+        case .success(let parsed): motionManifest = parsed
+        case .failure(let failure): return .failure(failure)
+        }
+        if let failure = ReplayAthleteCatalog.validateMotionManifest(
+            motionManifest,
+            source: manifest,
+            binData: motionBinData
+        ).failures.first {
+            return .failure(failure)
+        }
+        let motionTable: ReplayAthleteMotionTable
+        do {
+            motionTable = try ReplayAthleteMotionTable(
+                manifest: motionManifest,
+                binData: motionBinData
+            )
+        } catch let error as ReplayAthleteMotionTable.LoadError {
+            return .failure(.motionTableLoad(error))
+        } catch {
+            return .failure(.invalidMotionManifest("unrecognized table load error"))
+        }
+        let supportedSports = Set(Sport.allCases)
+        guard motionTable.boneNames == contract.semanticBoneNames,
+              motionTable.sourceCommit == manifest.pinnedCommit,
+              Set(motionTable.sports) == supportedSports,
+              Set(motionTable.clips.keys) == supportedSports else {
+            return .failure(.invalidMotionManifest("motion table"))
+        }
+        for sport in [Sport.rower, .skierg, .bike] {
+            guard let tableClip = motionTable.clips[sport],
+                  let contractClip = contract.clip(for: sport),
+                  tableClip.clipName == contractClip.name,
+                  abs(tableClip.driveEnd - contractClip.driveEnd) < 1e-9 else {
+                return .failure(.invalidMotionManifest("\(sport.rawValue) clip"))
+            }
+        }
+
+        return .success(ReplayAthletePreflight(
+            runtimeUsdzURL: runtimeUsdzURL,
+            contract: contract,
+            sourceManifest: manifest,
+            nativeManifest: nativeManifest,
+            motionTable: motionTable
+        ))
+    }
+}
+
 /// Loads and validates the bundled production athlete from the
 /// `ReplayReference` bundle: contract, source manifest, native USDZ, and the
 /// sampled motion table.
@@ -70,6 +248,7 @@ final class ReplayAthleteLibrary {
     private let source: any ReplayAthleteResourceSource
     private let failureReporter: (ReplayAthleteValidationFailure) -> Void
     private let entityLoader: (URL) async throws -> Entity
+    private let preflightObserver: (@Sendable (_ ranOnMainThread: Bool) -> Void)?
     private var template: ReplayAthleteTemplate?
     private var loadFailed = false
     private var inFlight: Task<ReplayAthleteTemplate?, Never>?
@@ -78,10 +257,12 @@ final class ReplayAthleteLibrary {
     init(
         source: any ReplayAthleteResourceSource,
         failureReporter: ((ReplayAthleteValidationFailure) -> Void)? = nil,
-        entityLoader: ((URL) async throws -> Entity)? = nil
+        entityLoader: ((URL) async throws -> Entity)? = nil,
+        preflightObserver: (@Sendable (_ ranOnMainThread: Bool) -> Void)? = nil
     ) {
         self.source = source
         self.entityLoader = entityLoader ?? { try await Entity(contentsOf: $0) }
+        self.preflightObserver = preflightObserver
         self.failureReporter = failureReporter ?? { failure in
             ReplayAthleteLibrary.logger.warn(
                 "Replay athlete package rejected",
@@ -130,112 +311,31 @@ final class ReplayAthleteLibrary {
             }
             urls[resource] = url
         }
-        var payloads: [ReplayAthleteResource: Data] = [:]
-        for resource in ReplayAthleteResource.allCases where resource != .usdz {
-            guard let url = urls[resource], let data = try? Data(contentsOf: url) else {
-                return reject(.unreadableResource(resource.rawValue))
-            }
-            payloads[resource] = data
-        }
-        guard let usdzURL = urls[.usdz],
-              let contractData = payloads[.contract],
-              let sourceData = payloads[.sourceManifest],
-              let motionManifestData = payloads[.motionManifest],
-              let motionBinData = payloads[.motionBin] else {
-            return reject(.invalidRuntimeAsset)
-        }
-
-        let parsedSource = ReplayAthleteCatalog.parseSourceManifest(data: sourceData)
-        guard case .success(let manifest) = parsedSource else {
-            if case .failure(let failure) = parsedSource { return reject(failure) }
-            return reject(.invalidContract("source manifest"))
-        }
-        let sourceValidation = ReplayAthleteCatalog.validateSourceManifest(manifest)
-        if let failure = sourceValidation.failures.first { return reject(failure) }
-
-        let contractHash = ReplayBundledResourceSupport.sha256Hex(of: contractData)
-        let usdzHash: String
-        do {
-            usdzHash = try ReplayBundledResourceSupport.sha256Hex(contentsOf: usdzURL)
-        } catch {
-            return reject(.unreadableResource(ReplayAthleteResource.usdz.rawValue))
-        }
-        guard contractHash == manifest.contractSha256 else {
-            return reject(.hashMismatch(
-                resource: "athlete.contract",
-                expected: manifest.contractSha256,
-                actual: contractHash
-            ))
-        }
-        guard usdzHash == manifest.usdzSha256 else {
-            return reject(.hashMismatch(
-                resource: "athlete.usdz",
-                expected: manifest.usdzSha256,
-                actual: usdzHash
-            ))
-        }
-        let parsedContract = ReplayAthleteCatalog.parseContract(data: contractData)
-        guard case .success(let contract) = parsedContract else {
-            if case .failure(let failure) = parsedContract { return reject(failure) }
-            return reject(.invalidContract("contract"))
-        }
-        let contractValidation = ReplayAthleteCatalog.validateContract(contract, manifest: manifest)
-        if let failure = contractValidation.failures.first { return reject(failure) }
-
-        let parsedMotion = ReplayAthleteCatalog.parseMotionManifest(data: motionManifestData)
-        guard case .success(let motionManifest) = parsedMotion else {
-            if case .failure(let failure) = parsedMotion { return reject(failure) }
-            return reject(.invalidMotionManifest("manifest"))
-        }
-        let motionValidation = ReplayAthleteCatalog.validateMotionManifest(
-            motionManifest,
-            source: manifest,
-            binData: motionBinData
-        )
-        if let failure = motionValidation.failures.first { return reject(failure) }
-
-        // The motion table must come from the same pinned tree and match the
-        // contract's semantic hierarchy exactly.
-        let motionTable: ReplayAthleteMotionTable
-        do {
-            motionTable = try ReplayAthleteMotionTable(
-                manifest: motionManifest,
-                binData: motionBinData
-            )
-        } catch let error as ReplayAthleteMotionTable.LoadError {
-            return reject(.motionTableLoad(error))
-        } catch {
-            return reject(.invalidMotionManifest("unrecognized table load error"))
-        }
-        let supportedSports = Set(Sport.allCases)
-        guard motionTable.boneNames == contract.semanticBoneNames,
-        motionTable.sourceCommit == manifest.pinnedCommit,
-        Set(motionTable.sports) == supportedSports,
-        Set(motionTable.clips.keys) == supportedSports else {
-            return reject(.invalidMotionManifest("motion table"))
-        }
-        for sport in [Sport.rower, .skierg, .bike] {
-            guard let tableClip = motionTable.clips[sport],
-                  let contractClip = contract.clip(for: sport),
-                  tableClip.clipName == contractClip.name,
-                  abs(tableClip.driveEnd - contractClip.driveEnd) < 1e-9 else {
-                return reject(.invalidMotionManifest("\(sport.rawValue) clip"))
-            }
+        let observer = preflightObserver
+        let preflightResult = await Task.detached(priority: .userInitiated) {
+            observer?(ReplayAthletePreflightLoader.isMainThread())
+            return ReplayAthletePreflightLoader.load(urls: urls)
+        }.value
+        let preflight: ReplayAthletePreflight
+        switch preflightResult {
+        case .success(let result): preflight = result
+        case .failure(let failure): return reject(failure)
         }
 
         let root: Entity
         do {
-            root = try await entityLoader(usdzURL)
+            root = try await entityLoader(preflight.runtimeUsdzURL)
         } catch {
-            return reject(.unreadableResource("athlete.usdz.runtime"))
+            return reject(.unreadableResource("athlete.native-usdz.runtime"))
         }
         let template: ReplayAthleteTemplate
         do {
             template = try ReplayAthleteTemplate(
                 root: root,
-                contract: contract,
-                sourceManifest: manifest,
-                motionTable: motionTable
+                contract: preflight.contract,
+                sourceManifest: preflight.sourceManifest,
+                nativeManifest: preflight.nativeManifest,
+                motionTable: preflight.motionTable
             )
         } catch let failure as ReplayAthleteValidationFailure {
             return reject(failure)
@@ -282,6 +382,7 @@ private extension ReplayAthleteValidationFailure {
         case .missingSkinnedAthlete: "missing-skinned-athlete"
         case .multipleSkinnedAthletes: "multiple-skinned-athletes"
         case .missingModelComponent: "missing-model-component"
+        case .surfaceCountMismatch: "surface-count-mismatch"
         case .missingSkeletalPose: "missing-skeletal-pose"
         case .missingAnimation: "missing-animation"
         case .invalidRuntimeAsset: "invalid-runtime-asset"
@@ -311,7 +412,8 @@ private extension ReplayAthleteValidationFailure {
         case .motionTableLoad(let error):
             String(describing: error)
         case .boneCountMismatch(let actual, let expected),
-             .jointCountMismatch(let actual, let expected):
+             .jointCountMismatch(let actual, let expected),
+             .surfaceCountMismatch(let actual, let expected):
             "actual=\(actual) expected=\(expected)"
         case .missingSkinnedAthlete,
              .multipleSkinnedAthletes,
