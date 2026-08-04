@@ -3,6 +3,15 @@ import Observation
 import RealityKit
 import RowPlayCore
 
+enum ReplayOrbitAdjustment: Equatable, Sendable {
+    case rotateLeft
+    case rotateRight
+    case rotateUp
+    case rotateDown
+    case zoomIn
+    case zoomOut
+}
+
 /// Owns scene-local camera interaction and RealityKit transform application.
 /// Playback time remains owned by `ReplayState` and its existing timeline.
 @MainActor
@@ -24,6 +33,8 @@ final class ReplayCameraController {
     @ObservationIgnored private var forceSnap = true
 
     private static let dragRadiansPerPoint = 0.006
+    private static let keyboardRotationStep = 10.0 * Double.pi / 180.0
+    private static let keyboardZoomFactor = 1.2
     private static let speedDampingRate = 3.0
     private static let maximumContinuousDistanceDelta = 30.0
 
@@ -160,6 +171,27 @@ final class ReplayCameraController {
 
     func resetOrbit() {
         orbit.reset()
+        endInteractions()
+        forceSnap = true
+    }
+
+    func applyOrbitAdjustment(_ adjustment: ReplayOrbitAdjustment) {
+        var updated = orbit
+        switch adjustment {
+        case .rotateLeft:
+            updated.rotate(yawDelta: Self.keyboardRotationStep, pitchDelta: 0)
+        case .rotateRight:
+            updated.rotate(yawDelta: -Self.keyboardRotationStep, pitchDelta: 0)
+        case .rotateUp:
+            updated.rotate(yawDelta: 0, pitchDelta: Self.keyboardRotationStep)
+        case .rotateDown:
+            updated.rotate(yawDelta: 0, pitchDelta: -Self.keyboardRotationStep)
+        case .zoomIn:
+            updated.zoom(magnification: Self.keyboardZoomFactor)
+        case .zoomOut:
+            updated.zoom(magnification: 1 / Self.keyboardZoomFactor)
+        }
+        orbit = updated
         endInteractions()
         forceSnap = true
     }

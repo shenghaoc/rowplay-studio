@@ -16,11 +16,14 @@ struct ReplayView: View {
     private let ghostCandidateByID: [Int: WorkoutDetail]
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var currentLocale
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @EnvironmentObject private var preferences: AppPreferences
     @Environment(\.automationModeEnabled) private var automationModeEnabled
     @State private var state: ReplayState
     @State private var rendererMode: ReplayRendererMode = .threeD
     @State private var cameraPreset: ReplayCameraPreset = .chase
+    @State private var orbitAdjustment: ReplayOrbitAdjustment?
+    @State private var orbitAdjustmentGeneration = 0
     @State private var effectiveReplayQuality: ReplayRenderQuality?
     @State private var cameraResetGeneration = 0
     @State private var replayDiscontinuityGeneration = 0
@@ -41,7 +44,13 @@ struct ReplayView: View {
     @State private var shareCardItem: ReplayRaceCardTransferItem?
 
     private var unit: DistanceUnit { preferences.distanceUnit }
-    private var reduceMotion: Bool { preferences.reduceReplayMotion || automationModeEnabled }
+    private var reduceMotion: Bool {
+        Self.shouldReduceMotion(
+            appPreference: preferences.reduceReplayMotion,
+            systemPreference: systemReduceMotion,
+            automationMode: automationModeEnabled
+        )
+    }
 
     init(
         detail: WorkoutDetail,
@@ -181,6 +190,10 @@ struct ReplayView: View {
                 .help("Replay camera")
                 #endif
 
+                if cameraPreset == .orbit {
+                    orbitAdjustmentMenu
+                }
+
                 qualityPicker
 
                 Button {
@@ -199,6 +212,31 @@ struct ReplayView: View {
         .padding(.vertical, 6)
         .padding(.horizontal)
         .background(.ultraThinMaterial)
+    }
+
+    private var orbitAdjustmentMenu: some View {
+        Menu {
+            Button("Rotate Left") { requestOrbitAdjustment(.rotateLeft) }
+            Button("Rotate Right") { requestOrbitAdjustment(.rotateRight) }
+            Button("Rotate Up") { requestOrbitAdjustment(.rotateUp) }
+            Button("Rotate Down") { requestOrbitAdjustment(.rotateDown) }
+            Divider()
+            Button("Zoom In") { requestOrbitAdjustment(.zoomIn) }
+            Button("Zoom Out") { requestOrbitAdjustment(.zoomOut) }
+        } label: {
+            Image(systemName: "move.3d")
+        }
+        .menuStyle(.borderlessButton)
+        .accessibilityLabel("Adjust orbit camera")
+        .accessibilityHint("Rotate or zoom the orbit camera using keyboard-accessible controls")
+        #if os(macOS)
+        .help("Adjust orbit camera")
+        #endif
+    }
+
+    private func requestOrbitAdjustment(_ adjustment: ReplayOrbitAdjustment) {
+        orbitAdjustment = adjustment
+        orbitAdjustmentGeneration &+= 1
     }
 
     // MARK: - Rival Control Band
@@ -535,6 +573,7 @@ struct ReplayView: View {
                 state: $state,
                 reduceMotion: reduceMotion,
                 rival: activeRival,
+                distanceUnit: unit,
                 selectedQuality: preferences.replayRenderQuality,
                 effectiveQuality: Binding(
                     get: { displayedEffectiveReplayQuality },
@@ -542,6 +581,8 @@ struct ReplayView: View {
                 ),
                 cameraPreset: cameraPreset,
                 cameraResetGeneration: cameraResetGeneration,
+                orbitAdjustment: orbitAdjustment,
+                orbitAdjustmentGeneration: orbitAdjustmentGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
             .id(Replay3DViewIdentity(
@@ -610,6 +651,14 @@ struct ReplayView: View {
 
     static func showsQualityControl(rendererMode: ReplayRendererMode) -> Bool {
         rendererMode == .threeD
+    }
+
+    static func shouldReduceMotion(
+        appPreference: Bool,
+        systemPreference: Bool,
+        automationMode: Bool
+    ) -> Bool {
+        appPreference || systemPreference || automationMode
     }
 
     static func isAdaptiveReduction(
