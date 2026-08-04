@@ -46,6 +46,222 @@ final class ReplayEnvironmentTests: XCTestCase {
         XCTAssertNotNil(bike.findEntity(named: "scoreboard"))
     }
 
+    func testEveryTierKeepsEachPinnedVenueStoryStructurallyComplete() {
+        for quality in ReplayRenderQuality.allCases {
+            let rower = ReplayEnvironmentInstaller.install(
+                sport: .rower,
+                quality: quality,
+                colorScheme: .dark
+            )
+            for name in [
+                "venue-sky",
+                "venue-horizon",
+                "regatta-basin",
+                "island-park",
+                "regatta-shoreline",
+                "regatta-pavilion",
+                "bank-tree-0",
+            ] {
+                XCTAssertNotNil(rower.findEntity(named: name), "rower \(quality) missing \(name)")
+            }
+
+            let ski = ReplayEnvironmentInstaller.install(
+                sport: .skierg,
+                quality: quality,
+                colorScheme: .dark
+            )
+            for name in [
+                "venue-sky",
+                "venue-horizon",
+                "nordic-stadium-field",
+                "nordic-start-pad",
+                "nordic-groom-lines",
+                "timing-lodge",
+                "nordic-pine-0",
+                "alpine-shoulder-0",
+            ] {
+                XCTAssertNotNil(ski.findEntity(named: name), "ski \(quality) missing \(name)")
+            }
+
+            let bike = ReplayEnvironmentInstaller.install(
+                sport: .bike,
+                quality: quality,
+                colorScheme: .dark
+            )
+            for name in [
+                "velodrome-track",
+                "velodrome-infield",
+                "velodrome-stands",
+                "velodrome-roof-canopy",
+                "velodrome-roof-shell",
+                "velodrome-infield-markings",
+                "arena-wall-0",
+                "bike-line-cote-d-azur",
+                "bike-line-measurement-black",
+                "bike-line-pursuit-blue",
+                "bike-line-sprinter-red",
+            ] {
+                XCTAssertNotNil(bike.findEntity(named: name), "bike \(quality) missing \(name)")
+            }
+            XCTAssertNil(bike.findEntity(named: "venue-sky"), "indoor venue must not add outdoor sky")
+        }
+    }
+
+    func testAdjacentTiersAddNamedCompositionFeaturesNotOnlyRepeatedDensity() {
+        let qualities = ReplayRenderQuality.allCases
+        let rower = qualities.map {
+            ReplayEnvironmentInstaller.install(sport: .rower, quality: $0, colorScheme: .dark)
+        }
+        XCTAssertNil(rower[0].findEntity(named: "boathouse"))
+        XCTAssertNotNil(rower[1].findEntity(named: "boathouse"))
+        XCTAssertNil(rower[1].findEntity(named: "timing-tower"))
+        XCTAssertNotNil(rower[2].findEntity(named: "timing-tower"))
+        XCTAssertNil(rower[2].findEntity(named: "wetland-boardwalk"))
+        XCTAssertNotNil(rower[3].findEntity(named: "wetland-boardwalk"))
+
+        let ski = qualities.map {
+            ReplayEnvironmentInstaller.install(sport: .skierg, quality: $0, colorScheme: .dark)
+        }
+        XCTAssertNil(ski[0].findEntity(named: "floodlight-1"))
+        XCTAssertNotNil(ski[1].findEntity(named: "floodlight-1"))
+        XCTAssertNil(ski[1].findEntity(named: "wax-hut"))
+        XCTAssertNotNil(ski[2].findEntity(named: "wax-hut"))
+        XCTAssertNil(ski[2].findEntity(named: "mountain-rescue-shelter"))
+        XCTAssertNotNil(ski[3].findEntity(named: "mountain-rescue-shelter"))
+
+        let bike = qualities.map {
+            ReplayEnvironmentInstaller.install(sport: .bike, quality: $0, colorScheme: .dark)
+        }
+        XCTAssertNil(bike[0].findEntity(named: "velodrome-skylight-1"))
+        XCTAssertNil(bike[0].findEntity(named: "velodrome-staging-pad-1"))
+        XCTAssertNotNil(bike[1].findEntity(named: "velodrome-skylight-1"))
+        XCTAssertNotNil(bike[1].findEntity(named: "velodrome-staging-pad-1"))
+        XCTAssertNil(bike[1].findEntity(named: "scoreboard"))
+        XCTAssertNotNil(bike[2].findEntity(named: "scoreboard"))
+        XCTAssertNotNil(bike[2].findEntity(named: "velodrome-team-pit"))
+        XCTAssertNil(bike[2].findEntity(named: "hospitality-deck"))
+        XCTAssertNotNil(bike[3].findEntity(named: "hospitality-deck"))
+    }
+
+    func testRepeatedSceneryUsesAuthoredSectorsWithOpenSightlines() {
+        let rowPlan = ReplayEnvironmentPlan.rower
+        guard case let .rower(rowVenue) = rowPlan.venue else {
+            return XCTFail("rower plan mismatch")
+        }
+        let rower = ReplayEnvironmentInstaller.install(
+            sport: .rower,
+            quality: .ultra,
+            colorScheme: .dark
+        )
+        let bankTrees = descendants(in: rower) { $0.name.hasPrefix("bank-tree-") }
+        XCTAssertEqual(bankTrees.count, rowVenue.woodlandTreeCounts[.ultra])
+        XCTAssertTrue(bankTrees.allSatisfy {
+            isInAuthoredSector(angle($0.position), sectors: rowVenue.shorelineSectors)
+        })
+        XCTAssertFalse(bankTrees.contains { (10...50).contains(angle($0.position)) })
+
+        let skiPlan = ReplayEnvironmentPlan.skierg
+        guard case let .skierg(skiVenue) = skiPlan.venue else {
+            return XCTFail("ski plan mismatch")
+        }
+        let ski = ReplayEnvironmentInstaller.install(
+            sport: .skierg,
+            quality: .ultra,
+            colorScheme: .dark
+        )
+        let pines = descendants(in: ski) { $0.name.hasPrefix("nordic-pine-") }
+        XCTAssertEqual(pines.count, skiVenue.forestTreeCounts[.ultra])
+        XCTAssertTrue(pines.allSatisfy {
+            isInAuthoredSector(angle($0.position), sectors: skiVenue.forestSectors)
+        })
+
+        let bikePlan = ReplayEnvironmentPlan.bike
+        guard case let .bike(bikeVenue) = bikePlan.venue else {
+            return XCTFail("bike plan mismatch")
+        }
+        let bike = ReplayEnvironmentInstaller.install(
+            sport: .bike,
+            quality: .ultra,
+            colorScheme: .dark
+        )
+        let walls = descendants(in: bike) { $0.name.hasPrefix("arena-wall-") }
+        XCTAssertEqual(walls.count, bikeVenue.wallSegments[.ultra])
+        XCTAssertTrue(walls.allSatisfy {
+            isInAuthoredSector(angle($0.position), sectors: bikeVenue.wallSectors)
+        })
+        XCTAssertFalse(walls.contains { angle($0.position) < 45 || angle($0.position) > 315 })
+    }
+
+    func testLiveThemeChangesResolveVenueSurfacesAndEnclosureColors() throws {
+        for sport in Sport.allCases {
+            let light = ReplayEnvironmentInstaller.install(
+                sport: sport,
+                quality: .low,
+                colorScheme: .light
+            )
+            let dark = ReplayEnvironmentInstaller.install(
+                sport: sport,
+                quality: .low,
+                colorScheme: .dark
+            )
+            let plan = ReplayEnvironmentPlan.plan(for: sport)
+            let surfaceName = sport == .bike ? "velodrome-roof-shell" : "venue-sky"
+            let lightMaterial = try simpleMaterial(named: surfaceName, in: light)
+            let darkMaterial = try simpleMaterial(named: surfaceName, in: dark)
+            assertColor(
+                lightMaterial.color.tint,
+                equals: plan.skyColor.resolvedColor(for: .light)
+            )
+            assertColor(
+                darkMaterial.color.tint,
+                equals: plan.skyColor.resolvedColor(for: .dark)
+            )
+            XCTAssertNotEqual(
+                plan.skyColor.hex(for: .light),
+                plan.skyColor.hex(for: .dark),
+                "\(sport) must have two authored theme states"
+            )
+        }
+    }
+
+    func testSceneWiresOneEffectiveQualityIntoVenueCourseAndEffectBudgets() {
+        for quality in ReplayRenderQuality.allCases {
+            let scene = Replay3DSceneBuilder.buildScene(
+                sport: .rower,
+                colorScheme: .dark,
+                configuration: quality.configuration,
+                effectiveQuality: quality,
+                bundledAssetSet: nil
+            )
+            XCTAssertEqual(
+                scene.bundledEnvironment.name,
+                "premium-environment-rower-\(quality.rawValue)"
+            )
+            XCTAssertEqual(
+                descendants(in: scene.course) { $0.name.hasPrefix("lane-ring-segment-") }.count,
+                quality.configuration.courseRingSegmentCount
+            )
+            XCTAssertEqual(
+                scene.effectRenderer.liveWakeEntities.count,
+                quality.configuration.wakeEntryCapacityPerParticipant
+            )
+            XCTAssertEqual(
+                scene.effectRenderer.ghostWakeEntities.count,
+                quality.configuration.wakeEntryCapacityPerParticipant
+            )
+            XCTAssertEqual(
+                scene.effectRenderer.sprayEntities.count,
+                quality.configuration.sprayParticleCapacity
+            )
+            XCTAssertEqual(
+                descendants(in: scene.bundledEnvironment) {
+                    $0.name.hasPrefix("buoy-0-")
+                }.count,
+                quality.configuration.buoysPerRing
+            )
+        }
+    }
+
     func testEnvironmentQualityUsesCoreBudgetsAndNamedPbrTiers() {
         XCTAssertEqual(
             ReplayRenderQuality.allCases.map { $0.configuration.buoysPerRing },
@@ -237,7 +453,7 @@ final class ReplayEnvironmentTests: XCTestCase {
         }
     }
 
-    func testPlanarPlacementPreservesMetreScaleWallTreeAndLandmarkGeometry() throws {
+    func testPlanarPlacementPreservesMetreScaleWallTreeAndCorrectedLandmarkGeometry() throws {
         let layout = ReplayCourseLayout.standard
         let mapping = ReplayEnvironmentPlanarMapping(layout: layout)
 
@@ -259,9 +475,10 @@ final class ReplayEnvironmentTests: XCTestCase {
             layout: layout
         )
         let tree = try XCTUnwrap(ski.findEntity(named: "nordic-pine-0"))
-        assertLocalSize(tree, equals: SIMD3(0.45, 2.2, 0.45))
-        XCTAssertEqual(tree.position.y, 1.1, accuracy: 1e-6)
-        XCTAssertEqual(horizontalRadius(tree.position), mapping.radius(74), accuracy: 1e-4)
+        assertLocalSize(tree, equals: SIMD3(1.5, 5.4, 1.5))
+        XCTAssertEqual(tree.position.y, 2.7, accuracy: 1e-6)
+        XCTAssertGreaterThanOrEqual(horizontalRadius(tree.position), mapping.radius(55))
+        XCTAssertLessThanOrEqual(horizontalRadius(tree.position), mapping.radius(91))
 
         let rower = ReplayEnvironmentInstaller.install(
             sport: .rower,
@@ -270,8 +487,8 @@ final class ReplayEnvironmentTests: XCTestCase {
             layout: layout
         )
         let tower = try XCTUnwrap(rower.findEntity(named: "timing-tower"))
-        assertLocalSize(tower, equals: SIMD3(0.5, 1.26, 0.56))
-        XCTAssertEqual(tower.position.y, 0.63, accuracy: 1e-6)
+        assertLocalSize(tower, equals: SIMD3(5.35, 5.135, 3.114))
+        XCTAssertEqual(tower.position.y, 2.5675, accuracy: 1e-6)
         XCTAssertEqual(horizontalRadius(tower.position), mapping.radius(70), accuracy: 1e-4)
     }
 
@@ -564,6 +781,44 @@ final class ReplayEnvironmentTests: XCTestCase {
 
     private func horizontalRadius(_ position: SIMD3<Float>) -> Float {
         hypot(position.x, position.z)
+    }
+
+    private func simpleMaterial(
+        named name: String,
+        in venue: Entity
+    ) throws -> SimpleMaterial {
+        let entity = try XCTUnwrap(venue.findEntity(named: name))
+        let receiver = try XCTUnwrap(descendants(in: entity) {
+            $0.components[ModelComponent.self] != nil
+        }.first)
+        let model = try XCTUnwrap(receiver.components[ModelComponent.self])
+        return try XCTUnwrap(model.materials.first as? SimpleMaterial)
+    }
+
+    /// Recovers the authored bearing of a placed entity. The planar mapping
+    /// positions scenery at (r·sin θ, y, r·cos θ), so the inverse is
+    /// atan2(x, z), normalized to [0, 360).
+    private func angle(_ position: SIMD3<Float>) -> Double {
+        let degrees = Double(atan2(position.x, position.z)) * 180 / .pi
+        return degrees < 0 ? degrees + 360 : degrees
+    }
+
+    /// Sector starts may be negative or wrap past 360, so compare the bearing's
+    /// offset from each start rather than the raw interval. The tolerance
+    /// absorbs the Float round-trip through the entity position for scenery
+    /// clamped exactly onto a sector edge.
+    private func isInAuthoredSector(
+        _ degrees: Double,
+        sectors: [ReplayEnvironmentSector],
+        tolerance: Double = 0.05
+    ) -> Bool {
+        sectors.contains { sector in
+            var offset = (degrees - sector.startDegrees)
+                .truncatingRemainder(dividingBy: 360)
+            if offset < 0 { offset += 360 }
+            return offset <= sector.spanDegrees + tolerance
+                || offset >= 360 - tolerance
+        }
     }
 
     private func assertColor(

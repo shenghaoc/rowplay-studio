@@ -82,6 +82,24 @@ struct ReplayEnvironmentPlacement: Equatable, Sendable {
     var angleRadians: Double { angleDegrees * .pi / 180 }
 }
 
+/// An authored angular land-use sector from the pinned venue plan. Repeated
+/// scenery is distributed inside these sectors so trees and wall bays form
+/// deliberate stands with open sightlines instead of uniform full-radius rings.
+struct ReplayEnvironmentSector: Equatable, Sendable {
+    let startDegrees: Double
+    let spanDegrees: Double
+    let weight: Double
+
+    init(startDegrees: Double, spanDegrees: Double, weight: Double = 1) {
+        self.startDegrees = startDegrees
+        self.spanDegrees = spanDegrees
+        self.weight = weight
+    }
+
+    var startRadians: Double { startDegrees * .pi / 180 }
+    var spanRadians: Double { spanDegrees * .pi / 180 }
+}
+
 struct ReplayEnvironmentLightingPlan: Equatable, Sendable {
     let sunColor: ReplayThemedColor
     /// RealityKit directional-light intensity adapted from the pinned web
@@ -134,6 +152,17 @@ struct ReplayRowerVenuePlan: Equatable, Sendable {
     let islandTree: ReplayEnvironmentMarkerPlan
     let foliageColor: ReplayThemedColor
 
+    let shorelineSectors: [ReplayEnvironmentSector]
+    let shorelineInnerRadius: Double
+    let shorelineOuterRadius: Double
+    let shorelineColor: ReplayThemedColor
+    let woodlandTreeCounts: ReplayQualityValues<Int>
+    let woodlandInnerRadius: Double
+    let woodlandOuterRadius: Double
+    let woodlandTree: ReplayEnvironmentMarkerPlan
+
+    let ultraBoardwalk: ReplayEnvironmentPlacement
+
     let buoyRingRadii: [Double]
     let buoy: ReplayEnvironmentMarkerPlan
     let buoyColor: ReplayThemedColor
@@ -145,18 +174,35 @@ struct ReplaySkiVenuePlan: Equatable, Sendable {
     let fieldCenterY: Double
     let fieldColor: ReplayThemedColor
     let fieldRoughness: Float
+    let groomLineCounts: ReplayQualityValues<Int>
 
     let landmarks: [ReplayEnvironmentPlacement]
     let landmarkCounts: ReplayQualityValues<Int>
 
     let forestTreeCounts: ReplayQualityValues<Int>
-    let forestRadius: Double
+    let forestSectors: [ReplayEnvironmentSector]
+    let forestInnerRadius: Double
+    let forestOuterRadius: Double
     let forestTree: ReplayEnvironmentMarkerPlan
     let forestColor: ReplayThemedColor
+
+    let alpineSectors: [ReplayEnvironmentSector]
+    let alpineShoulderCounts: ReplayQualityValues<Int>
+    let alpineInnerRadius: Double
+    let alpineOuterRadius: Double
+    let alpineShoulder: ReplayEnvironmentMarkerPlan
+    let alpineColor: ReplayThemedColor
 
     let floodlights: [ReplayEnvironmentPlacement]
     let floodlightCounts: ReplayQualityValues<Int>
     let floodlightColor: ReplayThemedColor
+    let ultraShelter: ReplayEnvironmentPlacement
+}
+
+struct ReplayBikeStandTierPlan: Equatable, Sendable {
+    let innerRadius: Double
+    let outerRadius: Double
+    let centerY: Double
 }
 
 struct ReplayBikeLinePlan: Equatable, Sendable {
@@ -197,11 +243,26 @@ struct ReplayBikeVenuePlan: Equatable, Sendable {
 
     let wallRadius: Double
     let wallSegments: ReplayQualityValues<Int>
+    let wallSectors: [ReplayEnvironmentSector]
     let wall: ReplayEnvironmentMarkerPlan
     let wallColor: ReplayThemedColor
 
+    let standSectors: [ReplayEnvironmentSector]
+    let standTiers: [ReplayBikeStandTierPlan]
+    let standTierCounts: ReplayQualityValues<Int>
+    let standColor: ReplayThemedColor
+
+    let roofHalfExtent: Double
+    let roofCenterY: Double
+    let roofThickness: Double
+    let roofColor: ReplayThemedColor
+    let roofBeamCounts: ReplayQualityValues<Int>
+    let skylightCounts: ReplayQualityValues<Int>
+    let hangarLightCounts: ReplayQualityValues<Int>
+
     let landmarks: [ReplayEnvironmentPlacement]
     let accentColor: ReplayThemedColor
+    let hospitalityDeck: ReplayEnvironmentPlacement
 
     let lines: [ReplayBikeLinePlan]
     let sprintMarkers: ReplayBikeSprintMarkerPlan
@@ -226,6 +287,8 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
 
     let sport: Sport
     let lighting: ReplayEnvironmentLightingPlan
+    let skyColor: ReplayThemedColor
+    let horizonColor: ReplayThemedColor
     let ground: ReplayEnvironmentGroundPlan
     let structureColor: ReplayThemedColor
     let venue: ReplayEnvironmentVenuePlan
@@ -247,6 +310,8 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
             fillColor: ReplayThemedColor(0xBFE9F1, 0x568B9A),
             fillIntensity: 2_800
         ),
+        skyColor: ReplayThemedColor(0x94C5D8, 0x173849),
+        horizonColor: ReplayThemedColor(0x6F9381, 0x244B46),
         ground: ReplayEnvironmentGroundPlan(
             halfExtent: 85,
             family: nil,
@@ -272,29 +337,52 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
                     name: "regatta-pavilion",
                     angleDegrees: 17,
                     radius: 72,
-                    size: SIMD3(0.9, 0.88, 0.86)
+                    // Pinned renderer scale [0.9, 0.88, 0.86] applied to the
+                    // shared 10.7 x 4.075 x 5.56 m pavilion envelope.
+                    size: SIMD3(9.63, 3.586, 4.782)
                 ),
                 ReplayEnvironmentPlacement(
                     name: "boathouse",
                     angleDegrees: 32,
                     radius: 75,
-                    size: SIMD3(0.72, 0.74, 0.76)
+                    size: SIMD3(7.704, 3.016, 4.226)
                 ),
                 ReplayEnvironmentPlacement(
                     name: "timing-tower",
                     angleDegrees: 43,
                     radius: 70,
-                    size: SIMD3(0.5, 1.26, 0.56)
+                    size: SIMD3(5.35, 5.135, 3.114)
                 ),
             ],
             landmarkCounts: ReplayQualityValues(1, 2, 3, 3),
             islandTreeCounts: ReplayQualityValues(4, 7, 10, 13),
             islandTreeRadius: 11.16,
             islandTree: ReplayEnvironmentMarkerPlan(
-                centerY: 0.65,
-                size: SIMD3(0.35, 1.25, 0.35)
+                centerY: 1.65,
+                size: SIMD3(1.7, 3.3, 1.7)
             ),
             foliageColor: ReplayThemedColor(0x3F6D50, 0x1C493D),
+            shorelineSectors: [
+                ReplayEnvironmentSector(startDegrees: -48, spanDegrees: 52, weight: 1.1),
+                ReplayEnvironmentSector(startDegrees: 62, spanDegrees: 100, weight: 1.35),
+                ReplayEnvironmentSector(startDegrees: 188, spanDegrees: 110, weight: 1.2),
+            ],
+            shorelineInnerRadius: 38.4,
+            shorelineOuterRadius: 44,
+            shorelineColor: ReplayThemedColor(0x697A58, 0x34483E),
+            woodlandTreeCounts: ReplayQualityValues(14, 32, 72, 104),
+            woodlandInnerRadius: 47,
+            woodlandOuterRadius: 69,
+            woodlandTree: ReplayEnvironmentMarkerPlan(
+                centerY: 2.75,
+                size: SIMD3(1.8, 5.5, 1.8)
+            ),
+            ultraBoardwalk: ReplayEnvironmentPlacement(
+                name: "wetland-boardwalk",
+                angleDegrees: 320,
+                radius: 45.5,
+                size: SIMD3(12, 0.22, 2.1)
+            ),
             buoyRingRadii: [23.8, 32.4],
             buoy: ReplayEnvironmentMarkerPlan(
                 centerY: 0.12,
@@ -313,6 +401,8 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
             fillColor: ReplayThemedColor(0x7FA3C4, 0x719BB5),
             fillIntensity: 2_480
         ),
+        skyColor: ReplayThemedColor(0x45647D, 0x142B42),
+        horizonColor: ReplayThemedColor(0x617E8D, 0x2E4A5A),
         ground: ReplayEnvironmentGroundPlan(
             halfExtent: 85,
             family: .snow02,
@@ -328,28 +418,48 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
             fieldCenterY: 0,
             fieldColor: ReplayThemedColor(0xC7D6E2, 0x849DAA),
             fieldRoughness: 0.94,
+            groomLineCounts: ReplayQualityValues(2, 4, 6, 8),
             landmarks: [
                 ReplayEnvironmentPlacement(
                     name: "timing-lodge",
                     angleDegrees: 6,
                     radius: 59,
-                    size: SIMD3(1.05, 1.12, 1)
+                    size: SIMD3(11.235, 4.564, 5.56)
                 ),
                 ReplayEnvironmentPlacement(
                     name: "wax-hut",
                     angleDegrees: 19.2,
                     radius: 61,
-                    size: SIMD3(0.68, 0.76, 0.74)
+                    size: SIMD3(7.276, 3.097, 4.114)
                 ),
             ],
             landmarkCounts: ReplayQualityValues(1, 1, 2, 2),
             forestTreeCounts: ReplayQualityValues(10, 36, 88, 132),
-            forestRadius: 74,
+            forestSectors: [
+                ReplayEnvironmentSector(startDegrees: -170, spanDegrees: 55, weight: 0.95),
+                ReplayEnvironmentSector(startDegrees: 105, spanDegrees: 65, weight: 1.1),
+                ReplayEnvironmentSector(startDegrees: 40, spanDegrees: 28, weight: 0.75),
+                ReplayEnvironmentSector(startDegrees: 205, spanDegrees: 52, weight: 0.9),
+            ],
+            forestInnerRadius: 55,
+            forestOuterRadius: 91,
             forestTree: ReplayEnvironmentMarkerPlan(
-                centerY: 1.1,
-                size: SIMD3(0.45, 2.2, 0.45)
+                centerY: 2.7,
+                size: SIMD3(1.5, 5.4, 1.5)
             ),
             forestColor: ReplayThemedColor(0x435D72, 0x315267),
+            alpineSectors: [
+                ReplayEnvironmentSector(startDegrees: -150, spanDegrees: 65, weight: 1.1),
+                ReplayEnvironmentSector(startDegrees: 35, spanDegrees: 60),
+            ],
+            alpineShoulderCounts: ReplayQualityValues(2, 3, 5, 7),
+            alpineInnerRadius: 103,
+            alpineOuterRadius: 126,
+            alpineShoulder: ReplayEnvironmentMarkerPlan(
+                centerY: 6,
+                size: SIMD3(14, 12, 18)
+            ),
+            alpineColor: ReplayThemedColor(0x7897A8, 0x4F6A7A),
             floodlights: [-8.0, 2, 12, 22, 32, -16, 38, 18].enumerated().map { index, angle in
                 ReplayEnvironmentPlacement(
                     name: "floodlight-\(index + 1)",
@@ -359,7 +469,13 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
                 )
             },
             floodlightCounts: ReplayQualityValues(0, 4, 6, 8),
-            floodlightColor: ReplayThemedColor(0xFFC97E, 0xFFC27A)
+            floodlightColor: ReplayThemedColor(0xFFC97E, 0xFFC27A),
+            ultraShelter: ReplayEnvironmentPlacement(
+                name: "mountain-rescue-shelter",
+                angleDegrees: 216,
+                radius: 78,
+                size: SIMD3(7.704, 2.934, 4.114)
+            )
         ))
     )
 
@@ -372,6 +488,8 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
             fillColor: ReplayThemedColor(0x7D94A8, 0x6D8BA0),
             fillIntensity: 2_480
         ),
+        skyColor: ReplayThemedColor(0xD2DCDE, 0x263642),
+        horizonColor: ReplayThemedColor(0x5A646C, 0x344452),
         ground: ReplayEnvironmentGroundPlan(
             halfExtent: 85,
             family: .brushedConcrete2,
@@ -396,26 +514,58 @@ struct ReplayEnvironmentPlan: Equatable, Sendable {
             infieldColor: ReplayThemedColor(0x6D7A74, 0x405149),
             wallRadius: 61.5,
             wallSegments: ReplayQualityValues(16, 24, 32, 40),
+            wallSectors: [
+                ReplayEnvironmentSector(startDegrees: 55, spanDegrees: 85, weight: 1.2),
+                ReplayEnvironmentSector(startDegrees: 220, spanDegrees: 60, weight: 0.85),
+                ReplayEnvironmentSector(startDegrees: 164, spanDegrees: 42),
+                ReplayEnvironmentSector(startDegrees: 228, spanDegrees: 42),
+            ],
             wall: ReplayEnvironmentMarkerPlan(
                 centerY: 3.1,
                 size: SIMD3(5.5, 6.2, 0.4)
             ),
             wallColor: ReplayThemedColor(0x5A646C, 0x344452),
+            standSectors: [
+                ReplayEnvironmentSector(startDegrees: 55, spanDegrees: 85, weight: 1.2),
+                ReplayEnvironmentSector(startDegrees: 220, spanDegrees: 60, weight: 0.85),
+            ],
+            standTiers: [
+                ReplayBikeStandTierPlan(innerRadius: 44.5, outerRadius: 47.6, centerY: 0.42),
+                ReplayBikeStandTierPlan(innerRadius: 47.8, outerRadius: 51.2, centerY: 0.92),
+                ReplayBikeStandTierPlan(innerRadius: 50.8, outerRadius: 54.1, centerY: 1.62),
+                ReplayBikeStandTierPlan(innerRadius: 53.7, outerRadius: 57.2, centerY: 2.46),
+                ReplayBikeStandTierPlan(innerRadius: 56.8, outerRadius: 60.2, centerY: 3.35),
+            ],
+            standTierCounts: ReplayQualityValues(2, 3, 4, 5),
+            standColor: ReplayThemedColor(0x65727A, 0x26343E),
+            roofHalfExtent: 72,
+            roofCenterY: 13.7,
+            roofThickness: 0.3,
+            roofColor: ReplayThemedColor(0xD2DCDE, 0x263642),
+            roofBeamCounts: ReplayQualityValues(2, 3, 5, 7),
+            skylightCounts: ReplayQualityValues(0, 2, 3, 4),
+            hangarLightCounts: ReplayQualityValues(0, 6, 10, 14),
             landmarks: [
                 ReplayEnvironmentPlacement(
                     name: "scoreboard",
                     angleDegrees: 95.8,
                     radius: 58,
-                    size: SIMD3(1.8, 1.1, 0.3)
+                    size: SIMD3(9.4, 6.5, 0.42)
                 ),
                 ReplayEnvironmentPlacement(
                     name: "service-building",
                     angleDegrees: 251.1,
                     radius: 60,
-                    size: SIMD3(0.82, 0.82, 1.05)
+                    size: SIMD3(8.774, 3.342, 5.838)
                 ),
             ],
             accentColor: ReplayThemedColor(0xD79A50, 0xF0B667),
+            hospitalityDeck: ReplayEnvironmentPlacement(
+                name: "hospitality-deck",
+                angleDegrees: 99.2,
+                radius: 58.2,
+                size: SIMD3(13.5, 3.1, 4.6)
+            ),
             lines: [
                 ReplayBikeLinePlan(
                     name: "cote-d-azur",
