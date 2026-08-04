@@ -326,9 +326,10 @@ public enum ReplayRigPoseSolver {
     ) -> ReplayBikeErgRigPose {
         let graph = ReplayMotionGraph.sampleBike(pose: strokePose)
         let crankAngle = graph.crank.angle
-        // Mirrors merged `renderer3d.ts`: wheels advance from course distance,
+        // Mirrors merged `renderer3dBikeAvatar.ts`: wheels advance from
+        // course distance using the same authored radius as the equipment,
         // while crank/pedal timing comes from the graph's circular state.
-        let wheelAngle = finite(distance, fallback: 0) / 0.45
+        let wheelAngle = finite(distance, fallback: 0) / ReplayBikeGripContract.wheelRadius
         let crankRadius = ReplayBikeGripContract.crankRadius
         let cosCrank = graph.leftPedal.rotation.cos
         let sinCrank = graph.leftPedal.rotation.sin

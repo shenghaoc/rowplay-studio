@@ -219,6 +219,7 @@ public enum ReplayRowGripContract {
     /// How much the preferred plane may steer the joint, 0 near straight → 1
     /// once flexion is clearly visible.  C2 (smootherstep).
     public static func elbowPlaneAuthority(_ flexion: Double) -> Double {
+        guard flexion.isFinite else { return 0 }
         let plane = elbowPlane
         let span = plane.authorityFull - plane.authorityStart
         let unit = min(max((flexion - plane.authorityStart) / span, 0), 1)
@@ -228,9 +229,12 @@ public enum ReplayRowGripContract {
     /// Preferred rowing elbow-plane direction in the athlete frame
     /// (+z stretcher, −z aft draw, +y up, x outboard by side), blended from
     /// the relaxed hang to the aft draw by plane authority.
-    public static func elbowPlaneDirection(side: Double, authority: Double) -> SIMD3<Double> {
+    public static func elbowPlaneDirection(
+        side: ReplayHandSide,
+        authority: Double
+    ) -> SIMD3<Double> {
         let plane = elbowPlane
-        let mix = min(max(authority, 0), 1)
+        let mix = authority.isFinite ? min(max(authority, 0), 1) : 0
         let sign = ReplayGripGeometry.mirrorSign(side)
         let direction = SIMD3(
             sign * (plane.relaxed.x + (plane.drawn.x - plane.relaxed.x) * mix),
@@ -247,8 +251,11 @@ public enum ReplayRowGripContract {
         shoulder: SIMD3<Double>,
         wrist: SIMD3<Double>,
         elbow: SIMD3<Double>,
-        side: Double
+        side: ReplayHandSide
     ) -> Double {
+        let shoulder = finitePoint(shoulder)
+        let wrist = finitePoint(wrist)
+        let elbow = finitePoint(elbow)
         var chord = wrist - shoulder
         chord.y = 0
         if ReplayGripGeometry.lengthSquared(chord) < 1e-10 { chord = SIMD3(0, 0, 1) }
@@ -288,8 +295,29 @@ public enum ReplayRowGripContract {
         hand: SIMD3<Double>,
         upperArmLength: Double,
         forearmLength: Double,
-        side: Double
+        side: ReplayHandSide
     ) -> ArmSolution {
+        let shoulder = finitePoint(shoulder)
+        let hand = finitePoint(hand)
+        let upperArmLength = segmentLength(upperArmLength)
+        let forearmLength = segmentLength(forearmLength)
+        guard upperArmLength > ReplayTwoBoneSolver.epsilon,
+              forearmLength > ReplayTwoBoneSolver.epsilon else {
+            let plane = elbowPlaneDirection(side: side, authority: 0)
+            let solved = ReplayTwoBoneSolver.solve3D(
+                root: shoulder,
+                target: hand,
+                firstLength: upperArmLength,
+                secondLength: forearmLength,
+                bendHint: plane
+            )
+            return ArmSolution(
+                elbow: solved.joint,
+                hand: solved.end,
+                plane: plane,
+                authority: 0
+            )
+        }
         let reach = ReplayGripGeometry.dot(hand - shoulder, hand - shoulder).squareRoot()
         let flexion = elbowFlexion(
             chordLength: reach,
@@ -391,5 +419,17 @@ public enum ReplayRowGripContract {
         }
         elbow = shoulder + chord * along + plane * radius
         return ArmSolution(elbow: elbow, hand: solvedHand, plane: plane, authority: authority)
+    }
+
+    private static func finitePoint(_ point: SIMD3<Double>) -> SIMD3<Double> {
+        SIMD3(
+            point.x.isFinite ? point.x : 0,
+            point.y.isFinite ? point.y : 0,
+            point.z.isFinite ? point.z : 0
+        )
+    }
+
+    private static func segmentLength(_ value: Double) -> Double {
+        value.isFinite ? abs(value) : 0
     }
 }

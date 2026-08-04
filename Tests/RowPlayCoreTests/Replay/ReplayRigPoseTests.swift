@@ -114,7 +114,10 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTAssertEqual(bike.crankAngle, angle, accuracy: 0.001,
                 "Crank angle should match phase at \(angle)")
             // Merged V4 advances wheels from covered distance, not crank phase.
-            XCTAssertEqual(bike.wheelAngle, (angle * 5) / 0.45, accuracy: 0.001,
+            XCTAssertEqual(
+                bike.wheelAngle,
+                (angle * 5) / ReplayBikeGripContract.wheelRadius,
+                accuracy: 0.001,
                 "Wheel angle should follow distance at \(angle)")
             // All values should be finite
             XCTAssertTrue(isFinite(bike.crankAngle))
