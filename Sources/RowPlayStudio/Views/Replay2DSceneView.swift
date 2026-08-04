@@ -19,6 +19,11 @@ private enum Replay2DParticipantKinematics {
 
 /// Sport-authentic Canvas replay. Time and distance remain visible as a
 /// secondary HUD while the venue and articulated participants carry the scene.
+///
+/// The production renderer deliberately remains an immediate-mode `Canvas`:
+/// its fixed authored geometry mirrors the pinned web renderer, redraw cost is
+/// bounded by a small deterministic path set, and no retained scene graph can
+/// accumulate stale contact state while scrubbing or switching rivals.
 struct Replay2DSceneView: View {
     let detail: WorkoutDetail
     @Binding var state: ReplayState
@@ -29,10 +34,8 @@ struct Replay2DSceneView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var lastTickDate: Date?
-    @State private var livePoseContext: ReplayStrokePoseContext?
-    @State private var liveMedianHR = 0
-    @State private var rivalPoseContext: ReplayStrokePoseContext?
-    @State private var rivalMedianHR = 0
+    @State private var livePoseAggregates: ReplayStrokePoseAggregates?
+    @State private var rivalPoseAggregates: ReplayStrokePoseAggregates?
 
     private var sport: Sport { detail.workout.sport }
 
@@ -259,9 +262,10 @@ struct Replay2DSceneView: View {
             phase: stablePhase(distance: frame.d),
             rate: frame.cadence
         )
-        let initialContext = Self.aggregates(for: detail.strokes, sport: sport).0
-        guard let context = livePoseContext ?? initialContext,
-              !detail.strokes.isEmpty else { return fallback }
+        guard case let .genuine(aggregates) = Replay2DStrokeArticulation.select(
+            cachedAggregates: livePoseAggregates,
+            hasUsableStrokeData: !detail.strokes.isEmpty
+        ) else { return fallback }
         let absoluteTime = frame.t + (detail.strokes.first?.t ?? 0)
         return pose(
             at: absoluteTime,
@@ -275,8 +279,8 @@ struct Replay2DSceneView: View {
                 progress: frame.progress
             ),
             strokes: detail.strokes,
-            context: context,
-            medianHR: liveMedianHR,
+            context: aggregates.context,
+            medianHR: aggregates.medianHeartRate,
             duration: state.duration
         ) ?? fallback
     }
@@ -290,9 +294,10 @@ struct Replay2DSceneView: View {
             phase: stablePhase(distance: frame.d),
             rate: frame.cadence
         )
-        let initialContext = Self.aggregates(for: rival.strokes, sport: sport).0
-        guard rival.hasGenuineStrokeData,
-              let context = rivalPoseContext ?? initialContext else {
+        guard case let .genuine(aggregates) = Replay2DStrokeArticulation.select(
+            cachedAggregates: rivalPoseAggregates,
+            hasUsableStrokeData: rival.hasGenuineStrokeData
+        ) else {
             return (fallback, frame.d)
         }
         let origin = rival.strokes.first?.t ?? 0
@@ -302,8 +307,8 @@ struct Replay2DSceneView: View {
                 at: absoluteTime,
                 frame: frame,
                 strokes: rival.strokes,
-                context: context,
-                medianHR: rivalMedianHR,
+                context: aggregates.context,
+                medianHR: aggregates.medianHeartRate,
                 duration: duration
             ) ?? fallback,
             frame.d
@@ -336,51 +341,18 @@ struct Replay2DSceneView: View {
     }
 
     private func rebuildPoseContexts() {
-        (livePoseContext, liveMedianHR) = Self.aggregates(for: detail.strokes, sport: sport)
+        livePoseAggregates = ReplayStrokePoseAggregates(
+            strokes: detail.strokes,
+            sport: sport
+        )
         if let rival, rival.hasGenuineStrokeData {
-            (rivalPoseContext, rivalMedianHR) = Self.aggregates(
-                for: rival.strokes,
+            rivalPoseAggregates = ReplayStrokePoseAggregates(
+                strokes: rival.strokes,
                 sport: sport
             )
         } else {
-            rivalPoseContext = nil
-            rivalMedianHR = 0
+            rivalPoseAggregates = nil
         }
-    }
-
-    private static func aggregates(
-        for strokes: [Stroke],
-        sport: Sport
-    ) -> (ReplayStrokePoseContext?, Int) {
-        guard !strokes.isEmpty else { return (nil, 0) }
-        let watts = strokes.map(\.watts)
-        let distances = strokes.indices.dropFirst().compactMap { index -> Double? in
-            let value = strokes[index].d - strokes[index - 1].d
-            return value.isFinite && value > 0 ? value : nil
-        }
-        let defaultDistance: Double = switch sport {
-        case .rower: 11
-        case .skierg: 8
-        case .bike: 5
-        }
-        let context = ReplayStrokePoseContext(
-            sport: sport,
-            peakWatts: watts.max() ?? 0,
-            medianWatts: Int(median(watts.map(Double.init), fallback: 0).rounded()),
-            medianDPS: median(distances, fallback: defaultDistance),
-            maxHR: strokes.compactMap(\.heartRate).max() ?? 0
-        )
-        let medianHR = Int(median(strokes.compactMap(\.heartRate).map(Double.init), fallback: 0).rounded())
-        return (context, medianHR)
-    }
-
-    private static func median(_ values: [Double], fallback: Double) -> Double {
-        let sorted = values.filter(\.isFinite).sorted()
-        guard !sorted.isEmpty else { return fallback }
-        let middle = sorted.count / 2
-        return sorted.count.isMultiple(of: 2)
-            ? (sorted[middle - 1] + sorted[middle]) / 2
-            : sorted[middle]
     }
 
     private func stablePhase(distance: Double) -> Double {
@@ -437,5 +409,21 @@ struct Replay2DSceneView: View {
             playerStrokes: playerStrokes,
             size: size
         )
+    }
+}
+
+/// Pure cache gate used by both live and rival 2D articulation. A missing
+/// precomputed value always selects the deterministic fallback; frame-time code
+/// never rebuilds medians to cover an appearance-order race.
+enum Replay2DStrokeArticulation: Equatable {
+    case genuine(ReplayStrokePoseAggregates)
+    case fallback
+
+    static func select(
+        cachedAggregates: ReplayStrokePoseAggregates?,
+        hasUsableStrokeData: Bool
+    ) -> Replay2DStrokeArticulation {
+        guard hasUsableStrokeData, let cachedAggregates else { return .fallback }
+        return .genuine(cachedAggregates)
     }
 }

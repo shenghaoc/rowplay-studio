@@ -276,16 +276,21 @@ enum Replay2DBikeRenderer {
             shoulder.x, shoulder.y, hand.x, hand.y,
             firstLength: 4.92, secondLength: 4.62, bendDirection: bend
         )
-        Replay2DFigure.drawShoulderCap(context, shoulder.x, shoulder.y, color: upperColor)
-        Replay2DFigure.taperedLimb(
-            context, shoulder.x, shoulder.y, solved.jointX, solved.jointY,
-            proximalWidth: 2.3, distalWidth: 1.7, color: upperColor
+        Replay2DLimbPainter.draw(
+            context,
+            root: shoulder,
+            solution: solved,
+            upperColor: upperColor,
+            lowerColor: lowerColor,
+            style: Replay2DLimbPaintStyle(
+                upperProximalWidth: 2.3,
+                upperDistalWidth: 1.7,
+                lowerProximalWidth: 1.75,
+                lowerDistalWidth: 1.25,
+                jointRadius: 0.95,
+                endRadius: 1.02,
+                shoulderRadius: 1.28
+            )
         )
-        Replay2DFigure.taperedLimb(
-            context, solved.jointX, solved.jointY, solved.endX, solved.endY,
-            proximalWidth: 1.75, distalWidth: 1.25, color: lowerColor
-        )
-        Replay2DFigure.disc(context, solved.jointX, solved.jointY, 0.95, color: lowerColor)
-        Replay2DFigure.disc(context, solved.endX, solved.endY, 1.02, color: lowerColor)
     }
 }

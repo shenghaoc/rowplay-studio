@@ -39,28 +39,16 @@ extension Color {
 
 // MARK: - Canvas Colors
 
-/// Mirrors the web `CanvasColors` interface. The `live`/`ghost` values must
-/// stay in sync with the web `--live`/`--ghost` custom properties.
+/// Runtime subset of the web `CanvasColors` interface. Source-only palette
+/// fields stay sealed in the parity fixture until a native drawing consumer
+/// exists; they are not carried as dead production state.
 struct Replay2DCanvasColors {
-    let tickMajor: Color
-    let tickMinor: Color
     let tickText: Color
     let laneLine: Color
-    let bibFill: Color
-    let bibText: Color
-    let bibDot: Color
-    let finishDark: Color
-    let finishLight: Color
-    let labelBg: Color
     let labelText: Color
-    let courseFill: Color
     let live: Color
     let ghost: Color
-    let skyTop: Color
-    let skyBottom: Color
-    let markerCap: Color
     let foam: Color
-    let shadow: Color
     let skin: Color
     let skinShade: Color
     let hair: Color
@@ -68,25 +56,12 @@ struct Replay2DCanvasColors {
 
     /// Web `COLORS_LIGHT` — values verbatim.
     static let light = Replay2DCanvasColors(
-        tickMajor: Color.requiredReplay2DHex("#bed0d7"),
-        tickMinor: Color.requiredReplay2DHex("#d0dbdf"),
         tickText: Color.requiredReplay2DHex("#4a6470"),
         laneLine: Color.requiredReplay2DHex("#bed0d7"),
-        bibFill: Color.requiredReplay2DHex("#f0f4f6"),
-        bibText: Color.requiredReplay2DHex("#0f2a36"),
-        bibDot: Color.requiredReplay2DHex("#f7fafb"),
-        finishDark: Color.requiredReplay2DHex("#0f2a36"),
-        finishLight: Color.requiredReplay2DHex("#f7fafb"),
-        labelBg: Color.requiredReplay2DHex("#f7fafb"),
         labelText: Color.requiredReplay2DHex("#0f2a36"),
-        courseFill: Color.requiredReplay2DHex("#e4ecef"),
         live: Color.requiredReplay2DHex("#5240ce"),
         ghost: Color.requiredReplay2DHex("#176b8c"),
-        skyTop: Color.requiredReplay2DHex("#f2f7f9"),
-        skyBottom: Color.requiredReplay2DHex("#e3edf1"),
-        markerCap: Color.requiredReplay2DHex("#9fb8c2"),
         foam: Color.requiredReplay2DHex("#ffffff"),
-        shadow: Color.requiredReplay2DHex("#0f2a36"),
         skin: Color.requiredReplay2DHex("#bb7053"),
         skinShade: Color.requiredReplay2DHex("#8e4f3d"),
         hair: Color.requiredReplay2DHex("#263840"),
@@ -95,25 +70,12 @@ struct Replay2DCanvasColors {
 
     /// Web `COLORS_DARK` — values verbatim.
     static let dark = Replay2DCanvasColors(
-        tickMajor: Color.requiredReplay2DHex("#3d505a"),
-        tickMinor: Color.requiredReplay2DHex("#2e3d45"),
         tickText: Color.requiredReplay2DHex("#8aa2ac"),
         laneLine: Color.requiredReplay2DHex("#3d505a"),
-        bibFill: Color.requiredReplay2DHex("#1c2a32"),
-        bibText: Color.requiredReplay2DHex("#dce6ea"),
-        bibDot: Color.requiredReplay2DHex("#0f2a36"),
-        finishDark: Color.requiredReplay2DHex("#dce6ea"),
-        finishLight: Color.requiredReplay2DHex("#0f2a36"),
-        labelBg: Color.requiredReplay2DHex("#0f2a36"),
         labelText: Color.requiredReplay2DHex("#dce6ea"),
-        courseFill: Color.requiredReplay2DHex("#142128"),
         live: Color.requiredReplay2DHex("#8c7cf0"),
         ghost: Color.requiredReplay2DHex("#3aa8cc"),
-        skyTop: Color.requiredReplay2DHex("#0e1d26"),
-        skyBottom: Color.requiredReplay2DHex("#0a151c"),
-        markerCap: Color.requiredReplay2DHex("#3d505a"),
         foam: Color.requiredReplay2DHex("#bcd3dd"),
-        shadow: Color.requiredReplay2DHex("#000000"),
         skin: Color.requiredReplay2DHex("#e2a27f"),
         skinShade: Color.requiredReplay2DHex("#ad6c54"),
         hair: Color.requiredReplay2DHex("#78919c"),
@@ -137,7 +99,7 @@ enum Replay2DStyle {
     static let bikeWheelSpokeCount = 6
     /// Stable mid-drive pose used when decorative athlete motion is reduced.
     static let reducedPosePhase = Double.pi * 0.5
-    /// Ghost comparison ink transparency (wake, streaks, name tab).
+    /// Ghost label and HUD comparison-ink transparency.
     static let ghostLaneAlpha: Double = 0.76
     /// Ghost avatar transparency.
     static let ghostAvatarAlpha: Double = 0.82
@@ -202,14 +164,6 @@ struct Replay2DAvatarContext {
 
 // MARK: - Figure Primitives
 
-/// Joint plus clamped end point of a fixed-length two-bone solve.
-struct Replay2DLimbSolution {
-    var jointX: Double
-    var jointY: Double
-    var endX: Double
-    var endY: Double
-}
-
 /// Shared figure painters and solver adapters used by all three sport avatars.
 enum Replay2DFigure {
     // MARK: Paths
@@ -249,7 +203,7 @@ enum Replay2DFigure {
         _ startX: Double, _ startY: Double,
         _ endX: Double, _ endY: Double,
         firstLength: Double, secondLength: Double, bendDirection: Double
-    ) -> Replay2DLimbSolution {
+    ) -> ReplayPlanarLimbSolution {
         let solved = ReplayTwoBoneSolver.solve2D(
             root: SIMD2(startX, startY),
             target: SIMD2(endX, endY),
@@ -257,12 +211,7 @@ enum Replay2DFigure {
             secondLength: secondLength,
             bendDirection: bendDirection
         )
-        return Replay2DLimbSolution(
-            jointX: solved.joint.x,
-            jointY: solved.joint.y,
-            endX: solved.end.x,
-            endY: solved.end.y
-        )
+        return ReplayPlanarLimbSolution(joint: solved.joint, end: solved.end)
     }
 
     // MARK: Painters

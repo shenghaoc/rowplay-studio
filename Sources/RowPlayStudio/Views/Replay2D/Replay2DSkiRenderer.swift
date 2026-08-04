@@ -31,110 +31,6 @@ enum Replay2DSkiRenderer {
         return currentCourseX - distanceSincePlant * scale
     }
 
-    /// Scalar planar closed-chain solve: keep a hand on a rigid pole while its
-    /// two-link arm remains reachable. Planar counterpart of the shared
-    /// `ReplayTwoBoneSolver.solveRigidContact3D`, ported from the web
-    /// `solveRigidContactPoint2D` in `figurePose.ts`.
-    static func constrainRigidContact2D(
-        rootX: Double, rootY: Double,
-        preferredX: Double, preferredY: Double,
-        centerX rawCenterX: Double, centerY rawCenterY: Double,
-        contactLength: Double,
-        minimumReach: Double, maximumReach: Double
-    ) -> (x: Double, y: Double, isFeasible: Bool) {
-        let epsilon = ReplayTwoBoneSolver.epsilon
-        let rootX = rawFinite(rootX)
-        let rootY = rawFinite(rootY)
-        let centerX = rawFinite(rawCenterX)
-        let centerY = rawFinite(rawCenterY)
-        let preferredWorldX = rawFinite(preferredX)
-        let preferredWorldY = rawFinite(preferredY)
-        let radius = segmentLength(contactLength)
-        let reachA = segmentLength(minimumReach)
-        let reachB = segmentLength(maximumReach)
-        let minReach = min(reachA, reachB)
-        let maxReach = max(reachA, reachB)
-
-        var preferredDX = preferredWorldX - centerX
-        var preferredDY = preferredWorldY - centerY
-        var preferredLength = (preferredDX * preferredDX + preferredDY * preferredDY).squareRoot()
-        if preferredLength <= epsilon {
-            preferredDX = rootX - centerX
-            preferredDY = rootY - centerY
-            preferredLength = (preferredDX * preferredDX + preferredDY * preferredDY).squareRoot()
-        }
-        if preferredLength <= epsilon {
-            preferredDX = 1
-            preferredDY = 0
-            preferredLength = 1
-        }
-
-        let candidateScale = radius / preferredLength
-        let candidateX = centerX + preferredDX * candidateScale
-        let candidateY = centerY + preferredDY * candidateScale
-        let candidateReach = ((candidateX - rootX) * (candidateX - rootX)
-            + (candidateY - rootY) * (candidateY - rootY)).squareRoot()
-        if candidateReach >= minReach - epsilon && candidateReach <= maxReach + epsilon {
-            return (candidateX, candidateY, true)
-        }
-
-        let boundaryReach = candidateReach > maxReach ? maxReach : minReach
-        var rootDeltaX = rootX - centerX
-        var rootDeltaY = rootY - centerY
-        let centerDistance = (rootDeltaX * rootDeltaX + rootDeltaY * rootDeltaY).squareRoot()
-        let circlesIntersect = centerDistance > epsilon
-            && centerDistance <= radius + boundaryReach + epsilon
-            && centerDistance + min(radius, boundaryReach) + epsilon >= max(radius, boundaryReach)
-
-        if circlesIntersect {
-            rootDeltaX /= centerDistance
-            rootDeltaY /= centerDistance
-            let along = (radius * radius - boundaryReach * boundaryReach
-                + centerDistance * centerDistance) / (2 * centerDistance)
-            let chordX = centerX + rootDeltaX * along
-            let chordY = centerY + rootDeltaY * along
-            let halfChord = max(0, radius * radius - along * along).squareRoot()
-            let perpendicularX = -rootDeltaY * halfChord
-            let perpendicularY = rootDeltaX * halfChord
-            let positiveX = chordX + perpendicularX
-            let positiveY = chordY + perpendicularY
-            let negativeX = chordX - perpendicularX
-            let negativeY = chordY - perpendicularY
-            let positiveDistanceSquared =
-                (positiveX - preferredWorldX) * (positiveX - preferredWorldX)
-                + (positiveY - preferredWorldY) * (positiveY - preferredWorldY)
-            let negativeDistanceSquared =
-                (negativeX - preferredWorldX) * (negativeX - preferredWorldX)
-                + (negativeY - preferredWorldY) * (negativeY - preferredWorldY)
-            if positiveDistanceSquared <= negativeDistanceSquared {
-                return (positiveX, positiveY, true)
-            }
-            return (negativeX, negativeY, true)
-        }
-
-        if centerDistance > epsilon {
-            let nearestScale = radius / centerDistance
-            return (
-                centerX + (rootX - centerX) * nearestScale,
-                centerY + (rootY - centerY) * nearestScale,
-                false
-            )
-        }
-        return (
-            centerX + preferredDX * candidateScale,
-            centerY + preferredDY * candidateScale,
-            false
-        )
-    }
-
-    private static func rawFinite(_ value: Double) -> Double {
-        value.isFinite ? value : 0
-    }
-
-    private static func segmentLength(_ value: Double) -> Double {
-        value.isFinite ? max(0, abs(value)) : 0
-    }
-
     // MARK: Equipment
 
     /// Ski shaft finishing hardware: a grip collar at the hand and a real basket.
@@ -280,17 +176,17 @@ enum Replay2DSkiRenderer {
         let nearPoleTipY = nearFlightTipY + (nearPlantY - nearFlightTipY) * k.poleContact
         let armMinimumReach = abs(5.2 - 5) + 0.02
         let armMaximumReach = 5.2 + 5 - 0.02
-        let farHand = constrainRigidContact2D(
-            rootX: shX - 0.45, rootY: shY - 0.4,
-            preferredX: preferredFarHandX, preferredY: preferredFarHandY,
-            centerX: farPoleTipX, centerY: farPoleTipY,
+        let farHand = ReplayPlanarRigidContactSolver.solve(
+            root: SIMD2(shX - 0.45, shY - 0.4),
+            preferred: SIMD2(preferredFarHandX, preferredFarHandY),
+            contactCenter: SIMD2(farPoleTipX, farPoleTipY),
             contactLength: poleLength,
             minimumReach: armMinimumReach, maximumReach: armMaximumReach
         )
-        let nearHand = constrainRigidContact2D(
-            rootX: shX, rootY: shY,
-            preferredX: preferredNearHandX, preferredY: preferredNearHandY,
-            centerX: nearPoleTipX, centerY: nearPoleTipY,
+        let nearHand = ReplayPlanarRigidContactSolver.solve(
+            root: SIMD2(shX, shY),
+            preferred: SIMD2(preferredNearHandX, preferredNearHandY),
+            contactCenter: SIMD2(nearPoleTipX, nearPoleTipY),
             contactLength: poleLength,
             minimumReach: armMinimumReach, maximumReach: armMaximumReach
         )
@@ -313,17 +209,22 @@ enum Replay2DSkiRenderer {
             shX - 0.45, shY - 0.4, farHand.x, farHand.y,
             firstLength: 5.2, secondLength: 5, bendDirection: 1
         )
-        Replay2DFigure.drawShoulderCap(context, shX - 0.45, shY - 0.4, color: farKit, radius: 1.18)
-        Replay2DFigure.taperedLimb(
-            context, shX - 0.45, shY - 0.4, farArm.jointX, farArm.jointY,
-            proximalWidth: 2.15, distalWidth: 1.6, color: farKit
+        Replay2DLimbPainter.draw(
+            context,
+            root: CGPoint(x: shX - 0.45, y: shY - 0.4),
+            solution: farArm,
+            upperColor: farKit,
+            lowerColor: skinShade,
+            style: Replay2DLimbPaintStyle(
+                upperProximalWidth: 2.15,
+                upperDistalWidth: 1.6,
+                lowerProximalWidth: 1.65,
+                lowerDistalWidth: 1.2,
+                jointRadius: 0.88,
+                endRadius: 0.96,
+                shoulderRadius: 1.18
+            )
         )
-        Replay2DFigure.taperedLimb(
-            context, farArm.jointX, farArm.jointY, farArm.endX, farArm.endY,
-            proximalWidth: 1.65, distalWidth: 1.2, color: skinShade
-        )
-        Replay2DFigure.disc(context, farArm.jointX, farArm.jointY, 0.88, color: skinShade)
-        Replay2DFigure.disc(context, farArm.endX, farArm.endY, 0.96, color: skinShade)
 
         // Skis paint behind both legs and boots — intentionally short and
         // neutral so equipment support reads without dominating the athlete.
@@ -398,17 +299,22 @@ enum Replay2DSkiRenderer {
             shX, shY + 0.2, nearHand.x, nearHand.y,
             firstLength: 5.2, secondLength: 5, bendDirection: 1
         )
-        Replay2DFigure.drawShoulderCap(context, shX, shY + 0.2, color: accent, radius: 1.4)
-        Replay2DFigure.taperedLimb(
-            context, shX, shY + 0.2, nearArm.jointX, nearArm.jointY,
-            proximalWidth: 2.35, distalWidth: 1.75, color: accent
+        Replay2DLimbPainter.draw(
+            context,
+            root: CGPoint(x: shX, y: shY + 0.2),
+            solution: nearArm,
+            upperColor: accent,
+            lowerColor: skin,
+            style: Replay2DLimbPaintStyle(
+                upperProximalWidth: 2.35,
+                upperDistalWidth: 1.75,
+                lowerProximalWidth: 1.85,
+                lowerDistalWidth: 1.3,
+                jointRadius: 0.95,
+                endRadius: 1.02,
+                shoulderRadius: 1.4
+            )
         )
-        Replay2DFigure.taperedLimb(
-            context, nearArm.jointX, nearArm.jointY, nearArm.endX, nearArm.endY,
-            proximalWidth: 1.85, distalWidth: 1.3, color: skin
-        )
-        Replay2DFigure.disc(context, nearArm.jointX, nearArm.jointY, 0.95, color: skin)
-        Replay2DFigure.disc(context, nearArm.endX, nearArm.endY, 1.02, color: skin)
         if !a.reduce && k.poleContact > 0.08 {
             let plant = k.poleContact
             Replay2DFigure.disc(context, nearPoleTipX, y, 1 + plant * 0.7, color: foam)

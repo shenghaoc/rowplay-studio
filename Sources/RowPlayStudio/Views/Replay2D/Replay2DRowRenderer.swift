@@ -7,99 +7,7 @@ import SwiftUI
 // commit 4d96480e). The rowing shell and sculler: fixed foot stretcher, sliding
 // seat, rotating torso, and two rigid sculls solved through their oarlocks.
 
-/// One straight oar resolved from handle through oarlock to blade tip.
-/// Mirrors the web `RigidOar2D`.
-struct Replay2DRigidOar {
-    var handleX: Double = 0
-    var handleY: Double = 0
-    var bladeRootX: Double = 0
-    var bladeRootY: Double = 0
-    var bladeTipX: Double = 0
-    var bladeTipY: Double = 0
-}
-
 enum Replay2DRowRenderer {
-    // MARK: Solvers
-
-    /// Solve a side-profile rowing arm on the rearward elbow branch.
-    ///
-    /// Rowers face +x, so behind the torso is -x. Resolve both two-bone
-    /// branches and retain the one with the smaller x coordinate: at the
-    /// near-straight catch the branches converge; once the late arm draw
-    /// creates a visible elbow it travels behind the shoulder rather than into
-    /// the chest or toward the handle.
-    static func solveRowerElbow2D(
-        shoulderX: Double, shoulderY: Double,
-        handX: Double, handY: Double,
-        upperArmLength: Double, forearmLength: Double
-    ) -> Replay2DLimbSolution {
-        var primary = Replay2DFigure.solveTwoBoneJoint2D(
-            shoulderX, shoulderY, handX, handY,
-            firstLength: upperArmLength, secondLength: forearmLength, bendDirection: 1
-        )
-        let alternate = Replay2DFigure.solveTwoBoneJoint2D(
-            shoulderX, shoulderY, handX, handY,
-            firstLength: upperArmLength, secondLength: forearmLength, bendDirection: -1
-        )
-        if alternate.jointX < primary.jointX {
-            primary.jointX = alternate.jointX
-            primary.jointY = alternate.jointY
-        }
-        return primary
-    }
-
-    /// Resolve a continuous oar angle whose rigid inboard grip meets an arm reach.
-    static func solveRowerOarAngle2D(
-        shoulderX: Double, shoulderY: Double,
-        lockX: Double, lockY: Double,
-        inboardLength: Double, requestedReach: Double, preferredAngle: Double
-    ) -> Double {
-        let pinDeltaX = lockX - shoulderX
-        let pinDeltaY = lockY - shoulderY
-        let amplitude = (pinDeltaX * pinDeltaX + pinDeltaY * pinDeltaY).squareRoot()
-        guard amplitude >= 1e-8, inboardLength >= 1e-8 else { return preferredAngle }
-        let signedInboard = -inboardLength
-        let baseDistanceSquared =
-            pinDeltaX * pinDeltaX + pinDeltaY * pinDeltaY + signedInboard * signedInboard
-        let cosine = max(
-            -1,
-            min(
-                1,
-                (requestedReach * requestedReach - baseDistanceSquared)
-                    / (2 * signedInboard * amplitude)
-            )
-        )
-        let center = atan2(pinDeltaY, pinDeltaX)
-        let offset = acos(cosine)
-        // The +offset branch is the continuous rearward-elbow solution for the
-        // side-profile scull; picking the branch nearest the aesthetic sweep
-        // let the two circle intersections swap mid-draw.
-        return center + offset
-    }
-
-    /// Resolve one straight oar from handle through oarlock to blade tip.
-    static func solveRigidOar2D(
-        lockX: Double, lockY: Double, angle: Double,
-        inboardLength: Double, outboardLength: Double, bladeLength: Double
-    ) -> Replay2DRigidOar {
-        let ux = cos(angle)
-        let uy = sin(angle)
-        var oar = Replay2DRigidOar()
-        oar.handleX = lockX - ux * inboardLength
-        oar.handleY = lockY - uy * inboardLength
-        oar.bladeRootX = lockX + ux * outboardLength
-        oar.bladeRootY = lockY + uy * outboardLength
-        oar.bladeTipX = oar.bladeRootX + ux * bladeLength
-        oar.bladeTipY = oar.bladeRootY + uy * bladeLength
-        return oar
-    }
-
-    static func interpolateAngle(from: Double, to: Double, amount: Double) -> Double {
-        from + atan2(sin(to - from), cos(to - from)) * amount
-    }
-
-    // MARK: Draw
-
     /// Rowing shell with fixed feet and legs → body → arms drive sequencing.
     static func draw(
         _ context: GraphicsContext,
@@ -142,27 +50,35 @@ enum Replay2DRowRenderer {
         let structuralMaximumReach = upperArmLength + forearmLength - 0.006
         let armClosure = Replay2DStyle.clamp01(k.armDraw)
         let farLockY = oarlockY - 0.65
-        let farLongAngle = solveRowerOarAngle2D(
-            shoulderX: shX - 0.4, shoulderY: shY - 0.4,
-            lockX: oarlockX, lockY: farLockY,
+        let farLongAngle = ReplayPlanarRowSolver.solveOarAngle(
+            shoulder: SIMD2(shX - 0.4, shY - 0.4),
+            lock: SIMD2(oarlockX, farLockY),
             inboardLength: 7.1, requestedReach: structuralMaximumReach,
             preferredAngle: preferredOarAngle + 0.035
         )
-        let farOar = solveRigidOar2D(
-            lockX: oarlockX, lockY: farLockY,
-            angle: interpolateAngle(from: farLongAngle, to: oarFinishAngle + 0.035, amount: armClosure),
+        let farOar = ReplayPlanarRowSolver.solveRigidOar(
+            lock: SIMD2(oarlockX, farLockY),
+            angle: ReplayPlanarRowSolver.interpolateAngle(
+                from: farLongAngle,
+                to: oarFinishAngle + 0.035,
+                amount: armClosure
+            ),
             inboardLength: 7.1, outboardLength: 13.8, bladeLength: 4.0
         )
         let nearLockY = oarlockY + 0.4
-        let nearLongAngle = solveRowerOarAngle2D(
-            shoulderX: shX, shoulderY: shY + 0.2,
-            lockX: oarlockX, lockY: nearLockY,
+        let nearLongAngle = ReplayPlanarRowSolver.solveOarAngle(
+            shoulder: SIMD2(shX, shY + 0.2),
+            lock: SIMD2(oarlockX, nearLockY),
             inboardLength: 7.1, requestedReach: structuralMaximumReach,
             preferredAngle: preferredOarAngle
         )
-        let nearOar = solveRigidOar2D(
-            lockX: oarlockX, lockY: nearLockY,
-            angle: interpolateAngle(from: nearLongAngle, to: oarFinishAngle, amount: armClosure),
+        let nearOar = ReplayPlanarRowSolver.solveRigidOar(
+            lock: SIMD2(oarlockX, nearLockY),
+            angle: ReplayPlanarRowSolver.interpolateAngle(
+                from: nearLongAngle,
+                to: oarFinishAngle,
+                amount: armClosure
+            ),
             inboardLength: 7.1, outboardLength: 13.8, bladeLength: 4.0
         )
         let farKit = accent.opacity(0.52)
@@ -256,22 +172,27 @@ enum Replay2DRowRenderer {
             color: a.shoe
         )
 
-        let farArm = solveRowerElbow2D(
-            shoulderX: shX - 0.4, shoulderY: shY - 0.4,
-            handX: farOar.handleX, handY: farOar.handleY,
+        let farArm = ReplayPlanarRowSolver.solveRearwardElbow(
+            shoulder: SIMD2(shX - 0.4, shY - 0.4),
+            hand: farOar.handle,
             upperArmLength: upperArmLength, forearmLength: forearmLength
         )
-        Replay2DFigure.drawShoulderCap(context, shX - 0.4, shY - 0.4, color: farKit, radius: 1.16)
-        Replay2DFigure.taperedLimb(
-            context, shX - 0.4, shY - 0.4, farArm.jointX, farArm.jointY,
-            proximalWidth: 2.2, distalWidth: 1.65, color: farKit
+        Replay2DLimbPainter.draw(
+            context,
+            root: CGPoint(x: shX - 0.4, y: shY - 0.4),
+            solution: farArm,
+            upperColor: farKit,
+            lowerColor: skinShade,
+            style: Replay2DLimbPaintStyle(
+                upperProximalWidth: 2.2,
+                upperDistalWidth: 1.65,
+                lowerProximalWidth: 1.75,
+                lowerDistalWidth: 1.25,
+                jointRadius: 0.9,
+                endRadius: 0.96,
+                shoulderRadius: 1.16
+            )
         )
-        Replay2DFigure.taperedLimb(
-            context, farArm.jointX, farArm.jointY, farArm.endX, farArm.endY,
-            proximalWidth: 1.75, distalWidth: 1.25, color: skinShade
-        )
-        Replay2DFigure.disc(context, farArm.jointX, farArm.jointY, 0.9, color: skinShade)
-        Replay2DFigure.disc(context, farArm.endX, farArm.endY, 0.96, color: skinShade)
 
         // Constant femur/tibia lengths remove the old telescoping knee.
         let nearLeg = Replay2DFigure.solveTwoBoneJoint2D(
@@ -324,22 +245,27 @@ enum Replay2DRowRenderer {
         )
         Replay2DFigure.disc(context, oarlockX, oarlockY + 0.4, 0.96, color: rim)
         Replay2DFigure.disc(context, oarlockX, oarlockY + 0.4, 0.4, color: foam)
-        let nearArm = solveRowerElbow2D(
-            shoulderX: shX, shoulderY: shY + 0.2,
-            handX: nearOar.handleX, handY: nearOar.handleY,
+        let nearArm = ReplayPlanarRowSolver.solveRearwardElbow(
+            shoulder: SIMD2(shX, shY + 0.2),
+            hand: nearOar.handle,
             upperArmLength: upperArmLength, forearmLength: forearmLength
         )
-        Replay2DFigure.drawShoulderCap(context, shX, shY + 0.2, color: accent, radius: 1.38)
-        Replay2DFigure.taperedLimb(
-            context, shX, shY + 0.2, nearArm.jointX, nearArm.jointY,
-            proximalWidth: 2.35, distalWidth: 1.75, color: accent
+        Replay2DLimbPainter.draw(
+            context,
+            root: CGPoint(x: shX, y: shY + 0.2),
+            solution: nearArm,
+            upperColor: accent,
+            lowerColor: skin,
+            style: Replay2DLimbPaintStyle(
+                upperProximalWidth: 2.35,
+                upperDistalWidth: 1.75,
+                lowerProximalWidth: 1.8,
+                lowerDistalWidth: 1.3,
+                jointRadius: 0.95,
+                endRadius: 1.05,
+                shoulderRadius: 1.38
+            )
         )
-        Replay2DFigure.taperedLimb(
-            context, nearArm.jointX, nearArm.jointY, nearArm.endX, nearArm.endY,
-            proximalWidth: 1.8, distalWidth: 1.3, color: skin
-        )
-        Replay2DFigure.disc(context, nearArm.jointX, nearArm.jointY, 0.95, color: skin)
-        Replay2DFigure.disc(context, nearArm.endX, nearArm.endY, 1.05, color: skin)
         if !a.reduce && k.bladeDepth > 0.06 {
             // Catch foam plus a lighter mid-drive mist keep the buried blade
             // readable.

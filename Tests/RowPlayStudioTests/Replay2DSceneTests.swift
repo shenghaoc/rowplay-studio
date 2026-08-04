@@ -6,8 +6,15 @@ import XCTest
 
 @MainActor
 final class Replay2DSceneTests: XCTestCase {
+    /// Fixed snapshot dimensions mirror the pinned web QA viewport. These ROI
+    /// counts catch missing or collapsed geometry; they do not claim human
+    /// visual approval of anatomy, depth, or palette quality.
     private let renderWidth = 960.0
     private let renderHeight = 460.0
+    private let minimumParticipantInkPixels = 180
+    private let minimumReducedMotionDifferencePixels = 60
+    private let minimumIndependentRivalInkPixels = 160
+    private let minimumVisibleColorDelta = 24.0
 
     func testEverySportPaintsParticipantPixelsBeyondVenue() throws {
         for sport in Sport.allCases {
@@ -25,7 +32,7 @@ final class Replay2DSceneTests: XCTestCase {
             )
             XCTAssertGreaterThan(
                 mask.count,
-                180,
+                minimumParticipantInkPixels,
                 "\(sport.rawValue) participant renderer added no meaningful pixels"
             )
 
@@ -58,7 +65,7 @@ final class Replay2DSceneTests: XCTestCase {
             )
             XCTAssertGreaterThan(
                 normal.symmetricDifference(reduced).count,
-                60,
+                minimumReducedMotionDifferencePixels,
                 "\(sport.rawValue) reduced motion did not change participant articulation"
             )
         }
@@ -117,7 +124,7 @@ final class Replay2DSceneTests: XCTestCase {
                     solo,
                     canvasROI: participantROI(sport: sport, centerX: ghostX)
                 ).count,
-                160,
+                minimumIndependentRivalInkPixels,
                 "\(sport.rawValue) genuine rival did not render independently"
             )
         }
@@ -177,6 +184,69 @@ final class Replay2DSceneTests: XCTestCase {
             _ = Replay2DVenueCatalog.palette(for: sport, darkTheme: false)
             _ = Replay2DVenueCatalog.palette(for: sport, darkTheme: true)
         }
+    }
+
+    func testVenueLandmarksAndPalettesRemainSportDistinct() {
+        XCTAssertNotEqual(
+            Replay2DVenueLandmark.size(for: .rower),
+            Replay2DVenueLandmark.size(for: .skierg)
+        )
+        XCTAssertNotEqual(
+            Replay2DVenueLandmark.size(for: .rower),
+            Replay2DVenueLandmark.size(for: .bike)
+        )
+        XCTAssertNotEqual(
+            Replay2DVenueLandmark.size(for: .skierg),
+            Replay2DVenueLandmark.size(for: .bike)
+        )
+
+        for darkTheme in [false, true] {
+            let rower = Replay2DVenueCatalog.palette(for: .rower, darkTheme: darkTheme)
+            let skierg = Replay2DVenueCatalog.palette(for: .skierg, darkTheme: darkTheme)
+            let bike = Replay2DVenueCatalog.palette(for: .bike, darkTheme: darkTheme)
+            XCTAssertNotEqual(rower.skyTop, skierg.skyTop)
+            XCTAssertNotEqual(rower.skyTop, bike.skyTop)
+            XCTAssertNotEqual(skierg.skyTop, bike.skyTop)
+            XCTAssertNotEqual(rower.groundTop, skierg.groundTop)
+            XCTAssertNotEqual(rower.groundTop, bike.groundTop)
+            XCTAssertNotEqual(skierg.groundTop, bike.groundTop)
+        }
+    }
+
+    func testMissingCachedAggregatesSelectDeterministicFallback() throws {
+        let context = ReplayStrokePoseContext(
+            sport: .rower,
+            peakWatts: 300,
+            medianWatts: 220,
+            medianDPS: 11,
+            maxHR: 180
+        )
+        let aggregates = ReplayStrokePoseAggregates(
+            context: context,
+            medianHeartRate: 150
+        )
+
+        XCTAssertEqual(
+            Replay2DStrokeArticulation.select(
+                cachedAggregates: nil,
+                hasUsableStrokeData: true
+            ),
+            .fallback
+        )
+        XCTAssertEqual(
+            Replay2DStrokeArticulation.select(
+                cachedAggregates: aggregates,
+                hasUsableStrokeData: false
+            ),
+            .fallback
+        )
+        XCTAssertEqual(
+            Replay2DStrokeArticulation.select(
+                cachedAggregates: aggregates,
+                hasUsableStrokeData: true
+            ),
+            .genuine(aggregates)
+        )
     }
 
     func testBikeRotationPointPreservesRadiusAndOpposition() {
@@ -301,7 +371,7 @@ final class Replay2DSceneTests: XCTestCase {
                     + abs(a.greenComponent - b.greenComponent)
                     + abs(a.blueComponent - b.blueComponent)
                     + abs(a.alphaComponent - b.alphaComponent)
-                if delta * 255 > 24 {
+                if delta * 255 > minimumVisibleColorDelta {
                     mask.insert(pixelY * first.pixelsWide + x)
                 }
             }
