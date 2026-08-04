@@ -14,8 +14,12 @@ claim that the complete phase or visual QA matrix is finished.
 - [x] **3/8 Equipment assets** — introduce per-sport native equipment assets,
       dimensional contracts, catalogs, libraries, providers, and atomic
       fallback while retaining the existing runtime until validation passes.
-- [ ] **4/8 Athlete runtime** — load the production athlete, apply materials,
-      drive skeletal motion with deterministic exact seeking, and preserve the
+- [x] **4/8 Athlete runtime** — retain the pinned USDZ as the canonical
+      rig/animation source; deterministically derive and validate eight actual
+      GLB-colour material subsets; activate the athlete at every tier with the
+      exact 0/128/256/512 process-shared detail ladder and independent
+      live/rival materials; move portable cold-load preflight off `MainActor`;
+      drive skeletal motion with deterministic exact seeking; and preserve the
       complete procedural-athlete fallback.
 - [ ] **5/8 Grip and contact** — integrate finger and thumb closure, contact
       solving, sport handle geometry, wrist orientation, release/recovery, and

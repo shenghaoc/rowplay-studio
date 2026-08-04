@@ -1,0 +1,50 @@
+{
+  "conversionScript": "script/convert_rowplay_athlete.py",
+  "converter": "Blender 5.2.0 LTS with OpenUSD (0, 26, 3)",
+  "geometryPolicy": "pinned USDZ mesh, skeleton, contacts, and animation retained exactly at the authored-value level; material subsets alone are derived from the pinned GLB reviewed vertex colours; no remodel, reskin, or geometry re-export",
+  "materialSlotCount": 8,
+  "runtimeDownloads": "none",
+  "runtimeMaterialNames": [
+    "rowplay-v4-skin",
+    "rowplay-v4-jersey",
+    "rowplay-v4-lower",
+    "rowplay-v4-footwear",
+    "rowplay-v4-hair",
+    "rowplay-v4-trim",
+    "rowplay-v4-eye",
+    "rowplay-v4-face-detail"
+  ],
+  "runtimeUsdzByteCount": 11583008,
+  "runtimeUsdzFile": "rowplay-athlete-v4-native.usdz",
+  "runtimeUsdzSha256": "f484e2a6eb02fa3f852f578f7a1dfa44c44f56deafb7f7d0ee7b6c7d33c48569",
+  "schema": "rowplay.replay.athlete-native.v1",
+  "skinnedMeshCount": 1,
+  "sourceCommit": "4d96480e7c6fb382f800555bd3aa463d9fe5b1a6",
+  "sourceContractPath": "static/replay-assets/rowplay-athlete-v4.contract.json",
+  "sourceContractSha256": "62dd814ba6113ca57419aac42905233f8e07589846be5c3a25bbadcf55d63dd3",
+  "sourceGlbPath": "static/replay-assets/rowplay-athlete-v4.glb",
+  "sourceGlbSha256": "a564a4dbd4922e2ba76ef21a23f5bf0eb1b0180846548f9d7110e55ffd8f760e",
+  "sourceUsdzPath": "static/replay-assets/rowplay-athlete-v4.usdz",
+  "sourceUsdzSha256": "cf65202b8360183be57308130226173171ac67d8d900e02f40ba3879569b569a",
+  "surfacePartition": "majority vertex-colour role per triangle",
+  "surfaceRoles": [
+    "athlete-skin",
+    "athlete-fabric",
+    "athlete-shorts",
+    "athlete-footwear",
+    "athlete-hair",
+    "athlete-trim",
+    "athlete-eye",
+    "athlete-face-detail"
+  ],
+  "surfaceTriangleCounts": {
+    "athlete-eye": 4880,
+    "athlete-fabric": 11886,
+    "athlete-face-detail": 2120,
+    "athlete-footwear": 20416,
+    "athlete-hair": 12080,
+    "athlete-shorts": 9594,
+    "athlete-skin": 42928,
+    "athlete-trim": 2352
+  }
+}

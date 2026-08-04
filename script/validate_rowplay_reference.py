@@ -73,6 +73,39 @@ def main() -> None:
     if bones.get("helperCount") != athlete.get("helperCount"):
         fail("helper count drifted")
 
+    # The pinned USDZ remains an immutable source reference. Native runtime
+    # uses a second deterministic derivative because the stock upstream USD
+    # export omits the GLB's regional vertex-colour attribute. The derivative
+    # keeps the pinned USDZ's authored geometry/rig/animation and binds all
+    # eight GLB-derived contract roles as material subsets; its own manifest
+    # seals both inputs and output bytes.
+    native = load(REFERENCE_ROOT / "athlete" / "rowplay-athlete-v4-native.json")
+    native_usdz = REFERENCE_ROOT / "athlete" / "rowplay-athlete-v4-native.usdz"
+    if native.get("schema") != "rowplay.replay.athlete-native.v1":
+        fail("native athlete manifest schema mismatch")
+    if native.get("sourceCommit") != pinned:
+        fail("native athlete manifest pinned to a different commit")
+    if native.get("sourceGlbSha256") != athlete.get("glbSha256"):
+        fail("native athlete manifest GLB hash mismatch")
+    if native.get("sourceUsdzSha256") != athlete.get("usdzSha256"):
+        fail("native athlete manifest source USDZ hash mismatch")
+    if native.get("sourceContractSha256") != athlete.get("contractSha256"):
+        fail("native athlete manifest contract hash mismatch")
+    if not native_usdz.exists():
+        fail("native athlete USDZ missing")
+    if sha256(native_usdz) != native.get("runtimeUsdzSha256"):
+        fail("native athlete USDZ hash mismatch")
+    if native_usdz.stat().st_size != native.get("runtimeUsdzByteCount"):
+        fail("native athlete USDZ byte count mismatch")
+    contract_roles = {surface.get("role") for surface in contract.get("surfaces", [])}
+    native_roles = native.get("surfaceRoles", [])
+    if len(native_roles) != 8 or set(native_roles) != contract_roles:
+        fail("native athlete surface roles do not match the pinned contract")
+    if native.get("materialSlotCount") != 8 or native.get("skinnedMeshCount") != 1:
+        fail("native athlete must keep one skinned mesh and eight material slots")
+    if len(native.get("runtimeMaterialNames", [])) != 8:
+        fail("native athlete material-name contract is incomplete")
+
     motion = load(REFERENCE_ROOT / "motion" / "rowplay-motion-manifest.json")
     if motion.get("sourceCommit") != pinned:
         fail("motion manifest pinned to a different commit")
