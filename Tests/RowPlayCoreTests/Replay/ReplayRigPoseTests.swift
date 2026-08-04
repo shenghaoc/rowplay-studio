@@ -25,8 +25,8 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerFinishPose() {
-        // At finish: drive = cos(π) = -1, recovery = max(0, -sin(π)) = 0
-        let pose = makeStrokePose(warpedPhase: .pi, amplitude: 1.0)
+        // The canonical graph reaches finish after its row drive window.
+        let pose = makeStrokePose(phase: 0.38 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -40,8 +40,7 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerMidDrivePose() {
-        // Mid-drive: warpedPhase = π/2
-        let pose = makeStrokePose(warpedPhase: .pi / 2, amplitude: 1.0)
+        let pose = makeStrokePose(phase: 0.15 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -56,8 +55,7 @@ final class ReplayRigPoseTests: XCTestCase {
     }
 
     func testRowerRecoveryPose() {
-        // Recovery: warpedPhase = 3π/2 → drive = cos(3π/2) ≈ 0, recovery = max(0, -sin(3π/2)) = 1
-        let pose = makeStrokePose(warpedPhase: 3 * .pi / 2, amplitude: 1.0)
+        let pose = makeStrokePose(phase: 0.60 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .rower, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -71,8 +69,8 @@ final class ReplayRigPoseTests: XCTestCase {
     // MARK: - SkiErg Tests
 
     func testSkiErgTallRecoveryPose() {
-        // Tall recovery: swing = cos(π) = -1, crunch = max(0, 1) = 1
-        let pose = makeStrokePose(warpedPhase: .pi, amplitude: 1.0)
+        // Pole-off completes at 29% of the canonical SkiErg cycle.
+        let pose = makeStrokePose(phase: 0.30 * tau, amplitude: 1.0)
         let result = ReplayRigPoseSolver.solve(
             sport: .skierg, strokePose: pose, distance: 0, reduceMotion: false
         )
@@ -100,6 +98,68 @@ final class ReplayRigPoseTests: XCTestCase {
         XCTAssertGreaterThan(ski.handleY, 0.4, "Handles should be high at plant")
     }
 
+    func testSkiErgPlantIsDeterministicAndCourseFixedWithinStroke() {
+        let firstCycle = 0.05
+        let secondCycle = 0.18
+        let firstDistance = firstCycle * 11
+        let secondDistance = secondCycle * 11
+        let firstPose = makeStrokePose(cycleFrac: firstCycle)
+        let secondPose = makeStrokePose(cycleFrac: secondCycle)
+
+        guard case .skierg(let first) = ReplayRigPoseSolver.solve(
+            sport: .skierg,
+            strokePose: firstPose,
+            distance: firstDistance,
+            reduceMotion: false
+        ), case .skierg(let second) = ReplayRigPoseSolver.solve(
+            sport: .skierg,
+            strokePose: secondPose,
+            distance: secondDistance,
+            reduceMotion: false
+        ) else {
+            return XCTFail("Expected SkiErg poses")
+        }
+
+        XCTAssertGreaterThan(first.poleContact, 0)
+        XCTAssertGreaterThan(second.poleContact, 0)
+        XCTAssertEqual(
+            firstDistance + first.plantBasketZ,
+            secondDistance + second.plantBasketZ,
+            accuracy: 1e-12
+        )
+        XCTAssertEqual(
+            ReplayRigPoseSolver.solve(
+                sport: .skierg,
+                strokePose: firstPose,
+                distance: firstDistance,
+                reduceMotion: false
+            ),
+            .skierg(first),
+            "Seeking the same pose must reconstruct the same plant"
+        )
+    }
+
+    func testSkiErgPreplantTargetsTheNextCatchWithoutHistory() {
+        let cycle = 0.97
+        let distance = cycle * 11
+        let pose = makeStrokePose(cycleFrac: cycle)
+        guard case .skierg(let ski) = ReplayRigPoseSolver.solve(
+            sport: .skierg,
+            strokePose: pose,
+            distance: distance,
+            reduceMotion: false
+        ) else {
+            return XCTFail("Expected SkiErg pose")
+        }
+
+        XCTAssertGreaterThan(ski.poleContact, 0)
+        XCTAssertEqual(
+            distance + ski.plantBasketZ,
+            11 + ReplaySkiGripContract.athleteProportions.polePlantForwardOffset,
+            accuracy: 1e-12
+        )
+    }
+
     // MARK: - BikeErg Tests
 
     func testBikeErgCrankPositions() {
@@ -115,9 +175,12 @@ final class ReplayRigPoseTests: XCTestCase {
             // Crank angle should match input phase
             XCTAssertEqual(bike.crankAngle, angle, accuracy: 0.001,
                 "Crank angle should match phase at \(angle)")
-            // Wheel angle should be 2.4× crank
-            XCTAssertEqual(bike.wheelAngle, angle * 2.4, accuracy: 0.001,
-                "Wheel angle should be 2.4× crank at \(angle)")
+            // Merged V4 advances wheels from covered distance, not crank phase.
+            XCTAssertEqual(
+                bike.wheelAngle,
+                (angle * 5) / ReplayBikeGripContract.axleY,
+                accuracy: 0.001,
+                "Wheel angle should follow distance at \(angle)")
             // All values should be finite
             XCTAssertTrue(isFinite(bike.crankAngle))
             XCTAssertTrue(isFinite(bike.wheelAngle))
@@ -125,6 +188,16 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTAssertTrue(isFinite(bike.pedalPosL.z))
             XCTAssertTrue(isFinite(bike.pedalPosR.y))
             XCTAssertTrue(isFinite(bike.pedalPosR.z))
+            XCTAssertEqual(
+                hypot(bike.pedalPosL.y, bike.pedalPosL.z),
+                ReplayBikeGripContract.crankRadius,
+                accuracy: 0.001
+            )
+            XCTAssertEqual(
+                hypot(bike.pedalPosR.y, bike.pedalPosR.z),
+                ReplayBikeGripContract.crankRadius,
+                accuracy: 0.001
+            )
         }
     }
 
@@ -136,9 +209,9 @@ final class ReplayRigPoseTests: XCTestCase {
         guard case .bike(let bike) = result else {
             XCTFail("Expected bike pose"); return
         }
-        // Pedals should be 180° apart: L at (0.18, 0), R at (-0.18, 0)
-        XCTAssertEqual(bike.pedalPosL.y, 0.18, accuracy: 0.001)
-        XCTAssertEqual(bike.pedalPosR.y, -0.18, accuracy: 0.001)
+        // Pedals should be 180° apart at the contract-owned crank radius.
+        XCTAssertEqual(bike.pedalPosL.y, ReplayBikeGripContract.crankRadius, accuracy: 0.001)
+        XCTAssertEqual(bike.pedalPosR.y, -ReplayBikeGripContract.crankRadius, accuracy: 0.001)
     }
 
     func testBikeErgThighAnglesDoNotFlipAtBottomOfStroke() {
@@ -165,6 +238,20 @@ final class ReplayRigPoseTests: XCTestCase {
         // Wheel should have rotated
         XCTAssertTrue(isFinite(bike.wheelAngle))
         XCTAssertNotEqual(bike.wheelAngle, 0, "Wheel should rotate")
+    }
+
+    func testBikeErgWheelRollUsesOuterTyreRadius() {
+        let distance = ReplayBikeGripContract.axleY * Double.pi * 2
+        let result = ReplayRigPoseSolver.solve(
+            sport: .bike,
+            strokePose: makeStrokePose(),
+            distance: distance,
+            reduceMotion: false
+        )
+        guard case .bike(let bike) = result else {
+            return XCTFail("Expected bike pose")
+        }
+        XCTAssertEqual(bike.wheelAngle, Double.pi * 2, accuracy: 1e-12)
     }
 
     // MARK: - Reduced Motion Tests
@@ -206,9 +293,9 @@ final class ReplayRigPoseTests: XCTestCase {
         XCTAssertEqual(bike.wheelAngle, 0, accuracy: 0.001)
     }
 
-    // MARK: - Amplitude/Intensity Influence
+    // MARK: - Canonical Graph Ownership
 
-    func testAmplitudeInfluence() {
+    func testCanonicalGraphOwnsTechniqueInsteadOfLegacyAmplitude() {
         let lowAmp = makeStrokePose(warpedPhase: 0, amplitude: 0.72)
         let highAmp = makeStrokePose(warpedPhase: 0, amplitude: 1.32)
 
@@ -224,11 +311,12 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTFail("Expected rower poses"); return
         }
 
-        // Higher amplitude should produce larger seat travel
-        let lowSeatRange = abs(low.seatZ + 0.1)
-        let highSeatRange = abs(high.seatZ + 0.1)
-        XCTAssertGreaterThan(highSeatRange, lowSeatRange,
-            "Higher amplitude should produce larger seat travel")
+        XCTAssertEqual(low.seatZ, high.seatZ, accuracy: 1e-12)
+        XCTAssertEqual(low.handleZ, high.handleZ, accuracy: 1e-12)
+
+        let lowEffort = ReplayMotionGraph.sampleRower(pose: makeStrokePose(phase: 0.15 * tau, intensity: 0))
+        let highEffort = ReplayMotionGraph.sampleRower(pose: makeStrokePose(phase: 0.15 * tau, intensity: 1))
+        XCTAssertNotEqual(lowEffort.accents.surge.value, highEffort.accents.surge.value)
     }
 
     // MARK: - Edge Cases
@@ -304,7 +392,8 @@ final class ReplayRigPoseTests: XCTestCase {
     private func makeStrokePose(
         warpedPhase: Double = 0,
         phase: Double = 0,
-        amplitude: Double = 1.0
+        amplitude: Double = 1.0,
+        intensity: Double = 0.5
     ) -> ReplayStrokePose {
         ReplayStrokePose(
             index: 0,
@@ -319,7 +408,7 @@ final class ReplayRigPoseTests: XCTestCase {
             strokeMeters: 11,
             rate: 28,
             watts: 200,
-            intensity: 0.5,
+            intensity: intensity,
             amplitude: amplitude,
             fatigue: 0
         )
@@ -343,6 +432,8 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTAssertTrue(s.handleY.isFinite, "handleY not finite", file: file, line: line)
             XCTAssertTrue(s.handleZ.isFinite, "handleZ not finite", file: file, line: line)
             XCTAssertTrue(s.poleRotation.isFinite, "poleRotation not finite", file: file, line: line)
+            XCTAssertTrue(s.poleContact.isFinite, "poleContact not finite", file: file, line: line)
+            XCTAssertTrue(s.plantBasketZ.isFinite, "plantBasketZ not finite", file: file, line: line)
             assertJointsFinite(s.joints, file: file, line: line)
         case .bike(let b):
             XCTAssertTrue(b.crankAngle.isFinite, "crankAngle not finite", file: file, line: line)
@@ -354,6 +445,26 @@ final class ReplayRigPoseTests: XCTestCase {
             XCTAssertTrue(b.riderSway.isFinite, "riderSway not finite", file: file, line: line)
             assertJointsFinite(b.joints, file: file, line: line)
         }
+    }
+
+    private func makeStrokePose(cycleFrac: Double) -> ReplayStrokePose {
+        ReplayStrokePose(
+            index: 0,
+            phase: cycleFrac * tau,
+            warpedPhase: cycleFrac * tau,
+            cycleFrac: cycleFrac,
+            driveFrac: 0.34,
+            drive: cycleFrac < 0.34,
+            driveProgress: min(1, cycleFrac / 0.34),
+            recoveryProgress: max(0, (cycleFrac - 0.34) / 0.66),
+            strokeSeconds: 2,
+            strokeMeters: 11,
+            rate: 28,
+            watts: 200,
+            intensity: 0.5,
+            amplitude: 1,
+            fatigue: 0
+        )
     }
 
     private func assertJointsFinite(_ j: ReplayAthleteJointPose, file: StaticString = #filePath, line: UInt = #line) {

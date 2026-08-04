@@ -119,19 +119,29 @@ public struct ReplaySkiErgRigPose: Equatable, Sendable {
     public var handleZ: Double
     /// Pole rotation angle (radians).
     public var poleRotation: Double
+    /// 0...1 closure of the basket-to-course contact channel.
+    public var poleContact: Double
+    /// Athlete-local forward coordinate of the deterministic course plant.
+    /// It compensates for travel since the current/next catch so planted
+    /// baskets do not slide with the athlete during seeks or normal playback.
+    public var plantBasketZ: Double
 
     public init(
         joints: ReplayAthleteJointPose = .neutral,
         hipCompression: Double = 0,
         handleY: Double = 0,
         handleZ: Double = 0,
-        poleRotation: Double = 0
+        poleRotation: Double = 0,
+        poleContact: Double = 0,
+        plantBasketZ: Double = 0
     ) {
         self.joints = joints
         self.hipCompression = hipCompression
         self.handleY = handleY
         self.handleZ = handleZ
         self.poleRotation = poleRotation
+        self.poleContact = poleContact
+        self.plantBasketZ = plantBasketZ
     }
 }
 
@@ -216,43 +226,36 @@ public enum ReplayRigPoseSolver {
         case .rower:
             return .rower(solveRower(strokePose: strokePose))
         case .skierg:
-            return .skierg(solveSkiErg(strokePose: strokePose))
+            return .skierg(solveSkiErg(strokePose: strokePose, distance: distance))
         case .bike:
-            return .bike(solveBikeErg(strokePose: strokePose))
+            return .bike(solveBikeErg(strokePose: strokePose, distance: distance))
         }
     }
 
     // MARK: - RowErg Solver
 
     private static func solveRower(strokePose: ReplayStrokePose) -> ReplayRowerRigPose {
-        let w = strokePose.warpedPhase
-        let drive = cos(w)
-        let recovery = max(0, -sin(w))
-        let amp = strokePose.amplitude
+        let graph = ReplayMotionGraph.sampleRower(pose: strokePose)
+        let legs = unit(graph.body.legExtension.value)
+        let torso = unit(graph.body.spineHinge.value)
+        let arms = unit(graph.body.armDraw.value)
+        let handle = unit(graph.body.handleTravel.value)
+        let feather = unit(graph.contacts.bladeFeather.value)
 
-        // Seat slides along rail: compressed toward stern at catch, extended at finish.
-        let seatZ = -0.1 - drive * 0.22 * amp
-
-        // Handle moves with stroke.
-        let handleY = 0.72 + recovery * 0.04 * amp
-        let handleZ = 0.58 - drive * 0.08 * amp
-        let handleRotX = recovery * 0.16 * amp
-
-        // Oars sweep and feather.
-        let oarSweep = -drive * 0.5 * amp
-        let oarFeather = recovery * 0.26 - 0.06
-
-        // Body lean: forward at catch, back at finish.
-        let torsoLean = -0.08 - drive * 0.2 * amp
-
-        // Arms: compact at catch (shoulders forward, elbows bent), extended at finish.
-        let shoulderFlex = -drive * 0.15 * amp
-        let elbowFlex = recovery * 0.3 * amp
-
-        // Legs: compressed at catch (hips flexed, knees bent), extended at finish.
-        let hipFlex = drive * 0.35 * amp
-        let kneeFlex = drive * 0.5 * amp
-        let ankleDorsi = -drive * 0.1 * amp
+        // All phase sequencing is carried by `ReplayMotionGraph`. These are
+        // static rig-space calibration ranges, not another movement model.
+        let seatZ = -0.20 + legs * 0.40
+        let handleY = 0.62 - handle * 0.05 + feather * 0.03
+        let handleZ = 0.66 - handle * 0.22
+        let handleRotX = feather * 0.20
+        let oarSweep = -0.58 + handle * 1.16
+        let oarFeather = -0.06 + feather * 0.34
+        let torsoLean = -0.28 + torso * 0.46
+        let shoulderFlex = -0.22 + arms * 0.34
+        let elbowFlex = arms * 0.42
+        let hipFlex = (1 - legs) * 0.48
+        let kneeFlex = (1 - legs) * 0.82
+        let ankleDorsi = (1 - legs) * -0.15
 
         let joints = ReplayAthleteJointPose(
             torsoLean: finite(torsoLean, fallback: 0),
@@ -283,34 +286,48 @@ public enum ReplayRigPoseSolver {
 
     // MARK: - SkiErg Solver
 
-    private static func solveSkiErg(strokePose: ReplayStrokePose) -> ReplaySkiErgRigPose {
-        let w = strokePose.warpedPhase
-        let swing = cos(w)
-        let crunch = max(0, -swing)
-        let amp = strokePose.amplitude
-
-        // Upper body crunch.
-        let hipCompression = finite(crunch * amp, fallback: 0)
-        let torsoLean = 0.2 + crunch * 0.5 * amp
-
-        // Handles pull down with swing.
-        let handleY = 0.42 + swing * 0.16 * amp - crunch * 0.16 * amp
-        let handleZ = 0.16 + swing * 0.25 * amp
-
-        // Poles swing.
-        let poleRotation = -swing * 0.9 * amp - 0.1
-
-        // Legs flex with crunch.
-        let legFlex = crunch * 0.16 * amp
+    private static func solveSkiErg(
+        strokePose: ReplayStrokePose,
+        distance: Double
+    ) -> ReplaySkiErgRigPose {
+        let graph = ReplayMotionGraph.sampleSkier(pose: strokePose)
+        let press = unit(graph.body.armPress.value)
+        let hinge = unit(graph.body.pelvisHinge.value)
+        let knees = unit(graph.body.kneeFlex.value)
+        let elbow = unit(graph.body.elbowLoad.value)
+        let poleSweep = unit(graph.body.poleSweep.value)
+        let armExtension = unit(graph.body.armExtension.value)
+        let poleContact = unit(graph.contacts.polePlant.value)
+        let hipCompression = unit(graph.body.torsoCompression.value)
+        let torsoLean = 0.18 + hinge * 0.55
+        // Classic double-pole hand arc: high/forward at the plant, then down
+        // past the hips at pole-off. The old indoor-machine handle range was
+        // too low and short for a rigid 1.37 m pole planted on the course.
+        let handleY = 1.58 - press * 1.02
+        let handleZ = 0.66 - poleSweep * 0.94
+        let poleRotation = -0.20 - poleSweep * 0.92
+        // Reconstruct the current/next catch's ground point from pose state,
+        // not the previously rendered frame. On a locally straight course,
+        // subtracting travel since that catch keeps the basket stationary in
+        // course space and remains deterministic under shuffled seeks.
+        let plantCycle = Double(strokePose.index)
+            + (strokePose.cycleFrac >= ReplayMotionGraph.skiPoleApproachStartCycle ? 1 : 0)
+        let currentCycle = Double(strokePose.index) + strokePose.cycleFrac
+        let distanceSincePlant = (currentCycle - plantCycle) * max(0, strokePose.strokeMeters)
+        let plantBasketZ = ReplaySkiGripContract.athleteProportions.polePlantForwardOffset
+            - distanceSincePlant
+        let shoulderFlex = 0.26 - press * 0.64
+        let elbowFlex = elbow * 0.55 + (1 - armExtension) * 0.16
+        let legFlex = knees * 0.24
 
         let joints = ReplayAthleteJointPose(
             torsoLean: finite(torsoLean, fallback: 0.2),
             torsoTilt: 0,
             headPitch: finite(torsoLean * 0.2, fallback: 0),
-            shoulderFlexL: finite(-swing * 0.3 * amp, fallback: 0),
-            shoulderFlexR: finite(-swing * 0.3 * amp, fallback: 0),
-            elbowFlexL: finite(crunch * 0.2 * amp, fallback: 0),
-            elbowFlexR: finite(crunch * 0.2 * amp, fallback: 0),
+            shoulderFlexL: finite(shoulderFlex, fallback: 0),
+            shoulderFlexR: finite(shoulderFlex, fallback: 0),
+            elbowFlexL: finite(elbowFlex, fallback: 0),
+            elbowFlexR: finite(elbowFlex, fallback: 0),
             hipFlexL: finite(legFlex, fallback: 0),
             hipFlexR: finite(legFlex, fallback: 0),
             kneeFlexL: finite(-legFlex * 0.75, fallback: 0),
@@ -322,57 +339,52 @@ public enum ReplayRigPoseSolver {
         return ReplaySkiErgRigPose(
             joints: joints,
             hipCompression: finite(hipCompression, fallback: 0),
-            handleY: finite(handleY, fallback: 0.42),
-            handleZ: finite(handleZ, fallback: 0.16),
-            poleRotation: finite(poleRotation, fallback: -0.1)
+            handleY: finite(handleY, fallback: 1.2),
+            handleZ: finite(handleZ, fallback: 0.2),
+            poleRotation: finite(poleRotation, fallback: -0.1),
+            poleContact: finite(poleContact, fallback: 0),
+            plantBasketZ: finite(plantBasketZ, fallback: 0.24)
         )
     }
 
     // MARK: - BikeErg Solver
 
-    /// Simplified gear ratio: wheel rotation = crank angle × this factor.
-    /// Matches the web renderer3d.ts `phase * 2.4` wheel spin formula.
-    private static let bikeWheelRatio: Double = 2.4
-
-    private static func solveBikeErg(strokePose: ReplayStrokePose) -> ReplayBikeErgRigPose {
-        let phase = strokePose.phase
-        let amp = strokePose.amplitude
-
-        // Crank and wheel rotation.
-        let crankAngle = finite(phase, fallback: 0)
-        let wheelAngle = finite(phase * bikeWheelRatio, fallback: 0)
-
-        // Pedal positions: left and right are 180° apart.
-        // cos(x+π) = -cos(x), sin(x+π) = -sin(x) — avoid redundant trig.
-        let crankRadius: Double = 0.18
-        let cosCrank = cos(crankAngle)
-        let sinCrank = sin(crankAngle)
+    private static func solveBikeErg(
+        strokePose: ReplayStrokePose,
+        distance: Double
+    ) -> ReplayBikeErgRigPose {
+        let graph = ReplayMotionGraph.sampleBike(pose: strokePose)
+        let crankAngle = graph.crank.angle
+        // Roll on the tyre's outer contact radius (rim + tube), matching the
+        // axle-height contract so the wheel neither slips nor sinks.
+        let wheelAngle = finite(distance, fallback: 0) / ReplayBikeGripContract.axleY
+        let crankRadius = ReplayBikeGripContract.crankRadius
+        let cosCrank = graph.leftPedal.rotation.cos
+        let sinCrank = graph.leftPedal.rotation.sin
         let pedalYL = crankRadius * cosCrank
         let pedalZL = crankRadius * sinCrank
         let pedalYR = -pedalYL
         let pedalZR = -pedalZL
-
-        // Rider sway with pedal stroke.
-        let riderSway = sin(phase) * 0.05 * amp
-
-        // Legs follow pedals: hip stays stable, knee follows pedal position.
+        let riderSway = graph.body.torsoSway.value * 0.15
         let thighAngleL = atan2(pedalZL + 0.35, 0.8 - pedalYL)
         let thighAngleR = atan2(pedalZR + 0.35, 0.8 - pedalYR)
+        let leftKnee = unit(graph.leftPedal.kneeLift.value)
+        let rightKnee = unit(graph.rightPedal.kneeLift.value)
 
         let joints = ReplayAthleteJointPose(
-            torsoLean: 0.74, // aero tuck
+            torsoLean: finite(0.74 + graph.body.spineLean.value, fallback: 0.74),
             torsoTilt: finite(riderSway, fallback: 0),
-            headPitch: 0.1,
-            shoulderFlexL: -0.3,
-            shoulderFlexR: -0.3,
+            headPitch: finite(0.1 + graph.body.headStabilization.value, fallback: 0.1),
+            shoulderFlexL: finite(-0.3 + graph.body.shoulderCounterRotation.value, fallback: -0.3),
+            shoulderFlexR: finite(-0.3 - graph.body.shoulderCounterRotation.value, fallback: -0.3),
             elbowFlexL: 0.4,
             elbowFlexR: 0.4,
             hipFlexL: finite(thighAngleL, fallback: 0),
             hipFlexR: finite(thighAngleR, fallback: 0),
-            kneeFlexL: finite(max(0, sin(crankAngle)) * 0.8 * amp, fallback: 0),
-            kneeFlexR: finite(max(0, -sin(crankAngle)) * 0.8 * amp, fallback: 0),
-            ankleDorsiL: finite(sinCrank * 0.15, fallback: 0),
-            ankleDorsiR: finite(-sinCrank * 0.15, fallback: 0)
+            kneeFlexL: finite(leftKnee * 0.8, fallback: 0),
+            kneeFlexR: finite(rightKnee * 0.8, fallback: 0),
+            ankleDorsiL: finite(graph.leftPedal.ankleFlex.value * 0.3, fallback: 0),
+            ankleDorsiR: finite(graph.rightPedal.ankleFlex.value * 0.3, fallback: 0)
         )
 
         return ReplayBikeErgRigPose(
@@ -411,9 +423,11 @@ public enum ReplayRigPoseSolver {
                     kneeFlexR: -0.05
                 ),
                 hipCompression: 0,
-                handleY: 0.42,
-                handleZ: 0.16,
-                poleRotation: -0.2
+                handleY: 1.2,
+                handleZ: 0.2,
+                poleRotation: -0.2,
+                poleContact: 0,
+                plantBasketZ: ReplaySkiGripContract.athleteProportions.polePlantForwardOffset
             ))
         case .bike:
             return .bike(ReplayBikeErgRigPose(
@@ -426,11 +440,15 @@ public enum ReplayRigPoseSolver {
                 ),
                 crankAngle: 0,
                 wheelAngle: 0,
-                pedalPosL: ReplayPedalPosition(y: 0.18, z: 0),
-                pedalPosR: ReplayPedalPosition(y: -0.18, z: 0),
+                pedalPosL: ReplayPedalPosition(y: ReplayBikeGripContract.crankRadius, z: 0),
+                pedalPosR: ReplayPedalPosition(y: -ReplayBikeGripContract.crankRadius, z: 0),
                 riderSway: 0
             ))
         }
+    }
+
+    private static func unit(_ value: Double) -> Double {
+        value.isFinite ? max(0, min(1, value)) : 0
     }
 }
 
