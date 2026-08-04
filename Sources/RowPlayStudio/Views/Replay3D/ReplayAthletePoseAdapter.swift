@@ -17,8 +17,8 @@ struct ReplayAthletePoseAdapter: Sendable {
 
     /// Clip fraction for a sport at the given motion sample.
     func clipFraction(sport: Sport, sample: ReplayAthleteMotionSample) -> Double {
-        let driveEnd = contract.clip(for: sport)?.driveEnd ?? defaultDriveEnd(for: sport)
-        return ReplayAthleteCatalog.clipFraction(
+        let driveEnd = requiredClip(for: sport).driveEnd
+        return ReplayAthletePhaseMap.clipFraction(
             sample: sample,
             authoredDriveEnd: driveEnd
         )
@@ -26,13 +26,14 @@ struct ReplayAthletePoseAdapter: Sendable {
 
     /// Apply deterministic phase sampling to an independent athlete instance.
     @MainActor
+    @discardableResult
     func apply(
         sample: ReplayAthleteMotionSample,
         sport: Sport,
         to instance: ReplayAthleteInstance
-    ) {
+    ) -> Bool {
         let fraction = clipFraction(sport: sport, sample: sample)
-        instance.seek(toClipFraction: fraction)
+        return instance.seek(toClipFraction: fraction)
     }
 
     /// Landmark progress checks used by dense-cycle movement tests.
@@ -42,15 +43,16 @@ struct ReplayAthletePoseAdapter: Sendable {
 
     /// True when `fraction` is within the drive half of the authored clip.
     func isDrive(sport: Sport, clipFraction: Double) -> Bool {
-        let driveEnd = contract.clip(for: sport)?.driveEnd ?? defaultDriveEnd(for: sport)
-        return ReplayAthleteCatalog.wrapUnit(clipFraction) < driveEnd
+        ReplayAthletePhaseMap.isDrive(
+            clipFraction: clipFraction,
+            authoredDriveEnd: requiredClip(for: sport).driveEnd
+        )
     }
 
-    private func defaultDriveEnd(for sport: Sport) -> Double {
-        switch sport {
-        case .rower: 0.38
-        case .skierg: 0.34
-        case .bike: 0.5
+    private func requiredClip(for sport: Sport) -> ReplayAthleteClipSpec {
+        guard let clip = contract.clip(for: sport) else {
+            preconditionFailure("Validated athlete contract missing \(sport.rawValue) clip")
         }
+        return clip
     }
 }

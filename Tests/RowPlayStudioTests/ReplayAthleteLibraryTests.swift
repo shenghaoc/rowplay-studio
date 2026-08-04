@@ -26,6 +26,10 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         XCTAssertTrue(
             Set(loaded.semanticJointIndices).isDisjoint(with: Set(loaded.helperJointIndices))
         )
+        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.leftHandContact)
+        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.rightHandContact)
+        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.leftFootContact)
+        XCTAssertNotNil(loaded.makeInstance(sport: .rower, name: "contacts", isRival: false)?.rightFootContact)
     }
 
     func testInstancesDriveDeterministicFinitePosesForAllSports() async throws {
@@ -163,10 +167,201 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         XCTAssertEqual(resource, "motion.bin")
     }
 
+    func testSuccessfulConcurrentRequestsCoalesceOneRuntimeLoad() async throws {
+        let source = TestAthleteResourceSource(urls: try bundledResourceURLs())
+        var entityLoads = 0
+        let library = ReplayAthleteLibrary(source: source, entityLoader: { url in
+            entityLoads += 1
+            return try await Entity(contentsOf: url)
+        })
+
+        async let first = library.athleteTemplate()
+        async let second = library.athleteTemplate()
+        let templates = await (first, second)
+
+        XCTAssertNotNil(templates.0)
+        XCTAssertTrue(templates.0 === templates.1)
+        XCTAssertEqual(entityLoads, 1)
+        for resource in ReplayAthleteResource.allCases {
+            XCTAssertEqual(source.requests[resource], 1)
+        }
+        XCTAssertNil(library.lastFailure)
+    }
+
+    func testContractHashMismatchReportsExactFailure() async throws {
+        var urls = try bundledResourceURLs()
+        let contractURL = try XCTUnwrap(urls[.contract])
+        var data = try Data(contentsOf: contractURL)
+        data.append(0x0a)
+        let changedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rowplay-contract-hash-\(UUID().uuidString).json")
+        try data.write(to: changedURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: changedURL) }
+        urls[.contract] = changedURL
+
+        let library = ReplayAthleteLibrary(source: TestAthleteResourceSource(urls: urls))
+        let template = await library.athleteTemplate()
+        XCTAssertNil(template)
+        guard case .hashMismatch(let resource, _, _) = library.lastFailure else {
+            return XCTFail("Expected typed contract hash failure")
+        }
+        XCTAssertEqual(resource, "athlete.contract")
+    }
+
+    func testMissingContactEntityReportsExactTemplateFailure() async throws {
+        let urls = try bundledResourceURLs()
+        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.usdz]))
+        let markerName = try XCTUnwrap(
+            ReplayAthleteCatalog.contactEntityNames[.leftHand]
+        )
+        let marker = try XCTUnwrap(
+            root.findEntity(named: markerName) ?? root.replayDescendant(named: markerName)
+        )
+        marker.removeFromParent()
+        let library = ReplayAthleteLibrary(
+            source: TestAthleteResourceSource(urls: urls),
+            entityLoader: { _ in root }
+        )
+
+        let template = await library.athleteTemplate()
+        XCTAssertNil(template)
+        XCTAssertEqual(library.lastFailure, .missingContact("left-hand"))
+    }
+
+    func testDuplicateContactEntityReportsExactTemplateFailure() async throws {
+        let urls = try bundledResourceURLs()
+        let root = try await Entity(contentsOf: try XCTUnwrap(urls[.usdz]))
+        let markerName = try XCTUnwrap(
+            ReplayAthleteCatalog.contactEntityNames[.rightHand]
+        )
+        let marker = try XCTUnwrap(
+            root.findEntity(named: markerName) ?? root.replayDescendant(named: markerName)
+        )
+        root.addChild(marker.clone(recursive: true))
+        let library = ReplayAthleteLibrary(
+            source: TestAthleteResourceSource(urls: urls),
+            entityLoader: { _ in root }
+        )
+
+        let template = await library.athleteTemplate()
+        XCTAssertNil(template)
+        XCTAssertEqual(library.lastFailure, .duplicateContact("right-hand"))
+    }
+
+    func testTemplateValidatorReportsJointIdentityAndTransformFailures() async throws {
+        let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
+        let template = try XCTUnwrap(loadedTemplate)
+        let contactCounts = Dictionary(uniqueKeysWithValues:
+            ReplayAthleteContactRole.allCases.map { ($0, 1) }
+        )
+
+        var duplicateNames = template.jointNames
+        duplicateNames[1] = duplicateNames[0]
+        assertTemplateFailure(
+            ReplayAthleteTemplateValidator.validate(
+                contract: template.contract,
+                motionBoneNames: template.motionTable.boneNames,
+                jointNames: duplicateNames,
+                jointTransforms: template.restTransforms,
+                availableContactRoleCounts: contactCounts
+            ),
+            matches: { if case .duplicateBone = $0 { true } else { false } }
+        )
+
+        var missingNames = template.jointNames
+        let hips = try XCTUnwrap(missingNames.firstIndex {
+            $0.split(separator: "/").last == "v4Hips"
+        })
+        missingNames[hips] = "missingHips"
+        assertTemplateFailure(
+            ReplayAthleteTemplateValidator.validate(
+                contract: template.contract,
+                motionBoneNames: template.motionTable.boneNames,
+                jointNames: missingNames,
+                jointTransforms: template.restTransforms,
+                availableContactRoleCounts: contactCounts
+            ),
+            equals: .missingBone("v4Hips")
+        )
+
+        var nonFinite = template.restTransforms
+        nonFinite[0].translation.x = .nan
+        assertTemplateFailure(
+            ReplayAthleteTemplateValidator.validate(
+                contract: template.contract,
+                motionBoneNames: template.motionTable.boneNames,
+                jointNames: template.jointNames,
+                jointTransforms: nonFinite,
+                availableContactRoleCounts: contactCounts
+            ),
+            matches: { if case .nonFiniteJointTransform = $0 { true } else { false } }
+        )
+
+        assertTemplateFailure(
+            ReplayAthleteTemplateValidator.validate(
+                contract: template.contract,
+                motionBoneNames: template.motionTable.boneNames,
+                jointNames: template.jointNames,
+                jointTransforms: Array(template.restTransforms.dropLast()),
+                availableContactRoleCounts: contactCounts
+            ),
+            equals: .jointCountMismatch(
+                actual: template.restTransforms.count - 1,
+                expected: template.jointNames.count
+            )
+        )
+
+        var missingRightFoot = contactCounts
+        missingRightFoot.removeValue(forKey: .rightFoot)
+        assertTemplateFailure(
+            ReplayAthleteTemplateValidator.validate(
+                contract: template.contract,
+                motionBoneNames: template.motionTable.boneNames,
+                jointNames: template.jointNames,
+                jointTransforms: template.restTransforms,
+                availableContactRoleCounts: missingRightFoot
+            ),
+            equals: .missingContact("right-foot")
+        )
+    }
+
+    func testSeekClearsConstraintAndReapplicationIsDeterministic() async throws {
+        let loadedTemplate = await ReplayAthleteLibrary.shared.athleteTemplate()
+        let template = try XCTUnwrap(loadedTemplate)
+        let instance = try XCTUnwrap(
+            template.makeInstance(sport: .rower, name: "constraint", isRival: false)
+        )
+        XCTAssertTrue(instance.seek(toClipFraction: 0.25))
+        let sampled = try XCTUnwrap(instance.currentConstraintPose())
+        XCTAssertTrue(instance.beginConstraintPass())
+        var constrained = try XCTUnwrap(instance.currentConstraintPose())
+        constrained.jointTransforms[0].translation.x += 0.1
+        XCTAssertTrue(instance.writeConstraintPose(constrained))
+        let firstConstrained = try XCTUnwrap(instance.currentConstraintPose())
+
+        XCTAssertTrue(instance.seek(toClipFraction: 0.25))
+        let restored = try XCTUnwrap(instance.currentConstraintPose())
+        XCTAssertEqual(
+            restored.jointTransforms[0].translation.x,
+            sampled.jointTransforms[0].translation.x,
+            accuracy: 1e-6
+        )
+
+        XCTAssertTrue(instance.beginConstraintPass())
+        var reapplied = try XCTUnwrap(instance.currentConstraintPose())
+        reapplied.jointTransforms[0].translation.x += 0.1
+        XCTAssertTrue(instance.writeConstraintPose(reapplied))
+        XCTAssertEqual(
+            try XCTUnwrap(instance.currentConstraintPose()).jointTransforms[0].translation.x,
+            firstConstrained.jointTransforms[0].translation.x,
+            accuracy: 1e-6
+        )
+    }
+
     private func bundledResourceURLs() throws -> [ReplayAthleteResource: URL] {
         var urls: [ReplayAthleteResource: URL] = [:]
         for resource in ReplayAthleteResource.allCases {
-            urls[resource] = try XCTUnwrap(ReplayAthleteLibrary.bundledURL(
+            urls[resource] = try XCTUnwrap(ReplayBundledResourceSupport.bundledURL(
                 name: resource.name,
                 extension: resource.fileExtension,
                 subdirectory: resource.subdirectory
@@ -175,6 +370,26 @@ final class ReplayAthleteLibraryTests: XCTestCase {
         return urls
     }
 
+    private func assertTemplateFailure(
+        _ result: Result<ReplayAthleteTemplateBinding, ReplayAthleteValidationFailure>,
+        equals expected: ReplayAthleteValidationFailure,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        assertTemplateFailure(result, matches: { $0 == expected }, file: file, line: line)
+    }
+
+    private func assertTemplateFailure(
+        _ result: Result<ReplayAthleteTemplateBinding, ReplayAthleteValidationFailure>,
+        matches predicate: (ReplayAthleteValidationFailure) -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard case .failure(let failure) = result else {
+            return XCTFail("Expected template validation failure", file: file, line: line)
+        }
+        XCTAssertTrue(predicate(failure), "Unexpected failure: \(failure)", file: file, line: line)
+    }
 }
 
 @MainActor

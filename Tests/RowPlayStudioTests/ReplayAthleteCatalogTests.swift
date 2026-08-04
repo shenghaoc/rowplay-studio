@@ -35,11 +35,11 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             return XCTFail("Failed to parse source manifest")
         }
         XCTAssertEqual(
-            ReplayAthleteCatalog.sha256Hex(of: contractData),
+            ReplayBundledResourceSupport.sha256Hex(of: contractData),
             manifest.contractSha256
         )
         XCTAssertEqual(
-            ReplayAthleteCatalog.sha256Hex(of: usdzData),
+            ReplayBundledResourceSupport.sha256Hex(of: usdzData),
             manifest.usdzSha256
         )
 
@@ -90,6 +90,47 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         XCTAssertEqual(
             ReplayAthleteCatalog.validateContract(contract, manifest: manifest).failures,
             [.invalidContract("mesh.meshName")]
+        )
+    }
+
+    func testContractRequiresUniqueContactRolesAndResolvableBones() throws {
+        let original = try Data(
+            contentsOf: try referenceURL("athlete/rowplay-athlete-v4.contract.json")
+        )
+        var root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: original) as? [String: Any]
+        )
+        var contacts = try XCTUnwrap(root["contacts"] as? [[String: Any]])
+        contacts.append(contacts[0])
+        root["contacts"] = contacts
+        let duplicate = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        XCTAssertEqual(
+            failure(ReplayAthleteCatalog.parseContract(data: duplicate)),
+            .duplicateContact("left-hand")
+        )
+
+        contacts.removeLast()
+        contacts[0]["bone"] = "v4MissingHand"
+        root["contacts"] = contacts
+        let missingBone = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        XCTAssertEqual(
+            failure(ReplayAthleteCatalog.parseContract(data: missingBone)),
+            .missingBone("v4MissingHand")
+        )
+    }
+
+    func testMotionManifestParserPreservesTypedCoreLoadErrors() throws {
+        let original = try Data(
+            contentsOf: try referenceURL("motion/rowplay-motion-manifest.json")
+        )
+        var root = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: original) as? [String: Any]
+        )
+        root["formatVersion"] = 999
+        let changed = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        XCTAssertEqual(
+            failure(ReplayAthleteCatalog.parseMotionManifest(data: changed)),
+            .motionTableLoad(.unsupportedFormatVersion(999))
         )
     }
 
@@ -156,7 +197,7 @@ final class ReplayAthleteCatalogTests: XCTestCase {
         XCTAssertEqual(motion.sourceCommit, source.pinnedCommit)
         XCTAssertEqual(motion.sourceGlbSha256, source.glbSha256)
         XCTAssertEqual(motion.motionBinByteCount, binData.count)
-        let table = try ReplayAthleteMotionTable(manifestData: manifestData, binData: binData)
+        let table = try ReplayAthleteMotionTable(manifest: motion, binData: binData)
         XCTAssertEqual(table.boneNames, contract.semanticBoneNames)
         XCTAssertEqual(table.sourceCommit, Self.pinnedRowPlayMain)
         XCTAssertGreaterThanOrEqual(table.samplesPerSport, 257)
@@ -170,22 +211,22 @@ final class ReplayAthleteCatalogTests: XCTestCase {
 
     func testClipFractionIsDeterministicAndBounded() {
         let sample = ReplayAthleteMotionSample(phase: 1.0, cycleFrac: 0.2, driveFrac: 0.4)
-        let a = ReplayAthleteCatalog.clipFraction(sample: sample, authoredDriveEnd: 0.38)
-        let b = ReplayAthleteCatalog.clipFraction(sample: sample, authoredDriveEnd: 0.38)
+        let a = ReplayAthletePhaseMap.clipFraction(sample: sample, authoredDriveEnd: 0.38)
+        let b = ReplayAthletePhaseMap.clipFraction(sample: sample, authoredDriveEnd: 0.38)
         XCTAssertEqual(a, b)
         XCTAssertGreaterThanOrEqual(a, 0)
         XCTAssertLessThan(a, 1)
 
         let catchSample = ReplayAthleteMotionSample(phase: 0, cycleFrac: 0, driveFrac: 0.4)
         XCTAssertEqual(
-            ReplayAthleteCatalog.clipFraction(sample: catchSample, authoredDriveEnd: 0.38),
+            ReplayAthletePhaseMap.clipFraction(sample: catchSample, authoredDriveEnd: 0.38),
             0,
             accuracy: 1e-9
         )
 
         let finishSample = ReplayAthleteMotionSample(phase: 0, cycleFrac: 0.4, driveFrac: 0.4)
         XCTAssertEqual(
-            ReplayAthleteCatalog.clipFraction(sample: finishSample, authoredDriveEnd: 0.38),
+            ReplayAthletePhaseMap.clipFraction(sample: finishSample, authoredDriveEnd: 0.38),
             0.38,
             accuracy: 1e-9
         )
@@ -251,5 +292,12 @@ final class ReplayAthleteCatalogTests: XCTestCase {
             .appendingPathComponent("Sources/RowPlayStudio/Resources/ReplayReference/\(relativePath)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: path.path), "Missing \(relativePath)")
         return path
+    }
+
+    private func failure<Success>(
+        _ result: Result<Success, ReplayAthleteValidationFailure>
+    ) -> ReplayAthleteValidationFailure? {
+        guard case .failure(let failure) = result else { return nil }
+        return failure
     }
 }

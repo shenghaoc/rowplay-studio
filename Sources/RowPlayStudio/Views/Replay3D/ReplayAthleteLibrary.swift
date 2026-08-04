@@ -47,7 +47,7 @@ protocol ReplayAthleteResourceSource: AnyObject {
 @MainActor
 private final class ReplayModuleAthleteResourceSource: ReplayAthleteResourceSource {
     func url(for resource: ReplayAthleteResource) -> URL? {
-        ReplayAthleteLibrary.bundledURL(
+        ReplayBundledResourceSupport.bundledURL(
             name: resource.name,
             extension: resource.fileExtension,
             subdirectory: resource.subdirectory
@@ -69,6 +69,7 @@ final class ReplayAthleteLibrary {
 
     private let source: any ReplayAthleteResourceSource
     private let failureReporter: (ReplayAthleteValidationFailure) -> Void
+    private let entityLoader: (URL) async throws -> Entity
     private var template: ReplayAthleteTemplate?
     private var loadFailed = false
     private var inFlight: Task<ReplayAthleteTemplate?, Never>?
@@ -76,13 +77,16 @@ final class ReplayAthleteLibrary {
 
     init(
         source: any ReplayAthleteResourceSource,
-        failureReporter: ((ReplayAthleteValidationFailure) -> Void)? = nil
+        failureReporter: ((ReplayAthleteValidationFailure) -> Void)? = nil,
+        entityLoader: ((URL) async throws -> Entity)? = nil
     ) {
         self.source = source
+        self.entityLoader = entityLoader ?? { try await Entity(contentsOf: $0) }
         self.failureReporter = failureReporter ?? { failure in
             ReplayAthleteLibrary.logger.warn(
                 "Replay athlete package rejected",
-                failure.diagnosticCode
+                failure.diagnosticCode,
+                failure.diagnosticContext
             )
         }
     }
@@ -127,7 +131,7 @@ final class ReplayAthleteLibrary {
             urls[resource] = url
         }
         var payloads: [ReplayAthleteResource: Data] = [:]
-        for resource in ReplayAthleteResource.allCases {
+        for resource in ReplayAthleteResource.allCases where resource != .usdz {
             guard let url = urls[resource], let data = try? Data(contentsOf: url) else {
                 return reject(.unreadableResource(resource.rawValue))
             }
@@ -136,7 +140,6 @@ final class ReplayAthleteLibrary {
         guard let usdzURL = urls[.usdz],
               let contractData = payloads[.contract],
               let sourceData = payloads[.sourceManifest],
-              let usdzData = payloads[.usdz],
               let motionManifestData = payloads[.motionManifest],
               let motionBinData = payloads[.motionBin] else {
             return reject(.invalidRuntimeAsset)
@@ -150,8 +153,13 @@ final class ReplayAthleteLibrary {
         let sourceValidation = ReplayAthleteCatalog.validateSourceManifest(manifest)
         if let failure = sourceValidation.failures.first { return reject(failure) }
 
-        let contractHash = ReplayAthleteCatalog.sha256Hex(of: contractData)
-        let usdzHash = ReplayAthleteCatalog.sha256Hex(of: usdzData)
+        let contractHash = ReplayBundledResourceSupport.sha256Hex(of: contractData)
+        let usdzHash: String
+        do {
+            usdzHash = try ReplayBundledResourceSupport.sha256Hex(contentsOf: usdzURL)
+        } catch {
+            return reject(.unreadableResource(ReplayAthleteResource.usdz.rawValue))
+        }
         guard contractHash == manifest.contractSha256 else {
             return reject(.hashMismatch(
                 resource: "athlete.contract",
@@ -188,13 +196,22 @@ final class ReplayAthleteLibrary {
 
         // The motion table must come from the same pinned tree and match the
         // contract's semantic hierarchy exactly.
-        guard let motionTable = try? ReplayAthleteMotionTable(
-            manifestData: motionManifestData,
-            binData: motionBinData
-        ),
-        motionTable.boneNames == contract.semanticBoneNames,
+        let motionTable: ReplayAthleteMotionTable
+        do {
+            motionTable = try ReplayAthleteMotionTable(
+                manifest: motionManifest,
+                binData: motionBinData
+            )
+        } catch let error as ReplayAthleteMotionTable.LoadError {
+            return reject(.motionTableLoad(error))
+        } catch {
+            return reject(.invalidMotionManifest("unrecognized table load error"))
+        }
+        let supportedSports = Set(Sport.allCases)
+        guard motionTable.boneNames == contract.semanticBoneNames,
         motionTable.sourceCommit == manifest.pinnedCommit,
-        motionTable.clips.count == 3 else {
+        Set(motionTable.sports) == supportedSports,
+        Set(motionTable.clips.keys) == supportedSports else {
             return reject(.invalidMotionManifest("motion table"))
         }
         for sport in [Sport.rower, .skierg, .bike] {
@@ -206,13 +223,23 @@ final class ReplayAthleteLibrary {
             }
         }
 
-        guard let root = try? await Entity(contentsOf: usdzURL),
-              let template = ReplayAthleteTemplate(
+        let root: Entity
+        do {
+            root = try await entityLoader(usdzURL)
+        } catch {
+            return reject(.unreadableResource("athlete.usdz.runtime"))
+        }
+        let template: ReplayAthleteTemplate
+        do {
+            template = try ReplayAthleteTemplate(
                 root: root,
                 contract: contract,
                 sourceManifest: manifest,
                 motionTable: motionTable
-              ) else {
+            )
+        } catch let failure as ReplayAthleteValidationFailure {
+            return reject(failure)
+        } catch {
             return reject(.invalidRuntimeAsset)
         }
 
@@ -230,11 +257,6 @@ final class ReplayAthleteLibrary {
         return nil
     }
 
-    static func bundledURL(name: String, extension ext: String, subdirectory: String) -> URL? {
-        let bundle = Bundle.module
-        return bundle.url(forResource: name, withExtension: ext, subdirectory: subdirectory)
-            ?? bundle.url(forResource: name, withExtension: ext)
-    }
 }
 
 private extension ReplayAthleteValidationFailure {
@@ -245,18 +267,59 @@ private extension ReplayAthleteValidationFailure {
         case .hashMismatch: "hash-mismatch"
         case .invalidContract: "invalid-contract"
         case .invalidMotionManifest: "invalid-motion-manifest"
+        case .motionTableLoad: "motion-table-load"
         case .byteCountMismatch: "byte-count-mismatch"
         case .missingBone: "missing-bone"
+        case .duplicateBone: "duplicate-bone"
         case .boneCountMismatch: "bone-count-mismatch"
+        case .jointCountMismatch: "joint-count-mismatch"
         case .missingClip: "missing-clip"
         case .invalidClipTiming: "invalid-clip-timing"
         case .missingContact: "missing-contact"
+        case .duplicateContact: "duplicate-contact"
         case .nonFiniteRestTransform: "nonfinite-rest-transform"
+        case .nonFiniteJointTransform: "nonfinite-joint-transform"
         case .missingSkinnedAthlete: "missing-skinned-athlete"
         case .multipleSkinnedAthletes: "multiple-skinned-athletes"
+        case .missingModelComponent: "missing-model-component"
+        case .missingSkeletalPose: "missing-skeletal-pose"
         case .missingAnimation: "missing-animation"
         case .invalidRuntimeAsset: "invalid-runtime-asset"
         case .pinMismatch: "pin-mismatch"
+        }
+    }
+
+    var diagnosticContext: String {
+        switch self {
+        case .missingResource(let resource),
+             .unreadableResource(let resource),
+             .invalidContract(let resource),
+             .invalidMotionManifest(let resource),
+             .missingBone(let resource),
+             .duplicateBone(let resource),
+             .missingContact(let resource),
+             .duplicateContact(let resource),
+             .nonFiniteRestTransform(let resource),
+             .nonFiniteJointTransform(let resource),
+             .pinMismatch(let resource):
+            resource
+        case .hashMismatch(let resource, _, _),
+             .byteCountMismatch(let resource, _, _):
+            resource
+        case .missingClip(let sport), .invalidClipTiming(let sport):
+            sport.rawValue
+        case .motionTableLoad(let error):
+            String(describing: error)
+        case .boneCountMismatch(let actual, let expected),
+             .jointCountMismatch(let actual, let expected):
+            "actual=\(actual) expected=\(expected)"
+        case .missingSkinnedAthlete,
+             .multipleSkinnedAthletes,
+             .missingModelComponent,
+             .missingSkeletalPose,
+             .missingAnimation,
+             .invalidRuntimeAsset:
+            "runtime"
         }
     }
 }

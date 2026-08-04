@@ -4,6 +4,94 @@ import RealityKit
 import RowPlayCore
 import simd
 
+struct ReplayAthleteTemplateBinding {
+    let jointNames: [String]
+    let semanticJointIndices: [Int]
+    let helperJointIndices: [Int]
+    let restTransforms: [Transform]
+}
+
+enum ReplayAthleteTemplateValidator {
+    static func validate(
+        contract: ReplayAthleteContract,
+        motionBoneNames: [String],
+        jointNames: [String],
+        jointTransforms: [Transform],
+        availableContactRoleCounts: [ReplayAthleteContactRole: Int]
+    ) -> Result<ReplayAthleteTemplateBinding, ReplayAthleteValidationFailure> {
+        guard jointNames.count == jointTransforms.count else {
+            return .failure(
+                .jointCountMismatch(actual: jointTransforms.count, expected: jointNames.count)
+            )
+        }
+        guard motionBoneNames == contract.semanticBoneNames else {
+            return .failure(.invalidMotionManifest("boneNames"))
+        }
+
+        var indexByLeafName: [String: Int] = [:]
+        for (index, path) in jointNames.enumerated() {
+            let leaf = path.split(separator: "/").last.map(String.init) ?? path
+            guard indexByLeafName[leaf] == nil else {
+                return .failure(.duplicateBone(leaf))
+            }
+            indexByLeafName[leaf] = index
+            guard isFinite(jointTransforms[index]) else {
+                return .failure(.nonFiniteJointTransform(leaf))
+            }
+        }
+
+        var semanticIndices: [Int] = []
+        semanticIndices.reserveCapacity(motionBoneNames.count)
+        for bone in motionBoneNames {
+            guard let index = indexByLeafName[bone] else {
+                return .failure(.missingBone(bone))
+            }
+            semanticIndices.append(index)
+        }
+        var helperIndices: [Int] = []
+        helperIndices.reserveCapacity(contract.helpers.count)
+        for helper in contract.helpers {
+            guard let index = indexByLeafName[helper.name] else {
+                return .failure(.missingBone(helper.name))
+            }
+            helperIndices.append(index)
+        }
+
+        for role in ReplayAthleteContactRole.allCases {
+            let markerCount = availableContactRoleCounts[role, default: 0]
+            guard markerCount > 0 else {
+                return .failure(.missingContact(role.rawValue))
+            }
+            guard markerCount == 1 else {
+                return .failure(.duplicateContact(role.rawValue))
+            }
+            guard let contact = contract.contacts.first(where: { $0.role == role }),
+                  indexByLeafName[contact.bone] != nil else {
+                return .failure(.missingBone(
+                    contract.contacts.first(where: { $0.role == role })?.bone ?? role.rawValue
+                ))
+            }
+        }
+
+        return .success(ReplayAthleteTemplateBinding(
+            jointNames: jointNames,
+            semanticJointIndices: semanticIndices,
+            helperJointIndices: helperIndices,
+            restTransforms: jointTransforms
+        ))
+    }
+
+    private static func isFinite(_ transform: Transform) -> Bool {
+        let translation = transform.translation
+        let rotation = transform.rotation.vector
+        let scale = transform.scale
+        return translation.x.isFinite && translation.y.isFinite && translation.z.isFinite
+            && rotation.x.isFinite && rotation.y.isFinite
+            && rotation.z.isFinite && rotation.w.isFinite
+            && scale.x.isFinite && scale.y.isFinite && scale.z.isFinite
+    }
+}
+
 /// Immutable loaded production-athlete template.
 ///
 /// The template entity never enters a live scene.  Callers receive
@@ -28,74 +116,41 @@ final class ReplayAthleteTemplate {
 
     private let rootTemplate: Entity
 
-    init?(
+    init(
         root: Entity,
         contract: ReplayAthleteContract,
         sourceManifest: ReplayAthleteSourceManifest,
         motionTable: ReplayAthleteMotionTable
-    ) {
+    ) throws {
         guard let athlete = root.findEntity(named: contract.meshName)
                 ?? root.replayDescendant(named: contract.meshName) else {
-            return nil
+            throw ReplayAthleteValidationFailure.missingSkinnedAthlete
         }
         guard athlete.components[ModelComponent.self] != nil else {
-            return nil
+            throw ReplayAthleteValidationFailure.missingModelComponent
         }
         guard let poses = athlete.components[SkeletalPosesComponent.self],
               let pose = poses.poses.default ?? poses.poses.first else {
-            return nil
-        }
-        let names = pose.jointNames
-        guard names.count == pose.jointTransforms.count else {
-            return nil
+            throw ReplayAthleteValidationFailure.missingSkeletalPose
         }
 
-        // Index every joint by its leaf bone name; the full hierarchy path is
-        // an asset-conversion detail the contract does not own.
-        var indexByLeafName: [String: Int] = [:]
-        for (index, path) in names.enumerated() {
-            let leaf = path.split(separator: "/").last.map(String.init) ?? path
-            // First occurrence wins; a duplicated leaf name is a contract
-            // violation caught below.
-            if indexByLeafName[leaf] != nil {
-                return nil
+        let availableContactRoleCounts = Dictionary(uniqueKeysWithValues:
+            ReplayAthleteCatalog.contactEntityNames.map { role, name in
+                (role, Self.entityCount(named: name, in: root))
             }
-            indexByLeafName[leaf] = index
-        }
-
-        // The loaded skeleton must expose the exact semantic and helper
-        // hierarchy the live contract declares.
-        var semanticIndices: [Int] = []
-        semanticIndices.reserveCapacity(motionTable.boneNames.count)
-        for bone in motionTable.boneNames {
-            guard let index = indexByLeafName[bone] else {
-                return nil
-            }
-            semanticIndices.append(index)
-        }
-        guard motionTable.boneNames == contract.semanticBoneNames else {
-            return nil
-        }
-        var helperIndices: [Int] = []
-        helperIndices.reserveCapacity(contract.helpers.count)
-        for helper in contract.helpers {
-            guard let index = indexByLeafName[helper.name] else {
-                return nil
-            }
-            helperIndices.append(index)
-        }
-
-        for transform in pose.jointTransforms {
-            let t = transform.translation
-            let r = transform.rotation.vector
-            let s = transform.scale
-            let finite =
-                t.x.isFinite && t.y.isFinite && t.z.isFinite
-                && r.x.isFinite && r.y.isFinite && r.z.isFinite && r.w.isFinite
-                && s.x.isFinite && s.y.isFinite && s.z.isFinite
-            if !finite {
-                return nil
-            }
+        )
+        let binding: ReplayAthleteTemplateBinding
+        switch ReplayAthleteTemplateValidator.validate(
+            contract: contract,
+            motionBoneNames: motionTable.boneNames,
+            jointNames: pose.jointNames,
+            jointTransforms: Array(pose.jointTransforms),
+            availableContactRoleCounts: availableContactRoleCounts
+        ) {
+        case .success(let validated):
+            binding = validated
+        case .failure(let failure):
+            throw failure
         }
 
         // Disable any authored light so native lighting remains authoritative.
@@ -106,12 +161,19 @@ final class ReplayAthleteTemplate {
         self.contract = contract
         self.sourceManifest = sourceManifest
         self.motionTable = motionTable
-        self.jointNames = names
-        self.semanticJointIndices = semanticIndices
-        self.helperJointIndices = helperIndices
-        self.restTransforms = Array(pose.jointTransforms)
+        self.jointNames = binding.jointNames
+        self.semanticJointIndices = binding.semanticJointIndices
+        self.helperJointIndices = binding.helperJointIndices
+        self.restTransforms = binding.restTransforms
         self.rootTemplate = root
         rootTemplate.isEnabled = false
+    }
+
+    private static func entityCount(named name: String, in entity: Entity) -> Int {
+        let localCount = entity.name == name ? 1 : 0
+        return localCount + entity.children.reduce(into: 0) { count, child in
+            count += entityCount(named: name, in: child)
+        }
     }
 
     func makeInstance(
@@ -119,7 +181,8 @@ final class ReplayAthleteTemplate {
         name: String,
         isRival: Bool
     ) -> ReplayAthleteInstance? {
-        guard motionTable.clips[sport] != nil else { return nil }
+        guard motionTable.clips[sport] != nil,
+              let selectedClipName = contract.clip(for: sport)?.name else { return nil }
         let clone = rootTemplate.clone(recursive: true)
         clone.name = name
         clone.isEnabled = true
@@ -134,7 +197,8 @@ final class ReplayAthleteTemplate {
             root: clone,
             athleteEntity: athlete,
             template: self,
-            sport: sport
+            sport: sport,
+            selectedClipName: selectedClipName
         )
         instance.applyBodyStyle(isRival: isRival)
         return instance
@@ -169,7 +233,8 @@ final class ReplayAthleteInstance {
         root: Entity,
         athleteEntity: Entity,
         template: ReplayAthleteTemplate,
-        sport: Sport
+        sport: Sport,
+        selectedClipName: String
     ) {
         self.root = root
         self.athleteEntity = athleteEntity
@@ -177,7 +242,7 @@ final class ReplayAthleteInstance {
         self.contract = template.contract
         self.jointNames = template.jointNames
         self.sport = sport
-        self.selectedClipName = template.contract.clip(for: sport)?.name ?? ""
+        self.selectedClipName = selectedClipName
         self.sampleBuffer = Array(
             repeating: ReplayAthleteBoneTransform(),
             count: template.motionTable.boneNames.count
@@ -187,14 +252,14 @@ final class ReplayAthleteInstance {
         // stack layer composes its install-time closure onto these transforms.
         self.workingTransforms = template.restTransforms
 
-        func contactEntity(for role: String) -> Entity? {
+        func contactEntity(for role: ReplayAthleteContactRole) -> Entity? {
             guard let name = ReplayAthleteCatalog.contactEntityNames[role] else { return nil }
             return root.findEntity(named: name) ?? root.replayDescendant(named: name)
         }
-        self.leftHandContact = contactEntity(for: "left-hand")
-        self.rightHandContact = contactEntity(for: "right-hand")
-        self.leftFootContact = contactEntity(for: "left-foot")
-        self.rightFootContact = contactEntity(for: "right-foot")
+        self.leftHandContact = contactEntity(for: .leftHand)
+        self.rightHandContact = contactEntity(for: .rightHand)
+        self.leftFootContact = contactEntity(for: .leftFoot)
+        self.rightFootContact = contactEntity(for: .rightFoot)
 
         // Stable names used by contact tests and equipment solvers.
         leftHandContact?.name = "hand-L"
@@ -221,8 +286,13 @@ final class ReplayAthleteInstance {
     /// no state from a previous frame can accumulate.  Digit-closure helper
     /// rotations were composed once at install and ride their corrected hand
     /// parents.
-    func seek(toClipFraction fraction: Double) {
-        template.motionTable.sample(sport: sport, fraction: fraction, into: &sampleBuffer)
+    @discardableResult
+    func seek(toClipFraction fraction: Double) -> Bool {
+        guard template.motionTable.sample(
+            sport: sport,
+            fraction: fraction,
+            into: &sampleBuffer
+        ) else { return false }
         for (tableIndex, jointIndex) in template.semanticJointIndices.enumerated() {
             let sampled = sampleBuffer[tableIndex]
             let scale = SIMD3<Float>(
@@ -247,8 +317,9 @@ final class ReplayAthleteInstance {
                 translation: translation
             )
         }
-        writePose(transforms: workingTransforms)
+        guard writePose(transforms: workingTransforms) else { return false }
         constraintPose = nil
+        return true
     }
 
     func stopAnimation() {
@@ -297,19 +368,20 @@ final class ReplayAthleteInstance {
         return true
     }
 
-    func contactEntity(role: String) -> Entity? {
+    func contactEntity(role: ReplayAthleteContactRole) -> Entity? {
         switch role {
-        case "left-hand": leftHandContact
-        case "right-hand": rightHandContact
-        case "left-foot": leftFootContact
-        case "right-foot": rightFootContact
-        default: nil
+        case .leftHand: leftHandContact
+        case .rightHand: rightHandContact
+        case .leftFoot: leftFootContact
+        case .rightFoot: rightFootContact
         }
     }
 
     /// Begin one deterministic skeletal correction pass from the sampled base
-    /// pose.  The caller must use `prepare → orient → constrain` in a single
-    /// frame.
+    /// pose. The per-frame order is `seek → beginConstraintPass →
+    /// solve/write`. Constraint transforms are intentionally ephemeral:
+    /// `seek` always rebuilds from the sampled table and bind helpers, so a
+    /// shuffled seek cannot accumulate an earlier frame's correction.
     func beginConstraintPass() -> Bool {
         if baseRootTransform == nil {
             baseRootTransform = root.transform
@@ -336,29 +408,33 @@ final class ReplayAthleteInstance {
         return component.poses.default ?? component.poses.first
     }
 
-    func writeConstraintPose(_ pose: SkeletalPose) {
+    @discardableResult
+    func writeConstraintPose(_ pose: SkeletalPose) -> Bool {
         guard var component = athleteEntity.components[SkeletalPosesComponent.self] else {
-            return
+            return false
         }
         component.poses.default = pose
         athleteEntity.components.set(component)
         constraintPose = pose
+        return true
     }
 
-    private func writePose(transforms: [Transform]) {
+    @discardableResult
+    private func writePose(transforms: [Transform]) -> Bool {
         guard var component = athleteEntity.components[SkeletalPosesComponent.self],
               var pose = component.poses.default ?? component.poses.first,
               pose.jointTransforms.count == transforms.count else {
-            return
+            return false
         }
         for index in transforms.indices {
             pose.jointTransforms[index] = transforms[index]
         }
         component.poses.default = pose
         athleteEntity.components.set(component)
+        return true
     }
 
-    func contactSpec(role: String) -> ReplayAthleteContactSpec? {
+    func contactSpec(role: ReplayAthleteContactRole) -> ReplayAthleteContactSpec? {
         contract.contacts.first { $0.role == role }
     }
 
@@ -369,7 +445,10 @@ final class ReplayAthleteInstance {
         return pose.jointNames.firstIndex { $0.split(separator: "/").last == Substring(bone) }
     }
 
-    func skeletalContactPosition(role: String, relativeTo space: Entity) -> SIMD3<Float>? {
+    func skeletalContactPosition(
+        role: ReplayAthleteContactRole,
+        relativeTo space: Entity
+    ) -> SIMD3<Float>? {
         guard let pose = currentConstraintPose(),
               let spec = contactSpec(role: role),
               let index = jointIndex(named: spec.bone, in: pose) else {
@@ -421,7 +500,11 @@ final class ReplayAthleteInstance {
         return matrices
     }
 
-    func setContactDebugMarker(role: String, position: SIMD3<Float>, relativeTo space: Entity) {
+    func setContactDebugMarker(
+        role: ReplayAthleteContactRole,
+        position: SIMD3<Float>,
+        relativeTo space: Entity
+    ) {
         // Markers mirror the solved skeletal contact for diagnostics/tests;
         // they are never snapped to equipment targets.
         contactEntity(role: role)?.setPosition(position, relativeTo: space)

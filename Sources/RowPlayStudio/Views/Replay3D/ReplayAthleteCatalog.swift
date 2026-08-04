@@ -1,34 +1,18 @@
-import CryptoKit
 import Foundation
 import RowPlayCore
 import simd
 
-/// Motion sample consumed by the V4 pose adapter.
-///
-/// Native replay remains authoritative for the clock; this is only the
-/// phase/drive fraction used to seek the authored sport motion table.
-struct ReplayAthleteMotionSample: Equatable, Sendable {
-    let phase: Double
-    let cycleFrac: Double
-    let driveFrac: Double
-
-    init(phase: Double, cycleFrac: Double, driveFrac: Double) {
-        self.phase = phase
-        self.cycleFrac = cycleFrac
-        self.driveFrac = driveFrac
-    }
-
-    init(strokePose: ReplayStrokePose) {
-        self.phase = strokePose.phase
-        self.cycleFrac = strokePose.cycleFrac
-        self.driveFrac = strokePose.driveFrac
-    }
+enum ReplayAthleteContactRole: String, CaseIterable, Sendable {
+    case leftHand = "left-hand"
+    case rightHand = "right-hand"
+    case leftFoot = "left-foot"
+    case rightFoot = "right-foot"
 }
 
 /// A contact role authored on the V4 contract.
 struct ReplayAthleteContactSpec: Equatable, Sendable {
     let bone: String
-    let role: String
+    let role: ReplayAthleteContactRole
     let localOffset: SIMD3<Double>
 }
 
@@ -135,14 +119,6 @@ struct ReplayAthleteSourceManifest: Equatable, Sendable {
     let totalBoneCount: Int
 }
 
-/// Cross-seals the sampled motion payload to the same upstream athlete tree.
-struct ReplayAthleteMotionManifest: Equatable, Sendable {
-    let sourceCommit: String
-    let sourceGlbSha256: String
-    let motionBinSha256: String
-    let motionBinByteCount: Int
-}
-
 /// Reasons the canonical athlete package cannot be used.
 enum ReplayAthleteValidationFailure: Error, Equatable, Sendable {
     case missingResource(String)
@@ -150,15 +126,22 @@ enum ReplayAthleteValidationFailure: Error, Equatable, Sendable {
     case hashMismatch(resource: String, expected: String, actual: String)
     case invalidContract(String)
     case invalidMotionManifest(String)
+    case motionTableLoad(ReplayAthleteMotionTable.LoadError)
     case byteCountMismatch(resource: String, expected: Int, actual: Int)
     case missingBone(String)
+    case duplicateBone(String)
     case boneCountMismatch(actual: Int, expected: Int)
+    case jointCountMismatch(actual: Int, expected: Int)
     case missingClip(Sport)
     case invalidClipTiming(Sport)
     case missingContact(String)
+    case duplicateContact(String)
     case nonFiniteRestTransform(String)
+    case nonFiniteJointTransform(String)
     case missingSkinnedAthlete
     case multipleSkinnedAthletes
+    case missingModelComponent
+    case missingSkeletalPose
     case missingAnimation
     case invalidRuntimeAsset
     case pinMismatch(String)
@@ -208,52 +191,12 @@ enum ReplayAthleteCatalog {
         "athlete-face-detail",
     ]
 
-    static let contactEntityNames: [String: String] = [
-        "left-hand": "v4LeftHandContact",
-        "right-hand": "v4RightHandContact",
-        "left-foot": "v4LeftFootContact",
-        "right-foot": "v4RightFootContact",
+    static let contactEntityNames: [ReplayAthleteContactRole: String] = [
+        .leftHand: "v4LeftHandContact",
+        .rightHand: "v4RightHandContact",
+        .leftFoot: "v4LeftFootContact",
+        .rightFoot: "v4RightFootContact",
     ]
-
-    /// Map canonical contract sport IDs onto native `Sport`.
-    static func sport(fromContractSport raw: String) -> Sport? {
-        switch raw {
-        case "rower":
-            .rower
-        case "skierg", "skier":
-            .skierg
-        case "bike":
-            .bike
-        default:
-            nil
-        }
-    }
-
-    static func wrapUnit(_ value: Double) -> Double {
-        guard value.isFinite else { return 0 }
-        var wrapped = value - value.rounded(.down)
-        if wrapped < 0 { wrapped += 1 }
-        if wrapped >= 1 { wrapped = 0 }
-        return wrapped
-    }
-
-    /// Deterministic phase → clip fraction mapping ported from the web V4
-    /// adapter: maps the native stroke cycle onto the authored clip's
-    /// drive/recovery split without introducing an independent animation
-    /// timer.
-    static func clipFraction(
-        sample: ReplayAthleteMotionSample,
-        authoredDriveEnd: Double
-    ) -> Double {
-        let phaseCycle = wrapUnit(sample.phase / (2 * Double.pi))
-        let cycle = sample.cycleFrac.isFinite ? wrapUnit(sample.cycleFrac) : phaseCycle
-        let sourceDrive = min(0.95, max(0.05, sample.driveFrac.isFinite ? sample.driveFrac : 0.4))
-        let clipDrive = min(0.95, max(0.05, authoredDriveEnd.isFinite ? authoredDriveEnd : 0.5))
-        if cycle < sourceDrive {
-            return (cycle / sourceDrive) * clipDrive
-        }
-        return clipDrive + ((cycle - sourceDrive) / (1 - sourceDrive)) * (1 - clipDrive)
-    }
 
     static func expectedClipName(for sport: Sport) -> String {
         switch sport {
@@ -362,7 +305,7 @@ enum ReplayAthleteCatalog {
         var clips: [ReplayAthleteClipSpec] = []
         for raw in rawClips {
             guard let sportRaw = raw["sport"] as? String,
-                  let sport = sport(fromContractSport: sportRaw),
+                  let sport = ReplayAthleteMotionTable.sport(fromManifestName: sportRaw),
                   let name = raw["name"] as? String,
                   let duration = raw["durationSeconds"] as? Double,
                   let driveEnd = raw["driveEnd"] as? Double,
@@ -398,7 +341,8 @@ enum ReplayAthleteCatalog {
         var contacts: [ReplayAthleteContactSpec] = []
         for raw in rawContacts {
             guard let bone = raw["bone"] as? String,
-                  let role = raw["role"] as? String,
+                  let roleRaw = raw["role"] as? String,
+                  let role = ReplayAthleteContactRole(rawValue: roleRaw),
                   let offset = raw["localOffset"] as? [Double],
                   offset.count == 3,
                   offset.allSatisfy(\.isFinite) else {
@@ -412,10 +356,14 @@ enum ReplayAthleteCatalog {
                 )
             )
         }
-        for role in ["left-hand", "right-hand", "left-foot", "right-foot"] {
-            if !contacts.contains(where: { $0.role == role }) {
-                return .failure(.missingContact(role))
-            }
+        let allBoneNames = semanticNames.union(helperNames)
+        for contact in contacts where !allBoneNames.contains(contact.bone) {
+            return .failure(.missingBone(contact.bone))
+        }
+        for role in ReplayAthleteContactRole.allCases {
+            let count = contacts.filter { $0.role == role }.count
+            if count == 0 { return .failure(.missingContact(role.rawValue)) }
+            if count > 1 { return .failure(.duplicateContact(role.rawValue)) }
         }
 
         guard let surfacesRaw = root["surfaces"] as? [[String: Any]] else {
@@ -596,28 +544,18 @@ enum ReplayAthleteCatalog {
 
     static func parseMotionManifest(
         data: Data
-    ) -> Result<ReplayAthleteMotionManifest, ReplayAthleteValidationFailure> {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let sourceCommit = root["sourceCommit"] as? String,
-              let sourceGlbSha256 = root["sourceGlbSha256"] as? String,
-              let motionBinSha256 = root["motionBinSha256"] as? String,
-              let motionBinByteCount = root["motionBinByteCount"] as? Int,
-              !sourceCommit.isEmpty,
-              !sourceGlbSha256.isEmpty,
-              !motionBinSha256.isEmpty,
-              motionBinByteCount > 0 else {
-            return .failure(.invalidMotionManifest("required fields"))
+    ) -> Result<ReplayAthleteMotionTable.Manifest, ReplayAthleteValidationFailure> {
+        do {
+            return .success(try ReplayAthleteMotionTable.parseManifest(data: data))
+        } catch let error as ReplayAthleteMotionTable.LoadError {
+            return .failure(.motionTableLoad(error))
+        } catch {
+            return .failure(.invalidMotionManifest("unrecognized load error"))
         }
-        return .success(ReplayAthleteMotionManifest(
-            sourceCommit: sourceCommit,
-            sourceGlbSha256: sourceGlbSha256,
-            motionBinSha256: motionBinSha256,
-            motionBinByteCount: motionBinByteCount
-        ))
     }
 
     static func validateMotionManifest(
-        _ motion: ReplayAthleteMotionManifest,
+        _ motion: ReplayAthleteMotionTable.Manifest,
         source: ReplayAthleteSourceManifest,
         binData: Data
     ) -> ReplayAthleteValidationResult {
@@ -628,25 +566,32 @@ enum ReplayAthleteCatalog {
         if motion.sourceGlbSha256 != source.glbSha256 {
             failures.append(.pinMismatch("motion.sourceGlbSha256"))
         }
-        if motion.motionBinByteCount != binData.count {
+        guard let byteCount = motion.motionBinByteCount, byteCount > 0 else {
+            return ReplayAthleteValidationResult(
+                failures: failures + [.invalidMotionManifest("motionBinByteCount")]
+            )
+        }
+        if byteCount != binData.count {
             failures.append(.byteCountMismatch(
                 resource: "motion.bin",
-                expected: motion.motionBinByteCount,
+                expected: byteCount,
                 actual: binData.count
             ))
         }
-        let actualHash = sha256Hex(of: binData)
-        if motion.motionBinSha256 != actualHash {
+        let actualHash = ReplayBundledResourceSupport.sha256Hex(of: binData)
+        guard let expectedHash = motion.motionBinSha256, !expectedHash.isEmpty else {
+            return ReplayAthleteValidationResult(
+                failures: failures + [.invalidMotionManifest("motionBinSha256")]
+            )
+        }
+        if expectedHash != actualHash {
             failures.append(.hashMismatch(
                 resource: "motion.bin",
-                expected: motion.motionBinSha256,
+                expected: expectedHash,
                 actual: actualHash
             ))
         }
         return ReplayAthleteValidationResult(failures: failures)
     }
 
-    static func sha256Hex(of data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
 }

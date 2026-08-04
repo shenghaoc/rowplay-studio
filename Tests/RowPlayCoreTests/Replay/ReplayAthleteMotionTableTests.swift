@@ -120,6 +120,27 @@ final class ReplayAthleteMotionTableTests: XCTestCase {
         XCTAssertEqual(correctSize, [sentinel])
     }
 
+    func testManifestRejectsClipForSportMissingFromSportsArray() throws {
+        let manifest = """
+        {"formatVersion":2,"boneNames":["hips"],"samplesPerSport":2,"sourceCommit":"fixture",
+        "sports":["rower"],"clips":[
+          {"sport":"rower","clipName":"row-cycle","durationSeconds":2,
+           "driveEnd":0.4,"phaseLandmarks":{"catch":0}},
+          {"sport":"bike","clipName":"bike-cycle","durationSeconds":2,
+           "driveEnd":0.5,"phaseLandmarks":{"top":0}}
+        ]}
+        """
+
+        XCTAssertThrowsError(
+            try ReplayAthleteMotionTable.parseManifest(data: Data(manifest.utf8))
+        ) { error in
+            XCTAssertEqual(
+                error as? ReplayAthleteMotionTable.LoadError,
+                .invalidManifest("clip for undeclared sport bike")
+            )
+        }
+    }
+
     private func binaryData(_ values: [Float]) -> Data {
         let littleEndian = values.map { $0.bitPattern.littleEndian }
         return littleEndian.withUnsafeBytes { Data($0) }
