@@ -19,6 +19,7 @@ public enum ReplayRenderQuality: String, CaseIterable, Equatable, Sendable {
                 wakeEntryCapacityPerParticipant: 0,
                 sprayParticleCapacity: 0,
                 sprayDropletsPerSidePerCatch: 0,
+                buoysPerRing: 12,
                 targetFrameRate: 30
             )
         case .medium:
@@ -28,6 +29,7 @@ public enum ReplayRenderQuality: String, CaseIterable, Equatable, Sendable {
                 wakeEntryCapacityPerParticipant: 16,
                 sprayParticleCapacity: 40,
                 sprayDropletsPerSidePerCatch: 4,
+                buoysPerRing: 18,
                 targetFrameRate: 60
             )
         case .high:
@@ -37,6 +39,7 @@ public enum ReplayRenderQuality: String, CaseIterable, Equatable, Sendable {
                 wakeEntryCapacityPerParticipant: 28,
                 sprayParticleCapacity: 48,
                 sprayDropletsPerSidePerCatch: 4,
+                buoysPerRing: 22,
                 targetFrameRate: 60
             )
         case .ultra:
@@ -46,6 +49,7 @@ public enum ReplayRenderQuality: String, CaseIterable, Equatable, Sendable {
                 wakeEntryCapacityPerParticipant: 44,
                 sprayParticleCapacity: 72,
                 sprayDropletsPerSidePerCatch: 6,
+                buoysPerRing: 28,
                 targetFrameRate: 60
             )
         }
@@ -90,12 +94,14 @@ public struct ReplayRenderConfiguration: Equatable, Sendable {
     public static let maximumWakeEntryCapacityPerParticipant = 44
     public static let maximumSprayParticleCapacity = 72
     public static let maximumSprayDropletsPerSidePerCatch = 6
+    public static let maximumBuoysPerRing = 28
 
     public let courseRingSegmentCount: Int
     public let laneMarkerCount: Int
     public let wakeEntryCapacityPerParticipant: Int
     public let sprayParticleCapacity: Int
     public let sprayDropletsPerSidePerCatch: Int
+    public let buoysPerRing: Int
     public let targetFrameRate: Int
 
     public init(
@@ -104,6 +110,7 @@ public struct ReplayRenderConfiguration: Equatable, Sendable {
         wakeEntryCapacityPerParticipant: Int,
         sprayParticleCapacity: Int,
         sprayDropletsPerSidePerCatch: Int,
+        buoysPerRing: Int,
         targetFrameRate: Int
     ) {
         self.courseRingSegmentCount = Self.bounded(
@@ -125,6 +132,10 @@ public struct ReplayRenderConfiguration: Equatable, Sendable {
         self.sprayDropletsPerSidePerCatch = Self.bounded(
             sprayDropletsPerSidePerCatch,
             maximum: Self.maximumSprayDropletsPerSidePerCatch
+        )
+        self.buoysPerRing = Self.bounded(
+            buoysPerRing,
+            maximum: Self.maximumBuoysPerRing
         )
         self.targetFrameRate = targetFrameRate == 30 ? 30 : 60
     }

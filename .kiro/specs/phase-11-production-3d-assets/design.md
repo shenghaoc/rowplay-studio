@@ -74,28 +74,34 @@ tables (`ReplayRowGripContract`, `ReplaySkiGripContract`,
 
 ## Scene composition
 
-`Replay3DSceneBuilder` composes: native venue (`ReplayEnvironment*` from the
-ported plan + CC0 maps, per-tier), sport equipment (procedural from Core
-contracts at Low/Medium, authored packages at High/Ultra via
-`ReplayBundledRigVisualProvider`), and production athletes — independent live
-and rival V4 clones with their own materials and skeletons, at every tier once
-the asset set validates.  Athlete surface detail follows the 0/128/256/512 px
-Low/Medium/High/Ultra ladder independently of the equipment-source split.
+`Replay3DSceneBuilder` composes: a non-failable native procedural venue
+(`ReplayEnvironment*` live plan + per-tier primary-receiver CC0 maps), sport
+equipment (procedural from Core contracts at Low/Medium, authored packages at
+High/Ultra via `ReplayBundledRigVisualProvider`), and production athletes —
+independent live and rival V4 clones with their own materials and skeletons, at
+every tier once the asset set validates.  Athlete surface detail follows the
+0/128/256/512 px Low/Medium/High/Ultra ladder independently of the
+equipment-source split.
 The builder also owns the effect renderer and per-sport chase camera
 (`ReplayCameraSolver`/`ReplayCameraChaseRig` in Core).  2D scenes live in
 `Views/Replay2D/` and consume the same motion graph.
 
 ## Failure model
 
-Athlete, equipment and venue loads validate and cache failures. A missing or
-invalid complete asset set yields the complete procedural scene with all replay
-state (time, play/pause, speed, camera, quality, rival) preserved. Low/Medium's
-validated V4 athlete plus procedural equipment is the intended tier policy,
-not a failure hybrid. When High/Ultra requests authored equipment, every
-logical visual clone is preflighted before either authored athlete or equipment
-is attached; a preflight failure discards both. A canonical-athlete runtime
-failure at any tier drops the asset set and rebuilds the complete procedural
-scene without per-frame retries.
+Athlete and equipment packages validate atomically and cache failures. A
+missing or invalid complete asset set yields the complete procedural rig with
+replay state (time, play/pause, speed, camera, quality, rival) preserved.
+Low/Medium's validated V4 athlete plus procedural equipment is the intended
+tier policy, not a failure hybrid. When High/Ultra requests authored equipment,
+every logical visual clone is preflighted before either authored athlete or
+equipment is attached; a preflight failure discards both, so athlete/equipment
+fallbacks never form mixed scenes. A canonical-athlete runtime failure at any
+tier drops the asset set and rebuilds the complete procedural scene without
+per-frame retries.
+
+Native venue geometry is deterministic and non-failable. Missing environment
+texture slots are cached and degrade only that primary receiver to its scalar
+PBR values; no per-frame retries occur.
 
 Equipment bundle URL resolution and RealityKit entity/provider work stay on
 the main actor; immutable manifest/package reads, streaming hashes, JSON
