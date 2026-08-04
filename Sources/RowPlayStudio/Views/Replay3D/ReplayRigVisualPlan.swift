@@ -16,40 +16,33 @@ enum ReplayRigVisualCatalog {
         switch sport {
         case .rower:
             return [
-                .init(logicalName: "visual-hull", sourceName: "equipment:row:boat-assembly:hull"),
-                .init(logicalName: "visual-deck-stripe", sourceName: "equipment:row:boat-assembly:accent-strakes"),
-                .init(logicalName: "visual-footplate", sourceName: "equipment:row:boat-assembly:foot-stretcher"),
-                .init(logicalName: "visual-rail", sourceName: "equipment:row:boat-assembly:slide-rails"),
+                // Consume the complete composites that the package gate
+                // validates. Selecting a few children here made the rest of
+                // the authored hull/rigger/cockpit set validation-only.
+                .init(logicalName: "visual-boat", sourceName: "equipment:row:boat-assembly"),
                 .init(logicalName: "visual-seat", sourceName: "equipment:row:seat-carriage"),
-                .init(logicalName: "visual-handle", sourceName: "equipment:row:oar-rig:grip"),
                 .init(logicalName: "visual-oar-port", sourceName: "equipment:row:oar-rig"),
                 .init(logicalName: "visual-oar-starboard", sourceName: "equipment:row:oar-rig"),
+                .init(logicalName: "visual-blade-port", sourceName: "equipment:row:blade"),
+                .init(logicalName: "visual-blade-starboard", sourceName: "equipment:row:blade"),
             ]
         case .skierg:
             return [
-                .init(logicalName: "visual-post-L", sourceName: "equipment:ski:ski-assembly:edge-left"),
-                .init(logicalName: "visual-post-R", sourceName: "equipment:ski:ski-assembly:edge-right"),
-                .init(logicalName: "visual-topBar", sourceName: "equipment:ski:ski-assembly:tip-ridge"),
-                .init(logicalName: "visual-cable", sourceName: "equipment:ski:pole-shaft"),
-                .init(logicalName: "visual-handle-L", sourceName: "equipment:ski:pole-grip"),
-                .init(logicalName: "visual-handle-R", sourceName: "equipment:ski:pole-grip"),
-                .init(logicalName: "visual-platform", sourceName: "equipment:ski:ski-assembly:top-deck"),
-                .init(logicalName: "visual-pole-L", sourceName: "equipment:ski:pole-shaft"),
-                .init(logicalName: "visual-pole-R", sourceName: "equipment:ski:pole-shaft"),
+                .init(logicalName: "visual-ski-L", sourceName: "equipment:ski:ski-assembly"),
+                .init(logicalName: "visual-ski-R", sourceName: "equipment:ski:ski-assembly"),
+                .init(logicalName: "visual-pole-shaft-L", sourceName: "equipment:ski:pole-shaft"),
+                .init(logicalName: "visual-pole-shaft-R", sourceName: "equipment:ski:pole-shaft"),
+                .init(logicalName: "visual-pole-grip-L", sourceName: "equipment:ski:pole-grip"),
+                .init(logicalName: "visual-pole-grip-R", sourceName: "equipment:ski:pole-grip"),
+                .init(logicalName: "visual-pole-basket-L", sourceName: "equipment:ski:pole-basket"),
+                .init(logicalName: "visual-pole-basket-R", sourceName: "equipment:ski:pole-basket"),
             ]
         case .bike:
             return [
                 .init(logicalName: "visual-wheel-front", sourceName: "equipment:bike:wheel-assembly"),
                 .init(logicalName: "visual-wheel-rear", sourceName: "equipment:bike:wheel-assembly"),
-                .init(logicalName: "visual-downTube", sourceName: "equipment:bike:frame-assembly:main-triangle"),
-                .init(logicalName: "visual-seatTube", sourceName: "equipment:bike:frame-assembly:seat-post"),
-                .init(logicalName: "visual-topTube", sourceName: "equipment:bike:frame-assembly:stays-and-fork"),
-                .init(logicalName: "visual-saddle", sourceName: "equipment:bike:frame-assembly:saddle"),
-                .init(logicalName: "visual-cranks", sourceName: "equipment:bike:drivetrain-assembly:crank-arms"),
-                .init(logicalName: "visual-chainRing", sourceName: "equipment:bike:drivetrain-assembly:chainring"),
-                .init(logicalName: "visual-pedal-L", sourceName: "equipment:bike:drivetrain-assembly:clipless-pedals"),
-                .init(logicalName: "visual-pedal-R", sourceName: "equipment:bike:drivetrain-assembly:clipless-pedals"),
-                .init(logicalName: "visual-handlebar", sourceName: "equipment:bike:frame-assembly:cockpit"),
+                .init(logicalName: "visual-frame", sourceName: "equipment:bike:frame-assembly"),
+                .init(logicalName: "visual-drivetrain", sourceName: "equipment:bike:drivetrain-assembly"),
             ]
         }
     }

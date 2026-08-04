@@ -92,8 +92,10 @@ the athlete is never scaled to fit equipment.
 6.1 The three venue stories are ported natively: RowErg morning-glass regatta
 basin; SkiErg blue-hour Nordic stadium; BikeErg evening indoor velodrome with
 the black/red/blue/côte-d'azur line grammar.
-6.2 Quality tiers follow the current contract: a valid production package is
-usable at every tier; the procedural renderer is a failure fallback only.
+6.2 Quality tiers follow the current contract: the validated production
+athlete is active at every tier; authored equipment is active at High/Ultra,
+while Low/Medium intentionally use contract-driven procedural equipment.  The
+complete procedural athlete-and-equipment renderer is a failure fallback only.
 Adjacent tiers are materially different (feature counts, texture usage: CC0
 maps at High, +normal maps at Ultra; athlete detail maps 128/256/512 px at
 Medium/High/Ultra and no athlete detail allocation at Low). Athlete detail

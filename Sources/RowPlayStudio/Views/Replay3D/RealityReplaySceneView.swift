@@ -178,11 +178,11 @@ struct RealityReplaySceneView: View {
                 cameraResetGeneration: cameraResetGeneration,
                 replayDiscontinuityGeneration: replayDiscontinuityGeneration
             )
-            if !sceneUpdated, container.visualSource == .bundled {
+            if !sceneUpdated, container.usesCanonicalAthlete {
                 // Drop the entire bundle atomically on a runtime skeletal or
-                // animation failure. Replay/camera state lives outside this
-                // graph identity boundary, so the procedural remake preserves
-                // the active UI and playback state.
+                // animation failure at any tier. Replay/camera state lives
+                // outside this graph identity boundary, so the procedural
+                // remake preserves the active UI and playback state.
                 Task { @MainActor in
                     guard bundledAssetSet != nil else { return }
                     bundledAssetSet = nil

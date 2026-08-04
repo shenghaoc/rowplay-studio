@@ -63,6 +63,42 @@ extension ReplayRigVisualProvider {
         parent.addChild(visual)
         return true
     }
+
+    /// Fits an authored leaf into the renderer-owned logical envelope.
+    ///
+    /// V3 leaf meshes are normalized authoring forms. Their geometry replaces
+    /// a measured procedural slot in RowPlay, whereas composite templates are
+    /// already metre-authored assemblies. RealityKit cannot swap a mesh while
+    /// retaining the slot transform, so a wrapper applies the same bounds fit
+    /// without mutating the cached template or any sibling clone.
+    func attachFittedVisual(
+        named name: String,
+        to parent: Entity,
+        targetSize: SIMD3<Float>,
+        targetCenter: SIMD3<Float> = .zero
+    ) -> Bool {
+        guard let visual = cloneVisual(named: name) else { return false }
+        let fit = Entity()
+        fit.name = "\(name)-fit"
+        fit.addChild(visual)
+        parent.addChild(fit)
+
+        let bounds = visual.visualBounds(relativeTo: fit)
+        let extents = bounds.extents
+        guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite,
+              extents.x > 1e-6, extents.y > 1e-6, extents.z > 1e-6 else {
+            fit.removeFromParent()
+            return false
+        }
+        let scale = SIMD3(
+            targetSize.x / extents.x,
+            targetSize.y / extents.y,
+            targetSize.z / extents.z
+        )
+        fit.scale = scale
+        fit.position = targetCenter - bounds.center * scale
+        return true
+    }
 }
 
 @MainActor

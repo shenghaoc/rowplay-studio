@@ -20,7 +20,10 @@ final class Replay3DSceneContainer {
     let sport: Sport
     let layout: ReplayCourseLayout
     let configuration: ReplayRenderConfiguration
+    /// Equipment source for this tier. The production athlete is independent
+    /// of this choice because it remains active at every tier once validated.
     let visualSource: ReplayAssetVisualSource
+    let usesCanonicalAthlete: Bool
 
     init(
         root: Entity,
@@ -37,7 +40,8 @@ final class Replay3DSceneContainer {
         sport: Sport,
         layout: ReplayCourseLayout,
         configuration: ReplayRenderConfiguration,
-        visualSource: ReplayAssetVisualSource
+        visualSource: ReplayAssetVisualSource,
+        usesCanonicalAthlete: Bool
     ) {
         self.root = root
         self.camera = camera
@@ -54,6 +58,7 @@ final class Replay3DSceneContainer {
         self.layout = layout
         self.configuration = configuration
         self.visualSource = visualSource
+        self.usesCanonicalAthlete = usesCanonicalAthlete
     }
 }
 
@@ -75,20 +80,18 @@ enum Replay3DSceneBuilder {
         // common visual nodes to the next sport. Treat a mismatched set exactly
         // like a failed load so rig and environment selection stay atomic.
         let matchingAssetSet = bundledAssetSet?.sport == sport ? bundledAssetSet : nil
-        let visualSource = ReplayAssetCatalog.visualSource(
+        let requestedEquipmentSource = ReplayAssetCatalog.visualSource(
             for: effectiveQuality,
             assetSetIsValid: matchingAssetSet != nil
         )
         let visualProvider: (any ReplayRigVisualProvider)?
-        let liveAthlete: ReplayAthleteInstance?
-        let ghostAthlete: ReplayAthleteInstance?
-        switch visualSource {
+        switch requestedEquipmentSource {
         case .procedural:
-            visualProvider = ReplayProceduralRigVisualProvider.shared
-            liveAthlete = nil
-            ghostAthlete = nil
+            visualProvider = nil
         case .bundled:
-            // Atomic package: equipment provider plus independent V4 clones.
+            // Authored equipment is requested only at High/Ultra. Its complete
+            // logical-slot preflight remains atomic with the canonical athlete:
+            // any rejected clone rebuilds the entire rig procedurally.
             let assetSet = matchingAssetSet!
             guard let preflightProvider = ReplayPreflightRigVisualProvider(
                 base: assetSet.rigVisualProvider,
@@ -103,29 +106,33 @@ enum Replay3DSceneBuilder {
                 )
             }
             visualProvider = preflightProvider
-            liveAthlete = assetSet.makeAthleteInstance(
-                sport: sport,
-                name: "live-v4-athlete",
-                isRival: false,
-                quality: effectiveQuality
-            )
-            ghostAthlete = assetSet.makeAthleteInstance(
-                sport: sport,
-                name: "ghost-v4-athlete",
-                isRival: true,
-                quality: effectiveQuality
-            )
-            // If either athlete clone fails, fall back entirely to procedural.
-            if liveAthlete == nil || ghostAthlete == nil {
-                return buildScene(
-                    sport: sport,
-                    colorScheme: colorScheme,
-                    configuration: configuration,
-                    effectiveQuality: effectiveQuality,
-                    bundledAssetSet: nil
-                )
-            }
         }
+
+        // The V4 athlete is quality-independent in the pinned runtime. A valid
+        // asset set therefore supplies independent live/rival clones at every
+        // tier, while Low/Medium deliberately retain procedural equipment.
+        let liveAthlete = matchingAssetSet?.makeAthleteInstance(
+            sport: sport,
+            name: "live-v4-athlete",
+            isRival: false,
+            quality: effectiveQuality
+        )
+        let ghostAthlete = matchingAssetSet?.makeAthleteInstance(
+            sport: sport,
+            name: "ghost-v4-athlete",
+            isRival: true,
+            quality: effectiveQuality
+        )
+        if matchingAssetSet != nil && (liveAthlete == nil || ghostAthlete == nil) {
+            return buildScene(
+                sport: sport,
+                colorScheme: colorScheme,
+                configuration: configuration,
+                effectiveQuality: effectiveQuality,
+                bundledAssetSet: nil
+            )
+        }
+        let usesCanonicalAthlete = liveAthlete != nil && ghostAthlete != nil
 
         let root = Entity()
         root.name = "scene-root"
@@ -163,10 +170,11 @@ enum Replay3DSceneBuilder {
         ground.position = SIMD3(0, -0.05, 0)
         root.addChild(ground)
 
-        // Athlete and equipment are selected as one atomic source. Venue
-        // replacement remains owned by the environment stack layer.
+        // At High/Ultra the athlete and requested authored equipment are one
+        // atomic source. Low/Medium intentionally pair the same validated V4
+        // athlete with their tier-specific procedural equipment.
         let resolvedVisualSource: ReplayAssetVisualSource =
-            visualSource == .bundled && liveAthlete != nil && ghostAthlete != nil
+            requestedEquipmentSource == .bundled && usesCanonicalAthlete
                 ? .bundled
                 : .procedural
 
@@ -192,7 +200,7 @@ enum Replay3DSceneBuilder {
         let liveRig = ReplaySportRigFactory.build(
             sport: sport, into: liveGroup, accent: .green, opacity: 1.0,
             visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
-            canonicalAthlete: resolvedVisualSource == .bundled ? liveAthlete : nil
+            canonicalAthlete: usesCanonicalAthlete ? liveAthlete : nil
         )
 
         // Ghost avatar
@@ -203,7 +211,7 @@ enum Replay3DSceneBuilder {
         let ghostRig = ReplaySportRigFactory.build(
             sport: sport, into: ghostGroup, accent: .purple, opacity: 0.45,
             visualProvider: resolvedVisualSource == .bundled ? visualProvider : nil,
-            canonicalAthlete: resolvedVisualSource == .bundled ? ghostAthlete : nil
+            canonicalAthlete: usesCanonicalAthlete ? ghostAthlete : nil
         )
         // Equipment remains translucent for a ghost. Each sport rig excludes
         // the V4 skinned body, which intentionally stays opaque/depth-writing
@@ -232,7 +240,8 @@ enum Replay3DSceneBuilder {
             sport: sport,
             layout: layout,
             configuration: configuration,
-            visualSource: resolvedVisualSource
+            visualSource: resolvedVisualSource,
+            usesCanonicalAthlete: usesCanonicalAthlete
         )
     }
 

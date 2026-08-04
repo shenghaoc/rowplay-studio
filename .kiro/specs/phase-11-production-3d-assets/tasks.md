@@ -22,8 +22,9 @@ claim that the complete phase or visual QA matrix is finished.
       drive skeletal motion with deterministic exact seeking; and preserve the
       complete procedural-athlete fallback.
 - [x] **5/8 Grip and contact** — integrate finger and thumb closure, contact
-      solving, sport handle geometry, wrist orientation, release/recovery, and
-      independent live/rival instances.
+      solving, independent sculls, course skis/poles, road-bike contact
+      geometry, wrist orientation, release/recovery, complete authored
+      composites at High/Ultra, and independent live/rival instances.
 - [ ] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.
 - [ ] **7/8 Environments and quality** — add the three venue stories,

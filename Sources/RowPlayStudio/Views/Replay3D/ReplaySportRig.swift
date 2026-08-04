@@ -63,8 +63,8 @@ enum ReplaySportRigFactory {
     ///   - opacity: Material opacity (1.0 for live, <1 for ghost).
     ///   - visualProvider: A complete bundled visual provider, or `nil` for the
     ///     existing procedural mesh path.
-    ///   - canonicalAthlete: Independent V4 athlete instance for Medium+/valid
-    ///     packages. When present the procedural body is not built.
+    ///   - canonicalAthlete: Independent validated V4 athlete instance for any
+    ///     quality tier. When present the procedural body is not built.
     /// - Returns: A `ReplaySportRig` that can apply poses.
     static func build(
         sport: Sport,
@@ -74,22 +74,30 @@ enum ReplaySportRigFactory {
         visualProvider: (any ReplayRigVisualProvider)? = nil,
         canonicalAthlete: ReplayAthleteInstance? = nil
     ) -> ReplaySportRig {
+        let requestsBundledEquipment = visualProvider?.usesBundledAssets == true
         let preflightProvider: ReplayPreflightRigVisualProvider?
-        if let alreadyPreflighted = visualProvider as? ReplayPreflightRigVisualProvider {
+        if requestsBundledEquipment,
+           let alreadyPreflighted = visualProvider as? ReplayPreflightRigVisualProvider {
             preflightProvider = alreadyPreflighted.isComplete(for: sport)
                 ? alreadyPreflighted
                 : nil
-        } else if let visualProvider {
+        } else if requestsBundledEquipment, let visualProvider {
             preflightProvider = ReplayPreflightRigVisualProvider(base: visualProvider, sport: sport)
         } else {
             preflightProvider = nil
         }
 
-        // Athlete and equipment are one build-time source decision. A missing
-        // athlete or any visual clone discards both authored inputs.
-        let usesBundledSource = preflightProvider != nil && canonicalAthlete != nil
+        // Authored equipment is atomic with the athlete when requested. At
+        // Low/Medium no authored equipment is requested, so a validated V4
+        // athlete intentionally rides the tier's procedural equipment.
+        let usesBundledEquipment = requestsBundledEquipment
+            && preflightProvider != nil
+            && canonicalAthlete != nil
+        let usesCanonicalAthlete = requestsBundledEquipment
+            ? usesBundledEquipment
+            : canonicalAthlete != nil
         let resolvedVisualProvider: (any ReplayRigVisualProvider)?
-        if usesBundledSource, let preflightProvider {
+        if usesBundledEquipment, let preflightProvider {
             // Bundled accent slots are recoloured on an independent clone. The
             // procedural provider remains unchanged because it already creates
             // its materials using this same `accent` value.
@@ -109,7 +117,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
             )
             return rig
         case .skierg:
@@ -119,7 +127,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
             )
             return rig
         case .bike:
@@ -129,7 +137,7 @@ enum ReplaySportRigFactory {
                 accent: accent,
                 opacity: opacity,
                 visualProvider: resolvedVisualProvider,
-                canonicalAthlete: usesBundledSource ? canonicalAthlete : nil
+                canonicalAthlete: usesCanonicalAthlete ? canonicalAthlete : nil
             )
             return rig
         }

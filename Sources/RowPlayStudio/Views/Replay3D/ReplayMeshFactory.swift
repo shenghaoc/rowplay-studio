@@ -194,12 +194,13 @@ enum ReplayMeshFactory {
     ) -> Entity {
         let wheel = Entity()
         wheel.name = "wheel"
-        // Tyre — flattened sphere as disc approximation
+        // Tyre — flattened along the X axle so the wheel lies in the Y/Z
+        // travel plane and rolls around X.
         let tyre = ModelEntity(
             mesh: MeshResource.generateSphere(radius: radius),
             materials: [tyreMaterial]
         )
-        tyre.scale = SIMD3(1, 1, 0.3)
+        tyre.scale = SIMD3(0.3, 1, 1)
         tyre.name = "tyre"
         wheel.addChild(tyre)
         // Spokes — crossed boxes

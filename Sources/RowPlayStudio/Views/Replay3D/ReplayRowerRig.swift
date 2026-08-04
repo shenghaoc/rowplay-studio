@@ -3,33 +3,39 @@ import RealityKit
 import RowPlayCore
 import SwiftUI
 
-/// RowErg articulated rig: scull hull, seat, handle, oars, and athlete body.
+/// RowErg articulated rig: a sculling shell, independent port/starboard
+/// sculls, sliding seat, and athlete body.
 ///
 /// Contact invariants:
-/// - Hands remain on the handle
-/// - Feet remain at the footplate
-/// - Pelvis remains on the seat
-/// - Both oars pivot from stable gates
+/// - Each hand remains on its own inboard scull grip
+/// - Feet remain at the contract-defined stretcher contacts
+/// - Pelvis remains on the sliding seat
+/// - Both sculls pivot from the fixed contract-defined oarlocks
 @MainActor
 final class ReplayRowerRig: ReplaySportRig {
     let root = Entity()
 
-    // Machine parts
-    private let hull = Entity()
+    private struct Scull {
+        let side: Float
+        let pivot: Entity
+        let blade: Entity
+        let gripAnchor: Entity
+    }
+
+    private let boat = Entity()
     private let seat = Entity()
-    private let handle = Entity()
-    private let handleGripL = Entity()
-    private let handleGripR = Entity()
     private let footAnchorL = Entity()
     private let footAnchorR = Entity()
-    private var oars: [Entity] = []
+    private var sculls: [Scull] = []
 
     // Fixed once during build; pose application never crosses source paths.
     private var source: ReplayRigSource?
     private var canonicalRuntimeFailure = false
 
-    /// Build-time handle orientation (Z rotation to lay cylinder horizontal).
-    private let handleBaseOrientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+    private let seatBasePosition = SIMD3<Float>(0, 0.30, -0.2)
+    private let scullInboardContact: Float = 0.66
+        + Float(ReplayRowGripContract.scullGrip.length) / 2
+        - Float(ReplayRowGripContract.scullGrip.anchorFromEnd)
 
     // MARK: - Build
 
@@ -53,129 +59,47 @@ final class ReplayRowerRig: ReplaySportRig {
             opacity: opacity
         )
 
-        // Hull — narrow shell
-        hull.name = "hull"
-        if visualProvider?.attachVisual(named: "visual-hull", to: hull) != true {
-            let hullMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.2, 3.0))
-            let hullModel = ModelEntity(mesh: hullMesh, materials: [accentMat])
-            hullModel.name = "hull-model"
-            hull.addChild(hullModel)
-        }
-        hull.position = SIMD3(0, 0.15, 0)
-        root.addChild(hull)
-
-        // Deck stripe
-        let stripe = Entity()
-        stripe.name = "deck-stripe"
-        if visualProvider?.attachVisual(named: "visual-deck-stripe", to: stripe) != true {
-            let stripeMesh = MeshResource.generateBox(size: SIMD3(0.14, 0.015, 2.2))
-            let stripeMat = SimpleMaterial(
-                color: NSColor.white.withAlphaComponent(CGFloat(opacity)),
-                isMetallic: false
+        boat.name = "boat"
+        if visualProvider?.attachVisual(named: "visual-boat", to: boat) != true {
+            buildProceduralBoat(
+                into: boat,
+                accentMaterial: accentMat,
+                metalMaterial: metalMat,
+                opacity: opacity
             )
-            let stripeModel = ModelEntity(mesh: stripeMesh, materials: [stripeMat])
-            stripeModel.name = "deck-stripe-model"
-            stripe.addChild(stripeModel)
         }
-        stripe.position = SIMD3(0, 0.335, 0)
-        root.addChild(stripe)
+        root.addChild(boat)
 
-        // Footplate
-        let footplate = Entity()
-        footplate.name = "footplate"
-        if visualProvider?.attachVisual(named: "visual-footplate", to: footplate) != true {
-            let footplateMesh = MeshResource.generateBox(size: SIMD3(0.48, 0.05, 0.12))
-            let footplateModel = ModelEntity(mesh: footplateMesh, materials: [metalMat])
-            footplateModel.name = "footplate-model"
-            footplate.addChild(footplateModel)
-        }
-        footplate.position = SIMD3(0, 0.34, 0.72)
-        footAnchorL.name = "foot-anchor-L"
-        footAnchorL.position = SIMD3(-0.1, 0.03, 0)
-        footplate.addChild(footAnchorL)
-        footAnchorR.name = "foot-anchor-R"
-        footAnchorR.position = SIMD3(0.1, 0.03, 0)
-        footplate.addChild(footAnchorR)
-        root.addChild(footplate)
-
-        // Rail
-        let rail = Entity()
-        rail.name = "rail"
-        if visualProvider?.attachVisual(named: "visual-rail", to: rail) != true {
-            let railMesh = MeshResource.generateBox(size: SIMD3(0.06, 0.04, 2.8))
-            let railModel = ModelEntity(mesh: railMesh, materials: [metalMat])
-            railModel.name = "rail-model"
-            rail.addChild(railModel)
-        }
-        rail.position = SIMD3(0, 0.26, 0)
-        root.addChild(rail)
-
-        // Seat
         seat.name = "seat"
         if visualProvider?.attachVisual(named: "visual-seat", to: seat) != true {
-            let seatMesh = MeshResource.generateBox(size: SIMD3(0.25, 0.06, 0.20))
-            let seatMat = SimpleMaterial(
+            let mesh = MeshResource.generateBox(size: SIMD3(0.31, 0.055, 0.24))
+            let material = SimpleMaterial(
                 color: NSColor.gray.withAlphaComponent(CGFloat(opacity)),
                 isMetallic: false
             )
-            let seatModel = ModelEntity(mesh: seatMesh, materials: [seatMat])
-            seatModel.name = "seat-model"
-            seat.addChild(seatModel)
+            let model = ModelEntity(mesh: mesh, materials: [material])
+            model.name = "seat-model"
+            seat.addChild(model)
         }
-        seat.position = SIMD3(0, 0.30, -0.2)
+        seat.position = seatBasePosition
         root.addChild(seat)
 
-        // Handle — cylinder laid horizontal via base orientation
-        handle.name = "handle"
-        if visualProvider?.attachVisual(named: "visual-handle", to: handle) != true {
-            let handleMesh = MeshResource.generateCylinder(height: 0.5, radius: 0.015)
-            let handleModel = ModelEntity(mesh: handleMesh, materials: [metalMat])
-            handleModel.name = "handle-model"
-            handle.addChild(handleModel)
-        }
-        handleGripL.name = "handle-grip-anchor-L"
-        handleGripL.position = SIMD3(0, 0.18, 0)
-        handle.addChild(handleGripL)
-        handleGripR.name = "handle-grip-anchor-R"
-        handleGripR.position = SIMD3(0, -0.18, 0)
-        handle.addChild(handleGripR)
-        handle.position = SIMD3(0, 0.55, 0.6)
-        handle.orientation = handleBaseOrientation
-        root.addChild(handle)
+        let foot = ReplayRowGripContract.footContact
+        footAnchorL.name = "foot-anchor-L"
+        footAnchorL.position = SIMD3(-Float(foot.lateral), Float(foot.y), Float(foot.z))
+        root.addChild(footAnchorL)
+        footAnchorR.name = "foot-anchor-R"
+        footAnchorR.position = SIMD3(Float(foot.lateral), Float(foot.y), Float(foot.z))
+        root.addChild(footAnchorR)
 
-        // Oars
         for side: Float in [-1, 1] {
-            let oar = Entity()
-            oar.name = "oar-\(side > 0 ? "starboard" : "port")"
-            let visualName = side > 0 ? "visual-oar-starboard" : "visual-oar-port"
-            if visualProvider?.attachVisual(named: visualName, to: oar) != true {
-                // Shaft
-                let shaftMesh = MeshResource.generateCylinder(height: 2.4, radius: 0.02)
-                let shaft = ModelEntity(mesh: shaftMesh, materials: [oarMat])
-                shaft.position = SIMD3(side * 1.2, 0, 0)
-                shaft.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
-                shaft.name = "shaft"
-                oar.addChild(shaft)
-
-                // Collar
-                let collarMesh = MeshResource.generateSphere(radius: 0.05)
-                let collar = ModelEntity(mesh: collarMesh, materials: [metalMat])
-                collar.name = "collar"
-                oar.addChild(collar)
-
-                // Blade
-                let bladeMesh = MeshResource.generateBox(size: SIMD3(0.5, 0.02, 0.26))
-                let blade = ModelEntity(mesh: bladeMesh, materials: [accentMat])
-                blade.position = SIMD3(side * 2.4, -0.05, 0)
-                blade.name = "blade"
-                oar.addChild(blade)
-            }
-
-            // The oar entity origin is the gate, so sweep/feather rotations
-            // cannot translate the collar away from its fixed hull contact.
-            oar.position = SIMD3(side * 0.32, 0.24, 0)
-            root.addChild(oar)
-            oars.append(oar)
+            sculls.append(buildScull(
+                side: side,
+                accentMaterial: accentMat,
+                metalMaterial: metalMat,
+                oarMaterial: oarMat,
+                visualProvider: visualProvider
+            ))
         }
 
         // Athlete body (seated). Canonical V4 and procedural paths are exclusive.
@@ -201,6 +125,139 @@ final class ReplayRowerRig: ReplaySportRig {
         }
     }
 
+    private func buildProceduralBoat(
+        into parent: Entity,
+        accentMaterial: any RealityKit.Material,
+        metalMaterial: any RealityKit.Material,
+        opacity: Float
+    ) {
+        let hull = ModelEntity(
+            mesh: .generateBox(size: SIMD3(0.50, 0.20, 3.0)),
+            materials: [accentMaterial]
+        )
+        hull.name = "hull"
+        hull.position = SIMD3(0, 0.15, 0)
+        parent.addChild(hull)
+
+        let stripeMaterial = SimpleMaterial(
+            color: NSColor.white.withAlphaComponent(CGFloat(opacity)),
+            isMetallic: false
+        )
+        let stripe = ModelEntity(
+            mesh: .generateBox(size: SIMD3(0.14, 0.015, 2.2)),
+            materials: [stripeMaterial]
+        )
+        stripe.name = "deck-stripe"
+        stripe.position = SIMD3(0, 0.335, 0)
+        parent.addChild(stripe)
+
+        let stretcher = ReplayRowGripContract.stretcher
+        let footplate = ModelEntity(
+            mesh: .generateBox(size: SIMD3(0.48, 0.05, 0.12)),
+            materials: [metalMaterial]
+        )
+        footplate.name = "footplate"
+        footplate.position = SIMD3(0, Float(stretcher.centerY), Float(stretcher.centerZ))
+        footplate.orientation = simd_quatf(
+            angle: Float(stretcher.boardRotation),
+            axis: SIMD3(1, 0, 0)
+        )
+        parent.addChild(footplate)
+
+        let rail = ModelEntity(
+            mesh: .generateBox(size: SIMD3(0.06, 0.04, 2.8)),
+            materials: [metalMaterial]
+        )
+        rail.name = "rail"
+        rail.position = SIMD3(0, 0.26, 0)
+        parent.addChild(rail)
+    }
+
+    private func buildScull(
+        side: Float,
+        accentMaterial: any RealityKit.Material,
+        metalMaterial: any RealityKit.Material,
+        oarMaterial: any RealityKit.Material,
+        visualProvider: (any ReplayRigVisualProvider)?
+    ) -> Scull {
+        let suffix = side > 0 ? "starboard" : "port"
+        let shortSuffix = side > 0 ? "R" : "L"
+        let pivot = Entity()
+        pivot.name = "oar-\(suffix)"
+
+        let visualRoot = Entity()
+        visualRoot.name = "oar-visual-\(shortSuffix)"
+        // The authored oar points +X outboard. Mirror the port visual around
+        // its oarlock while leaving the logical contact solve symmetric.
+        if side < 0 {
+            visualRoot.orientation = simd_quatf(angle: .pi, axis: SIMD3(0, 1, 0))
+        }
+
+        let oarVisualName = side > 0 ? "visual-oar-starboard" : "visual-oar-port"
+        if visualProvider?.attachVisual(named: oarVisualName, to: visualRoot) != true {
+            let shaft = ModelEntity(
+                mesh: .generateCylinder(height: 2.22, radius: 0.02),
+                materials: [oarMaterial]
+            )
+            shaft.name = "shaft"
+            shaft.position = SIMD3(0.61, 0, -0.04)
+            shaft.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+            visualRoot.addChild(shaft)
+
+            let grip = ModelEntity(
+                mesh: .generateCylinder(
+                    height: Float(ReplayRowGripContract.scullGrip.length),
+                    radius: Float(ReplayRowGripContract.scullGrip.radius)
+                ),
+                materials: [metalMaterial]
+            )
+            grip.name = "scull-grip-\(shortSuffix)"
+            grip.position = SIMD3(-0.66, 0, -0.04)
+            grip.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+            visualRoot.addChild(grip)
+
+            let collar = ModelEntity(
+                mesh: .generateSphere(radius: 0.05),
+                materials: [metalMaterial]
+            )
+            collar.name = "collar"
+            visualRoot.addChild(collar)
+        }
+
+        let blade = Entity()
+        blade.name = "blade-\(shortSuffix)"
+        let bladeVisualName = side > 0 ? "visual-blade-starboard" : "visual-blade-port"
+        if visualProvider?.attachFittedVisual(
+            named: bladeVisualName,
+            to: blade,
+            targetSize: SIMD3(0.54, 0.022, 0.30)
+        ) != true {
+            let model = ModelEntity(
+                mesh: .generateBox(size: SIMD3(0.54, 0.022, 0.30)),
+                materials: [accentMaterial]
+            )
+            model.name = "blade-model-\(shortSuffix)"
+            blade.addChild(model)
+        }
+        blade.position = SIMD3(1.82, -0.06, 0)
+        visualRoot.addChild(blade)
+        pivot.addChild(visualRoot)
+
+        let gripAnchor = Entity()
+        gripAnchor.name = "scull-grip-anchor-\(shortSuffix)"
+        gripAnchor.position = SIMD3(-side * scullInboardContact, -0.04, 0)
+        pivot.addChild(gripAnchor)
+
+        let oarlock = ReplayRowGripContract.oarlock
+        pivot.position = SIMD3(
+            side * Float(oarlock.lateral),
+            Float(oarlock.y),
+            Float(oarlock.z)
+        )
+        root.addChild(pivot)
+        return Scull(side: side, pivot: pivot, blade: blade, gripAnchor: gripAnchor)
+    }
+
     // MARK: - Pose Application
 
     @discardableResult
@@ -213,36 +270,28 @@ final class ReplayRowerRig: ReplaySportRig {
             return .failed(.unexpectedSport)
         }
 
-        // Finite guard at Studio/RealityKit boundary
         let seatZ = ReplaySportRigFiniteGuard.finite(Float(rowerPose.seatZ), fallback: -0.1)
-        let handleY = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleY), fallback: 0.55)
-        let handleZ = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleZ), fallback: 0.6)
-        let handleRotX = ReplaySportRigFiniteGuard.finite(Float(rowerPose.handleRotX), fallback: 0)
         let oarSweep = ReplaySportRigFiniteGuard.finite(Float(rowerPose.oarSweep), fallback: 0)
         let oarFeather = ReplaySportRigFiniteGuard.finite(Float(rowerPose.oarFeather), fallback: -0.06)
 
-        // Seat slides along rail
-        seat.position.z = Float(-0.2) + seatZ
+        seat.position = seatBasePosition + SIMD3(0, 0, seatZ)
 
-        // Handle moves with stroke — compose feather rotation on top of base orientation
-        handle.position = SIMD3(0, handleY, handleZ)
-        handle.orientation = simd_quatf(angle: handleRotX, axis: SIMD3(1, 0, 0)) * handleBaseOrientation
-
-        // Oars sweep and feather
-        for (i, oar) in oars.enumerated() {
-            let side: Float = i == 0 ? -1 : 1
-            oar.orientation = simd_quatf(
-                angle: oarSweep * side,
-                axis: SIMD3(0, 1, 0)
-            ) * simd_quatf(
-                angle: oarFeather * side,
+        for scull in sculls {
+            // Yaw moves each inboard grip on its own rigid circle. Roll is
+            // mirrored so both blades bury/extract together without moving
+            // either oarlock.
+            let yaw = simd_quatf(angle: oarSweep * scull.side, axis: SIMD3(0, 1, 0))
+            let roll = simd_quatf(angle: -oarFeather * scull.side, axis: SIMD3(0, 0, 1))
+            scull.pivot.orientation = roll * yaw
+            scull.blade.orientation = simd_quatf(
+                angle: Float(rowerPose.handleRotX),
                 axis: SIMD3(1, 0, 0)
             )
         }
 
         let pelvisTarget = SIMD3<Float>(0, 0.30, -0.1 + seatZ)
-        let handL = handleGripL.position(relativeTo: root)
-        let handR = handleGripR.position(relativeTo: root)
+        let handL = sculls[0].gripAnchor.position(relativeTo: root)
+        let handR = sculls[1].gripAnchor.position(relativeTo: root)
         let footL = footAnchorL.position(relativeTo: root)
         let footR = footAnchorR.position(relativeTo: root)
 
