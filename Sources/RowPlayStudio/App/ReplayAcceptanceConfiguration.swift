@@ -56,6 +56,8 @@ struct ReplayAcceptanceConfiguration: Equatable, Sendable {
     let windowHeight: Double
     /// Local metrics directory when supplied. Never logged as a private path.
     let outputDirectory: String?
+    /// Public catalog token threaded to telemetry. Not a private path.
+    let scenarioID: String?
 
     var demoWorkoutID: Int {
         Self.demoWorkoutID(for: sport)
@@ -105,6 +107,7 @@ struct ReplayAcceptanceConfiguration: Equatable, Sendable {
             invalid: .invalidHeight
         )
         let outputDirectory = try parseOutputDirectory(environment["ROWPLAY_QA_OUTPUT"])
+        let scenarioID = parseScenarioID(environment["ROWPLAY_QA_SCENARIO"])
 
         return ReplayAcceptanceConfiguration(
             sport: sport,
@@ -117,7 +120,8 @@ struct ReplayAcceptanceConfiguration: Equatable, Sendable {
             reducedMotion: reducedMotion,
             windowWidth: width,
             windowHeight: height,
-            outputDirectory: outputDirectory
+            outputDirectory: outputDirectory,
+            scenarioID: scenarioID
         )
     }
 
@@ -225,6 +229,12 @@ struct ReplayAcceptanceConfiguration: Equatable, Sendable {
             throw Diagnostic.invalidOutput
         }
         return trimmed
+    }
+
+    private static func parseScenarioID(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : String(trimmed.prefix(128))
     }
 }
 

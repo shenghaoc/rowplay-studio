@@ -187,7 +187,7 @@ payload = {
     "notes": [
         "Trace bundles stay outside the repository.",
         "No workout IDs, tokens, account data, or absolute private paths are included.",
-        "GPU counters are reported only when xctrace lists a usable template.",
+        "gpuTraceStatus is informational only: GPU templates are listed for availability reporting but not attached during profiling. No GPU counter data is collected.",
     ],
 }
 pathlib.Path(summary_path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

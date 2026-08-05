@@ -40,7 +40,8 @@ final class ReplayAcceptanceConfigurationTests: XCTestCase {
             "ROWPLAY_QA_REDUCED_MOTION": "1",
             "ROWPLAY_QA_WIDTH": "1000",
             "ROWPLAY_QA_HEIGHT": "700",
-            "ROWPLAY_QA_OUTPUT": "/tmp/rowplay-acceptance-test"
+            "ROWPLAY_QA_OUTPUT": "/tmp/rowplay-acceptance-test",
+            "ROWPLAY_QA_SCENARIO": "skierg-2d-ultra-orbit"
         ]
         let config = try AppLaunchConfiguration.make(from: env)
         XCTAssertTrue(config.acceptanceMode)
@@ -57,6 +58,7 @@ final class ReplayAcceptanceConfigurationTests: XCTestCase {
         XCTAssertEqual(acceptance.windowWidth, 1000)
         XCTAssertEqual(acceptance.windowHeight, 700)
         XCTAssertEqual(acceptance.outputDirectory, "/tmp/rowplay-acceptance-test")
+        XCTAssertEqual(acceptance.scenarioID, "skierg-2d-ultra-orbit")
         XCTAssertEqual(acceptance.demoWorkoutID, ReplayAcceptanceConfiguration.skiergDemoWorkoutID)
     }
 

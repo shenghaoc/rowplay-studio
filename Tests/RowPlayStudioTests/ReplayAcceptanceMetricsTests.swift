@@ -7,11 +7,15 @@ final class ReplayAcceptanceMetricsTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        ReplayAcceptanceMetricsStore.resetForTests()
+        MainActor.assumeIsolated {
+            ReplayAcceptanceMetricsStore.resetForTests()
+        }
     }
 
     override func tearDown() {
-        ReplayAcceptanceMetricsStore.resetForTests()
+        MainActor.assumeIsolated {
+            ReplayAcceptanceMetricsStore.resetForTests()
+        }
         super.tearDown()
     }
 

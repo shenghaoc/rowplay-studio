@@ -1,12 +1,10 @@
 import RowPlayCore
-import RowPlayPlatform
 import SwiftUI
 
 /// Staged-app host that constructs the production `ReplayView` from
 /// deterministic demo workouts. It never builds a parallel renderer.
 struct ReplayAcceptanceHarnessView: View {
     let configuration: ReplayAcceptanceConfiguration
-    @EnvironmentObject private var preferences: AppPreferences
 
     private var detail: WorkoutDetail {
         Self.detail(for: configuration.sport)
@@ -38,13 +36,13 @@ struct ReplayAcceptanceHarnessView: View {
         )
         .onAppear {
             ReplayAcceptanceMetricsStore.beginScenario(
-                scenarioID: nil,
+                scenarioID: configuration.scenarioID,
                 selectedQuality: configuration.quality,
                 effectiveQuality: configuration.quality,
                 livePresent: true,
                 rivalPresent: configuration.rival != .none
             )
-            // Periodic flush so SIGTERM/kill still leave metrics on disk.
+            // One-shot safety flush so SIGTERM/kill still leaves metrics on disk.
             if let outputDirectory = configuration.outputDirectory {
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(20))
@@ -59,13 +57,9 @@ struct ReplayAcceptanceHarnessView: View {
                 outputDirectory: configuration.outputDirectory
             )
         }
-        // Acceptance never writes QA state into user preferences.
-        .onAppear {
-            _ = preferences
-        }
     }
 
-    static func detail(for sport: Sport) -> WorkoutDetail {
+    nonisolated static func detail(for sport: Sport) -> WorkoutDetail {
         let id = ReplayAcceptanceConfiguration.demoWorkoutID(for: sport)
         if let match = DemoWorkoutLibrary.details.first(where: { $0.id == id }) {
             return match
@@ -75,13 +69,13 @@ struct ReplayAcceptanceHarnessView: View {
             ?? DemoWorkoutLibrary.details[0]
     }
 
-    static func ghostCandidates(for sport: Sport, excluding id: Int) -> [WorkoutDetail] {
+    nonisolated static func ghostCandidates(for sport: Sport, excluding id: Int) -> [WorkoutDetail] {
         DemoWorkoutLibrary.details.filter {
             $0.workout.sport == sport && $0.id != id && $0.workout.hasStrokeData
         }
     }
 
-    static func resolvedRival(
+    nonisolated static func resolvedRival(
         mode: ReplayAcceptanceConfiguration.RivalMode,
         detail: WorkoutDetail,
         candidates: [WorkoutDetail]

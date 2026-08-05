@@ -2,6 +2,7 @@ import XCTest
 @testable import RowPlayStudio
 import RowPlayCore
 
+@MainActor
 final class ReplayAcceptanceHarnessTests: XCTestCase {
 
     func testCatalogScenariosResolveValidDemoWorkouts() throws {

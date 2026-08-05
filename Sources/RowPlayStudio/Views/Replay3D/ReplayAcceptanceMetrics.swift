@@ -153,12 +153,6 @@ struct ReplayAcceptanceMetrics: Equatable, Sendable {
 
     mutating func noteEffectiveQuality(_ quality: ReplayRenderQuality) {
         guard isEnabled else { return }
-        if quality != effectiveQuality, quality.rawValue != selectedQuality.rawValue {
-            // Count only sticky degradations below the selected ceiling.
-            if quality != selectedQuality {
-                adaptiveDegradationCount += 1
-            }
-        }
         effectiveQuality = quality
     }
 
@@ -308,11 +302,6 @@ enum ReplayAcceptanceMetricsStore {
             sceneUpdateDurationMilliseconds: sceneUpdateDurationMilliseconds,
             activeBudgetMilliseconds: activeBudgetMilliseconds
         )
-        // Flush once the bounded window fills so forced process exits still
-        // leave a usable summary when an output directory was supplied later.
-        if metrics.sampleCount >= ReplayAcceptanceMetrics.maximumSampleCount {
-            // Summary emit still requires endAndEmit(outputDirectory:).
-        }
     }
 
     /// Test/profile seam: snapshot current metrics without disabling collection.
