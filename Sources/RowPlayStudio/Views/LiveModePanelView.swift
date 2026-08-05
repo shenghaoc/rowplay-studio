@@ -36,6 +36,7 @@ struct LiveModePanelView: View {
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
+                .accessibilityHint("Starts or stops live telemetry polling")
             }
 
             if library.liveState.enabled {
