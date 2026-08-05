@@ -2,7 +2,7 @@
 
 ## Current State
 
-RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), and Phase 10A past-session ghost replay (PR #61). Phase 10B complete rival workflow (constant pace, imported CSV/TCX/FIT rivals, finish verdict, local race report/card export) is implemented on branch `codex/phase-10b-complete-rival-workflow`.
+RowPlay Studio has merged the native macOS foundation slices through Phase 7, the Phase 8A RealityKit foundation, Phase 8B articulated rigs, Phase 8C replay cameras and sport effects (PR #57), Phase 8D adaptive replay quality (PR #58), Phase 10A past-session ghost replay (PR #61), Phase 10B complete rival workflow (PR #64), and Phase 11 production 3D assets (PRs #90–#97).
 
 ### What Is Implemented
 
@@ -19,7 +19,7 @@ RowPlay Studio has merged the native macOS foundation slices through Phase 7, th
 - **Phase 8C replay cameras and sport effects — merged as PR #57**: Renderer-neutral chase, side, overhead, and orbit camera solving; accessible 3D camera selection/reset and orbit gestures; fixed-capacity deterministic RowErg foam/blade-spray and SkiErg snow/pole-spray effects; lower-opacity ghost wakes; BikeErg effect suppression; and reduced-motion/seek resets. The unavailable trackpad-magnification, production-route ghost, and exact-1440x900 proof remains documented rather than rewritten as complete.
 - **Phase 8D adaptive replay quality — merged as PR #58**: Persisted low, medium, high, and ultra quality ceilings with medium as the default; exact quality-specific course/effect entity budgets; calibrated sticky one-tier degradation with no automatic upgrade; raw-before-clamp sampling; stable inner-scene rebuilds; a bounded 120-sample metrics accumulator; and privacy-safe selection, degradation, and window telemetry. Available runtime evidence is recorded below without claiming universal or final production performance.
 - **Phase 10A past-session ghost replay — merged as PR #61**: Ranked ghost candidate selection with user-visible rival picker; `ReplayRaceGap` live gap helpers (metres, seconds, absolute time, ghost sampling); `WorkoutLibrary` ghost candidate caching; 2D ghost stroke path on replay canvas; live ahead/behind gap display; 3D ghost pose integration with context clearing on rival change.
-- **Phase 10B complete rival workflow — implementation complete on branch**: Generic `ReplayRival` for past-session, constant-pace, and imported CSV/TCX/FIT rivals; bounded security-scoped file reads; streaming quoted CSV; strict namespace-insensitive TCX XML parsing with encoding-independent DTD rejection; bounded FIT validation; `ReplayRaceResult` finish/winner/tie/DNF semantics with interpolated distance crossings; finish verdict UI; minimized local race report JSON and race-card PNG export/share with privacy-safe rival distance/time/pace metrics but without imported filenames or internal workout/session identifiers (no public URL); correct bounded 2D paths and 3D support for all rival kinds with fallback articulation for non-genuine traces.
+- **Phase 10B complete rival workflow — merged as PR #64**: Generic `ReplayRival` for past-session, constant-pace, and imported CSV/TCX/FIT rivals; bounded security-scoped file reads; streaming quoted CSV; strict namespace-insensitive TCX XML parsing with encoding-independent DTD rejection; bounded FIT validation; `ReplayRaceResult` finish/winner/tie/DNF semantics with interpolated distance crossings; finish verdict UI; minimized local race report JSON and race-card PNG export/share with privacy-safe rival distance/time/pace metrics but without imported filenames or internal workout/session identifiers (no public URL); correct bounded 2D paths and 3D support for all rival kinds with fallback articulation for non-genuine traces.
 - **Native shell**: `NavigationSplitView` layout, sidebar with sort/sport pickers, dashboard with metric tiles and PB highlights, workout detail with replay/tools, settings with mock-only hardware status.
 - **Settings wiring**: `demoModeEnabled` controls demo data loading, `reduceReplayMotion` lowers replay animation frame rate, `preferredDistanceUnit` switches distance formatting between metric and imperial, `replayRenderQuality` persists the selected 3D ceiling with a medium fallback, and the Concept2 section manages token save/sync/disconnect. Effective quality and performance state are never persisted.
 - **Demo mode**: Deterministic seeded workout data via `DemoWorkoutLibrary`; the app is fully explorable without Concept2 credentials.
@@ -47,7 +47,7 @@ Cloudflare KV and D1 from the web app. Key implications for RowPlay Studio:
 
 ## Verified
 
-The items below describe the merged baseline, the validation completed for Phase 8C before PR #57 merged, the Phase 8D evidence collected on that review branch, and the Phase 10B evidence collected on its ready-for-review branch. They do not claim unavailable visual or profiling cases passed.
+The items below describe the merged baseline and the validation completed for each phase before merging. They do not claim unavailable visual or profiling cases passed.
 
 - `swift test` — all tests pass with no failures.
 - `swift build` — clean build.
