@@ -1,8 +1,9 @@
 # Phase 11 Replacement Stack QA
 
-The final layer owns the complete acceptance matrix; lower layers provide
-targeted evidence only. This record deliberately separates reproducible scene
-validation from human screenshot review.
+Phase 11 merged to `main` through PRs #90–#97. The final layer owns the complete
+automated acceptance matrix; lower layers provide targeted evidence only. This
+record deliberately separates reproducible scene validation from human
+screenshot review.
 
 ## Reproducible matrix
 
@@ -36,20 +37,16 @@ is automated, but pixel-level human approval is not inferred from a test pass.
 The final stack must use `./script/build_and_run.sh --verify`; launching the raw
 SwiftPM executable is not valid evidence. The staged bundle gate proves only
 that the signed `.app` launches. Exact-head macOS/Linux CI and unresolved
-review threads remain merge-time gates for each PR.
+review threads remained merge-time gates for each PR.
 
 ## Human verification boundary
 
 The automated matrices do not prove final pixels, interaction feel, or sustained
-GPU performance. A staged-app walkthrough across 2D/3D, all sports, both themes,
-rival off/on, all camera presets, all tiers, Reduced Motion, and supported
-window extremes remains unperformed unless a dated evidence record is added.
-No screenshot or manual-approval claim is made by this file.
+GPU performance. Phase 12 owns that staged-app human walkthrough and profiling
+release gate; see `docs/visual-qa/phase-12-replay-acceptance/`.
 
 ## Claim boundary
 
-Checking task 8 records that the final stack layer and automated matrix exist.
-It does not mean Phase 11 is accepted or shipped: the phase becomes complete only
-after PRs 1 through 8 merge bottom-up and each descendant is restacked and
-revalidated at its new exact head, with the human boundary above either
-completed or explicitly accepted by the owner.
+Task 8 records that the final stack layer and automated matrix exist and that
+PRs #90–#97 merged. Phase 11 does not by itself claim completed human visual
+acceptance or sustained GPU profiling; those are Phase 12 deliverables.

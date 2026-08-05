@@ -37,4 +37,20 @@ enum ReplayPerformanceTelemetry {
             "metrics window tier=\(effectiveQuality.rawValue, privacy: .public) level=\(governorLevel, privacy: .public) samples=\(snapshot.sampleCount, privacy: .public) averageFrameMs=\(snapshot.averageFrameIntervalMilliseconds, privacy: .public) worstFrameMs=\(snapshot.worstFrameIntervalMilliseconds, privacy: .public) averageSceneMs=\(snapshot.averageSceneUpdateDurationMilliseconds, privacy: .public) worstSceneMs=\(snapshot.worstSceneUpdateDurationMilliseconds, privacy: .public) overBudget=\(snapshot.samplesAboveBudget, privacy: .public)"
         )
     }
+
+    /// One privacy-safe acceptance summary. Scenario IDs are public catalog
+    /// tokens only; no workout, account, token, or path data is logged.
+    static func recordAcceptanceSummary(
+        _ summary: ReplayAcceptanceMetrics.Summary,
+        scenarioID: String?
+    ) {
+        let scenario = scenarioID ?? "unspecified"
+        logger.info(
+            "acceptance summary scenario=\(scenario, privacy: .public) samples=\(summary.sampleCount, privacy: .public) p50FrameMs=\(summary.p50FrameIntervalMilliseconds, privacy: .public) p95FrameMs=\(summary.p95FrameIntervalMilliseconds, privacy: .public) p99FrameMs=\(summary.p99FrameIntervalMilliseconds, privacy: .public) worstFrameMs=\(summary.worstFrameIntervalMilliseconds, privacy: .public) p95SceneMs=\(summary.p95SceneUpdateDurationMilliseconds, privacy: .public) overBudget=\(summary.samplesAboveBudget, privacy: .public) selected=\(summary.selectedQuality, privacy: .public) effective=\(summary.effectiveQuality, privacy: .public) degrade=\(summary.adaptiveDegradationCount, privacy: .public) rebuilds=\(summary.sceneRebuildCount, privacy: .public) fallbacks=\(summary.fallbackCount, privacy: .public) fallback=\(summary.fallbackCategory, privacy: .public) live=\(summary.livePresent, privacy: .public) rival=\(summary.rivalPresent, privacy: .public)"
+        )
+    }
+
+    static func recordAcceptanceWriteFailure() {
+        logger.error("acceptance metrics write failed category=output-directory")
+    }
 }

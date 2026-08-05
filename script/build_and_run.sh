@@ -16,17 +16,27 @@ APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 
 usage() {
-  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify]" >&2
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--automation|--sign-verify|--acceptance]" >&2
 }
+
+ACCEPTANCE_SCENARIO=""
+ACCEPTANCE_STAGE_ONLY=0
 
 while (($#)); do
   case "$1" in
-    run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify|--automation|automation|--sign-verify|sign-verify)
+    run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify|--automation|automation|--sign-verify|sign-verify|--acceptance|acceptance)
       if [[ "$MODE" != "run" ]]; then
         usage
         exit 2
       fi
       MODE="$1"
+      ;;
+    --scenario)
+      shift
+      ACCEPTANCE_SCENARIO="${1:-}"
+      ;;
+    --stage-only)
+      ACCEPTANCE_STAGE_ONLY=1
       ;;
     --help|-h)
       usage
@@ -134,6 +144,23 @@ case "$MODE" in
     codesign --verify --deep --strict "$APP_BUNDLE"
     codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 | grep -E "^(Identifier|TeamIdentifier|Signature)" || true
     echo "Bundle verification complete."
+    ;;
+  --acceptance|acceptance)
+    # Narrow staging wrapper used by script/launch_replay_acceptance.sh.
+    # Does not launch the raw SwiftPM executable. Launch itself is owned by
+    # the scenario script so environment values stay centralized.
+    if [[ "$ACCEPTANCE_STAGE_ONLY" -eq 1 ]]; then
+      echo "Acceptance bundle staged at $APP_BUNDLE"
+      if [[ -n "$ACCEPTANCE_SCENARIO" ]]; then
+        echo "acceptance scenario prepared: $ACCEPTANCE_SCENARIO"
+      fi
+    else
+      if [[ -z "$ACCEPTANCE_SCENARIO" ]]; then
+        echo "acceptance mode requires --scenario <ID> (prefer script/launch_replay_acceptance.sh)" >&2
+        exit 2
+      fi
+      "$ROOT_DIR/script/launch_replay_acceptance.sh" --scenario "$ACCEPTANCE_SCENARIO"
+    fi
     ;;
   *)
     usage

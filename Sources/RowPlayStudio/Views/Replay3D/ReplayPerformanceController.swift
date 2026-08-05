@@ -104,6 +104,10 @@ final class ReplayPerformanceController {
             effectiveQuality: degradedQuality,
             governorLevel: newLevel
         )
+        ReplayAcceptanceMetricsStore.noteAdaptiveDegradation(
+            effectiveQuality: degradedQuality
+        )
+        ReplayAcceptanceMetricsStore.noteSceneRebuild()
     }
 
     func shouldMeasureSceneUpdate(
@@ -130,6 +134,14 @@ final class ReplayPerformanceController {
         pendingFrameSample = nil
         guard milliseconds.isFinite, milliseconds >= 0 else { return }
         recordedSceneUpdateCount &+= 1
+
+        // Acceptance metrics reuse every production paired sample, not only
+        // completed 120-sample windows.
+        ReplayAcceptanceMetricsStore.recordPairedSample(
+            frameIntervalMilliseconds: sample.frameIntervalMilliseconds,
+            sceneUpdateDurationMilliseconds: milliseconds,
+            activeBudgetMilliseconds: sample.activeBudgetMilliseconds
+        )
 
         guard let snapshot = metrics.record(
             frameIntervalMilliseconds: sample.frameIntervalMilliseconds,

@@ -14,6 +14,9 @@ struct ReplayView: View {
     let ghostCandidates: [WorkoutDetail]
     let ghostCandidatesRevision: UInt64
     private let ghostCandidateByID: [Int: WorkoutDetail]
+    private let initialConfiguration: ReplayViewInitialConfiguration
+    /// Session-local quality ceiling used when acceptance mode forbids preference writes.
+    private let sessionQualityOverride: ReplayRenderQuality?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var currentLocale
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
@@ -25,6 +28,7 @@ struct ReplayView: View {
     @State private var orbitAdjustment: ReplayOrbitAdjustment?
     @State private var orbitAdjustmentGeneration = 0
     @State private var effectiveReplayQuality: ReplayRenderQuality?
+    @State private var sessionSelectedQuality: ReplayRenderQuality?
     @State private var cameraResetGeneration = 0
     @State private var replayDiscontinuityGeneration = 0
     @State private var activeRival: ReplayRival?
@@ -44,8 +48,16 @@ struct ReplayView: View {
     @State private var shareCardItem: ReplayRaceCardTransferItem?
 
     private var unit: DistanceUnit { preferences.distanceUnit }
+    private var selectedReplayQuality: ReplayRenderQuality {
+        sessionSelectedQuality
+            ?? sessionQualityOverride
+            ?? preferences.replayRenderQuality
+    }
     private var reduceMotion: Bool {
-        Self.shouldReduceMotion(
+        if let forced = initialConfiguration.forceReducedMotion {
+            return forced
+        }
+        return Self.shouldReduceMotion(
             appPreference: preferences.reduceReplayMotion,
             systemPreference: systemReduceMotion,
             automationMode: automationModeEnabled
@@ -56,17 +68,55 @@ struct ReplayView: View {
         detail: WorkoutDetail,
         ghostCandidates: [WorkoutDetail] = [],
         ghostCandidatesRevision: UInt64 = 0,
-        initialGhostID: Int? = nil
+        initialGhostID: Int? = nil,
+        initialConfiguration: ReplayViewInitialConfiguration = .production
     ) {
         self.detail = detail
         self.ghostCandidates = ghostCandidates
         self.ghostCandidatesRevision = ghostCandidatesRevision
+        self.initialConfiguration = initialConfiguration
+        self.sessionQualityOverride = initialConfiguration.quality
         let candidateByID = ghostCandidates.reduce(into: [Int: WorkoutDetail]()) { result, candidate in
             result[candidate.id] = candidate
         }
         self.ghostCandidateByID = candidateByID
-        _state = State(initialValue: ReplayState(strokes: detail.strokes))
+
+        let replayState = ReplayState(strokes: detail.strokes)
+        if let seekTime = initialConfiguration.seekTime, seekTime.isFinite, seekTime >= 0 {
+            replayState.seek(to: seekTime)
+        }
+        _state = State(initialValue: replayState)
+        _rendererMode = State(
+            initialValue: initialConfiguration.rendererMode ?? .threeD
+        )
+        _cameraPreset = State(
+            initialValue: initialConfiguration.cameraPreset ?? .chase
+        )
+        if let quality = initialConfiguration.quality {
+            _sessionSelectedQuality = State(initialValue: quality)
+            _effectiveReplayQuality = State(initialValue: quality)
+        }
+
         let initialRival: ReplayRival? = {
+            if let mode = initialConfiguration.rivalMode {
+                switch mode {
+                case .none:
+                    return nil
+                case .session:
+                    if let id = initialGhostID, let candidate = candidateByID[id] {
+                        return ReplayRivalFactory.makeSessionRival(from: candidate)
+                    }
+                    if let candidate = ghostCandidates.first {
+                        return ReplayRivalFactory.makeSessionRival(from: candidate)
+                    }
+                    return nil
+                case .pace:
+                    return ReplayRivalFactory.makeConstantPaceRival(
+                        pacePer500m: detail.workout.pace,
+                        player: detail.workout
+                    )
+                }
+            }
             guard let id = initialGhostID,
                   let candidate = candidateByID[id] else {
                 return nil
@@ -97,11 +147,17 @@ struct ReplayView: View {
             playbackControls
         }
         .navigationTitle("Replay")
+        .onAppear {
+            if initialConfiguration.autoPlay {
+                state.play()
+            }
+        }
         .onDisappear {
             cancelRivalImport()
             state.pause()
         }
         .onChange(of: preferences.replayRenderQuality) { _, quality in
+            guard initialConfiguration.persistsQualityPreference else { return }
             effectiveReplayQuality = quality
         }
         .onChange(of: colorScheme) { _, _ in
@@ -576,7 +632,7 @@ struct ReplayView: View {
                 reduceMotion: reduceMotion,
                 rival: activeRival,
                 distanceUnit: unit,
-                selectedQuality: preferences.replayRenderQuality,
+                selectedQuality: selectedReplayQuality,
                 effectiveQuality: Binding(
                     get: { displayedEffectiveReplayQuality },
                     set: { effectiveReplayQuality = $0 }
@@ -598,11 +654,14 @@ struct ReplayView: View {
     private var qualityPicker: some View {
         HStack(spacing: AppDesign.Spacing.small) {
             Picker(selection: Binding(
-                get: { preferences.replayRenderQuality.rawValue },
+                get: { selectedReplayQuality.rawValue },
                 set: { rawValue in
                     guard let quality = ReplayRenderQuality(rawValue: rawValue) else { return }
                     effectiveReplayQuality = quality
-                    preferences.replayRenderQuality = quality
+                    sessionSelectedQuality = quality
+                    if initialConfiguration.persistsQualityPreference {
+                        preferences.replayRenderQuality = quality
+                    }
                 }
             )) {
                 ForEach(ReplayRenderQuality.allCases, id: \.rawValue) { quality in
@@ -615,7 +674,7 @@ struct ReplayView: View {
             .labelStyle(.iconOnly)
             .accessibilityLabel(Self.qualityAccessibilityLabel)
             .accessibilityValue(Self.qualityAccessibilityValue(
-                selected: preferences.replayRenderQuality,
+                selected: selectedReplayQuality,
                 effective: displayedEffectiveReplayQuality
             ))
             #if os(macOS)
@@ -624,7 +683,7 @@ struct ReplayView: View {
             .accessibilityHint("Opens a menu to select the maximum 3D replay quality")
 
             if Self.isAdaptiveReduction(
-                selected: preferences.replayRenderQuality,
+                selected: selectedReplayQuality,
                 effective: displayedEffectiveReplayQuality
             ) {
                 Image(systemName: "arrow.down.circle")
@@ -680,7 +739,7 @@ struct ReplayView: View {
 
     private var displayedEffectiveReplayQuality: ReplayRenderQuality {
         Self.effectiveQualityForDisplay(
-            selected: preferences.replayRenderQuality,
+            selected: selectedReplayQuality,
             reportedEffective: effectiveReplayQuality
         )
     }

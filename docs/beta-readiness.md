@@ -64,15 +64,18 @@ The items below describe the merged baseline, the validation completed for Phase
 - Phase 8D unavailable evidence is explicit: exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Automated scene/governor tests cover bounded entities, ghost separation, and deterministic degradation, but do not replace those unavailable UI/profiling checks.
 - Phase 10B validation on the final review-fix tree passes the focused rival factory (15), parser (51), race-result (7), report (8), card (9), ghost-workflow (30), 3D scene-effects (13), quality-scene (18), and workout-library ghost candidate (12) tests; `swift build --target RowPlayCore`; full `swift test` with 1,168 tests total (978 Core, 68 Platform, 122 Studio), two expected authenticated-smoke skips, and zero failures; full `swift build`; both architecture scans; and `git diff --check`.
 - Phase 10B staged-bundle gates pass on the final hardening tree with `./script/build_and_run.sh --verify`, `--automation`, and `--sign-verify`. The staged app was exercised through Best Match and removal; invalid and valid constant-pace entry; an actual CSV import through the native file panel; 2D and 3D rival rendering; finish verdict appearance and seek-back hiding; real privacy-minimized race-report JSON and 1080x1440 race-card PNG saves; and a first-click native share sheet that was opened and cancelled without transmitting the card. The exported JSON and card were inspected for content, dimensions, clipping, and prohibited identifiers. TCX/FIT behavior is covered by parser fixtures/tests rather than claimed as a separate native file-panel walkthrough; a spoken VoiceOver pass, exact 1440x900 inspection, and Instruments profiling were not available.
-- Phase 11's final stack layer defines two complementary 48-case scene
-  matrices. The procedural sport/tier/camera matrix verifies scene wiring,
-  varied viewport aspects, the shared rival-rendering predicate, full resolved
-  camera poses, and authored FOVs. The deterministic sport/tier/theme/rival
-  matrix supplies validated assets, exercises the bundled athlete/equipment
-  path at High/Ultra, and verifies Reduced Motion, repeated exact seeks,
-  chase-rival viewport framing, and rival pullback. This automated proof
-  does not replace the still-unperformed human renderer/theme/window matrix or
-  sustained GPU profiling.
+- Phase 11 merged through PRs #90–#97 with two complementary 48-case automated
+  scene matrices. The procedural sport/tier/camera matrix verifies scene
+  wiring, varied viewport aspects, the shared rival-rendering predicate, full
+  resolved camera poses, and authored FOVs. The deterministic
+  sport/tier/theme/rival matrix supplies validated assets, exercises the
+  bundled athlete/equipment path at High/Ultra, and verifies Reduced Motion,
+  repeated exact seeks, chase-rival viewport framing, and rival pullback.
+  Those automated matrices do not by themselves complete human visual
+  acceptance or sustained GPU profiling.
+- Phase 12 adds deterministic staged-app acceptance mode, a reviewed scenario
+  catalog, bounded acceptance metrics, launch/profile scripts, and the human
+  visual plus sustained-performance release gate for production replay.
 - Source-map: all sync, storage, and app-shell wiring files have corresponding source-map entries.
 - Roadmap: all phase status claims updated to reflect merged state.
 - Privacy: `PrivacyRedaction` and `PrivacySafeLogger` are tested. No CoreBluetooth imports in `RowPlayCore`. Keychain uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
@@ -92,13 +95,16 @@ The items below describe the merged baseline, the validation completed for Phase
 ### Should-Fix
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
-2. **Final production 3D performance is not proven**: Phase 8D's available automated, bundle, telemetry, and visual evidence passes, but exact 1440x900, trackpad magnification, production-route ghost replay, and Instruments profiling were unavailable. Tier targets are scheduling policy, not guaranteed frame rates, and the observed windows do not establish a universal tier-performance ordering.
-3. **Phase 11 is not merged yet**: production USDZ athlete/equipment, venues,
-   current motion/grip contracts, and three-sport 2D replay are implemented in
-   the PR #90 replacement stack. The V4 athlete is bundled at every tier, with
-   authored equipment at High/Ultra and contract-driven procedural equipment
-   intentionally retained at Low/Medium. None of it is a shipped capability
-   until all eight layers pass exact-head CI/review and merge bottom-up.
+2. **Final production 3D performance needs Phase 12 evidence**: Phase 8D and
+   Phase 11 automated matrices pass, and Phase 11 delivered production athlete,
+   equipment, venues, three-sport 2D, cameras, rivals, and effects. Sustained
+   same-machine profiling, the complete human visual matrix, and the
+   deterministic acceptance release gate are Phase 12 responsibilities. Tier
+   targets remain scheduling policy, not universal frame-rate guarantees.
+3. **Phase 11 human/profiling acceptance was intentionally deferred**: PRs
+   #90–#97 merged the production replay stack. Phase 12 records the staged-app
+   human walkthrough and sustained performance evidence without rewriting
+   athlete, equipment, environment, or motion systems.
 
 ## Must Not Ship Yet
 
@@ -108,4 +114,9 @@ The items below describe the merged baseline, the validation completed for Phase
 
 ## Recommended Next PRs
 
-1. **CoreBluetooth erg transport**: Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with proper entitlements and permission handling.
+1. **Phase 12 replay acceptance** (user-prioritized before Bluetooth): complete
+   the deterministic acceptance mode, human visual matrix, and sustained
+   performance release gate for production replay.
+2. **CoreBluetooth erg transport** (deferred until replay acceptance lands):
+   Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with
+   proper entitlements and permission handling.

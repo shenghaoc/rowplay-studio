@@ -1,7 +1,7 @@
 import Foundation
 
 /// Available renderer modes for the workout replay surface.
-public enum ReplayRendererMode: String, CaseIterable, Identifiable {
+public enum ReplayRendererMode: String, CaseIterable, Identifiable, Sendable {
     case twoD = "2D"
     case threeD = "3D"
 
