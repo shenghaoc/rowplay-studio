@@ -16,10 +16,17 @@ public enum HrImport: Sendable {
 
     /// Extract valid HR samples from strokes.
     public static func extractHrSeries(_ strokes: [Stroke]) -> [HrSample] {
-        strokes
-            .filter { $0.heartRate != nil && $0.heartRate! > 0 && $0.t.isFinite }
-            .map { HrSample(t: $0.t, hr: $0.heartRate!) }
-            .sorted { $0.t < $1.t }
+        var samples = [HrSample]()
+        samples.reserveCapacity(strokes.count)
+
+        for stroke in strokes {
+            if let hr = stroke.heartRate, hr > 0, stroke.t.isFinite {
+                samples.append(HrSample(t: stroke.t, hr: hr))
+            }
+        }
+
+        samples.sort { $0.t < $1.t }
+        return samples
     }
 
     /// Linear HR interpolation at `fileTime`; nil outside range.
