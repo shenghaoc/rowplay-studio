@@ -83,6 +83,7 @@ struct ContentView: View {
             .opacity(0)
             .accessibilityHidden(true)
         }
+        .focusedSceneValue(\.replayCommand, replayCommand)
         #endif
         .toolbar {
             ToolbarItemGroup {
@@ -124,9 +125,7 @@ struct ContentView: View {
                 comparisonCandidates: library.comparisonCandidates(for: detail.id),
                 annotationStore: library.annotationStore,
                 onUpdateDetail: library.updateDetail,
-                onReplay: {
-                    detailNavigation.showReplay(workoutID: detail.id)
-                }
+                onReplay: requestReplayForCurrentSelection
             )
         } else {
             DashboardView(
@@ -187,6 +186,33 @@ struct ContentView: View {
 
     private var selectedWorkoutID: Int? {
         storedSelectedWorkoutID == Self.dashboardSelectionID ? nil : storedSelectedWorkoutID
+    }
+
+    private var selectedDetail: WorkoutDetail? {
+        selectedWorkoutID.flatMap { library.detail(id: $0) }
+    }
+
+    private var replayCommand: ReplayCommand {
+        ReplayCommand(
+            unavailability: detailNavigation.replayUnavailability(
+                for: selectedDetail,
+                isLibraryLoading: syncController.isLoading
+            ),
+            run: requestReplayForCurrentSelection
+        )
+    }
+
+    /// Replay command entry point for both the Workout menu item and the
+    /// detail toolbar button.
+    ///
+    /// Resolves the selection and library through live storage when invoked,
+    /// so an action closure captured during an earlier render pass still
+    /// targets the workout that is selected right now.
+    private func requestReplayForCurrentSelection() {
+        detailNavigation.showReplay(
+            for: selectedDetail,
+            isLibraryLoading: syncController.isLoading
+        )
     }
 
     private func reloadLibrary() {
