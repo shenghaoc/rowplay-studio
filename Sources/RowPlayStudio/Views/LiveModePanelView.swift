@@ -36,7 +36,19 @@ struct LiveModePanelView: View {
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
-                .accessibilityHint("Starts or stops live telemetry polling")
+                // labelsHidden() hides the visual title; keep an explicit a11y label so VoiceOver
+                // still announces the control name (not only "switch").
+                .accessibilityLabel("Enable Live Mode")
+                .accessibilityHint(
+                    library.liveState.enabled
+                        ? LocalizedStringKey("Stops live telemetry polling")
+                        : LocalizedStringKey("Starts live telemetry polling")
+                )
+                .help(
+                    library.liveState.enabled
+                        ? LocalizedStringKey("Stop live telemetry polling")
+                        : LocalizedStringKey("Start live telemetry polling")
+                )
             }
 
             if library.liveState.enabled {
