@@ -106,42 +106,57 @@ public struct ReplayRowerRigPose: Equatable, Sendable {
     }
 }
 
-/// SkiErg-specific rig pose: hip compression, handle height, pole travel,
-/// plus the common athlete joints.
+/// SkiErg-specific rig pose: hip compression, hand path, pole travel, plus
+/// the common athlete joints.
+///
+/// Coordinates are rig-root relative (ground at y = 0, travel along +z), the
+/// same frame the pole and ski anchors are placed in.
 public struct ReplaySkiErgRigPose: Equatable, Sendable {
     /// Common athlete joint angles.
     public var joints: ReplayAthleteJointPose
     /// Hip compression amount (0 = tall, 1 = fully compressed).
     public var hipCompression: Double
-    /// Handle Y position (vertical).
-    public var handleY: Double
-    /// Handle Z position (forward/back).
-    public var handleZ: Double
     /// Pole rotation angle (radians).
     public var poleRotation: Double
     /// 0...1 closure of the basket-to-course contact channel.
     public var poleContact: Double
-    /// Athlete-local forward coordinate of the deterministic course plant.
-    /// It compensates for travel since the current/next catch so planted
-    /// baskets do not slide with the athlete during seeks or normal playback.
+    /// Forward coordinate of the deterministic course plant.  It compensates
+    /// for travel since the current/next catch so planted baskets do not
+    /// slide with the athlete during seeks or normal playback.
     public var plantBasketZ: Double
+    /// Preferred hand height — the web renderer's shoulder-arc hand path
+    /// evaluated in the hinging torso frame, which the V4 clip's authored
+    /// hand keys follow.  Defaults reproduce the calm reduced-motion carry.
+    public var preferredHandY: Double
+    /// Preferred hand forward offset (see `preferredHandY`).
+    public var preferredHandZ: Double
+    /// Shoulder height in the same hinging torso frame as `preferredHandY`.
+    /// The rig solves the rigid pole contact inside the reach annulus around
+    /// this point so a planted pole cannot drag the hand past full extension.
+    public var shoulderY: Double
+    /// Shoulder forward offset (see `shoulderY`).
+    public var shoulderZ: Double
 
     public init(
         joints: ReplayAthleteJointPose = .neutral,
         hipCompression: Double = 0,
-        handleY: Double = 0,
-        handleZ: Double = 0,
         poleRotation: Double = 0,
         poleContact: Double = 0,
-        plantBasketZ: Double = 0
+        plantBasketZ: Double = 0,
+        preferredHandY: Double = 0.663,
+        preferredHandZ: Double = 0.094,
+        shoulderY: Double = 1.271,
+        shoulderZ: Double = 0.080
     ) {
         self.joints = joints
         self.hipCompression = hipCompression
-        self.handleY = handleY
-        self.handleZ = handleZ
         self.poleRotation = poleRotation
         self.poleContact = poleContact
         self.plantBasketZ = plantBasketZ
+        self.preferredHandY = preferredHandY
+        self.preferredHandZ = preferredHandZ
+        self.shoulderY = shoulderY
+        self.shoulderZ = shoulderZ
     }
 }
 
@@ -300,11 +315,6 @@ public enum ReplayRigPoseSolver {
         let poleContact = unit(graph.contacts.polePlant.value)
         let hipCompression = unit(graph.body.torsoCompression.value)
         let torsoLean = 0.18 + hinge * 0.55
-        // Classic double-pole hand arc: high/forward at the plant, then down
-        // past the hips at pole-off. The old indoor-machine handle range was
-        // too low and short for a rigid 1.37 m pole planted on the course.
-        let handleY = 1.58 - press * 1.02
-        let handleZ = 0.66 - poleSweep * 0.94
         let poleRotation = -0.20 - poleSweep * 0.92
         // Reconstruct the current/next catch's ground point from pose state,
         // not the previously rendered frame. On a locally straight course,
@@ -319,6 +329,54 @@ public enum ReplayRigPoseSolver {
         let shoulderFlex = 0.26 - press * 0.64
         let elbowFlex = elbow * 0.55 + (1 - armExtension) * 0.16
         let legFlex = knees * 0.24
+
+        // Web-parity preferred hand path (renderer3dSkiAvatar.skiPreferredHand):
+        // a polar arc around the shoulder during pole contact and a Bezier
+        // return during recovery, authored in the hinging torso frame.  The
+        // V4 clip's hand keys were derived from these runtime frames, so the
+        // native pole/hand targets must ride the same curve or the contact
+        // pass diverges from the sampled body by up to 9 cm mid-pull.
+        let proportions = ReplaySkiGripContract.athleteProportions
+        let rebound = unit(graph.accents.rebound.value)
+        let maxArmReach = proportions.upperArmLength + proportions.forearmLength - 0.02
+        let armReach = min(0.72 - elbow * 0.28 + armExtension * 0.08, maxArmReach * 0.96)
+        let armAngle = 0.56 - poleSweep * 2.56
+        var handLocalY = 0.54 + sin(armAngle) * armReach
+        var handLocalZ = 0.05 + cos(armAngle) * armReach
+        if strokePose.cycleFrac > ReplayMotionGraph.skiPoleOffCycle {
+            // Recovery return: hands come forward close to the body then
+            // lift to the high reach.  Endpoints reuse the polar formula at
+            // its boundary sweeps so the hand-off and cycle seam stay
+            // continuous; sweep itself is the C² recovery progress.
+            let t = 1 - unit(poleSweep)
+            let offY = 0.54 + sin(0.56 - 2.56) * armReach
+            let offZ = 0.05 + cos(0.56 - 2.56) * armReach
+            let reachY = 0.54 + sin(0.56) * armReach
+            let reachZ = 0.05 + cos(0.56) * armReach
+            handLocalY = cubicBezier(offY, 0.1, 0.48, reachY, at: t)
+            handLocalZ = cubicBezier(offZ, 0.2, 0.3, reachZ, at: t)
+        }
+        // Both branches place the hand on a circle of radius `armReach`
+        // around the shoulder, and `armReach <= maxArmReach * 0.96`, so the
+        // web's extra hard clamp toward the shoulder can never fire here and
+        // is deliberately not ported.  `ReplayAthleteContactSolver` still
+        // clamps against the sampled skeleton's real reach, which is what
+        // actually differs from these contract proportions.
+        //
+        // Hinging torso frame: pelvis carry plus forward pitch.  The shoulder
+        // rides the same frame, and the rig needs it to keep the rigid pole
+        // contact inside the arm's reach annulus the way the web does.
+        let pelvisCarryY = 0.735 - knees * 0.11 + rebound * 0.045
+        let pelvisCarryZ = hinge * 0.055
+        let torsoPitch = 0.055 + hinge * 0.56
+        func inRootFrame(y: Double, z: Double) -> (y: Double, z: Double) {
+            (
+                pelvisCarryY + y * cos(torsoPitch) - z * sin(torsoPitch),
+                pelvisCarryZ + y * sin(torsoPitch) + z * cos(torsoPitch)
+            )
+        }
+        let preferredHand = inRootFrame(y: handLocalY, z: handLocalZ)
+        let shoulder = inRootFrame(y: 0.54, z: 0.05)
 
         let joints = ReplayAthleteJointPose(
             torsoLean: finite(torsoLean, fallback: 0.2),
@@ -339,11 +397,13 @@ public enum ReplayRigPoseSolver {
         return ReplaySkiErgRigPose(
             joints: joints,
             hipCompression: finite(hipCompression, fallback: 0),
-            handleY: finite(handleY, fallback: 1.2),
-            handleZ: finite(handleZ, fallback: 0.2),
             poleRotation: finite(poleRotation, fallback: -0.1),
             poleContact: finite(poleContact, fallback: 0),
-            plantBasketZ: finite(plantBasketZ, fallback: 0.24)
+            plantBasketZ: finite(plantBasketZ, fallback: 0.24),
+            preferredHandY: finite(preferredHand.y, fallback: 0.66),
+            preferredHandZ: finite(preferredHand.z, fallback: 0.09),
+            shoulderY: finite(shoulder.y, fallback: 1.27),
+            shoulderZ: finite(shoulder.z, fallback: 0.09)
         )
     }
 
@@ -423,8 +483,6 @@ public enum ReplayRigPoseSolver {
                     kneeFlexR: -0.05
                 ),
                 hipCompression: 0,
-                handleY: 1.2,
-                handleZ: 0.2,
                 poleRotation: -0.2,
                 poleContact: 0,
                 plantBasketZ: ReplaySkiGripContract.athleteProportions.polePlantForwardOffset
@@ -449,6 +507,24 @@ public enum ReplayRigPoseSolver {
 
     private static func unit(_ value: Double) -> Double {
         value.isFinite ? max(0, min(1, value)) : 0
+    }
+
+    /// Scalar cubic Bezier through `p0`/`p3` with interior controls
+    /// `p1`/`p2`, evaluated at `t` in [0, 1].  Ports the web ski-recovery
+    /// curve, whose value is provably bounded by its control points.
+    private static func cubicBezier(
+        _ p0: Double,
+        _ p1: Double,
+        _ p2: Double,
+        _ p3: Double,
+        at t: Double
+    ) -> Double {
+        let clamped = max(0, min(1, t))
+        let inverse = 1 - clamped
+        return inverse * inverse * inverse * p0
+            + 3 * inverse * inverse * clamped * p1
+            + 3 * inverse * clamped * clamped * p2
+            + clamped * clamped * clamped * p3
     }
 }
 

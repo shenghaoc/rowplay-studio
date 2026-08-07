@@ -24,7 +24,9 @@ and sustained-profiling acceptance gate is Phase 12.
       complete procedural-athlete fallback.
 - [x] **5/8 Grip and contact** — integrate finger and thumb closure, contact
       solving, independent sculls, course skis/poles, road-bike contact
-      geometry, wrist orientation, release/recovery, complete authored
+      geometry, wrist orientation (superseded: Phase 12 removed the fixed-axis
+      terminal twist in favour of the clip's authored wrist/ankle orientation),
+      release/recovery, complete authored
       composites at High/Ultra, and independent live/rival instances.
 - [x] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.

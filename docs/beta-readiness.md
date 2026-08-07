@@ -103,8 +103,9 @@ The items below describe the merged baseline and the validation completed for ea
    targets remain scheduling policy, not universal frame-rate guarantees.
 3. **Phase 11 human/profiling acceptance was intentionally deferred**: PRs
    #90–#97 merged the production replay stack. Phase 12 records the staged-app
-   human walkthrough and sustained performance evidence without rewriting
-   athlete, equipment, environment, or motion systems.
+   human walkthrough and sustained performance evidence, and fixes the one
+   defect that walkthrough demonstrated — production athlete pose and contact
+   correction — without rewriting equipment, environment, or authored assets.
 
 ## Must Not Ship Yet
 

@@ -12,41 +12,66 @@
       "file": "Sources/RowPlayStudio/Views/Replay3D/ReplayPerformanceController.swift",
       "id": "acceptance-metrics-pairing",
       "scenario": "rower-3d-ultra-session-rival"
+    },
+    {
+      "id": "athlete-pose-and-contact-correction",
+      "scenario": "all-3d-scenarios",
+      "baselineEvidence": "Close visual inspection of the staged app showed the athlete facing away from its equipment with limbs and extremities twisted outside anatomical range on all three sports. The launch-based matrix pass did not detect this because it scored process and telemetry health, not rendered pose.",
+      "rootCause": "Motion-table glTF joint locals were applied to a USDZ skeleton in a +90 degree X-rotated joint space (only the root joint needed the remap); the Blender USD export faces -Z where the GLB and all ported rigs face +Z and carried a native-only 0.95 scale; and the contact solver forced a fixed pole vector plus a fixed-axis terminal twist.",
+      "files": [
+        "Sources/RowPlayStudio/Views/Replay3D/ReplayAthleteInstance.swift",
+        "Sources/RowPlayStudio/Views/Replay3D/ReplayAthleteContactSolver.swift",
+        "Sources/RowPlayStudio/Views/Replay3D/ReplayRigSource.swift",
+        "Sources/RowPlayStudio/Views/Replay3D/ReplaySkiErgRig.swift",
+        "Sources/RowPlayCore/Replay/ReplayRigPose.swift"
+      ],
+      "regressionCoverage": [
+        "ReplayBundledContactSweepTests.testBundledScenesSolveContactsAcrossDenseStrokeCycle",
+        "ReplayBundledContactSweepTests.testHandTargetWithinReachToleranceIsAccepted",
+        "ReplayBundledContactSweepTests.testHandTargetBeyondReachToleranceFailsClosed",
+        "ReplayRigPoseTests.testSkiErgPreferredHandStaysWithinArmReachAcrossCycle",
+        "ReplayRigPoseTests.testSkiErgReducedMotionKeepsAuthoredCarryPosition"
+      ],
+      "postFixEvidence": "Dense sweep rejects 0 of 771 authored phases across the three sports with worst applied grip error 0.0014 m; staged-app playback re-inspected on all three sports shows hands and feet on their equipment contacts.",
+      "visualEvidenceStatus": "not-committed-screen-recording-tcc-unavailable"
     }
   ],
   "performance": {
-    "bike-3d-ultra-session-rival": {
-      "adaptiveDegradationCount": 0,
-      "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
-      "p95FrameIntervalMilliseconds": 16.67,
-      "p95SceneUpdateDurationMilliseconds": 0.37,
-      "rssLastBytes": 333971456,
-      "sampleCount": 600,
-      "samplesAboveBudget": 19,
-      "sceneRebuildCount": 0,
-      "timeProfilerStatus": "recorded"
-    },
-    "rower-3d-ultra-session-rival": {
-      "adaptiveDegradationCount": 0,
-      "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
-      "p95FrameIntervalMilliseconds": 16.67,
-      "p95SceneUpdateDurationMilliseconds": 0.55,
-      "rssLastBytes": 276480000,
-      "sampleCount": 600,
-      "samplesAboveBudget": 6,
-      "sceneRebuildCount": 0,
-      "timeProfilerStatus": "recorded"
-    },
-    "skierg-3d-ultra-session-rival": {
-      "adaptiveDegradationCount": 0,
-      "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
-      "p95FrameIntervalMilliseconds": 16.67,
-      "p95SceneUpdateDurationMilliseconds": 0.47,
-      "rssLastBytes": 288243712,
-      "sampleCount": 600,
-      "samplesAboveBudget": 3,
-      "sceneRebuildCount": 0,
-      "timeProfilerStatus": "recorded"
+    "note": "Captured before athlete-pose-and-contact-correction. The fix changes per-frame contact solving, so these figures are a pre-fix baseline and were not re-measured.",
+    "scenarios": {
+      "bike-3d-ultra-session-rival": {
+        "adaptiveDegradationCount": 0,
+        "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
+        "p95FrameIntervalMilliseconds": 16.67,
+        "p95SceneUpdateDurationMilliseconds": 0.37,
+        "rssLastBytes": 333971456,
+        "sampleCount": 600,
+        "samplesAboveBudget": 19,
+        "sceneRebuildCount": 0,
+        "timeProfilerStatus": "recorded"
+      },
+      "rower-3d-ultra-session-rival": {
+        "adaptiveDegradationCount": 0,
+        "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
+        "p95FrameIntervalMilliseconds": 16.67,
+        "p95SceneUpdateDurationMilliseconds": 0.55,
+        "rssLastBytes": 276480000,
+        "sampleCount": 600,
+        "samplesAboveBudget": 6,
+        "sceneRebuildCount": 0,
+        "timeProfilerStatus": "recorded"
+      },
+      "skierg-3d-ultra-session-rival": {
+        "adaptiveDegradationCount": 0,
+        "gpuTraceStatus": "template-listed-not-attached:Metal System Trace",
+        "p95FrameIntervalMilliseconds": 16.67,
+        "p95SceneUpdateDurationMilliseconds": 0.47,
+        "rssLastBytes": 288243712,
+        "sampleCount": 600,
+        "samplesAboveBudget": 3,
+        "sceneRebuildCount": 0,
+        "timeProfilerStatus": "recorded"
+      }
     }
   },
   "phase": 12,
@@ -157,7 +182,7 @@
     {
       "camera": "chase",
       "id": "rower-3d-low-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "catch",
       "quality": "low",
       "reducedMotion": false,
@@ -167,13 +192,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "side",
       "id": "rower-3d-medium-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "drive",
       "quality": "medium",
       "reducedMotion": false,
@@ -183,13 +208,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 14,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "rower-3d-high-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "finish",
       "quality": "high",
       "reducedMotion": false,
@@ -199,13 +224,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "rower-3d-ultra-session-rival",
-      "notes": "60s profiled with Time Profiler + RSS; see performance block",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "drive",
       "quality": "ultra",
       "reducedMotion": false,
@@ -215,13 +240,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 16,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "side",
       "id": "rower-3d-ultra-pace-rival",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "recovery",
       "quality": "ultra",
       "reducedMotion": false,
@@ -231,13 +256,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 22,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "overhead",
       "id": "rower-3d-overhead",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "drive",
       "quality": "high",
       "reducedMotion": false,
@@ -247,13 +272,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "orbit",
       "id": "rower-3d-orbit",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "finish",
       "quality": "high",
       "reducedMotion": false,
@@ -263,13 +288,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 15,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "skierg-3d-low-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "plant",
       "quality": "low",
       "reducedMotion": false,
@@ -279,13 +304,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 8,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "side",
       "id": "skierg-3d-high-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pull",
       "quality": "high",
       "reducedMotion": false,
@@ -295,13 +320,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "skierg-3d-ultra-session-rival",
-      "notes": "60s profiled with Time Profiler + RSS; see performance block",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pull",
       "quality": "ultra",
       "reducedMotion": false,
@@ -311,13 +336,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 18,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "overhead",
       "id": "skierg-3d-overhead",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "recovery",
       "quality": "medium",
       "reducedMotion": false,
@@ -327,13 +352,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "orbit",
       "id": "skierg-3d-orbit",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "plant",
       "quality": "high",
       "reducedMotion": false,
@@ -343,13 +368,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 14,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "bike-3d-low-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "low",
       "reducedMotion": false,
@@ -359,13 +384,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 8,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "side",
       "id": "bike-3d-high-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "high",
       "reducedMotion": false,
@@ -375,13 +400,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "bike-3d-ultra-session-rival",
-      "notes": "60s profiled with Time Profiler + RSS; see performance block",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "ultra",
       "reducedMotion": false,
@@ -391,13 +416,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 16,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "overhead",
       "id": "bike-3d-overhead",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "medium",
       "reducedMotion": false,
@@ -407,13 +432,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "orbit",
       "id": "bike-3d-orbit",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "high",
       "reducedMotion": false,
@@ -423,13 +448,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 14,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "rower-3d-reduced-motion",
-      "notes": "Reduced Motion launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "static-pose",
       "quality": "high",
       "reducedMotion": true,
@@ -439,13 +464,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "side",
       "id": "skierg-3d-reduced-motion",
-      "notes": "Reduced Motion launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "static-pose",
       "quality": "high",
       "reducedMotion": true,
@@ -455,13 +480,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "bike-3d-reduced-motion",
-      "notes": "Reduced Motion launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "static-pose",
       "quality": "medium",
       "reducedMotion": true,
@@ -471,7 +496,7 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 8,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
@@ -493,7 +518,7 @@
     {
       "camera": "chase",
       "id": "rower-3d-compact",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "drive",
       "quality": "medium",
       "reducedMotion": false,
@@ -503,13 +528,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1000x680"
     },
     {
       "camera": "chase",
       "id": "rower-3d-large",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "drive",
       "quality": "ultra",
       "reducedMotion": false,
@@ -519,13 +544,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 16,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1680x1050"
     },
     {
       "camera": "chase",
       "id": "skierg-3d-compact",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pull",
       "quality": "medium",
       "reducedMotion": false,
@@ -535,13 +560,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1000x680"
     },
     {
       "camera": "chase",
       "id": "bike-3d-large",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "high",
       "reducedMotion": false,
@@ -551,13 +576,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1680x1050"
     },
     {
       "camera": "chase",
       "id": "rower-3d-medium-session-rival",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "catch",
       "quality": "medium",
       "reducedMotion": false,
@@ -567,13 +592,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 20,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "skierg-3d-medium-session-rival",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "recovery",
       "quality": "medium",
       "reducedMotion": false,
@@ -583,13 +608,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 16,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "bike-3d-medium-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "medium",
       "reducedMotion": false,
@@ -599,13 +624,13 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 10,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "rower-3d-ultra-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "recovery",
       "quality": "ultra",
       "reducedMotion": false,
@@ -615,13 +640,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "skierg-3d-ultra-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "plant",
       "quality": "ultra",
       "reducedMotion": false,
@@ -631,13 +656,13 @@
       "status": "launched",
       "theme": "light",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     },
     {
       "camera": "chase",
       "id": "bike-3d-ultra-solo",
-      "notes": "Staged-app process launch verified",
+      "notes": "Staged-app process launch verified. Pose not validated by this method; see evidenceBackedFixes.athlete-pose-and-contact-correction",
       "phase": "pedal",
       "quality": "ultra",
       "reducedMotion": false,
@@ -647,7 +672,7 @@
       "status": "launched",
       "theme": "dark",
       "timeSeconds": 12,
-      "visualResult": "pass-launch-and-automated-matrix",
+      "visualResult": "pass-launch-and-automated-matrix; pose superseded by athlete-pose-and-contact-correction",
       "window": "1280x800"
     }
   ],

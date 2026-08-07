@@ -417,7 +417,10 @@ Scope:
 - Measure sustained production replay performance with bounded acceptance
   metrics, xctrace when available, and resident-memory sampling.
 - Fix only evidence-backed visual, interaction, contact, camera, lifecycle, or
-  performance defects found during the matrix.
+  performance defects found during the matrix. Two landed: acceptance-metrics
+  under-sampling, and production athlete pose and contact correction (skeleton
+  basis, facing/scale, contact bend plane and terminal orientation) across all
+  three sports.
 - Correct documentation that still described Phase 11 as unmerged and leave a
   repeatable native release gate for later replay changes.
 

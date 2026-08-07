@@ -173,9 +173,9 @@ final class ReplaySportRigStructureTests: XCTestCase {
         let tallPose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
             joints: .neutral,
             hipCompression: 0,
-            handleY: 0.58,
-            handleZ: 0.41,
-            poleRotation: -1.0
+            poleRotation: -1.0,
+            preferredHandY: 0.58,
+            preferredHandZ: 0.41
         ))
         rig.applyPose(tallPose)
         let tallHandleY = findEntity(named: "pole-grip-anchor-L", in: rig.root)?
@@ -185,9 +185,9 @@ final class ReplaySportRigStructureTests: XCTestCase {
         let compressedPose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
             joints: .neutral,
             hipCompression: 0.8,
-            handleY: 0.26,
-            handleZ: -0.09,
-            poleRotation: 0.8
+            poleRotation: 0.8,
+            preferredHandY: 0.26,
+            preferredHandZ: -0.09
         ))
         rig.applyPose(compressedPose)
         let compressedHandleY = findEntity(named: "pole-grip-anchor-L", in: rig.root)?
@@ -285,11 +285,11 @@ final class ReplaySportRigStructureTests: XCTestCase {
         let rig = buildRig(sport: .skierg)
         rig.applyPose(.skierg(ReplaySkiErgRigPose(
             hipCompression: 0.7,
-            handleY: 1.25,
-            handleZ: 0.36,
             poleRotation: -0.7,
             poleContact: 1,
-            plantBasketZ: 0.24
+            plantBasketZ: 0.24,
+            preferredHandY: 0.72,
+            preferredHandZ: 0.18
         )))
 
         try assertContact(named: "hand-L", with: "pole-grip-anchor-L", in: rig)
@@ -400,8 +400,8 @@ final class ReplaySportRigStructureTests: XCTestCase {
     func testRepeatedPoseApplicationDoesNotDriftSkiErg() {
         let rig = buildRig(sport: .skierg)
         let pose = ReplaySportRigPose.skierg(ReplaySkiErgRigPose(
-            joints: .neutral, hipCompression: 0, handleY: 0.42, handleZ: 0.16,
-            poleRotation: -0.1
+            joints: .neutral, hipCompression: 0, poleRotation: -0.1,
+            preferredHandY: 0.42, preferredHandZ: 0.16
         ))
         assertNoDrift(
             rig: rig,
@@ -504,8 +504,8 @@ final class ReplaySportRigStructureTests: XCTestCase {
             ))
         case .skierg:
             return .skierg(ReplaySkiErgRigPose(
-                joints: .neutral, hipCompression: 0, handleY: 0.42, handleZ: 0.16,
-                poleRotation: -0.1
+                joints: .neutral, hipCompression: 0, poleRotation: -0.1,
+                preferredHandY: 0.42, preferredHandZ: 0.16
             ))
         case .bike:
             return .bike(ReplayBikeErgRigPose(

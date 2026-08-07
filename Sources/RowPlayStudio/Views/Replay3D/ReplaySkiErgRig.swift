@@ -98,7 +98,7 @@ final class ReplaySkiErgRig: ReplaySportRig {
                 instance: canonicalAthlete,
                 sport: .skierg,
                 parent: root,
-                rootScale: 0.95,
+                rootScale: 1.0,
                 rootPosition: SIMD3(0, 0.72, 0.02)
             ))
         } else {
@@ -249,8 +249,6 @@ final class ReplaySkiErgRig: ReplaySportRig {
             return .failed(.unexpectedSport)
         }
 
-        let handleY = ReplaySportRigFiniteGuard.finite(Float(skiPose.handleY), fallback: 1.2)
-        let handleZ = ReplaySportRigFiniteGuard.finite(Float(skiPose.handleZ), fallback: 0.2)
         let poleRotation = ReplaySportRigFiniteGuard.finite(Float(skiPose.poleRotation), fallback: -0.2)
         let poleContact = min(
             1,
@@ -266,12 +264,33 @@ final class ReplaySkiErgRig: ReplaySportRig {
         )
 
         let equipment = ReplaySkiGripContract.athleteProportions
+        let preferredHandY = ReplaySportRigFiniteGuard.finite(
+            Float(skiPose.preferredHandY),
+            fallback: 0.66
+        )
+        let preferredHandZ = ReplaySportRigFiniteGuard.finite(
+            Float(skiPose.preferredHandZ),
+            fallback: 0.09
+        )
+        let shoulderY = ReplaySportRigFiniteGuard.finite(
+            Float(skiPose.shoulderY),
+            fallback: 1.27
+        )
+        let shoulderZ = ReplaySportRigFiniteGuard.finite(
+            Float(skiPose.shoulderZ),
+            fallback: 0.09
+        )
+        func placePoles() -> [SIMD3<Float>] {
         var handTargets: [SIMD3<Float>] = []
         for pole in poles {
+            // The preferred hand rides the web renderer's shoulder-arc path
+            // (torso-frame polar arc plus recovery Bezier) — the same curve
+            // the V4 clip's hand keys were authored from.  Lateral span is
+            // the web's shoulder half width plus its fixed 0.05 m margin.
             let desiredHand = SIMD3<Float>(
-                pole.side * Float(equipment.skiCenterOffset),
-                0.82 - (1.58 - handleY) * (0.42 / 1.02),
-                0.28 - (0.66 - handleZ) * (0.38 / 0.94)
+                pole.side * Float(equipment.shoulderHalfWidth + 0.05),
+                preferredHandY,
+                preferredHandZ
             )
 
             // Free-flight baskets swing behind the carried hand at an exact
@@ -293,11 +312,23 @@ final class ReplaySkiErgRig: ReplaySportRig {
                 plantBasketZ
             )
             let blendedBasket = freeBasket + (plantBasket - freeBasket) * poleContact
-            let handDirection = normalizedOrFallback(
-                desiredHand - blendedBasket,
-                fallback: SIMD3(0, 1, 0)
+            // Rigid pole length is preserved, but the contact point is the one
+            // closest to the authored hand that the arm can actually reach: a
+            // planted basket must not drag the hand past full extension (web
+            // parity with `solveRigidContactPoint3D` + reach clamp).
+            let shoulder = SIMD3<Float>(
+                pole.side * Float(equipment.shoulderHalfWidth),
+                shoulderY,
+                shoulderZ
             )
-            let solvedHand = blendedBasket + handDirection * poleLength
+            let solvedHand = SIMD3<Float>(ReplayTwoBoneSolver.solveRigidContact3D(
+                root: SIMD3<Double>(shoulder),
+                preferred: SIMD3<Double>(desiredHand),
+                contactCenter: SIMD3<Double>(blendedBasket),
+                contactLength: Double(poleLength),
+                minimumReach: 0,
+                maximumReach: equipment.upperArmLength + equipment.forearmLength - 0.02
+            ).point)
 
             pole.root.position = solvedHand
             pole.root.orientation = simd_quatf(
@@ -306,22 +337,31 @@ final class ReplaySkiErgRig: ReplaySportRig {
             )
             handTargets.append(pole.gripAnchor.position(relativeTo: root))
         }
+        return handTargets
+        }
 
         let compressionOffset = hipCompression * 0.15
         let pelvisTarget = SIMD3<Float>(0, 0.72 - compressionOffset, 0.02)
         let footL = footAnchorL.position(relativeTo: root)
         let footR = footAnchorR.position(relativeTo: root)
-        let targets = ReplayAthleteContactTargets(
-            pelvis: pelvisTarget,
-            leftHand: handTargets[0],
-            rightHand: handTargets[1],
-            leftFoot: footL,
-            rightFoot: footR
-        )
+        func targets(handTargets: [SIMD3<Float>]) -> ReplayAthleteContactTargets {
+            ReplayAthleteContactTargets(
+                pelvis: pelvisTarget,
+                leftHand: handTargets[0],
+                rightHand: handTargets[1],
+                leftFoot: footL,
+                rightFoot: footR
+            )
+        }
 
+        let handTargets = placePoles()
         switch source {
         case .bundled(let runtime):
-            let result = runtime.apply(motion: motion, targets: targets, relativeTo: root)
+            let result = runtime.apply(
+                motion: motion,
+                targets: targets(handTargets: handTargets),
+                relativeTo: root
+            )
             canonicalRuntimeFailure = result.failure != nil
             return result
         case .procedural(let athlete):

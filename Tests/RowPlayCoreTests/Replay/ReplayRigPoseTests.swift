@@ -94,8 +94,8 @@ final class ReplayRigPoseTests: XCTestCase {
         }
         // Should be tall (less compression)
         XCTAssertLessThan(ski.hipCompression, 0.1, "Should be tall at plant")
-        // Handles should be high
-        XCTAssertGreaterThan(ski.handleY, 0.4, "Handles should be high at plant")
+        // Hands should be high on the reach at the plant
+        XCTAssertGreaterThan(ski.preferredHandY, 0.9, "Hands should be high at plant")
     }
 
     func testSkiErgPlantIsDeterministicAndCourseFixedWithinStroke() {
@@ -137,6 +137,54 @@ final class ReplayRigPoseTests: XCTestCase {
             .skierg(first),
             "Seeking the same pose must reconstruct the same plant"
         )
+    }
+
+    /// The preferred hand path is the web renderer's shoulder arc, so the
+    /// authored hand must stay inside the arm's reach envelope at every phase
+    /// of the cycle — otherwise the rigid pole solve drags it off the grip.
+    func testSkiErgPreferredHandStaysWithinArmReachAcrossCycle() {
+        let proportions = ReplaySkiGripContract.athleteProportions
+        let maxReach = proportions.upperArmLength + proportions.forearmLength - 0.02
+        for step in 0..<128 {
+            let cycleFrac = Double(step) / 128
+            guard case .skierg(let pose) = ReplayRigPoseSolver.solve(
+                sport: .skierg,
+                strokePose: makeStrokePose(cycleFrac: cycleFrac),
+                distance: cycleFrac * 8,
+                reduceMotion: false
+            ) else {
+                return XCTFail("Expected SkiErg pose at \(cycleFrac)")
+            }
+            XCTAssertTrue(pose.preferredHandY.isFinite && pose.preferredHandZ.isFinite)
+            XCTAssertTrue(pose.shoulderY.isFinite && pose.shoulderZ.isFinite)
+            let dy = pose.preferredHandY - pose.shoulderY
+            let dz = pose.preferredHandZ - pose.shoulderZ
+            // Lateral span between shoulder and preferred hand is the web's
+            // fixed 0.05 m margin beyond the shoulder half width.
+            let span = (0.05 * 0.05 + dy * dy + dz * dz).squareRoot()
+            XCTAssertLessThanOrEqual(
+                span,
+                maxReach + 1e-6,
+                "Preferred hand outside arm reach at cycleFrac \(cycleFrac)"
+            )
+        }
+    }
+
+    /// Reduced motion must keep the calm carry the rig rendered before the
+    /// preferred-hand path existed, so the defaults cannot drift.
+    func testSkiErgReducedMotionKeepsAuthoredCarryPosition() {
+        guard case .skierg(let pose) = ReplayRigPoseSolver.solve(
+            sport: .skierg,
+            strokePose: makeStrokePose(cycleFrac: 0.4),
+            distance: 3,
+            reduceMotion: true
+        ) else {
+            return XCTFail("Expected SkiErg pose")
+        }
+        // Matches the legacy handleY/handleZ remap the rig applied for the
+        // reduced-motion pose (1.2, 0.2) before the web-parity port.
+        XCTAssertEqual(pose.preferredHandY, 0.663, accuracy: 0.01)
+        XCTAssertEqual(pose.preferredHandZ, 0.094, accuracy: 0.01)
     }
 
     func testSkiErgPreplantTargetsTheNextCatchWithoutHistory() {
@@ -429,8 +477,10 @@ final class ReplayRigPoseTests: XCTestCase {
             assertJointsFinite(r.joints, file: file, line: line)
         case .skierg(let s):
             XCTAssertTrue(s.hipCompression.isFinite, "hipCompression not finite", file: file, line: line)
-            XCTAssertTrue(s.handleY.isFinite, "handleY not finite", file: file, line: line)
-            XCTAssertTrue(s.handleZ.isFinite, "handleZ not finite", file: file, line: line)
+            XCTAssertTrue(s.preferredHandY.isFinite, "preferredHandY not finite", file: file, line: line)
+            XCTAssertTrue(s.preferredHandZ.isFinite, "preferredHandZ not finite", file: file, line: line)
+            XCTAssertTrue(s.shoulderY.isFinite, "shoulderY not finite", file: file, line: line)
+            XCTAssertTrue(s.shoulderZ.isFinite, "shoulderZ not finite", file: file, line: line)
             XCTAssertTrue(s.poleRotation.isFinite, "poleRotation not finite", file: file, line: line)
             XCTAssertTrue(s.poleContact.isFinite, "poleContact not finite", file: file, line: line)
             XCTAssertTrue(s.plantBasketZ.isFinite, "plantBasketZ not finite", file: file, line: line)

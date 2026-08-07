@@ -262,6 +262,7 @@ final class ReplayAthleteInstance {
     let gripController: ReplayAthleteGripController
 
     private let template: ReplayAthleteTemplate
+    private let rootTableIndex: Int?
     private var baseRootTransform: Transform?
     private var constraintPose: SkeletalPose?
 
@@ -297,6 +298,7 @@ final class ReplayAthleteInstance {
             repeating: ReplayAthleteBoneTransform(),
             count: template.motionTable.boneNames.count
         )
+        self.rootTableIndex = template.contract.semanticBones.firstIndex(where: { $0.parent == nil })
 
         // Working pose starts at bind; helper joints are pre-composed with
         // the install-time grip closure once — per frame only the semantic
@@ -339,6 +341,23 @@ final class ReplayAthleteInstance {
         baseRootTransform = root.transform
     }
 
+    /// Basis change from the motion table's glTF joint space into the USDZ
+    /// skeleton's.
+    ///
+    /// The table stores glTF joint locals sampled from the pinned GLB, while
+    /// the USDZ skeleton is a Blender export whose joint space is the glTF
+    /// space rotated by +90° about X (the asset root's `rotateXYZ (90, 0,
+    /// 180)` presents it upright again).  Both exports share the same bone
+    /// frames, so every parented joint's local transform is numerically
+    /// identical between them; only the root joint (`v4Hips`, parented to the
+    /// skeleton itself) absorbs the basis change and needs this remap.
+    private static let rootJointBasisRotation = simd_quatf(
+        ix: Float(2.0.squareRoot() / 2),
+        iy: 0,
+        iz: 0,
+        r: Float(2.0.squareRoot() / 2)
+    )
+
     /// Seek the authored base motion to a normalized clip fraction in [0, 1).
     ///
     /// The pose is rebuilt from the bind pose plus the sampled table every
@@ -363,17 +382,23 @@ final class ReplayAthleteInstance {
                 Float(sampled.scale.y),
                 Float(sampled.scale.z)
             )
-            let rotation = simd_quatf(
+            var rotation = simd_quatf(
                 ix: Float(sampled.rotation.x),
                 iy: Float(sampled.rotation.y),
                 iz: Float(sampled.rotation.z),
                 r: Float(sampled.rotation.w)
             )
-            let translation = SIMD3<Float>(
+            var translation = SIMD3<Float>(
                 Float(sampled.translation.x),
                 Float(sampled.translation.y),
                 Float(sampled.translation.z)
             )
+            if tableIndex == rootTableIndex {
+                // Rx · (T·R·S) = T(Rx·t) · R(Rx·q) · S — the joint's scale is
+                // left of nothing and stays as authored.
+                rotation = Self.rootJointBasisRotation * rotation
+                translation = SIMD3(translation.x, -translation.z, translation.y)
+            }
             workingTransforms[jointIndex] = Transform(
                 scale: scale,
                 rotation: rotation,

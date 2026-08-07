@@ -27,10 +27,18 @@ Phase 11 merge (PRs #90–#97), and evidence-backed fixes only.
 
 ## Baseline before rendering fixes
 
-No production 2D/3D rendering, camera, contact, or lifecycle defect was
-demonstrated that required changing scene code. The only evidence-backed code
-defect found during the matrix was acceptance-metrics sampling wiring (paired
-samples were recorded only when a production 120-sample window completed).
+The first pass through the matrix recorded only an acceptance-metrics sampling
+defect (paired samples were recorded only when a production 120-sample window
+completed) and concluded that no scene code had to change.
+
+**That conclusion was wrong.** The matrix was scored from staged-app process
+launches plus the Phase 11 automated matrices, and neither can see a pose: a
+subsequent close visual inspection of the 3D athlete found gross skeletal
+defects on all three sports that the launch-based pass had missed. The
+per-sport "Pass" rows below are retained as the record of what that method
+actually established — process and telemetry health, not pose correctness —
+and are superseded for the 3D athlete by the fix recorded under
+[Evidence-backed fixes](#evidence-backed-fixes).
 
 ### Metrics sampling defect
 
@@ -66,15 +74,15 @@ samples were recorded only when a production 120-sample window completed).
 
 | Sport | Result | Notes |
 | --- | --- | --- |
-| RowErg Ultra+rival | Pass | Process stable 60s; no fallback category; no quality oscillation |
-| SkiErg Ultra+rival | Pass | Same |
-| BikeErg Ultra+rival | Pass | Same; slightly higher over-budget sample count still without adaptive degrade |
+| RowErg Ultra+rival | Pass (process/telemetry only) | Process stable 60s; no fallback category; no quality oscillation. Athlete pose was **not** validated by this method — see fix 4 |
+| SkiErg Ultra+rival | Pass (process/telemetry only) | Same |
+| BikeErg Ultra+rival | Pass (process/telemetry only) | Same; slightly higher over-budget sample count still without adaptive degrade |
 
 ### Quality tiers
 
-Low/Medium/High/Ultra catalog entries all launch. Production athlete remains
-the Phase 11 path at every tier; Low/Medium retain procedural equipment policy
-by design. No tier transition oscillation observed in Ultra profiles
+Low/Medium/High/Ultra catalog entries all launch. The production athlete is
+active at every tier (Phase 11 asset and material path, with the Phase 12 pose
+fix in fix 4 below); Low/Medium retain procedural equipment policy by design. No tier transition oscillation observed in Ultra profiles
 (`adaptiveDegradationCount=0`, `sceneRebuildCount=0`).
 
 ### Rival / camera
@@ -113,8 +121,37 @@ Observations (this machine only, not universal guarantees):
    `ReplayState.play()` so profiling is not idle.
 3. **`ReplayRendererMode: Sendable`** — required for Sendable acceptance
    configuration under Swift 6.
+4. **Production athlete pose and contact correction** (all three sports)
+   - *Failing scenario*: every 3D catalog scenario — reproduced most directly
+     on `rower-3d-ultra-session-rival`, `skierg-3d-ultra-session-rival`, and
+     `bike-3d-ultra-session-rival`. The launch-based pass scored these as
+     passing because it never inspected the rendered pose.
+   - *Baseline evidence*: close visual inspection of the staged app showed the
+     athlete facing away from its equipment, with limbs and extremities
+     twisted well outside anatomical range, on RowErg, SkiErg, and BikeErg.
+   - *Root cause*: three independent defects. (a) `seek` applied the motion
+     table's glTF joint locals directly to a USDZ skeleton whose joint space
+     is that space rotated +90° about X; only the root joint absorbs the basis
+     change, so it alone needed the remap. (b) Blender's USD export presents
+     the athlete facing −Z while the pinned GLB and every ported sport rig
+     face +Z, so the instance root needed a 180° yaw; the native-only 0.95
+     athlete scale had no upstream counterpart. (c) The contact solver forced
+     a fixed pole vector and a fixed-axis terminal twist, folding limbs and
+     rotating hands and feet whenever the authored plane disagreed; the bend
+     plane now comes from the sampled clip and the terminal keeps its authored
+     orientation, matching the web renderer.
+   - *Regression coverage*: `ReplayBundledContactSweepTests` sweeps all 257
+     authored phases for all three sports and asserts every frame solves
+     within the grip budget, plus reach-clamp boundary cases in both
+     directions; `ReplayRigPoseTests` pins the SkiErg hand path inside the arm
+     envelope across the cycle and pins the reduced-motion carry.
+   - *Post-fix evidence*: sweep reports 0 rejected phases of 771 with worst
+     applied grip error 1.4 mm; staged-app playback re-inspected on all three
+     sports shows hands on the handle, pole grips, and handlebars and feet on
+     the stretcher, ski bindings, and pedals.
 
-No camera FOV, contact, material, equipment, environment, or motion-contract
+Contact solving, the SkiErg hand path, and the athlete basis/scale did change
+as a result of fix 4. No camera FOV, material, equipment, or environment
 changes were required by demonstrated defects.
 
 ## Accessibility and Reduced Motion
@@ -138,5 +175,7 @@ changes were required by demonstrated defects.
 ## Claim boundary
 
 Phase 12 ships a **repeatable release gate** and records same-machine evidence.
-It does not claim new athlete/asset quality work, Bluetooth, or CI green before
-exact-head checks complete.
+It does not claim new athlete/asset authoring, Bluetooth, or CI green before
+exact-head checks complete. It does include one evidence-backed athlete pose
+and contact-correction fix (fix 4), which changes pose code but no authored
+asset.

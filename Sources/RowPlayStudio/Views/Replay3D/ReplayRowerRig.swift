@@ -108,7 +108,7 @@ final class ReplayRowerRig: ReplaySportRig {
                 instance: canonicalAthlete,
                 sport: .rower,
                 parent: root,
-                rootScale: 0.95,
+                rootScale: 1.0,
                 rootPosition: SIMD3(0, 0.30, -0.1)
             ))
         } else {

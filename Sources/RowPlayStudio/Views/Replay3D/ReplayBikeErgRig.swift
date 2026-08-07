@@ -156,7 +156,7 @@ final class ReplayBikeErgRig: ReplaySportRig {
                 instance: canonicalAthlete,
                 sport: .bike,
                 parent: rider,
-                rootScale: 0.95,
+                rootScale: 1.0,
                 rootPosition: .zero
             ))
         } else {
