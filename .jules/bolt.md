@@ -32,6 +32,10 @@
 **Learning:** In Swift, calling `.filter { ... }.min { ... }` inside a loop for each standard distance when trying to find the best workouts creates unnecessary intermediate array allocations for large arrays of workouts and results in an O(K * N) time complexity (where K is the number of standard distances).
 **Action:** Optimize with a single O(N) pass: resolve each workout to at most one standard distance via the existing tolerance helper, and keep the fastest time per bucket in a dictionary (O(K) space). Do not re-scan the full collection per distance.
 
+## 2026-08-05 - Array Reallocation During Map Replacements
+**Learning:** When optimizing Swift array iterations by replacing chained higher-order functions (like `map` or `filter`) with a `for` loop, appending to a newly initialized array can still trigger multiple memory reallocations as the array grows, diminishing the performance gains.
+**Action:** Always explicitly use `reserveCapacity(count)` on the new arrays before the loop when the final size is known (e.g., matching the original array's `.count`), ensuring O(N) allocation behavior.
+
 ## 2026-08-06 - Avoid Chained Array Functions and Use `.reserveCapacity` on Large Arrays
 **Learning:** Chaining `.filter`, `.map`, and `.sorted` on large arrays (like an array of strokes containing thousands of entries) creates unnecessary intermediate array allocations, consuming more memory and CPU.
 **Action:** Optimize by replacing these chained methods with a single `for` loop, appending to a new array that has been properly sized using `.reserveCapacity()`, and sorting the final array in-place.

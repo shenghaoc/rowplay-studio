@@ -127,11 +127,28 @@ public enum RepDetection: Sendable {
         guard let t0 = strokes.first?.t else {
             return ([], [], [], [], [])
         }
-        let times = strokes.map { $0.t - t0 }
-        let pace = strokes.map { $0.pace }
-        let rate = strokes.map { $0.cadence }
-        let power = strokes.map { Double($0.watts) }
-        let hr = strokes.map { $0.heartRate.map { Double($0) } ?? 0 }
+
+        let count = strokes.count
+        var times = [Double]()
+        var pace = [Double]()
+        var rate = [Double]()
+        var power = [Double]()
+        var hr = [Double]()
+
+        times.reserveCapacity(count)
+        pace.reserveCapacity(count)
+        rate.reserveCapacity(count)
+        power.reserveCapacity(count)
+        hr.reserveCapacity(count)
+
+        for s in strokes {
+            times.append(s.t - t0)
+            pace.append(s.pace)
+            rate.append(s.cadence)
+            power.append(Double(s.watts))
+            hr.append(s.heartRate.map(Double.init) ?? 0)
+        }
+
         return (times, pace, rate, power, hr)
     }
 
@@ -152,9 +169,14 @@ public enum RepDetection: Sendable {
     }
 
     private static func repAvgPaceFromArrays(_ pace: [Double], fallback: TimeInterval) -> TimeInterval {
-        let valid = pace.filter { $0 > 0 }
-        if !valid.isEmpty {
-            return valid.reduce(0, +) / Double(valid.count)
+        var sum = 0.0
+        var count = 0
+        for p in pace where p > 0 {
+            sum += p
+            count += 1
+        }
+        if count > 0 {
+            return sum / Double(count)
         }
         return fallback > 0 ? fallback : 0
     }
