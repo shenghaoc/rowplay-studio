@@ -137,14 +137,18 @@ Observations (this machine only, not universal guarantees):
      face +Z, so the instance root needed a 180° yaw; the native-only 0.95
      athlete scale had no upstream counterpart. (c) The contact solver forced
      a fixed pole vector and a fixed-axis terminal twist, folding limbs and
-     rotating hands and feet whenever the authored plane disagreed; the bend
-     plane now comes from the sampled clip and the terminal keeps its authored
-     orientation, matching the web renderer.
+     rotating hands and feet whenever the authored frame disagreed; the
+     terminal now keeps its authored orientation, and the bend planes are
+     anatomical hints expressed in the corrected skeleton basis (this clip's
+     limb channels are barely animated, so a bend plane derived from the
+     sampled mid joint is noise for much of the cycle and measurably crossed
+     the SkiErg knees through the midline).
    - *Regression coverage*: `ReplayBundledContactSweepTests` sweeps all 257
      authored phases for all three sports and asserts every frame solves
-     within the grip budget, plus reach-clamp boundary cases in both
-     directions; `ReplayRigPoseTests` pins the SkiErg hand path inside the arm
-     envelope across the cycle and pins the reduced-motion carry.
+     within the grip budget, asserts knees/feet/elbows/hands never cross the
+     body midline, and pins reach-clamp boundary cases in both directions;
+     `ReplayRigPoseTests` pins the SkiErg hand path inside the arm envelope
+     across the cycle and pins the reduced-motion carry.
    - *Post-fix evidence*: sweep reports 0 rejected phases of 771 with worst
      applied grip error 1.4 mm; staged-app playback re-inspected on all three
      sports shows hands on the handle, pole grips, and handlebars and feet on

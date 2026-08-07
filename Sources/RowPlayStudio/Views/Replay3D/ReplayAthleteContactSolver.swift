@@ -95,19 +95,25 @@ fileprivate struct ReplayAthleteContactPolicy {
             Float(spec.localOffset.z)
         )
 
-        // The live bend plane comes from the sampled clip pose at solve
-        // time; these are degenerate-chain fallbacks only, expressed in the
-        // solver workspace (the athlete's glTF space rotated +90° about X,
-        // so glTF-authored directions remap by (x, y, z) → (x, -z, y)).
+        // Anatomical bend planes in the solver workspace (the athlete's
+        // glTF space rotated +90° about X, so glTF-authored directions remap
+        // by (x, y, z) → (x, -z, y)).  In rig space these point every elbow
+        // and knee outward on its own side — elbows out/back/slightly down,
+        // knees out/forward — for all three sports.
+        // Feet keep the lateral term small: the hip→foot chord tilts
+        // forward, so perpendicularization strips much of the forward
+        // component and the lateral remainder decides how far the knee
+        // flares.  0.12 keeps the bend side deterministic without the
+        // sumo-wide knees a 0.24 lateral produced at deep compression.
         switch role {
         case .leftHand:
             bendHint = SIMD3(-0.65, 0.70, -0.22)
         case .rightHand:
             bendHint = SIMD3(0.65, 0.70, -0.22)
         case .leftFoot:
-            bendHint = SIMD3(-0.24, -0.82, 0.18)
+            bendHint = SIMD3(-0.12, -0.90, 0.18)
         case .rightFoot:
-            bendHint = SIMD3(0.24, -0.82, 0.18)
+            bendHint = SIMD3(0.12, -0.90, 0.18)
         }
     }
 }
@@ -507,34 +513,19 @@ enum ReplayAthleteContactSolver {
             throw ReplayAthleteContactSolveFailure.degenerateLimb(binding.policy.role)
         }
 
-        // The sampled clip pose defines the bend plane: the mid joint's
-        // offset from the root→target chord carries the authored elbow or
-        // knee direction into the corrected chord frame, so the limb bends
-        // the way the animation does instead of following a fixed pole
-        // vector (which folds limbs whenever the authored plane disagrees).
-        // A nearly straight chain carries no authored plane — its
-        // perpendicular is numerical noise pointing anywhere, including
-        // backwards through the joint — so the anatomical policy hint takes
-        // over unless the offset is a meaningful fraction of the limb.
-        var bendHint = binding.policy.bendHint
-        let chord = target - root
-        let chordLength = length(chord)
-        if chordLength > 1e-5 {
-            let chordDirection = chord / chordLength
-            let jointOffset = joint - root
-            let perpendicular = jointOffset
-                - chordDirection * simd_dot(jointOffset, chordDirection)
-            if length(perpendicular) > 0.05 * (firstLength + secondLength) {
-                bendHint = normalize(perpendicular)
-            }
-        }
-
+        // The bend plane is the anatomical policy hint, full stop.  This
+        // clip's limb channels are barely animated (the contact pass is the
+        // limb animation, as in the web renderer), so a bend plane derived
+        // from the sampled mid joint is noise for much of the cycle — it
+        // measurably crossed the SkiErg knees through the midline at half
+        // the swept phases.  The static hints live in the skeleton basis and
+        // keep every elbow and knee bending outward/forward on its own side.
         let solution = ReplayTwoBoneSolver.solve3D(
             root: double(root),
             target: double(target),
             firstLength: Double(firstLength),
             secondLength: Double(secondLength),
-            bendHint: double(bendHint)
+            bendHint: double(binding.policy.bendHint)
         )
         let desiredJoint = float(solution.joint)
         let desiredEnd = float(solution.end)
