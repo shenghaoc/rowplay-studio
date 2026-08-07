@@ -117,7 +117,7 @@ struct ContentView: View {
     private var detailContent: some View {
         if library.isEmpty && !preferences.demoModeEnabled {
             emptyState
-        } else if let selectedWorkoutID, let detail = library.detail(id: selectedWorkoutID) {
+        } else if let detail = selectedDetail {
             WorkoutDetailView(
                 detail: detail,
                 detailsRevision: library.detailsRevision,
