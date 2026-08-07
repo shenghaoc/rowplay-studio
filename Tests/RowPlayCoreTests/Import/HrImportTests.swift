@@ -34,6 +34,19 @@ final class HrImportTests: XCTestCase {
         XCTAssertEqual(samples[2].t, 10)
     }
 
+    func testExtractHrSeriesFiltersNonFiniteTimeAndNonPositiveHr() {
+        let strokes = [
+            makeStroke(t: 0, d: 0, hr: 150),
+            makeStroke(t: .nan, d: 10, hr: 160),
+            makeStroke(t: .infinity, d: 20, hr: 170),
+            makeStroke(t: 4, d: 30, hr: -5),
+            makeStroke(t: 6, d: 40, hr: 155),
+        ]
+        let samples = HrImport.extractHrSeries(strokes)
+        XCTAssertEqual(samples.map(\.t), [0, 6])
+        XCTAssertEqual(samples.map(\.hr), [150, 155])
+    }
+
     // MARK: - Interpolate HR
 
     func testInterpolateHrExactMatch() {
