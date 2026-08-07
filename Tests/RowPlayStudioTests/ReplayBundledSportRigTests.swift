@@ -632,9 +632,9 @@ final class ReplayBundledSportRigTests: XCTestCase {
                 kneeFlexR: 0.16
             ),
             hipCompression: 0.25,
-            handleY: 0.57,
-            handleZ: 0.18,
-            poleRotation: -0.22
+            poleRotation: -0.22,
+            preferredHandY: 0.57,
+            preferredHandZ: 0.18
         )))
         assertContact(named: "hand-L", with: "pole-grip-anchor-L", in: ski)
         assertContact(named: "hand-R", with: "pole-grip-anchor-R", in: ski)
@@ -745,12 +745,16 @@ final class ReplayBundledSportRigTests: XCTestCase {
                     line: line
                 )
             }
+            // Hands solve within the grip budget of their reach-clamped
+            // targets; against the physical anchor they may additionally
+            // fall short by the documented best-effort reach tolerance.
             XCTAssertLessThanOrEqual(
                 simd_distance(
                     contact.position(relativeTo: rig.root),
                     anchor.position(relativeTo: rig.root)
                 ),
-                ReplayAthleteContactSolver.gripChannelContactBudgetMeters,
+                ReplayAthleteContactSolver.gripChannelContactBudgetMeters
+                    + ReplayAthleteContactSolver.gripReachShortfallToleranceMeters,
                 file: file,
                 line: line
             )

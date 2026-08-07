@@ -1,8 +1,9 @@
 # Phase 11 — Current RowPlay Parity: Stacked Tasks
 
-Phase 11 is delivered as eight reviewable pull requests. A checked item means
-that the corresponding layer has landed in its own stack branch; it does not
-claim that the complete phase or visual QA matrix is finished.
+Phase 11 delivered as eight reviewable pull requests and merged to `main`
+through PRs #90–#97. A checked item means the corresponding layer landed and
+merged. Automated matrices shipped with layer 8/8; the complete human visual
+and sustained-profiling acceptance gate is Phase 12.
 
 - [x] **1/8 Reference bundle and provenance** — pin current RowPlay `main`,
       preserve manifests and hashes, add sync/export/conversion/validation
@@ -23,7 +24,9 @@ claim that the complete phase or visual QA matrix is finished.
       complete procedural-athlete fallback.
 - [x] **5/8 Grip and contact** — integrate finger and thumb closure, contact
       solving, independent sculls, course skis/poles, road-bike contact
-      geometry, wrist orientation, release/recovery, complete authored
+      geometry, wrist orientation (superseded: Phase 12 removed the fixed-axis
+      terminal twist in favour of the clip's authored wrist/ankle orientation),
+      release/recovery, complete authored
       composites at High/Ultra, and independent live/rival instances.
 - [x] **6/8 Replay 2D** — replace the timeline placeholder with the three sport
       renderers plus parity, accessibility, and Reduced Motion coverage.

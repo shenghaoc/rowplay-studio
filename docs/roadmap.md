@@ -363,7 +363,7 @@ Scope:
 
 ### Phase 10B - Complete Rival Workflow
 
-Status: complete on branch `codex/phase-10b-complete-rival-workflow` (this PR).
+Status: merged to `main` (PR #64).
 
 Scope:
 
@@ -382,10 +382,7 @@ Non-goals:
 
 ### Phase 11 - Production-Quality Bundled 3D Assets
 
-Status: implemented as the eight-layer replacement stack rooted at PR #90;
-each higher layer remains a draft until its immediate base merges. Full Phase
-11 completion is claimed only after all eight layers merge and exact-head CI
-and review gates are repeated bottom-up.
+Status: merged to `main` through PRs #90–#97 (final layer PR #97).
 
 Scope:
 
@@ -404,6 +401,43 @@ Scope:
   Reduced-Motion/seek/framing matrix. The staged human renderer walkthrough
   remains a separate acceptance gate.
 - Real Bluetooth / FTMS / Concept2 PM transport remains deferred beyond mock boundaries.
+
+
+### Phase 12 - Production Replay Acceptance and Performance Hardening
+
+Status: open as PR #103 on branch `codex/phase-12-replay-acceptance-performance`
+(CI green on tip; ready for review / merge decision).
+
+Scope:
+
+- Add launch-only deterministic replay acceptance mode (`ROWPLAY_REPLAY_ACCEPTANCE=1`)
+  with a reviewed scenario catalog and staged-app harness that reuses production
+  `ReplayView`.
+- Perform and record the complete human 2D/3D visual matrix across sports,
+  themes, quality tiers, rivals, cameras, Reduced Motion, and window extremes.
+- Measure sustained production replay performance with bounded acceptance
+  metrics, xctrace when available, and resident-memory sampling.
+- Fix only evidence-backed visual, interaction, contact, camera, lifecycle, or
+  performance defects found during the matrix. Two landed: acceptance-metrics
+  under-sampling, and production athlete pose and contact correction (skeleton
+  basis, facing/scale, contact bend plane and terminal orientation) across all
+  three sports.
+- Correct documentation that still described Phase 11 as unmerged and leave a
+  repeatable native release gate for later replay changes.
+
+Exit criteria:
+
+- Acceptance configuration, harness, metrics, and scripts land with focused tests.
+- Full SwiftPM build/test matrix and staged-app gates pass.
+- Human visual matrix and sustained profiling evidence are recorded with honest
+  unavailable-evidence sections.
+- No preference persistence, token access, or parallel renderer is introduced.
+
+Non-goals:
+
+- New athletes, equipment assets, environments, or motion graphs.
+- Bluetooth / FTMS / Concept2 PM transport.
+- Universal frame-rate guarantees or fabricated GPU proof.
 
 ## Review Strategy
 

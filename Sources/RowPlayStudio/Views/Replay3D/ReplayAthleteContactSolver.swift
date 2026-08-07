@@ -12,11 +12,21 @@ struct ReplayAthleteContactTargets {
     var rightFoot: SIMD3<Float>
 
     subscript(role: ReplayAthleteContactRole) -> SIMD3<Float> {
-        switch role {
-        case .leftHand: leftHand
-        case .rightHand: rightHand
-        case .leftFoot: leftFoot
-        case .rightFoot: rightFoot
+        get {
+            switch role {
+            case .leftHand: leftHand
+            case .rightHand: rightHand
+            case .leftFoot: leftFoot
+            case .rightFoot: rightFoot
+            }
+        }
+        set {
+            switch role {
+            case .leftHand: leftHand = newValue
+            case .rightHand: rightHand = newValue
+            case .leftFoot: leftFoot = newValue
+            case .rightFoot: rightFoot = newValue
+            }
         }
     }
 }
@@ -69,7 +79,6 @@ fileprivate struct ReplayAthleteContactPolicy {
     let bone: String
     let offset: SIMD3<Float>
     let bendHint: SIMD3<Float>
-    let terminalUp: SIMD3<Float>
 
     init?(instance: ReplayAthleteInstance, role: ReplayAthleteContactRole) {
         guard let spec = instance.resolvedContactSpec(role: role),
@@ -86,19 +95,25 @@ fileprivate struct ReplayAthleteContactPolicy {
             Float(spec.localOffset.z)
         )
 
+        // Anatomical bend planes in the solver workspace (the athlete's
+        // glTF space rotated +90° about X, so glTF-authored directions remap
+        // by (x, y, z) → (x, -z, y)).  In rig space these point every elbow
+        // and knee outward on its own side — elbows out/back/slightly down,
+        // knees out/forward — for all three sports.
+        // Feet keep the lateral term small: the hip→foot chord tilts
+        // forward, so perpendicularization strips much of the forward
+        // component and the lateral remainder decides how far the knee
+        // flares.  0.12 keeps the bend side deterministic without the
+        // sumo-wide knees a 0.24 lateral produced at deep compression.
         switch role {
         case .leftHand:
-            bendHint = SIMD3(-0.65, -0.22, -0.70)
-            terminalUp = SIMD3(0, 1, 0)
+            bendHint = SIMD3(-0.65, 0.70, -0.22)
         case .rightHand:
-            bendHint = SIMD3(0.65, -0.22, -0.70)
-            terminalUp = SIMD3(0, 1, 0)
+            bendHint = SIMD3(0.65, 0.70, -0.22)
         case .leftFoot:
-            bendHint = SIMD3(-0.24, 0.18, 0.82)
-            terminalUp = SIMD3(0, 0, 1)
+            bendHint = SIMD3(-0.12, -0.90, 0.18)
         case .rightFoot:
-            bendHint = SIMD3(0.24, 0.18, 0.82)
-            terminalUp = SIMD3(0, 0, 1)
+            bendHint = SIMD3(0.12, -0.90, 0.18)
         }
     }
 }
@@ -236,6 +251,28 @@ private struct ReplayAthleteMatrixWorkspace {
 enum ReplayAthleteContactSolver {
     static let gripChannelContactBudgetMeters: Float = 0.01
     static let reachContactBudgetMeters: Float = 0.12
+    /// Hand targets are clamped into the sampled arm's reach envelope before
+    /// solving (web parity: the grip path and the authored clip can skew by
+    /// a few centimetres at stroke extremes, and the web constrains
+    /// best-effort rather than failing the frame).
+    ///
+    /// The clamp is bounded: only a shortfall within this tolerance is
+    /// forgiven by the residual gate.  A larger shortfall means the rig and
+    /// the athlete genuinely disagree, so the frame is still measured against
+    /// the true equipment target and fails closed into the atomic restore
+    /// rather than rendering a hand floating off the equipment.
+    ///
+    /// The bound covers the authored skew measured by
+    /// `ReplayBundledContactSweepTests` over every phase of all three sports:
+    /// RowErg peaks at 3.0 cm at maximum drive and SkiErg at 7.6 cm where the
+    /// rigid planted pole outruns the arm late in the press.  It is set above
+    /// those because a single rejected frame drops the bundled athlete for the
+    /// rest of the session (`RealityReplaySceneView` clears the asset set), so
+    /// failing closed on routine authoring skew would permanently degrade
+    /// every RowErg and SkiErg replay to the procedural rig — far worse than a
+    /// hand sitting a few centimetres inside the grip.  Genuinely broken rigs
+    /// miss by metres and still fail.
+    static let gripReachShortfallToleranceMeters: Float = 0.08
 
     /// Deterministic instrumentation seam used by focused performance tests.
     private(set) static var lastMetricsForTesting: ReplayAthleteMatrixEvaluationMetrics?
@@ -295,14 +332,66 @@ enum ReplayAthleteContactSolver {
             let bindings = resolvedPlan.bindings
             let pelvisIndex = resolvedPlan.pelvisIndex
 
+            // `ReplayTwoBoneSolver.solve3D` already clamps an out-of-reach
+            // target along this same ray, so this does not change the solved
+            // pose — it records what the arm can actually attain so the
+            // residual gate below judges the solve against a reachable
+            // target instead of rejecting the frame outright, matching the
+            // web renderer's best-effort constrain.  Bounded by
+            // `gripReachShortfallToleranceMeters`; feet and pelvis stay exact.
+            //
+            // `reach` is recomputed per role from the live workspace, which
+            // is only valid because `solveLimb` writes rotations exclusively
+            // and the four chains are disjoint; a future translation or
+            // non-unit scale write would need this revisited.
+            func convertedTarget(
+                role: ReplayAthleteContactRole,
+                effectiveTargets: inout ReplayAthleteContactTargets,
+                workspace: ReplayAthleteMatrixWorkspace
+            ) -> SIMD3<Float> {
+                var local = instance.athleteEntity.convert(position: targets[role], from: space)
+                guard role == .leftHand || role == .rightHand else { return local }
+                let binding = bindings[role]!
+                let shoulder = point(.zero, matrix: workspace.matrices[binding.upper])
+                let elbow = point(.zero, matrix: workspace.matrices[binding.lower])
+                let contact = point(
+                    binding.policy.offset,
+                    matrix: workspace.matrices[binding.terminal]
+                )
+                let reach = (length(elbow - shoulder) + length(contact - elbow)) * 0.998
+                let delta = local - shoulder
+                let distanceToTarget = length(delta)
+                if distanceToTarget > reach, distanceToTarget > 1e-6, reach > 1e-5 {
+                    local = shoulder + delta * (reach / distanceToTarget)
+                    // Only a bounded shortfall is forgiven by the residual
+                    // gate; a larger one keeps the true target so the frame
+                    // fails closed instead of reporting a phantom contact.
+                    if distanceToTarget - reach <= gripReachShortfallToleranceMeters {
+                        effectiveTargets[role] = instance.athleteEntity.convert(
+                            position: local,
+                            to: space
+                        )
+                    }
+                }
+                return local
+            }
+            var effectiveTargets = targets
+
             // Row's long reach benefits from an initial arm clearance solve.
             // The same workspace is retained through root closure and the
-            // final all-limb pass.
+            // final all-limb pass.  The pre-pass converts targets before the
+            // pelvis is aligned, so its clamp results are throwaway — only
+            // the post-alignment pass may update the measured targets.
             if instance.sport == .rower {
+                var prePassTargets = targets
                 for role in [ReplayAthleteContactRole.leftHand, .rightHand] {
                     try solveLimb(
                         binding: bindings[role]!,
-                        target: instance.athleteEntity.convert(position: targets[role], from: space),
+                        target: convertedTarget(
+                            role: role,
+                            effectiveTargets: &prePassTargets,
+                            workspace: workspace
+                        ),
                         workspace: &workspace
                     )
                 }
@@ -319,7 +408,11 @@ enum ReplayAthleteContactSolver {
             for role in ReplayAthleteContactRole.allCases {
                 try solveLimb(
                     binding: bindings[role]!,
-                    target: instance.athleteEntity.convert(position: targets[role], from: space),
+                    target: convertedTarget(
+                        role: role,
+                        effectiveTargets: &effectiveTargets,
+                        workspace: workspace
+                    ),
                     workspace: &workspace
                 )
             }
@@ -338,7 +431,7 @@ enum ReplayAthleteContactSolver {
                 bindings: bindings,
                 workspace: workspace,
                 pelvisIndex: pelvisIndex,
-                targets: targets,
+                targets: effectiveTargets,
                 relativeTo: space
             )
             guard isUsable(error) else {
@@ -420,6 +513,13 @@ enum ReplayAthleteContactSolver {
             throw ReplayAthleteContactSolveFailure.degenerateLimb(binding.policy.role)
         }
 
+        // The bend plane is the anatomical policy hint, full stop.  This
+        // clip's limb channels are barely animated (the contact pass is the
+        // limb animation, as in the web renderer), so a bend plane derived
+        // from the sampled mid joint is noise for much of the cycle — it
+        // measurably crossed the SkiErg knees through the midline at half
+        // the swept phases.  The static hints live in the skeleton basis and
+        // keep every elbow and knee bending outward/forward on its own side.
         let solution = ReplayTwoBoneSolver.solve3D(
             root: double(root),
             target: double(target),
@@ -451,7 +551,12 @@ enum ReplayAthleteContactSolver {
             role: binding.policy.role,
             workspace: &workspace
         )
-        orientTerminal(binding: binding, workspace: &workspace)
+        // The terminal keeps the clip's authored wrist/ankle orientation,
+        // carried rigidly by the forearm/shin swings above.  A former
+        // fixed-axis twist toward a static workspace "up" rotated hands and
+        // feet grotesquely whenever the authored frame disagreed; the web
+        // renderer never applies more than a bounded few-degree terminal
+        // correction, so the authored orientation is the parity choice.
     }
 
     private static func aimJoint(
@@ -473,33 +578,6 @@ enum ReplayAthleteContactSolver {
             Transform(matrix: workspace.matrices[$0]).rotation
         } ?? identityQuaternion()
         workspace.setRotation(normalized(inverse(parentWorld) * desiredWorld), at: joint)
-    }
-
-    private static func orientTerminal(
-        binding: ReplayAthleteContactBinding,
-        workspace: inout ReplayAthleteMatrixWorkspace
-    ) {
-        let matrix = workspace.matrices[binding.terminal]
-        let terminalPosition = point(.zero, matrix: matrix)
-        let contactPosition = point(binding.policy.offset, matrix: matrix)
-        let axis = contactPosition - terminalPosition
-        guard length(axis) > 1e-5 else { return }
-        let normal = normalize(axis)
-        let currentWorld = Transform(matrix: matrix).rotation
-        let currentUp = project(simd_act(currentWorld, SIMD3(0, 1, 0)), off: normal)
-        let desiredUp = project(binding.policy.terminalUp, off: normal)
-        guard length(currentUp) > 1e-5, length(desiredUp) > 1e-5 else { return }
-        let from = normalize(currentUp)
-        let to = normalize(desiredUp)
-        let angle = atan2(simd_dot(normal, simd_cross(from, to)), simd_dot(from, to))
-        let desiredWorld = simd_quatf(angle: angle, axis: normal) * currentWorld
-        let parentWorld = workspace.topology.parent[binding.terminal].map {
-            Transform(matrix: workspace.matrices[$0]).rotation
-        } ?? identityQuaternion()
-        workspace.setRotation(
-            normalized(inverse(parentWorld) * desiredWorld),
-            at: binding.terminal
-        )
     }
 
     private static func measure(
@@ -580,10 +658,6 @@ enum ReplayAthleteContactSolver {
 
     private static func identityQuaternion() -> simd_quatf {
         simd_quatf(angle: 0, axis: SIMD3(1, 0, 0))
-    }
-
-    private static func project(_ vector: SIMD3<Float>, off normal: SIMD3<Float>) -> SIMD3<Float> {
-        vector - normal * simd_dot(vector, normal)
     }
 
     private static func point(_ point: SIMD3<Float>, matrix: simd_float4x4) -> SIMD3<Float> {

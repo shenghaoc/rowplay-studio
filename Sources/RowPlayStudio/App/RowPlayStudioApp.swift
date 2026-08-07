@@ -16,7 +16,7 @@ struct RowPlayStudioApp: App {
         let configuration = AppLaunchConfiguration.fromEnvironment()
         launchConfiguration = configuration
         _library = StateObject(
-            wrappedValue: configuration.automationMode
+            wrappedValue: configuration.usesDeterministicDemoData
                 ? WorkoutLibrary.automationDemo()
                 : WorkoutLibrary(
                     details: [],
@@ -27,18 +27,24 @@ struct RowPlayStudioApp: App {
 
     var body: some Scene {
         WindowGroup("RowPlay Studio", id: "main") {
-            ContentView(library: library)
+            rootContent
                 #if os(macOS)
-                .frame(minWidth: 1_000, minHeight: 680)
+                .frame(
+                    minWidth: windowMinimumWidth,
+                    minHeight: windowMinimumHeight
+                )
                 #endif
                 .environmentObject(preferences)
                 .environmentObject(syncController)
                 .environment(\.automationModeEnabled, launchConfiguration.automationMode)
+                .environment(\.acceptanceModeEnabled, launchConfiguration.acceptanceMode)
                 .task {
                     AutomationReadinessTelemetry.recordContentPresented(
                         automationMode: launchConfiguration.automationMode
+                            || launchConfiguration.acceptanceMode
                     )
-                    if !launchConfiguration.automationMode {
+                    // Acceptance and automation never touch tokens or sync.
+                    if !launchConfiguration.usesDeterministicDemoData {
                         await syncController.loadCachedWorkouts(into: library)
                     }
                 }
@@ -53,7 +59,7 @@ struct RowPlayStudioApp: App {
                     }
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
-                .disabled(!syncController.canSync)
+                .disabled(!syncController.canSync || launchConfiguration.acceptanceMode)
                 .help(!syncController.canSync ? "Connect a logbook to sync" : "Sync Concept2 Logbook")
                 .accessibilityHint(!syncController.canSync ? "Requires logbook connection" : "Syncs logbook with Concept2")
 
@@ -63,7 +69,7 @@ struct RowPlayStudioApp: App {
                     }
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(syncController.isLoading)
+                .disabled(syncController.isLoading || launchConfiguration.acceptanceMode)
                 .help(syncController.isLoading ? "Currently loading workouts" : "Reload Workout Library")
                 .accessibilityHint(syncController.isLoading ? "Currently loading workouts" : "Reloads the workout library")
             }
@@ -78,6 +84,29 @@ struct RowPlayStudioApp: App {
                 .environmentObject(syncController)
         }
         #endif
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
+        if let acceptance = launchConfiguration.acceptanceConfiguration {
+            ReplayAcceptanceHarnessView(configuration: acceptance)
+        } else {
+            ContentView(library: library)
+        }
+    }
+
+    private var windowMinimumWidth: CGFloat {
+        if let acceptance = launchConfiguration.acceptanceConfiguration {
+            return CGFloat(acceptance.windowWidth)
+        }
+        return 1_000
+    }
+
+    private var windowMinimumHeight: CGFloat {
+        if let acceptance = launchConfiguration.acceptanceConfiguration {
+            return CGFloat(acceptance.windowHeight)
+        }
+        return 680
     }
 }
 

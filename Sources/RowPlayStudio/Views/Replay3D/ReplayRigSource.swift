@@ -1,3 +1,4 @@
+import Foundation
 import RealityKit
 import RowPlayCore
 
@@ -54,6 +55,11 @@ final class ReplayBundledAthleteRuntime {
         instance.attach(to: parent)
         instance.root.scale = SIMD3(repeating: rootScale)
         instance.root.position = rootPosition
+        // Blender's USD export presents the athlete facing -Z where the
+        // pinned GLB (and every sport rig ported from the web renderer)
+        // faces +Z.  Yawing the instance root 180° restores the web-parity
+        // facing for all three sports.
+        instance.root.orientation = simd_quatf(angle: .pi, axis: SIMD3(0, 1, 0))
         instance.captureBaseRootTransform()
         do {
             self.contactPlanResult = .success(try ReplayAthleteContactPlan(instance: instance))
