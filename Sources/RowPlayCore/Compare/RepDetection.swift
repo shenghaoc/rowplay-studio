@@ -146,11 +146,7 @@ public enum RepDetection: Sendable {
             pace.append(s.pace)
             rate.append(s.cadence)
             power.append(Double(s.watts))
-            if let h = s.heartRate {
-                hr.append(Double(h))
-            } else {
-                hr.append(0)
-            }
+            hr.append(s.heartRate.map(Double.init) ?? 0)
         }
 
         return (times, pace, rate, power, hr)
