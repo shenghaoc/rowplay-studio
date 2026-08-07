@@ -77,6 +77,16 @@ final class ReplayAcceptanceHarnessTests: XCTestCase {
         XCTAssertEqual(viewConfig.rivalMode, .pace)
         XCTAssertEqual(viewConfig.forceReducedMotion, true)
         XCTAssertFalse(viewConfig.persistsQualityPreference)
+        // Reduced Motion acceptance must not auto-play idle motion.
+        XCTAssertFalse(viewConfig.autoPlay)
+
+        let playing = try XCTUnwrap(
+            try ReplayAcceptanceConfiguration.parse(from: [
+                "ROWPLAY_REPLAY_ACCEPTANCE": "1",
+                "ROWPLAY_QA_REDUCED_MOTION": "0",
+            ])
+        )
+        XCTAssertTrue(playing.makeViewConfiguration().autoPlay)
     }
 
     func testNormalReplayViewConstructionRemainsSourceCompatible() {

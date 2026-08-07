@@ -31,5 +31,6 @@
       sweep added for task 8.
 - [x] **11. Documentation** — Phase 12 Kiro spec, roadmap, source-map,
       beta-readiness, Phase 11 status corrections, visual-QA README/manifest.
-- [ ] **12. Draft PR** — single PR with complete evidence sections; remains draft
-      until exact-head CI and review complete.
+- [x] **12. Draft PR** — single PR with complete evidence sections; exact-head CI
+      green on tip `9fb015a` (Core Linux + macOS Full Stack); opened as PR #103
+      ready for review (no open review threads).

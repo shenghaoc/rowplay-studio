@@ -179,7 +179,9 @@ changes were required by demonstrated defects.
 ## Claim boundary
 
 Phase 12 ships a **repeatable release gate** and records same-machine evidence.
-It does not claim new athlete/asset authoring, Bluetooth, or CI green before
-exact-head checks complete. It does include one evidence-backed athlete pose
-and contact-correction fix (fix 4), which changes pose code but no authored
-asset.
+It does not claim new athlete/asset authoring, Bluetooth, or universal
+frame-rate guarantees. Exact-head CI on the PR tip is green (Core Linux +
+macOS Full Stack). It does include one evidence-backed athlete pose and
+contact-correction fix (fix 4), which changes pose code but no authored asset.
+Performance table figures remain a pre–pose-fix baseline (see Performance
+evidence).

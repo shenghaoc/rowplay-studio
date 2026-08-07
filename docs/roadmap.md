@@ -405,7 +405,8 @@ Scope:
 
 ### Phase 12 - Production Replay Acceptance and Performance Hardening
 
-Status: in progress on branch `codex/phase-12-replay-acceptance-performance` (this PR).
+Status: open as PR #103 on branch `codex/phase-12-replay-acceptance-performance`
+(CI green on tip; ready for review / merge decision).
 
 Scope:
 
