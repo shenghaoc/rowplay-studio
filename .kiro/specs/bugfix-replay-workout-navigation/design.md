@@ -20,7 +20,7 @@ detail column (the "Replay Workout" button), so the regression surfaces now.
 Wrap the conditional content inside the `NavigationSplitView` `detail:` closure
 with a path-bound `NavigationStack`. A focused `DetailNavigationState` owns the
 typed replay route and selection-reset behavior. `WorkoutDetailView` invokes an
-`onReplay` callback that appends the selected workout ID to that path:
+`onReplay` callback that appends the replay route to that path:
 
 ```swift
 } detail: {
@@ -28,9 +28,7 @@ typed replay route and selection-reset behavior. `WorkoutDetailView` invokes an
         if ... {
             emptyState
         } else if ... {
-            WorkoutDetailView(onReplay: {
-                detailNavigation.showReplay(workoutID: detail.id)
-            })
+            WorkoutDetailView(onReplay: requestReplayForCurrentSelection)
         } else {
             DashboardView(...)
         }
@@ -41,6 +39,13 @@ typed replay route and selection-reset behavior. `WorkoutDetailView` invokes an
     }
 }
 ```
+
+> **Superseded detail:** this fix originally passed
+> `onReplay: { detailNavigation.showReplay(workoutID: detail.id) }`, capturing
+> the workout ID at render time. That made the replay open the *previously*
+> selected workout once AppKit began dispatching stale toolbar actions. See
+> [`bugfix-replay-shortcut-stale-workout`](../bugfix-replay-shortcut-stale-workout/design.md);
+> the `NavigationStack` design below is unchanged by that follow-up.
 
 **Why `NavigationStack` inside `detail:` and not on each sub-view:**
 Placing it at the `detail:` level ensures all content views can use

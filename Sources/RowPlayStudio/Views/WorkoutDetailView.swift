@@ -41,7 +41,10 @@ struct WorkoutDetailView: View {
                 .accessibilityHint(detail.workout.hasStrokeData
                                    ? LocalizedStringKey("Opens the workout replay viewer")
                                    : LocalizedStringKey("Replay requires stroke data"))
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                // ⇧⌘P lives on the Workout menu item: it belongs in the menu
+                // bar to be discoverable, and a shortcut on this
+                // NSToolbar-bridged item can dispatch a stale action after the
+                // selection changes.
             }
         }
         .onAppear {

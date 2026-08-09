@@ -11,6 +11,11 @@ struct RowPlayStudioApp: App {
     private let launchConfiguration: AppLaunchConfiguration
     @StateObject private var library: WorkoutLibrary
     @StateObject private var syncController = Concept2SyncController()
+    #if os(macOS)
+    /// Published by the focused workout window so the menu item tracks the
+    /// current selection instead of capturing a workout ID.
+    @FocusedValue(\.replayCommand) private var replayCommand
+    #endif
 
     init() {
         let configuration = AppLaunchConfiguration.fromEnvironment()
@@ -53,6 +58,16 @@ struct RowPlayStudioApp: App {
         .commands {
             SidebarCommands()
             CommandMenu("Workout") {
+                Button("Replay Workout") {
+                    replayCommand?.run()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(replayCommand?.isEnabled != true)
+                .help(replayCommand?.help ?? "Select a workout to replay")
+                .accessibilityHint(replayCommand?.help ?? "Select a workout to replay")
+
+                Divider()
+
                 Button("Sync Concept2 Logbook") {
                     Task {
                         await syncController.syncNow(into: library)
