@@ -405,8 +405,7 @@ Scope:
 
 ### Phase 12 - Production Replay Acceptance and Performance Hardening
 
-Status: open as PR #103 on branch `codex/phase-12-replay-acceptance-performance`
-(CI green on tip; ready for review / merge decision).
+Status: merged to `main` as PR #103.
 
 Scope:
 
@@ -438,6 +437,61 @@ Non-goals:
 - New athletes, equipment assets, environments, or motion graphs.
 - Bluetooth / FTMS / Concept2 PM transport.
 - Universal frame-rate guarantees or fabricated GPU proof.
+
+
+### Phase 13 - Replay Motion Expressiveness
+
+Status: in progress as four stacked slices (13A–13D). 13A merged as
+`phase-13a-continuous-phase-warp`.
+
+The 3D replay athlete reads as a mannequin: every stroke is pose-identical and
+only playback speed and the drive/recovery split vary. The root cause is that
+the Phase 11 bundled production athlete path samples a flat authored clip and
+ignores `ReplayMotionGraph` entirely, so the high-quality renderer is driven by
+less information than the procedural fallback it replaced.
+
+Scope:
+
+- **13A** — Replace the two-segment linear `ReplayAthletePhaseMap.clipFraction`
+  with a monotone cubic Hermite map sharing one PCHIP tangent, making playback
+  speed C1 at both the drive/recovery seam and the cycle wrap. The linear map
+  stepped 24.5%–65.4% at the seam over the production drive-share range,
+  vanishing only where the estimator happened to return the authored value.
+- **13B** — Add a pure Core additive pose layer that maps existing motion-graph
+  channels plus `intensity` / `fatigue` / `amplitude` onto bounded rotation
+  offsets for `v4Spine`, `v4Chest`, `v4Neck`, `v4Head`, and both clavicles — the
+  bones the four-role contact solver cannot reach — composed before the existing
+  single contact solve.
+- **13C** — Deterministic, bounded per-stroke micro-variation keyed on stroke
+  index so consecutive strokes are not bit-identical, zero under Reduced Motion
+  and under `ROWPLAY_REPLAY_ACCEPTANCE=1`.
+- **13D** — Measure where Medium and Ultra frame time actually goes. Diagnostic
+  only; the fix is Phase 14 scope.
+
+Exit criteria:
+
+- Monotone, landmark-exact, C1 phase warp with stated tolerances and dense
+  grid coverage.
+- Additive offsets bounded by declared Core constants, identically zero under
+  Reduced Motion, with contact residuals still inside existing tolerances and
+  no new `degenerateLimb` / `residualExceeded`.
+- Identical inputs produce identical poses across runs, repeated seeks, and
+  backward seeks.
+- Web parity fixtures pass unmodified; procedural, 2D, and rival/ghost paths
+  unchanged in behaviour.
+- A written frame-pacing finding with measured numbers and an explicit
+  unavailable-evidence statement.
+
+Non-goals:
+
+- New athlete, equipment, or environment assets; any asset regeneration; the
+  pinned upstream commit stays pinned.
+- New clips, facial or finger animation, secondary/cloth simulation, or leg IK
+  beyond the existing contact solver.
+- Bluetooth / FTMS / Concept2 PM transport, iOS targets, localization,
+  notarization, external dependencies, toolchain or deployment-target changes.
+- Any universal frame-rate guarantee or production-performance claim, and any
+  performance fix in 13D.
 
 ## Review Strategy
 
