@@ -75,7 +75,20 @@ The items below describe the merged baseline and the validation completed for ea
   acceptance or sustained GPU profiling.
 - Phase 12 adds deterministic staged-app acceptance mode, a reviewed scenario
   catalog, bounded acceptance metrics, launch/profile scripts, and the human
-  visual plus sustained-performance release gate for production replay.
+  visual plus sustained-performance release gate for production replay. Merged
+  as PR #103.
+- Phase 13A makes the production athlete's phase warp C1. `ReplayAthletePhaseMap`
+  re-times the native stroke cycle onto the authored clip's drive/recovery
+  split; the previous two-segment linear map stepped playback speed by 24.5% to
+  65.4% at the drive/recovery seam — and again, oppositely, at the cycle wrap —
+  everywhere the native drive share (0.28–0.46) differed from the authored
+  `driveEnd` (0.38 rower, 0.34 SkiErg). It is now two cubic Hermite segments
+  sharing one PCHIP weighted-harmonic tangent, which is simultaneously the
+  interior-knot and wrap-knot tangent for a two-segment cycle. Landmarks are
+  unchanged and exact, the map is strictly increasing analytically, and both
+  seams are continuous to 9.3e-6 at h = 1e-6 across the production range
+  (2e-3 bound at the degenerate corners of the full clamped square). The map is
+  native-owned and bound by no web parity fixture.
 - Source-map: all sync, storage, and app-shell wiring files have corresponding source-map entries.
 - Roadmap: all phase status claims updated to reflect merged state.
 - Privacy: `PrivacyRedaction` and `PrivacySafeLogger` are tested. No CoreBluetooth imports in `RowPlayCore`. Keychain uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
@@ -95,17 +108,30 @@ The items below describe the merged baseline and the validation completed for ea
 ### Should-Fix
 
 1. **No FIT/TCX/GPX HR file parsing**: HR import accepts only JSON arrays or simple CSV; real HR files need format parsers. (Phase 10B adds FIT/TCX/CSV for **replay rivals only**, not general HR import.)
-2. **Final production 3D performance needs Phase 12 evidence**: Phase 8D and
-   Phase 11 automated matrices pass, and Phase 11 delivered production athlete,
-   equipment, venues, three-sport 2D, cameras, rivals, and effects. Sustained
-   same-machine profiling, the complete human visual matrix, and the
-   deterministic acceptance release gate are Phase 12 responsibilities. Tier
-   targets remain scheduling policy, not universal frame-rate guarantees.
-3. **Phase 11 human/profiling acceptance was intentionally deferred**: PRs
-   #90–#97 merged the production replay stack. Phase 12 records the staged-app
-   human walkthrough and sustained performance evidence, and fixes the one
-   defect that walkthrough demonstrated — production athlete pose and contact
-   correction — without rewriting equipment, environment, or authored assets.
+2. **Medium and Ultra miss their frame-interval budgets and the cause is not
+   yet measured**: Phase 8D telemetry on the developer's own machine recorded a
+   34.167 ms average against a 33.33 ms target at Low (met), 24.583 ms against
+   16.67 ms at Medium, and 27.222 ms against 16.67 ms at Ultra — 47% to 63%
+   over. Scene update cost is under 0.4 ms, under 2% of the frame, and the
+   Phase 8D governor only tunes course ring segments, lane markers, wake
+   entries, and droplet counts, none of which can account for the missing
+   ~24 ms. Phase 13D measures where the time actually goes and proposes, but
+   does not implement, the fix. Tier targets remain scheduling policy, not
+   universal frame-rate guarantees.
+3. **The bundled athlete's per-stroke expressiveness is still limited**: Phase
+   13A made the phase warp continuous, but the bundled production athlete path
+   still samples a flat authored clip and ignores `ReplayMotionGraph`, and
+   `ReplayStrokePose.intensity` / `fatigue` / `amplitude` still reach the 3D
+   scene only through one 6 cm vertical bob. `v4Spine`, `v4Chest`, `v4Neck`,
+   `v4Head`, and both clavicles are never written after clip sampling, so
+   layback, catch compression, head drop under fatigue, and shoulder set are
+   frozen across every stroke. Phases 13B and 13C address this.
+4. **Phase 11 human/profiling acceptance was intentionally deferred**: PRs
+   #90–#97 merged the production replay stack. Phase 12 (PR #103) recorded the
+   staged-app human walkthrough and sustained performance evidence, and fixed
+   the one defect that walkthrough demonstrated — production athlete pose and
+   contact correction — without rewriting equipment, environment, or authored
+   assets.
 
 ## Must Not Ship Yet
 
@@ -115,9 +141,11 @@ The items below describe the merged baseline and the validation completed for ea
 
 ## Recommended Next PRs
 
-1. **Phase 12 replay acceptance** (user-prioritized before Bluetooth): complete
-   the deterministic acceptance mode, human visual matrix, and sustained
-   performance release gate for production replay.
-2. **CoreBluetooth erg transport** (deferred until replay acceptance lands):
+1. **Phase 13 replay motion expressiveness** (user-prioritized before
+   Bluetooth): the continuous phase warp (13A, landed), the additive
+   motion-graph pose layer (13B), deterministic per-stroke variation (13C), and
+   the frame-pacing measurement (13D). 13D is diagnostic only; any pacing fix it
+   points at is Phase 14 scope.
+2. **CoreBluetooth erg transport** (deferred until replay work lands):
    Implement `CoreBluetoothErgConnection` conforming to `ErgConnection` with
    proper entitlements and permission handling.
